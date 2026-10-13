@@ -37,7 +37,7 @@ The main web app (`apps/web`) uses **Next.js App Router** with all pages under
 | Workspace         | Package name            | Port   | Notes                                           |
 | ----------------- | ----------------------- | ------ | ----------------------------------------------- |
 | `apps/web`        | `solana-com`            | `3000` | Main site and shared user-facing entry point    |
-| `apps/docs`       | `solana-docs`           | `3003` | Fumadocs-based developer docs                   |
+| `apps/docs`       | (none, Mintlify)        | `3003` | Mintlify developer docs (`pnpm dev:docs`)       |
 | `apps/media`      | `solana-com-media`      | `3002` | Keystatic-backed news and podcasts              |
 | `apps/templates`  | `solana-templates`      | `3001` | Templates showcase, proxied behind `solana.com` |
 | `apps/accelerate` | `solana-com-accelerate` | `3004` | Event app with `/accelerate` rewrites           |
@@ -75,7 +75,7 @@ use the pnpm version declared by the repository.
 
    # Specific app
    pnpm dev --filter solana-com                # Main website
-   pnpm dev --filter solana-docs               # Documentation
+   pnpm dev:docs                               # Documentation (mint dev)
    pnpm dev --filter solana-com-media          # Blog/Media
    pnpm dev --filter solana-templates          # Templates
    pnpm dev --filter solana-com-accelerate     # Accelerate
@@ -98,7 +98,7 @@ Targeted validation is usually faster:
 
 ```bash
 pnpm --filter solana-com lint
-pnpm --filter solana-docs build
+pnpm --filter @workspace/docs-tooling mint:validate
 pnpm --filter solana-com-media test
 pnpm --filter solana-templates check-types
 ```
@@ -126,7 +126,8 @@ The solana.com website is managed and maintained by the Solana Foundation. See
 
 - [`AGENTS.md`](./AGENTS.md) — Repo-level fast context for coding agents
 - [`apps/web/AGENTS.md`](./apps/web/AGENTS.md) — Main website
-- [`apps/docs/AGENTS.md`](./apps/docs/AGENTS.md) — Documentation
+- [`packages/docs-tooling/AUTHORING.md`](./packages/docs-tooling/AUTHORING.md) —
+  Documentation (Mintlify)
 - [`apps/media/AGENTS.md`](./apps/media/AGENTS.md) — Blog/Media
 - [`apps/templates/AGENTS.md`](./apps/templates/AGENTS.md) — Templates
 - [`apps/accelerate/AGENTS.md`](./apps/accelerate/AGENTS.md) — Accelerate
@@ -141,10 +142,10 @@ Most take an optional target: an app or package name (`docs`, `web`, `media`,
 
 ```bash
 just docs                      # dev server for apps/docs (also: web, media, templates, acc, bp)
-just build docs                # build one app (omit the target for everything)
+just build web                 # build one app (omit the target for everything)
 just lint web                  # lint, typecheck and test work the same way
-just typecheck docs
+just typecheck web
 just fmt apps/docs/foo.mdx     # oxfmt on files, folders or app names
 just fmt-changed               # format only files changed vs origin/main
-just check docs                # format check + lint + typecheck + test, as CI does
+just check web                 # format check + lint + typecheck + test, as CI does
 ```

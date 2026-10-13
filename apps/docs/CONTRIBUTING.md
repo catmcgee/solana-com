@@ -91,10 +91,12 @@ order `### Kit`, `### Web3.js v3`, `### Rust`, `### Python`,
 Both web3.js majors are installed side by side, which pnpm only allows under
 distinct names, so example sources import the aliases `@solana/web3.js-v3` and
 `@solana/web3.js-legacy`. Both are rewritten back to `@solana/web3.js` when the
-snippet is inlined into a page
-(`apps/docs/src/lib/remark-web3js-specifier.mjs`), so readers see the real
-package name. `@solana/spl-token` depends on legacy web3.js and resolves to it
-automatically; v3 token examples use the `@solana-program/*` clients instead.
+snippet is inlined into a page (legacy
+`apps/docs/src/lib/remark-web3js-specifier.mjs`, deleted in the Mintlify
+migration; recover with `git show 023c6d918:<path>`, ported by WP2), so readers
+see the real package name. `@solana/spl-token` depends on legacy web3.js and
+resolves to it automatically; v3 token examples use the `@solana-program/*`
+clients instead.
 
 1. Put the runnable file under
    `packages/docs-examples/cookbook/<section>/<page>/` (e.g. `kit.ts`).
@@ -157,8 +159,9 @@ MDX can point at a file explicitly with `output=<path>` on the fence.
 An example whose output is a freshly generated key pair would read as wrong
 frozen into a file, so `cookbook/wallets/create-keypair` builds its output in
 the browser instead — it generates a real Ed25519 key pair with `@solana/keys`
-on each Run. To do the same for another example, add a module under
-`apps/docs/src/app/components/code/runners/` exporting one function per tab
+on each Run. To do the same for another example, add a module under the legacy
+`apps/docs/src/app/components/code/runners/` (deleted in the Mintlify migration;
+`git show 023c6d918:<path>`, replaced by WP5) exporting one function per tab
 title, register it in `runners/registry.ts`, and name it from the MDX with
 `<CodeTabs flags="r" runner="<id>">`. Prefer a captured `.output.txt` wherever a
 fixed value is honest — it costs no client JavaScript.

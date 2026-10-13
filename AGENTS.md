@@ -20,14 +20,14 @@ Most apps are not standalone product islands. They share:
 
 Pick the app first. That usually cuts exploration time in half.
 
-| Area                  | Workspace                                   | Local Port | Key Route Prefixes                                                               |
-| --------------------- | ------------------------------------------- | ---------- | -------------------------------------------------------------------------------- |
-| Main marketing site   | `apps/web` / `solana-com`                   | `3000`     | `/`, `/solutions`, `/ecosystem`, `/events`, selected `/developers/*` routes      |
-| Developer docs        | `apps/docs` / `solana-docs`                 | `3003`     | `/docs`, `/learn`, `/developers`, `/developers/cookbook`, `/developers/bootcamp` |
-| Media/blog            | `apps/media` / `solana-com-media`           | `3002`     | `/news`, `/changelog`, `/reports`, `/upgrades`, `/podcasts`, `/keystatic`        |
-| Templates showcase    | `apps/templates` / `solana-templates`       | `3001`     | `/developers/templates` via rewrites                                             |
-| Accelerate event site | `apps/accelerate` / `solana-com-accelerate` | `3004`     | `/accelerate` via rewrites                                                       |
-| Breakpoint event site | `apps/breakpoint` / `solana-com-breakpoint` | `3005`     | `/breakpoint` via rewrites                                                       |
+| Area                  | Workspace                                   | Local Port | Key Route Prefixes                                                          |
+| --------------------- | ------------------------------------------- | ---------- | --------------------------------------------------------------------------- |
+| Main marketing site   | `apps/web` / `solana-com`                   | `3000`     | `/`, `/solutions`, `/ecosystem`, `/events`, selected `/developers/*` routes |
+| Developer docs        | `apps/docs` (Mintlify, no package)          | `3003`     | `/docs`, `/learn/*`, `/developers/cookbook`, `/developers/bootcamp`         |
+| Media/blog            | `apps/media` / `solana-com-media`           | `3002`     | `/news`, `/changelog`, `/reports`, `/upgrades`, `/podcasts`, `/keystatic`   |
+| Templates showcase    | `apps/templates` / `solana-templates`       | `3001`     | `/developers/templates` via rewrites                                        |
+| Accelerate event site | `apps/accelerate` / `solana-com-accelerate` | `3004`     | `/accelerate` via rewrites                                                  |
+| Breakpoint event site | `apps/breakpoint` / `solana-com-breakpoint` | `3005`     | `/breakpoint` via rewrites                                                  |
 
 ## Repo Layout
 
@@ -35,7 +35,10 @@ Pick the app first. That usually cuts exploration time in half.
 
 - `apps/web`: main `solana.com` app, large surface area, mix of marketing,
   ecosystem, events, news aggregation, and developer entry points
-- `apps/docs`: Fumadocs-based developer docs with MDX content under `content/`
+- `apps/docs`: Mintlify project (migration in progress on `mintlify-migration`).
+  Folders mirror public URLs (`docs/`, `<locale>/docs/`, `developers/cookbook/`,
+  `developers/bootcamp/`, `learn/`). Tooling and authoring rules live in
+  `packages/docs-tooling` (see `packages/docs-tooling/AUTHORING.md`)
 - `apps/media`: Keystatic-backed news and podcast site with content in
   `content/`
 - `apps/templates`: templates browser that fetches metadata from GitHub
@@ -68,7 +71,7 @@ pnpm dev:web
 pnpm dev:media
 pnpm dev:acc
 pnpm dev:bp
-pnpm --filter solana-docs dev
+pnpm dev:docs   # mint dev in apps/docs (port 3003)
 pnpm --filter solana-templates dev
 pnpm --filter solana-com-breakpoint dev
 pnpm lint
@@ -87,7 +90,7 @@ node skills/refresh-agent-context/scripts/workspace_inventory.mjs
 Useful filters:
 
 - `solana-com`
-- `solana-docs`
+- `@workspace/docs-tooling` (Mintlify docs tooling; apps/docs has no package)
 - `solana-com-media`
 - `solana-templates`
 - `solana-com-accelerate`
@@ -120,8 +123,8 @@ inspect `packages/ui-chrome` and the target app `next.config.ts` together.
 
 ## Content Ownership
 
-- `apps/docs/content`: source of truth for docs, cookbook, learn, and developer
-  bootcamp content
+- `apps/docs/{docs,developers,learn,<locale>}`: source of truth for docs,
+  cookbook, learn, and developer bootcamp content
 - `apps/media/content`: source of truth for posts, podcasts, reports, upgrades,
   releases, authors, tags, and global CMS content
 - `packages/i18n/messages/*`: shared UI message catalogs by app

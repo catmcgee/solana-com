@@ -1,0 +1,116 @@
+diff --git a/.github/workflows/action.yml b/.github/workflows/action.yml
+index 8c7de88e2..0c6e17355 100644
+--- a/.github/workflows/action.yml
++++ b/.github/workflows/action.yml
+@@ -51,7 +51,6 @@ jobs:
+           - solana-com-accelerate
+           - solana-com-breakpoint
+           - solana-com-media
+-          - solana-docs
+           - solana-templates
+     steps:
+       - name: Checkout repository
+@@ -100,6 +99,7 @@ jobs:
+           - "@workspace/sentry"
+           - "@workspace/ui"
+           - "@solana-foundation/fab-menu"
++          - "@workspace/docs-tooling"
+     steps:
+       - name: Checkout repository
+         uses: actions/checkout@v4
+diff --git a/.github/workflows/docs-examples.yml b/.github/workflows/docs-examples.yml
+index c7c2b6085..e7a158e34 100644
+--- a/.github/workflows/docs-examples.yml
++++ b/.github/workflows/docs-examples.yml
+@@ -5,13 +5,13 @@ on:
+     branches: [main]
+     paths:
+       - "packages/docs-examples/**"
+-      - "apps/docs/content/cookbook/**"
++      - "apps/docs/developers/cookbook/**"
+       - ".github/workflows/docs-examples.yml"
+   pull_request:
+     branches: [main]
+     paths:
+       - "packages/docs-examples/**"
+-      - "apps/docs/content/cookbook/**"
++      - "apps/docs/developers/cookbook/**"
+       - ".github/workflows/docs-examples.yml"
+ 
+ permissions:
+diff --git a/.github/workflows/docs-mintlify.yml b/.github/workflows/docs-mintlify.yml
+new file mode 100644
+index 000000000..1d1b62f65
+--- /dev/null
++++ b/.github/workflows/docs-mintlify.yml
+@@ -0,0 +1,70 @@
++name: Docs (Mintlify)
++
++# WP0 stub (spec §4.4, §9). Runs the docs-tooling checks that exist today;
++# later work packages add `verify` (WP12), `generate --check`, `mint validate`
++# and `mint broken-links` as they land.
++
++on:
++  pull_request:
++    branches: [main]
++    paths:
++      - "apps/docs/**"
++      - "packages/docs-tooling/**"
++      - "apps/web/rewrites-redirects.ts"
++      - ".github/workflows/docs-mintlify.yml"
++  push:
++    branches: [main]
++    paths:
++      - "apps/docs/**"
++      - "packages/docs-tooling/**"
++      - ".github/workflows/docs-mintlify.yml"
++
++permissions:
++  contents: read
++
++jobs:
++  docs-tooling:
++    name: Docs tooling
++    runs-on: ubuntu-latest
++    steps:
++      - name: Checkout repository
++        uses: actions/checkout@v4
++        with:
++          # legacy-urls / verify-urls read the pre-migration tree from git.
++          fetch-depth: 0
++
++      - name: Install pnpm
++        uses: pnpm/action-setup@v6
++        with:
++          run_install: false
++
++      - name: Install Node.js
++        uses: actions/setup-node@v4
++        with:
++          node-version-file: .node-version
++          cache: "pnpm"
++
++      - name: Install Safe Chain
++        run: |
++          npm install --global @aikidosec/safe-chain
++          safe-chain setup-ci
++
++      - name: Install dependencies
++        run: pnpm install --frozen-lockfile
++
++      - name: Type check
++        run: pnpm --filter @workspace/docs-tooling check-types
++
++      - name: Unit and fixture tests
++        run: pnpm --filter @workspace/docs-tooling test
++
++      - name: Convert is up to date (no-op until WP2 registers transforms)
++        run: pnpm --filter @workspace/docs-tooling cli convert --check
++
++      - name: Legacy URL parity
++        run: pnpm --filter @workspace/docs-tooling cli verify-urls
++
++      # TODO(WP11/WP12): enable once content is converted.
++      # - name: Mintlify validate
++      #   working-directory: apps/docs
++      #   run: npx -y mint@latest validate

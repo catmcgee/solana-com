@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { repoRoot } from "../constants";
 import type { RouteGenerator } from "../types";
+import { locales } from "@workspace/i18n/config";
 import {
   createEntry,
   createLocalizedEntries,
@@ -11,7 +12,11 @@ import {
   walkFiles,
 } from "../utils";
 
-const docsContentRoot = path.join(repoRoot, "apps", "docs", "content");
+// apps/docs is a Mintlify project whose folder layout mirrors public URLs:
+// English at apps/docs/<collection>/..., other locales at
+// apps/docs/<locale>/<collection>/... (packages/docs-tooling move rules).
+// WP9 replaces this walk with packages/docs-tooling/generated/pages.json.
+const docsRoot = path.join(repoRoot, "apps", "docs");
 
 function toRoutePath(baseRoute: string, relativePath: string) {
   const withoutExtension = relativePath.replace(/\.mdx$/, "");
@@ -25,17 +30,16 @@ function toRoutePath(baseRoute: string, relativePath: string) {
   );
 }
 
-function getLocalizedContentEntries(contentDir: string, baseRoute: string) {
-  if (!fs.existsSync(contentDir)) {
-    return [];
-  }
-
+function getLocalizedContentEntries(collectionPath: string, baseRoute: string) {
   const entries = [];
 
-  for (const locale of fs.readdirSync(contentDir)) {
-    const localeDir = path.join(contentDir, locale);
+  for (const locale of locales) {
+    const localeDir =
+      locale === "en"
+        ? path.join(docsRoot, collectionPath)
+        : path.join(docsRoot, locale, collectionPath);
 
-    if (!fs.statSync(localeDir).isDirectory()) {
+    if (!fs.existsSync(localeDir) || !fs.statSync(localeDir).isDirectory()) {
       continue;
     }
 
@@ -108,20 +112,14 @@ export const docsRoutes: RouteGenerator = () => {
 
     return dedupeEntries([
       ...rootEntries,
-      ...getLocalizedContentEntries(
-        path.join(docsContentRoot, "docs"),
-        "/docs",
-      ),
-      ...getLocalizedContentEntries(
-        path.join(docsContentRoot, "learn"),
-        "/learn",
-      ),
+      ...getLocalizedContentEntries("docs", "/docs"),
+      ...getLocalizedContentEntries("learn", "/learn"),
       ...getDefaultLocaleContentEntries(
-        path.join(docsContentRoot, "cookbook"),
+        path.join(docsRoot, "developers", "cookbook"),
         "/developers/cookbook",
       ),
       ...getLocalizedContentEntries(
-        path.join(docsContentRoot, "developers-learn"),
+        path.join("developers", "bootcamp"),
         "/developers/bootcamp",
       ),
     ]);

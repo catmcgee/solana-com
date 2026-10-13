@@ -50,7 +50,9 @@ dev target="":
 
 web: (dev "web")
 
-docs: (dev "docs")
+# apps/docs is a Mintlify project (no package.json): run the Mintlify CLI.
+docs:
+    cd apps/docs && npx -y mint@latest dev --port 3003
 
 media: (dev "media")
 

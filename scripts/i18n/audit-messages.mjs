@@ -12,10 +12,6 @@ const appConfigs = {
     codeRoots: [path.join(repoRoot, "apps/web/src")],
     inherits: [],
   },
-  docs: {
-    codeRoots: [path.join(repoRoot, "apps/docs/src")],
-    inherits: ["web"],
-  },
   media: {
     codeRoots: [
       path.join(repoRoot, "apps/media/app"),

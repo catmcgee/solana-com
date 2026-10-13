@@ -126,14 +126,14 @@ function routeExists(pathname) {
   }
   if (pathname.startsWith("/developers/cookbook/")) {
     const slug = pathname.slice("/developers/cookbook/".length);
-    const base = path.join(repoRoot, "apps/docs/content/cookbook", slug);
+    const base = path.join(repoRoot, "apps/docs/developers/cookbook", slug);
     return (
       existsSync(`${base}.mdx`) || existsSync(path.join(base, "index.mdx"))
     );
   }
   if (pathname.startsWith("/docs/")) {
     const slug = pathname.slice("/docs/".length);
-    const base = path.join(repoRoot, "apps/docs/content/docs/en", slug);
+    const base = path.join(repoRoot, "apps/docs/docs", slug);
     return (
       existsSync(`${base}.mdx`) || existsSync(path.join(base, "index.mdx"))
     );
@@ -145,7 +145,7 @@ function routeExists(pathname) {
     if (!course || segments.length > 2) return false;
     const contentRoot = path.join(
       repoRoot,
-      "apps/docs/content/developers-learn/en",
+      "apps/docs/developers/bootcamp",
       courseSlug,
     );
     if (segments.length === 1)
@@ -296,7 +296,7 @@ function readStaticExport(sourceText, relativePath, exportName) {
 
 const bootcampCurriculumPath = path.join(
   repoRoot,
-  "apps/docs/src/utils/developers-learn-curriculum.ts",
+  "packages/docs-tooling/data/bootcamp/developers-learn-curriculum.ts",
 );
 function readBootcampCourses() {
   const source = ts.createSourceFile(
