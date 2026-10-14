@@ -1,145 +1,129 @@
 ---
-title: blockSubscribe
-hideTableOfContents: true
-h1: Méthode RPC blockSubscribe
+title: Méthode RPC blockSubscribe
+sidebarTitle: blockSubscribe
 ---
 
 Abonnez-vous pour recevoir une notification chaque fois qu'un nouveau bloc est
 `confirmed` ou `finalized`.
 
-<Callout type="warn" title={"Méthode instable"}>
+<Warning>
+  **Méthode instable**
+
   Cet abonnement est considéré comme **instable** et n'est disponible que si le
   validator a été démarré avec l'option
   `--rpc-pubsub-enable-block-subscription`. Le format de cet abonnement pourrait
   changer à l'avenir.
-</Callout>
+</Warning>
 
-<APIMethod>
+<RequestExample>
+  ```json WebSocket
+  {
+    "jsonrpc": "2.0",
+    "id": "1",
+    "method": "blockSubscribe",
+    "params": [
+      {
+        "mentionsAccountOrProgram": "LieKvPRE8XeX3Y2xVNHjKlpAScD12lYySBVQ4HqoJ5op"
+      },
+      {
+        "commitment": "confirmed",
+        "encoding": "base64",
+        "transactionDetails": "full",
+        "maxSupportedTransactionVersion": 0,
+        "showRewards": true
+      }
+    ]
+  }
+  ```
+</RequestExample>
 
-```jsonc !!request
-{
-  "jsonrpc": "2.0",
-  "id": "1",
-  "method": "blockSubscribe",
-  "params": [
-    // !hover(1:3) 0
-    {
-      "mentionsAccountOrProgram": "LieKvPRE8XeX3Y2xVNHjKlpAScD12lYySBVQ4HqoJ5op"
-    },
-    // !hover(1:6) 1
-    {
-      // !hover commitment
-      "commitment": "confirmed",
-      // !hover encoding
-      "encoding": "base64",
-      // !hover transactionDetails
-      "transactionDetails": "full",
-      // !hover maxSupportedTransactionVersion
-      "maxSupportedTransactionVersion": 0,
-      // !hover showRewards
-      "showRewards": true
-    }
-  ]
-}
-```
+<ResponseExample>
+  ```json Response
+  {
+    "jsonrpc": "2.0",
+    "result": 0,
+    "id": 1
+  }
+  ```
+</ResponseExample>
 
-### !params
+### Parameters
 
-#### !! 0
+<ParamField body="0" type="string | object" required>
+  critères de filtrage pour les journaux afin de recevoir des résultats par type
+  de compte ; actuellement pris en charge :
 
-!type string | object  
-!required
+  - `all` - inclure toutes les transactions dans le bloc
+  - Un objet JSON avec le champ suivant :
+    - `mentionsAccountOrProgram: <string>` - renvoie uniquement les transactions
+      qui mentionnent la clé publique fournie (sous forme de chaîne encodée en
+      base-58). Si aucune mention dans un bloc donné, aucune notification ne sera
+      envoyée.
+</ParamField>
 
-critères de filtrage pour les journaux afin de recevoir des résultats par type
-de compte ; actuellement pris en charge :
+<ParamField body="1" type="object">
+  Objet de configuration contenant les champs suivants :
 
-- `all` - inclure toutes les transactions dans le bloc
-- Un objet JSON avec le champ suivant :
-  - `mentionsAccountOrProgram: <string>` - renvoie uniquement les transactions
-    qui mentionnent la clé publique fournie (sous forme de chaîne encodée en
-    base-58). Si aucune mention dans un bloc donné, aucune notification ne sera
-    envoyée.
+  <Expandable title="properties" defaultOpen>
+    <ParamField body="commitment" type="string" default="finalized">
+      Values: `confirmed`, `finalized`
 
-#### !! 1
+      Le commitment décrit le niveau de finalisation d'un bloc à un moment donné. Voir
+      [Configuration de l'engagement d'état](/docs/rpc#configuring-state-commitment).
 
-!type object
+      - `processed` n'est pas pris en charge.
+    </ParamField>
 
-Objet de configuration contenant les champs suivants :
+    <ParamField body="encoding" type="string" default="json">
+      Values: `json`, `jsonParsed`, `base58`, `base64`
 
-##### !! commitment
+      format d'encodage pour chaque Transaction retournée
 
-!type string !values confirmed finalized !default finalized
+      - `jsonParsed` tente d'utiliser des analyseurs d'instructions spécifiques aux
+        programmes pour renvoyer des données plus lisibles et explicites dans la liste
+        `transaction.message.instructions`.
+      - Si `jsonParsed` est demandé mais qu'aucun analyseur ne peut être trouvé,
+        l'instruction revient à l'encodage JSON standard (champs `accounts`, `data` et
+        `programIdIndex`).
+    </ParamField>
 
-Le commitment décrit le niveau de finalisation d'un bloc à un moment donné. Voir
-[Configuration de l'engagement d'état](/docs/rpc#configuring-state-commitment).
+    <ParamField body="transactionDetails" type="string" default="full">
+      Values: `full`, `accounts`, `signatures`, `none`
 
-- `processed` n'est pas pris en charge.
+      niveau de détail de transaction à retourner
 
-##### !! encoding
+      - Si `accounts` sont demandés, les détails de la transaction incluent uniquement
+        les signatures et une liste annotée des comptes dans chaque transaction.
+      - Les métadonnées de transaction sont limitées à : fee, err, pre_balances,
+        post_balances, pre_token_balances et post_token_balances.
+    </ParamField>
 
-!type string  
-!values json jsonParsed base58 base64  
-!default json
+    <ParamField body="maxSupportedTransactionVersion" type="number" default="0">
+      Values: `0`
 
-format d'encodage pour chaque Transaction retournée
+      Actuellement, la seule valeur valide pour ce paramètre est `0`. Le définir à `0`
+      vous permet de récupérer toutes les transactions, y compris les transactions
+      versionnées et les transactions héritées.
 
-- `jsonParsed` tente d'utiliser des analyseurs d'instructions spécifiques aux
-  programmes pour renvoyer des données plus lisibles et explicites dans la liste
-  `transaction.message.instructions`.
-- Si `jsonParsed` est demandé mais qu'aucun analyseur ne peut être trouvé,
-  l'instruction revient à l'encodage JSON standard (champs `accounts`, `data` et
-  `programIdIndex`).
+      Ce paramètre détermine la version maximale de transaction qui sera renvoyée dans
+      la réponse. Si vous demandez une transaction avec une version supérieure à cette
+      valeur, une erreur sera renvoyée. Si vous omettez ce paramètre, seules les
+      transactions héritées seront renvoyées — toute transaction versionnée entraînera
+      une erreur.
+    </ParamField>
 
-##### !! transactionDetails
+    <ParamField body="showRewards" type="bool">
+      indique s'il faut remplir le tableau `rewards`. Si le paramètre n'est pas
+      fourni, les récompenses sont incluses par défaut.
+    </ParamField>
+  </Expandable>
+</ParamField>
 
-!type string  
-!values full accounts signatures none  
-!default full
+### Result
 
-niveau de détail de transaction à retourner
-
-- Si `accounts` sont demandés, les détails de la transaction incluent uniquement
-  les signatures et une liste annotée des comptes dans chaque transaction.
-- Les métadonnées de transaction sont limitées à : fee, err, pre_balances,
-  post_balances, pre_token_balances et post_token_balances.
-
-##### !! maxSupportedTransactionVersion
-
-!type number !values 0 !default 0
-
-Actuellement, la seule valeur valide pour ce paramètre est `0`. Le définir à `0`
-vous permet de récupérer toutes les transactions, y compris les transactions
-versionnées et les transactions héritées.
-
-Ce paramètre détermine la version maximale de transaction qui sera renvoyée dans
-la réponse. Si vous demandez une transaction avec une version supérieure à cette
-valeur, une erreur sera renvoyée. Si vous omettez ce paramètre, seules les
-transactions héritées seront renvoyées — toute transaction versionnée entraînera
-une erreur.
-
-##### !! showRewards
-
-!type bool
-
-indique s'il faut remplir le tableau `rewards`. Si le paramètre n'est pas
-fourni, les récompenses sont incluses par défaut.
-
-### !!result
-
-```jsonc !response
-{
-  "jsonrpc": "2.0",
-  // !hover result
-  "result": 0,
-  "id": 1
-}
-```
-
-!type integer
-
-identifiant d'abonnement (nécessaire pour se désabonner)
-
-</APIMethod>
+<ResponseField name="result" type="integer">
+  identifiant d'abonnement (nécessaire pour se désabonner)
+</ResponseField>
 
 #### Format de notification :
 

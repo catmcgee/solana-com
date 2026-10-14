@@ -2,7 +2,6 @@
 title: Eksekusi Program
 description:
   Cara Solana mengompilasi dan mengeksekusi program, termasuk VM sBPF, model compute unit, cache program, dan syscall.
-url: /docs/core/programs/program-execution
 type: conceptual
 prerequisites:
   - /docs/core/programs
@@ -16,12 +15,14 @@ related:
 
 {/* TOC: Compilation, Write programs, Program execution model, Program cache, Syscalls */}
 
-<Callout type="info" title="Ringkasan">
+<Info>
+  **Ringkasan**
+
   Program dikompilasi ke sBPF melalui LLVM dan dijalankan dalam VM yang terisolasi dengan anggaran 1,4 juta CU
   per transaksi. Runtime menyimpan cache hingga 512 program yang telah dikompilasi,
   menyediakan syscall untuk logging, CPI, kripto, dan memori, serta menunda
   deployment baru sebesar 1 slot.
-</Callout>
+</Info>
 
 ## Kompilasi
 
@@ -30,11 +31,11 @@ biner [ELF](https://en.wikipedia.org/wiki/Executable_and_Linkable_Format)
 yang berisi Solana Bytecode Format (sBPF). Biner ELF disimpan secara onchain dalam
 sebuah executable account.
 
-<Callout>
+<Note>
   sBPF adalah varian kustom Solana dari bytecode [eBPF](https://en.wikipedia.org/wiki/EBPF),
   yang disesuaikan untuk runtime Solana. Ini bukan eBPF standar dan memiliki
   modifikasi khusus Solana.
-</Callout>
+</Note>
 
 ## Tulis program
 
@@ -42,7 +43,7 @@ Program Solana terutama ditulis dalam
 [Rust](https://rust-book.cs.brown.edu/title-page.html) menggunakan salah satu dari tiga
 pendekatan:
 
-<Cards>
+<Columns cols={2}>
   <Card title="Anchor" href="https://www.anchor-lang.com/docs">
     Sebuah framework yang menggunakan macro Rust untuk mengurangi boilerplate. Direkomendasikan untuk
     sebagian besar developer.
@@ -55,7 +56,7 @@ pendekatan:
     Rust langsung tanpa framework. Menawarkan kontrol penuh tetapi memerlukan lebih banyak
     implementasi manual.
   </Card>
-</Cards>
+</Columns>
 
 Lihat [Cross-Program Invocations](/docs/core/cpi) untuk konsep dan contoh CPI
 yang berlaku di semua pendekatan ini.
@@ -76,7 +77,7 @@ Untuk setiap instruksi, runtime:
 2. **Memeriksa precompile.** Jika program adalah sebuah
    [precompile](/docs/core/programs/precompiles), runtime memanggil
    [`process_precompile()`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/invoke_context.rs#L491),
-   yang tetap melakukan push dan pop stack frame (melalui _rs`push()`_ dan _rs`pop()`_)
+   yang tetap melakukan push dan pop stack frame (melalui `push()` dan `pop()`)
    tetapi melewati VM sBPF dan pencarian cache program, mengeksekusi kode native
    secara langsung.
 
@@ -84,7 +85,7 @@ Untuk setiap instruksi, runtime:
    [`InvokeContext::process_instruction()`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/invoke_context.rs#L481)
    dan
    [`process_executable_chain()`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/invoke_context.rs#L507),
-   dipanggil dari _rs`process_message()`_.) Memanggil
+   dipanggil dari `process_message()`.) Memanggil
    [`push()`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/invoke_context.rs#L233)
    pada
    [`InvokeContext`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/invoke_context.rs#L184),
@@ -93,7 +94,7 @@ Untuk setiap instruksi, runtime:
    di puncak stack instruksi saat ini) adalah program yang sama.
    Rekursi-diri mendalam (A -> A -> A) diizinkan, tunduk pada batas kedalaman stack.
    Pola reentrancy lainnya (misalnya, A memanggil B memanggil A) mengembalikan
-   _rs`InstructionError::ReentrancyNotAllowed`_.
+   `InstructionError::ReentrancyNotAllowed`.
 
 4. **Menyelesaikan program.** Runtime memanggil
    [`process_executable_chain()`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/invoke_context.rs#L507)
@@ -114,7 +115,7 @@ Untuk setiap instruksi, runtime:
    - Menserialkan data akun ke dalam buffer parameter flat
    - Membuat VM sBPF dengan stack, heap, dan region memori
    - Menjalankan kode yang telah dikompilasi, mengonsumsi compute unit selama eksekusi. Mengembalikan
-     _rs`ComputationalBudgetExceeded`_ jika anggaran terlampaui.
+     `ComputationalBudgetExceeded` jika anggaran terlampaui.
    - Mendeserialkan data akun dari buffer kembali ke dalam state akun
 
 6. **Melakukan pop stack frame.** Memanggil
@@ -155,14 +156,14 @@ Program yang baru di-deploy atau diperbarui tidak langsung efektif. Konstanta
 [`DELAY_VISIBILITY_SLOT_OFFSET`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/loaded_programs.rs#L32)
 bernilai `1`, artinya program yang di-deploy pada slot N menjadi efektif pada slot
 N+1. Selama slot deployment, setiap upaya untuk memanggil versi baru mengembalikan
-_rs`DelayVisibility`_, yang menyebabkan runtime melaporkan "Program is not deployed."
+`DelayVisibility`, yang menyebabkan runtime melaporkan "Program is not deployed."
 
 ### Kebijakan eviction
 
 Cache menampung hingga
 [`MAX_LOADED_ENTRY_COUNT`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/loaded_programs.rs#L31)
 (512) entri program yang telah dikompilasi. Ketika batas tercapai, program yang paling jarang digunakan
-di-evict ke state _rs`Unloaded`_. Penggunaan dilacak oleh
+di-evict ke state `Unloaded`. Penggunaan dilacak oleh
 [`tx_usage_counter`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/loaded_programs.rs#L197)
 (dinaikkan setiap kali transaksi mereferensikan program) dan
 [`latest_access_slot`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/loaded_programs.rs#L199).
@@ -181,4 +182,4 @@ Program dapat mengatur data kembalian melalui syscall `sol_set_return_data`. Dat
 struktur [`TransactionReturnData`](https://github.com/anza-xyz/agave/blob/v3.1.8/transaction-context/src/lib.rs#L499) di tingkat transaksi
 yang menyimpan byte data dan `program_id` dari program yang
 instruksinya memanggil syscall. Ukuran maksimum adalah 1.024 byte
-(_rs`MAX_RETURN_DATA`_).
+(`MAX_RETURN_DATA`).

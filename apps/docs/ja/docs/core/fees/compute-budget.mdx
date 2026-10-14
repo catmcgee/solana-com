@@ -2,7 +2,6 @@
 title: 計算予算
 description:
   Solanaにおける計算ユニット制限、ComputeBudgetInstructionのバリエーション、スケジューラーコストモデル、ブロック制限、および実行予算定数について。
-url: /docs/core/fees/compute-budget
 type: reference
 prerequisites:
   - /docs/core/fees
@@ -16,26 +15,27 @@ related:
 
 {/* TOC: Compute unit limit, Compute budget instructions, Scheduler cost model, Block limits, Execution budget constants */}
 
-<Callout type="info" title="概要">
+<Info>
+  **概要**
+
   デフォルトではinstructionごとに200K CU、トランザクションごとに最大1.4M
   CU。最適化するには`SetComputeUnitLimit`および`SetComputeUnitPrice`のinstructionsを使用してください。
   優先手数料は実際の使用量ではなく、リクエストされたCUに基づいて決定されます。
-</Callout>
+</Info>
 
-<Callout
-  type="warn"
-  title="ComputeBudget instructions はv1トランザクションには適用されません"
->
+<Warning>
+  **ComputeBudget instructions はv1トランザクションには適用されません**
+
   このページではレガシーおよびv0トランザクションについて説明しています。近日公開予定の[v1
   フォーマット](/docs/core/transactions/versioned-transactions#v1-message-format)では、ComputeBudget instructions は設定に対して無視されます（150 CUとinstruction slot のコストが発生するno-opとして実行されます）— 制限と優先手数料はメッセージ設定で直接指定され、未設定の制限のデフォルト値は以下の値ではなく**ゼロ**になります。
-</Callout>
+</Warning>
 
 ## 計算ユニット制限
 
 各instructionには
 [デフォルトで200,000 CU](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/execution_budget.rs#L44)が割り当てられ、各トランザクションは
 [1,400,000 CU](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/execution_budget.rs#L39)に制限されています。明示的な
-_rs`SetComputeUnitLimit`_
+`SetComputeUnitLimit`
 instructionが存在しない場合、instructionタイプに基づいて
 [デフォルトが計算されます](https://github.com/anza-xyz/agave/blob/v3.1.8/compute-budget-instruction/src/compute_budget_instruction_details.rs#L196-L219):
 
@@ -57,7 +57,7 @@ default_cu_limit = (num_non_migratable_builtin_instructions * 3,000)
 - **移行中のビルトイン**でSBFへの移行が完了したもの(機能ゲート付き): 非ビルトインとして扱われます(それぞれ200,000
   CU)。
 
-結果は _rs`MAX_COMPUTE_UNIT_LIMIT`_ (1,400,000)にクランプされます。
+結果は `MAX_COMPUTE_UNIT_LIMIT` (1,400,000)にクランプされます。
 
 トランザクションに
 [`SetComputeUnitLimit`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/compute-budget-interface/src/lib.rs#L32)
@@ -68,9 +68,9 @@ instructionを含めることで、このデフォルトを上書きできます
 1. トランザクションをシミュレートしてCU消費量を測定します。
 2. シミュレート値に10%の安全マージンを追加します。
 
-<Callout type="warn">
+<Warning>
   優先手数料は、実際に使用された計算ユニット数ではなく、トランザクションでリクエストされた計算ユニット制限によって決定されます。計算ユニット制限を高く設定しすぎたり、デフォルト量を使用したりすると、未使用の計算ユニットに対して料金を支払うことになります。
-</Callout>
+</Warning>
 
 ## コンピュートバジェットinstructions
 
@@ -91,23 +91,23 @@ instructionを含めることで、このデフォルトを上書きできます
 [コンピュートバジェットinstructionsの処理](https://github.com/anza-xyz/agave/blob/v3.1.8/compute-budget-instruction/src/compute_budget_instruction_details.rs#L101-L153)時には、以下のルールが適用されます:
 
 - **タイプごとに1つ**: 各instructionバリアントは、トランザクションごとに1つのみ許可されます。重複を含めると、
-  _rs`DuplicateInstruction`_
+  `DuplicateInstruction`
   エラーが発生します(トランザクション全体が失敗します)。
 - **`RequestHeapFrame`**: 値は[`MIN_HEAP_FRAME_BYTES`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/execution_budget.rs#L49)(32
   KiB)から[`MAX_HEAP_FRAME_BYTES`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/execution_budget.rs#L48)(256
   KiB)の間で、かつ[1,024の倍数](https://github.com/anza-xyz/agave/blob/v3.1.8/compute-budget-instruction/src/compute_budget_instruction_details.rs#L192-L194)である必要があります。それ以外の場合、トランザクションは
-  _rs`InvalidInstructionData`_
+  `InvalidInstructionData`
   で失敗します。ヒープサイズは、トランザクション内で呼び出されるすべてのプログラム(CPIを含む)に適用されます。
 - **`SetComputeUnitLimit`**: 任意の`u32`値が受け入れられます。有効な制限は[`MAX_COMPUTE_UNIT_LIMIT`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/execution_budget.rs#L39)(1,400,000)にクランプされます。
 - **`SetComputeUnitPrice`**: 任意の`u64`値が受け入れられます(0から`u64::MAX`まで)。
 - **`SetLoadedAccountsDataSizeLimit`**: 値は0より大きい必要があります(`NonZeroU32`)。値が0の場合、[`InvalidLoadedAccountsDataSizeLimit`](https://github.com/anza-xyz/agave/blob/v3.1.8/compute-budget-instruction/src/compute_budget_instruction_details.rs#L141)が発生します。有効な制限は[`MAX_LOADED_ACCOUNTS_DATA_SIZE_BYTES`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/execution_budget.rs#L53)(64
   MiB)にクランプされます。
 - **認識されないデータ**: コンピュートバジェットプログラムに送信されたinstructionで、既知のバリアントにデシリアライズできないものは、
-  _rs`InvalidInstructionData`_ で失敗します。
+  `InvalidInstructionData` で失敗します。
 
-<Callout>
+<Note>
   以下のスケジューラーコストモデルは、validator内部の実行前コスト推定について説明しています。ほとんどの開発者は、上記のコンピュートバジェットinstructionsのみを必要とします。
-</Callout>
+</Note>
 
 ## スケジューラーコストモデル
 
@@ -163,10 +163,10 @@ total_cost = signature_cost
 | [`MAX_VOTE_UNITS`](https://github.com/anza-xyz/agave/blob/v3.1.8/cost-model/src/block_cost_limits.rs#L39)                     | 36,000,000 |
 | [`MAX_BLOCK_ACCOUNTS_DATA_SIZE_DELTA`](https://github.com/anza-xyz/agave/blob/v3.1.8/cost-model/src/block_cost_limits.rs#L43) | 100 MB     |
 
-<Callout>
+<Note>
   [SIMD-0286](https://github.com/solana-foundation/solana-improvement-documents/blob/main/proposals/0286-raise-block-limits-to-100M.md)
   は、_`MAX_BLOCK_UNITS`_を100,000,000に増加することを提案しています。
-</Callout>
+</Note>
 
 ## 実行バジェット定数
 

@@ -1,0 +1,220 @@
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import type { AddressInfo } from "node:net";
+import {
+  generateKeyPairSigner,
+  type KeyPairSigner,
+  type Signature,
+} from "@solana/kit";
+import { beforeAll, describe, expect, it } from "vitest";
+import { fundSol, setTokenBalance } from "../../../test/fixtures/fund";
+import { recordText, runExample } from "../../../test/record";
+import { confirm, demoPay, demoVerify, newOrder } from "./demo";
+import { getOrder, type Order } from "./orders";
+import { payStore } from "./pay";
+import { createCheckoutServer } from "./server";
+import { verifyPayment } from "./verify-payment";
+import { USDC_MINT } from "./config";
+
+const out = (name: string) => new URL(`./${name}.output.txt`, import.meta.url);
+
+describe("paths/payments/checkout", () => {
+  let customer: KeyPairSigner;
+  let store: KeyPairSigner;
+  let order: Order;
+  let paid: Signature;
+
+  beforeAll(async () => {
+    customer = await generateKeyPairSigner();
+    store = await generateKeyPairSigner();
+    await fundSol(customer.address);
+    await setTokenBalance(customer.address, 10_000_000n); // 10 USDC
+    await setTokenBalance(store.address, 0n); // the store's USDC account exists
+    order = await newOrder("order-1001", store.address, 1_000_000n);
+  });
+
+  it("pay: the customer pays 1 USDC with the order reference", async () => {
+    const r = await runExample(() => demoPay(customer, order), {
+      output: out("pay"),
+    });
+    paid = r.value;
+    expect(r.succeeded).toEqual([paid]);
+  });
+
+  it("verify: verifyPayment checks amount, mint, recipient and reference", async () => {
+    const r = await runExample(
+      async () => {
+        const ok = await demoVerify(order, paid);
+        await demoVerify({ ...order, amount: 2_000_000n }, paid);
+        return ok;
+      },
+      {
+        output: out("verify-payment"),
+        signatures: "none",
+      },
+    );
+    expect(r.value).toEqual({ paid: true });
+
+    const base = {
+      signature: paid,
+      storeOwner: store.address,
+      mint: USDC_MINT,
+      amount: order.amount,
+      reference: order.reference,
+    };
+    expect(await verifyPayment({ ...base, amount: 2_000_000n })).toEqual({
+      paid: false,
+      reason: "amount mismatch: expected 2000000, received 1000000",
+    });
+    const other = await generateKeyPairSigner();
+    expect(await verifyPayment({ ...base, reference: other.address })).toEqual({
+      paid: false,
+      reason: "reference not found",
+    });
+    expect(await verifyPayment({ ...base, storeOwner: other.address })).toEqual(
+      {
+        paid: false,
+        reason: "amount mismatch: expected 1000000, received 0",
+      },
+    );
+    expect(await verifyPayment({ ...base, mint: other.address })).toEqual({
+      paid: false,
+      reason: "amount mismatch: expected 1000000, received 0",
+    });
+  });
+
+  it("route: confirms once, rejects a replay and a short payment", async () => {
+    const r = await runExample(
+      async () => {
+        const first = await confirm(order.id, paid);
+        const replay = await confirm(order.id, paid);
+        const order2 = await newOrder("order-1002", store.address, 2_000_000n);
+        const short = await demoPay(customer, {
+          ...order2,
+          amount: 1_000_000n,
+        });
+        const underpaid = await confirm(order2.id, short);
+        return { first, replay, underpaid };
+      },
+      { output: out("route") },
+    );
+    expect(r.value.first).toEqual({
+      status: 200,
+      body: { paid: true, orderId: order.id, signature: paid },
+    });
+    expect(r.value.replay).toEqual({
+      status: 402,
+      body: { paid: false, reason: "already used" },
+    });
+    expect(r.value.underpaid).toEqual({
+      status: 402,
+      body: {
+        paid: false,
+        reason: "amount mismatch: expected 2000000, received 1000000",
+      },
+    });
+  });
+
+  it("server: the node:http variant confirms a payment", async () => {
+    const server = createCheckoutServer();
+    await new Promise<void>((resolve) =>
+      server.listen(0, "127.0.0.1", resolve),
+    );
+    const { port } = server.address() as AddressInfo;
+    try {
+      const r = await runExample(
+        async () => {
+          const order3 = await newOrder(
+            "order-1003",
+            store.address,
+            1_500_000n,
+          );
+          const sig = await demoPay(customer, order3);
+          const res = await fetch(
+            `http://127.0.0.1:${port}/api/orders/${order3.id}/confirm`,
+            {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ signature: sig }),
+            },
+          );
+          const body = await res.json();
+          console.log(
+            `POST /api/orders/${order3.id}/confirm ->`,
+            res.status,
+            JSON.stringify(body),
+          );
+          return res.status;
+        },
+        { output: out("server") },
+      );
+      expect(r.value).toBe(200);
+
+      // Hostile or broken requests get 4xx answers and the server stays up.
+      const post = (path: string, body: string) =>
+        fetch(`http://127.0.0.1:${port}${path}`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body,
+        });
+      expect((await post("/api/orders/%E0%A4%A/confirm", "{}")).status).toBe(
+        400,
+      );
+      expect(
+        (await post("/api/orders/order-1003/confirm", "not json")).status,
+      ).toBe(400);
+      expect(
+        (await post("/api/orders/order-1003/confirm", "null")).status,
+      ).toBe(400);
+      expect(
+        (
+          await post(
+            "/api/orders/order-1003/confirm",
+            JSON.stringify({ signature: 42 }),
+          )
+        ).status,
+      ).toBe(400);
+      expect((await post("/api/orders/nope/confirm", "{}")).status).toBe(404);
+
+      // A second, different valid payment for an already-paid order is refused.
+      const again = await payStore(customer, (await getOrder("order-1003"))!);
+      const res = await post(
+        "/api/orders/order-1003/confirm",
+        JSON.stringify({ signature: again }),
+      );
+      expect(res.status).toBe(402);
+      expect(await res.json()).toEqual({ paid: false, reason: "already used" });
+    } finally {
+      await new Promise((resolve) => server.close(resolve));
+    }
+  });
+
+  const python = process.env.PYTHON ?? "python3";
+  const hasSolanaPy =
+    spawnSync(python, ["-c", "import solana, solders"]).status === 0;
+  it.skipIf(!hasSolanaPy)("python: verify_payment.py agrees", async () => {
+    const run = (amount: bigint) =>
+      spawnSync(
+        python,
+        [
+          fileURLToPath(new URL("./verify_payment.py", import.meta.url)),
+          paid,
+          store.address,
+          String(amount),
+          order.reference,
+        ],
+        { encoding: "utf8", env: { ...process.env } },
+      );
+    const ok = run(order.amount);
+    const bad = run(5_000_000n);
+    expect(ok.status, ok.stderr).toBe(0);
+    expect(ok.stdout.trim()).toBe("paid: True");
+    expect(bad.stdout.trim()).toBe(
+      "paid: False, reason: amount mismatch: expected 5000000, received 1000000",
+    );
+    recordText(
+      out("verify_payment"),
+      `$ python verify_payment.py <signature> <store> ${order.amount} <reference>\n${ok.stdout.trim()}`,
+    );
+  });
+});

@@ -13,7 +13,7 @@ extension yang diperlukan diaktifkan.
 Diagram berikut menunjukkan langkah-langkah yang terlibat dalam membuat token account dengan
 Confidential Balances yang diaktifkan:
 
-```mermaid title="Create Token Account with Confidential Balances"
+```mermaid
 sequenceDiagram
     participant Payer as Wallet
     participant ATA as Associated Token Program
@@ -48,6 +48,46 @@ sequenceDiagram
     Token22-->>TokenAccount: Configure Confidential Balances
     deactivate Token22
 ```
+
+<div className="nojs-only" data-fallback="mermaid">
+  ```text Mermaid
+  sequenceDiagram
+      participant Payer as Wallet
+      participant ATA as Associated Token Program
+      participant Token22 as Token Extensions Program
+      participant ZK as ZK ElGamal Proof Program
+      participant TokenAccount as Token Account
+
+      Payer->>ATA: create_associated_token_account()
+      activate ATA
+      ATA->>Token22: Create token account at deterministic address
+      deactivate ATA
+      activate Token22
+      Token22-->>TokenAccount: Initialize Token Account
+      deactivate Token22
+
+      Payer->>Token22: reallocate() for ConfidentialTransferAccount extension
+      activate Token22
+      Token22-->>TokenAccount: Add space for extension data
+      deactivate Token22
+
+      Payer->>Payer: Derive ElGamal keypair and AES key
+      Payer->>Payer: Generate pubkey validity proof
+      Payer->>Payer: Encrypt initial balance (0) with AES key
+
+      Payer->>ZK: VerifyPubkeyValidity into context state account
+      activate ZK
+      ZK-->>ZK: Verify proof and store result in context state account
+      deactivate ZK
+
+      Payer->>Token22: configure_account() referencing the proof context account
+      activate Token22
+      Token22-->>TokenAccount: Configure Confidential Balances
+      deactivate Token22
+  ```
+</div>
+
+<p className="sol-caption">Create Token Account with Confidential Balances</p>
 
 ### State Token Account Confidential Balances
 
@@ -105,7 +145,7 @@ pub struct ConfidentialTransferAccount {
 }
 ```
 
-_rs`ConfidentialTransferAccount`_ berisi beberapa field yang mengelola
+`ConfidentialTransferAccount` berisi beberapa field yang mengelola
 Confidential Balances:
 
 - **approved**: Status persetujuan akun untuk Confidential Balances. Jika
@@ -137,18 +177,18 @@ Confidential Balances:
   masuk dari instruksi deposit dan transfer.
 
 - **maximum_pending_balance_credit_counter**: Batas jumlah kredit tertunda
-  sebelum memerlukan instruksi _rs`ApplyPendingBalance`_ untuk mengonversi saldo
+  sebelum memerlukan instruksi `ApplyPendingBalance` untuk mengonversi saldo
   tertunda menjadi saldo yang tersedia.
 
 - **expected_pending_balance_credit_counter**: Nilai
   `pending_balance_credit_counter` yang diberikan oleh klien melalui instruction
-  data terakhir kali instruksi _rs`ApplyPendingBalance`_ diproses.
+  data terakhir kali instruksi `ApplyPendingBalance` diproses.
 
 - **actual_pending_balance_credit_counter**: Nilai
   `pending_balance_credit_counter` pada token account pada saat instruksi
-  _rs`ApplyPendingBalance`_ terakhir diproses.
+  `ApplyPendingBalance` terakhir diproses.
 
-<Callout type="info">
+<Info>
   **Saldo Tertunda vs Saldo Tersedia**
 
 Saldo rahasia dipisahkan menjadi saldo tertunda dan saldo tersedia untuk
@@ -159,13 +199,13 @@ token karena saldo terenkripsi akan berubah antara saat transaksi dikirimkan dan
 saat diproses, yang mengakibatkan transaksi gagal.
 
 Semua deposit dan jumlah transfer awalnya ditambahkan ke saldo tertunda. Pemilik
-token account harus menggunakan instruksi _rs`ApplyPendingBalance`_ untuk
+token account harus menggunakan instruksi `ApplyPendingBalance` untuk
 mengonversi saldo tertunda menjadi saldo tersedia. Transfer atau deposit masuk
 tidak memengaruhi saldo tersedia pada token account.
 
-</Callout>
+</Info>
 
-<Callout type="info">
+<Info>
   **Pemisahan Saldo Tertunda Tinggi/Rendah**
 
 Saldo tertunda rahasia dibagi menjadi `pending_balance_lo` dan
@@ -173,15 +213,15 @@ Saldo tertunda rahasia dibagi menjadi `pending_balance_lo` dan
 untuk angka yang lebih besar. Anda dapat menemukan implementasi aritmetika
 ciphertext
 [di sini](https://github.com/solana-program/token-2022/blob/efd0c957fefbd79882d77df5fb2dac88c001249c/confidential-transfer/ciphertext-arithmetic/src/lib.rs#L54),
-yang digunakan dalam instruksi _rs`ApplyPendingBalance`_
+yang digunakan dalam instruksi `ApplyPendingBalance`
 [di sini](https://github.com/solana-program/token-2022/blob/efd0c957fefbd79882d77df5fb2dac88c001249c/program/src/extension/confidential_transfer/processor.rs#L1180-L1184).
 
-</Callout>
+</Info>
 
-<Callout type="info">
+<Info>
   **Penghitung Kredit Saldo Tertunda**
 
-Saat memanggil instruksi _rs`ApplyPendingBalance`_ untuk mengonversi saldo
+Saat memanggil instruksi `ApplyPendingBalance` untuk mengonversi saldo
 tertunda menjadi saldo tersedia:
 
 1. Klien mencari saldo tertunda dan tersedia saat ini, mengenkripsi jumlahnya,
@@ -189,14 +229,14 @@ tertunda menjadi saldo tersedia:
    kunci AES pemilik token account.
 
 2. Penghitung kredit tertunda yang diharapkan dan aktual melacak perubahan pada
-   nilai penghitung antara saat instruksi _rs`ApplyPendingBalance`_ dibuat dan
+   nilai penghitung antara saat instruksi `ApplyPendingBalance` dibuat dan
    diproses:
    - `expected_pending_balance_credit_counter`: Nilai
      `pending_balance_credit_counter` saat klien membuat instruksi
-     _rs`ApplyPendingBalance`_
+     `ApplyPendingBalance`
    - `actual_pending_balance_credit_counter`: Nilai
      `pending_balance_credit_counter` pada token account pada saat instruksi
-     _rs`ApplyPendingBalance`_ diproses
+     `ApplyPendingBalance` diproses
 
 Pencocokan antara counter expected/actual menunjukkan bahwa
 `decryptable_available_balance` sesuai dengan `available_balance`.
@@ -217,7 +257,7 @@ langkah-langkah berikut untuk merekonsiliasi `decryptable_available_balance`:
    - Tambahkan jumlah publik dari instruksi deposit
    - Dekripsi dan tambahkan jumlah ciphertext tujuan dari instruksi transfer
 
-</Callout>
+</Info>
 
 ### Instruksi yang Diperlukan
 
@@ -225,15 +265,15 @@ Membuat dan mengonfigurasi token account untuk Confidential Balances menggunakan
 instruksi-instruksi berikut, yang semuanya dapat dimuat dalam satu transaksi:
 
 1. **Buat Token Account**: Panggil instruksi
-   _rs`AssociatedTokenAccountInstruction::Create`_ milik Associated Token
+   `AssociatedTokenAccountInstruction::Create` milik Associated Token
    Program untuk membuat token account pada alamat deterministiknya.
 
 2. **Realokasi Ruang Akun**: Panggil instruksi
-   _rs`TokenInstruction::Reallocate`_ milik Token Extension Program untuk
-   menambahkan ruang bagi status _rs`ConfidentialTransferAccount`_.
+   `TokenInstruction::Reallocate` milik Token Extension Program untuk
+   menambahkan ruang bagi status `ConfidentialTransferAccount`.
 
 3. **Verifikasi Bukti Validitas Pubkey**: Buat akun yang dimiliki oleh program
-   ZK ElGamal Proof, lalu panggil instruksi _rs`VerifyPubkeyValidity`_-nya untuk
+   ZK ElGamal Proof, lalu panggil instruksi `VerifyPubkeyValidity`-nya untuk
    memverifikasi bukti dan menyimpan hasil terverifikasi di akun status konteks
    tersebut.
 
@@ -241,28 +281,28 @@ instruksi-instruksi berikut, yang semuanya dapat dimuat dalam satu transaksi:
    [ConfidentialTransferInstruction::ConfigureAccount](https://github.com/solana-program/token-2022/blob/efd0c957fefbd79882d77df5fb2dac88c001249c/program/src/extension/confidential_transfer/processor.rs#L201)
    dari Token Extension Program,
    dengan mereferensikan akun state konteks bukti melalui
-   _rs`ProofLocation::ContextStateAccount`_, untuk menginisialisasi
-   state _rs`ConfidentialTransferAccount`_.
+   `ProofLocation::ContextStateAccount`, untuk menginisialisasi
+   state `ConfidentialTransferAccount`.
 
-<Callout type="info">
+<Info>
 
 **Hanya pemilik token account yang dapat mengaktifkan Confidential Balances pada sebuah token
 account**.
 
-Instruksi _rs`ConfigureAccount`_ memerlukan pembuatan kunci enkripsi
+Instruksi `ConfigureAccount` memerlukan pembuatan kunci enkripsi
 dan bukti di sisi klien yang hanya dapat dibuat oleh pemilik token account.
 
 Bukti validitas pubkey memverifikasi bahwa kunci publik ElGamal akun adalah
-valid. Bukti ini dihasilkan dengan _rs`build_pubkey_validity_proof_data`_, diverifikasi di
+valid. Bukti ini dihasilkan dengan `build_pubkey_validity_proof_data`, diverifikasi di
 chain oleh program ZK ElGamal Proof ke dalam sebuah akun state konteks, lalu
-direferensikan dari _rs`ConfigureAccount`_ melalui
-_rs`ProofLocation::ContextStateAccount`_, sehingga tidak ada byte bukti yang dikirim dalam instruksi
+direferensikan dari `ConfigureAccount` melalui
+`ProofLocation::ContextStateAccount`, sehingga tidak ada byte bukti yang dikirim dalam instruksi
 token itu sendiri. Untuk detail implementasi, lihat:
 
 - [PubkeyValidityProofData](https://github.com/anza-xyz/agave/blob/b39a9764005ac8596b7e14e61d381305ce57ecaa/zk-sdk/src/zk_elgamal_proof_program/proof_data/pubkey_validity.rs#L58)
 - [PubkeyValidityProof](https://github.com/anza-xyz/agave/blob/b39a9764005ac8596b7e14e61d381305ce57ecaa/zk-sdk/src/sigma_proofs/pubkey_validity.rs#L65)
 
-</Callout>
+</Info>
 
 ## Contoh Kode
 
@@ -278,10 +318,9 @@ dan ganti placeholder mint dengan mint yang dibuat sesuai
 
 ### Rust
 
-<CodeTabs>
+<CodeGroup>
 
-```rust !! title="main.rs"
-// !collapse(1:36) collapsed
+```rust main.rs expandable
 // Imports: dependencies used by this example.
 use anyhow::{Context, Result};
 use solana_address::Address;
@@ -439,7 +478,6 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-// !collapse(1:1000) collapsed
 // Setup: helper function to create the confidential mint.
 fn create_confidential_mint(rpc_client: &RpcClient, payer: &Keypair, decimals: u8) -> Result<Pubkey> {
     let mint = Keypair::new();
@@ -507,7 +545,7 @@ fn load_keypair() -> Result<Keypair> {
 }
 ```
 
-```toml !! title="Cargo.toml"
+```toml Cargo.toml
 [package]
 name = "confidential-transfer"
 version = "0.1.0"
@@ -539,14 +577,13 @@ dirs = "6.0.0"
 serde_json = "1.0"
 ```
 
-</CodeTabs>
+</CodeGroup>
 
 ### Typescript
 
-<CodeTabs>
+<CodeGroup>
 
-```ts !! title="index.ts"
-// !collapse(1:21) collapsed
+```ts index.ts expandable
 // Imports: dependencies used by this example.
 import {
   deriveAeKeyForOwnerMint,
@@ -623,7 +660,6 @@ console.log(
   `Enabled Confidential Balances on token account ${tokenAccount}: ${result.context.signature}`
 );
 
-// !collapse(1:1000) collapsed
 // Setup: helper function to create the confidential mint.
 async function createConfidentialMint(
   kitClient: typeof client,
@@ -658,7 +694,7 @@ async function createConfidentialMint(
 }
 ```
 
-```json !! title="package.json"
+```json package.json
 {
   "name": "confidential-account",
   "version": "0.1.0",
@@ -678,13 +714,13 @@ async function createConfidentialMint(
 }
 ```
 
-</CodeTabs>
+</CodeGroup>
 
-<Callout type="info">
+<Info>
   Helper TypeScript tersedia di subpath
   `@solana-program/token-2022/confidential` dan dibangun di atas
   `@solana/zk-sdk` untuk primitif enkripsi. `owner` dan `client` berasal dari
   pengaturan `@solana/kit` Anda; rencana instruksi yang dikembalikan dikirim
   dengan dukungan rencana instruksi milik `@solana/kit`, yang membagi pekerjaan
   ke dalam beberapa transaksi ketika bukti terlalu besar untuk satu transaksi.
-</Callout>
+</Info>

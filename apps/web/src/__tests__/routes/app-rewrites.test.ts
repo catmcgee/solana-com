@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   ACCELERATE_APP_URL,
   BREAKPOINT_APP_URL,
-  DOCS_APP_URL,
   MEDIA_APP_URL,
+  MINTLIFY_ORIGIN,
   templatesAppUrl,
 } from "@@/apps-urls";
 import rewritesAndRedirects from "@@/rewrites-redirects";
@@ -55,10 +55,13 @@ describe("Cross-app rewrites", () => {
       "/podcasts/:path*",
       `${MEDIA_APP_URL}/podcasts/:path*`,
     );
-    expectBeforeFileRewrite("/docs/:path*", `${DOCS_APP_URL}/docs/:path*`);
+    expectBeforeFileRewrite(
+      "/docs/:path((?![^/]+/llms\\.txt$).*)",
+      `${MINTLIFY_ORIGIN}/docs/:path`,
+    );
     expectBeforeFileRewrite(
       "/developers/cookbook/:path*",
-      `${DOCS_APP_URL}/developers/cookbook/:path*`,
+      `${MINTLIFY_ORIGIN}/developers/cookbook/:path*`,
     );
     expectBeforeFileRewrite(
       "/developers/templates/:path*",
@@ -74,15 +77,15 @@ describe("Cross-app rewrites", () => {
     );
   });
 
-  it("keeps templates rewrites before generic developer docs rewrites", () => {
+  it("keeps templates rewrites before the developer docs rewrites", () => {
     expect(expectSourceIndex("/developers/templates")).toBeLessThan(
-      expectSourceIndex("/developers"),
-    );
-    expect(expectSourceIndex("/developers/templates/:path*")).toBeLessThan(
-      expectSourceIndex("/developers/:path*.md"),
+      expectSourceIndex("/developers/:page(cookbook|cookbook\\.md)"),
     );
     expect(expectSourceIndex("/developers/templates/:path*")).toBeLessThan(
       expectSourceIndex("/developers/cookbook/:path*"),
+    );
+    expect(expectSourceIndex("/developers/templates/:path*")).toBeLessThan(
+      expectSourceIndex("/developers/bootcamp/:path*"),
     );
   });
 
@@ -114,7 +117,15 @@ describe("Cross-app rewrites", () => {
     );
     expectBeforeFileRewrite(
       "/docs-assets/:path+",
-      `${DOCS_APP_URL}/docs-assets/:path+`,
+      `${MINTLIFY_ORIGIN}/docs-assets/:path+`,
+    );
+    expectBeforeFileRewrite(
+      "/mintlify-assets/:path+",
+      `${MINTLIFY_ORIGIN}/mintlify-assets/:path+`,
+    );
+    expectBeforeFileRewrite(
+      "/_mintlify/:path*",
+      `${MINTLIFY_ORIGIN}/_mintlify/:path*`,
     );
   });
 

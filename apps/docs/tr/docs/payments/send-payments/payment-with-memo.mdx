@@ -14,10 +14,10 @@ Memo programı, işlemin günlüklerine metin yazar. Bu günlükler, gezginler v
 sağlayıcıları tarafından indekslenir, böylece memolar ödeme mutabakatı için
 aranabilir hale gelir.
 
-<Callout>
+<Note>
   Temel ödeme kavramları için [Solana'da ödemeler nasıl
   çalışır](/docs/payments/how-payments-work) bölümüne bakın.
-</Callout>
+</Note>
 
 Memo eklemek, talimatları doğrudan oluşturmayı gerektirir, bu da işleme nelerin
 dahil edileceği konusunda size kontrol sağlar.
@@ -25,148 +25,126 @@ dahil edileceği konusunda size kontrol sağlar.
 Aşağıdaki adımlar temel akışı gösterir. Tam çalıştırılabilir kod için
 [Demo](#demo) bölümüne bakın.
 
-<ScrollyCoding>
+<Steps>
+  <Step title="Memo programını içe aktar">
+    `@solana-program/memo` paketinden `getAddMemoInstruction` fonksiyonunu içe
+    aktararak memo talimatları oluşturun.
 
-## !!steps Memo programını içe aktar
+    ```ts title="Memo ile ödeme" focus={1}
+    import { getAddMemoInstruction } from "@solana-program/memo";
+    ```
+  </Step>
 
-`@solana-program/memo` paketinden `getAddMemoInstruction` fonksiyonunu içe
-aktararak memo talimatları oluşturun.
+  <Step title="Transfer talimatı oluştur">
+    Kaynak ATA, hedef ATA, yetki (imzalayan) ve temel birimlerdeki tutarı belirterek
+    token transfer talimatını oluşturun.
 
-<CodePlaceholder title="Memo ile ödeme" />
+    ```ts title="Memo ile ödeme" focus={3-8}
+    import { getAddMemoInstruction } from "@solana-program/memo";
 
-```ts !! title="Payment with Memo"
-// !focus
-import { getAddMemoInstruction } from "@solana-program/memo";
-```
+    const transferInstruction = getTransferInstruction({
+      source: senderAta,
+      destination: recipientAta,
+      authority: sender.address,
+      amount: 250_000n // adjusted for the mint's decimals
+    });
+    ```
+  </Step>
 
-## !!steps Transfer talimatı oluştur
+  <Step title="Memo talimatı oluştur">
+    Bir mesaj içeren memo talimatı oluşturun. Bu mesaj, işlemin program
+    günlüklerinde görünür olacaktır.
 
-Kaynak ATA, hedef ATA, yetki (imzalayan) ve temel birimlerdeki tutarı belirterek
-token transfer talimatını oluşturun.
+    ```ts title="Memo ile ödeme" focus={10-12}
+    import { getAddMemoInstruction } from "@solana-program/memo";
 
-<CodePlaceholder title="Memo ile ödeme" />
+    const transferInstruction = getTransferInstruction({
+      source: senderAta,
+      destination: recipientAta,
+      authority: sender.address,
+      amount: 250_000n
+    });
 
-```ts !! title="Payment with Memo"
-import { getAddMemoInstruction } from "@solana-program/memo";
+    const memoInstruction = getAddMemoInstruction({
+      memo: "Payment for services rendered - Invoice #12345"
+    });
+    ```
+  </Step>
 
-// !focus(1:6)
-const transferInstruction = getTransferInstruction({
-  source: senderAta,
-  destination: recipientAta,
-  authority: sender.address,
-  amount: 250_000n // adjusted for the mint's decimals
-});
-```
+  <Step title="Memo ile işlem gönder">
+    Transfer ve memo talimatlarını tek bir işlemde birleştirin.
 
-## !!steps Memo talimatı oluştur
+    ```ts title="Memo ile ödeme" highlight={16} focus={14-16}
+    import { getAddMemoInstruction } from "@solana-program/memo";
 
-Bir mesaj içeren memo talimatı oluşturun. Bu mesaj, işlemin program
-günlüklerinde görünür olacaktır.
+    const transferInstruction = getTransferInstruction({
+      source: senderAta,
+      destination: recipientAta,
+      authority: sender.address,
+      amount: 250_000n
+    });
 
-<CodePlaceholder title="Memo ile ödeme" />
+    const memoInstruction = getAddMemoInstruction({
+      memo: "Payment for services rendered - Invoice #12345"
+    });
 
-```ts !! title="Payment with Memo"
-import { getAddMemoInstruction } from "@solana-program/memo";
+    const {
+      context: { signature }
+    } = await client.sendTransaction([transferInstruction, memoInstruction]);
+    ```
+  </Step>
 
-const transferInstruction = getTransferInstruction({
-  source: senderAta,
-  destination: recipientAta,
-  authority: sender.address,
-  amount: 250_000n
-});
+  <Step title="İşlem günlüklerinde notu görüntüle">
+    İşlem onaylandıktan sonra, günlüklerdeki notu görüntülemek için işlemi getirin.
+    Not, Memo programından bir günlük mesajı olarak görünür.
 
-// !focus(1:3)
-const memoInstruction = getAddMemoInstruction({
-  memo: "Payment for services rendered - Invoice #12345"
-});
-```
+    ```ts title="Notlu ödeme" focus={18-26}
+    import { getAddMemoInstruction } from "@solana-program/memo";
 
-## !!steps Memo ile işlem gönder
+    const transferInstruction = getTransferInstruction({
+      source: senderAta,
+      destination: recipientAta,
+      authority: sender.address,
+      amount: 250_000n
+    });
 
-Transfer ve memo talimatlarını tek bir işlemde birleştirin.
+    const memoInstruction = getAddMemoInstruction({
+      memo: "Payment for services rendered - Invoice #12345"
+    });
 
-<CodePlaceholder title="Memo ile ödeme" />
+    const {
+      context: { signature }
+    } = await client.sendTransaction([transferInstruction, memoInstruction]);
 
-```ts !! title="Payment with Memo"
-import { getAddMemoInstruction } from "@solana-program/memo";
+    const transaction = await client.rpc
+      .getTransaction(signature, {
+        encoding: "jsonParsed",
+        maxSupportedTransactionVersion: 1
+      })
+      .send();
 
-const transferInstruction = getTransferInstruction({
-  source: senderAta,
-  destination: recipientAta,
-  authority: sender.address,
-  amount: 250_000n
-});
+    console.log("Transaction logs with Memo:");
+    console.log(transaction?.meta?.logMessages);
+    ```
 
-const memoInstruction = getAddMemoInstruction({
-  memo: "Payment for services rendered - Invoice #12345"
-});
-
-// !focus(1:3)
-const {
-  context: { signature }
-  // !mark
-} = await client.sendTransaction([transferInstruction, memoInstruction]);
-```
-
-## !!steps İşlem günlüklerinde notu görüntüle
-
-İşlem onaylandıktan sonra, günlüklerdeki notu görüntülemek için işlemi getirin.
-Not, Memo programından bir günlük mesajı olarak görünür.
-
-<CodePlaceholder title="Notlu ödeme" />
-
-```sh title="Example Transaction Logs"
-"Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb invoke [1]",
-"Program log: Instruction: Transfer",
-"Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 1682 of 200000 compute units",
-"Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb success",
-"Program MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr invoke [1]",
-# !mark
-'Program log: Memo (len 46): "Payment for services rendered - Invoice #12345"',
-"Program MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr consumed 18097 of 198318 compute units",
-"Program MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr success",
-"Program ComputeBudget111111111111111111111111111111 invoke [1]",
-"Program ComputeBudget111111111111111111111111111111 success"
-```
-
-```ts !! title="Payment with Memo"
-import { getAddMemoInstruction } from "@solana-program/memo";
-
-const transferInstruction = getTransferInstruction({
-  source: senderAta,
-  destination: recipientAta,
-  authority: sender.address,
-  amount: 250_000n
-});
-
-const memoInstruction = getAddMemoInstruction({
-  memo: "Payment for services rendered - Invoice #12345"
-});
-
-const {
-  context: { signature }
-} = await client.sendTransaction([transferInstruction, memoInstruction]);
-
-// !focus(1:9)
-const transaction = await client.rpc
-  .getTransaction(signature, {
-    encoding: "jsonParsed",
-    maxSupportedTransactionVersion: 1
-  })
-  .send();
-
-console.log("Transaction logs with Memo:");
-console.log(transaction?.meta?.logMessages);
-```
-
-</ScrollyCoding>
+    ```sh title="Example Transaction Logs" highlight={6}
+    "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb invoke [1]",
+    "Program log: Instruction: Transfer",
+    "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 1682 of 200000 compute units",
+    "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb success",
+    "Program MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr invoke [1]",
+    'Program log: Memo (len 46): "Payment for services rendered - Invoice #12345"',
+    "Program MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr consumed 18097 of 198318 compute units",
+    "Program MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr success",
+    "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+    "Program ComputeBudget111111111111111111111111111111 success"
+    ```
+  </Step>
+</Steps>
 
 ### Demo
 
-<CodeTabs flags="r">
-
-```ts !! title="Demo"
-// !collapse(1:16) collapsed
+```ts Demo highlight={16,60-62,67} expandable
 // Click ">" icon on left to expand demo imports
 import { createClient, generateKeyPairSigner, lamports } from "@solana/kit";
 import type { KeyPairSigner } from "@solana/kit";
@@ -182,7 +160,6 @@ import {
   getMintToInstruction,
   getTransferInstruction
 } from "@solana-program/token-2022";
-// !mark
 import { getAddMemoInstruction } from "@solana-program/memo";
 
 // Generate keypairs for sender and recipient
@@ -227,7 +204,6 @@ const transferInstruction = getTransferInstruction({
 });
 
 // Create instruction to add a memo to the transaction
-// !mark(1:3)
 const memoInstruction = getAddMemoInstruction({
   memo: "Payment for services rendered - Invoice #12345"
 });
@@ -235,7 +211,6 @@ const memoInstruction = getAddMemoInstruction({
 // Send transaction with both transfer and memo
 const {
   context: { signature }
-  // !mark
 } = await client.sendTransaction([transferInstruction, memoInstruction]);
 
 console.log("\n=== Token Payment with Memo Complete ===");
@@ -267,7 +242,6 @@ console.log(transaction?.meta?.logMessages);
 // =============================================================================
 // Demo Setup Helper Function
 // =============================================================================
-// !collapse(1:1000) collapsed
 
 /**
  * Sets up for a token transfer with memo demo:
@@ -366,5 +340,3 @@ async function demoSetup(sender: KeyPairSigner, recipient: KeyPairSigner) {
   };
 }
 ```
-
-</CodeTabs>

@@ -4,7 +4,6 @@ description:
   Come il runtime di Solana carica e convalida gli account prima dell'esecuzione
   e il formato di serializzazione utilizzato per passare i dati degli account ai
   programmi.
-url: /docs/core/accounts/account-runtime
 type: reference
 prerequisites:
   - /docs/core/accounts
@@ -16,18 +15,20 @@ related:
   - /docs/core/constants-reference
 ---
 
-<Callout type="info" title="Riepilogo">
+<Info>
+  **Riepilogo**
+
   Prima dell'esecuzione, il runtime carica gli account, convalida il pagatore
   delle commissioni, verifica l'esenzione dall'affitto e serializza i dati degli
   account in un layout di memoria accessibile ai programmi.
-</Callout>
+</Info>
 
-<Callout>
+<Note>
   Questa pagina tratta gli aspetti interni del runtime. La maggior parte degli
   sviluppatori non necessita di queste informazioni per creare programmi.
   Consulta [Struttura degli account](/docs/core/accounts/account-structure) per
   la visione orientata agli sviluppatori.
-</Callout>
+</Note>
 
 ## Caricamento degli account
 
@@ -45,7 +46,7 @@ Questo processo esegue diverse convalide:
    compreso tra 0 e il minimo per l'esenzione dall'affitto. Gli account nonce
    devono sempre mantenere abbastanza lamport per rimanere esenti dall'affitto.
    Se il pagatore non è né un account di sistema né un account nonce, la
-   transazione fallisce con _rs`TransactionError::InvalidAccountForFee`_.
+   transazione fallisce con `TransactionError::InvalidAccountForFee`.
 
 2. **Limite di dimensione dei dati caricati**: la dimensione totale di tutti gli
    account caricati (incluso un
@@ -53,16 +54,16 @@ Questo processo esegue diverse convalide:
    di 64 byte per account) non deve superare
    [`MAX_LOADED_ACCOUNTS_DATA_SIZE_BYTES`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/execution_budget.rs#L53)
    (64 MiB). Il superamento di questo limite produce
-   _rs`TransactionError::MaxLoadedAccountsDataSizeExceeded`_.
+   `TransactionError::MaxLoadedAccountsDataSizeExceeded`.
 
 3. **Convalida del program account**: ogni programma invocato da un'istruzione
    deve esistere ed essere di proprietà di un loader valido: uno dei
    [`PROGRAM_OWNERS`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/account/src/lib.rs#L802)
    (BPF Loader Upgradeable, BPF Loader, BPF Loader Deprecated, Loader V4) o il
    loader nativo. Se il program account non esiste, la transazione fallisce con
-   _rs`TransactionError::ProgramAccountNotFound`_. Se esiste ma ha un
+   `TransactionError::ProgramAccountNotFound`. Se esiste ma ha un
    proprietario non valido, la transazione fallisce con
-   _rs`TransactionError::InvalidProgramForExecution`_.
+   `TransactionError::InvalidProgramForExecution`.
 
 4. **Account inesistenti**: Gli account che non esistono onchain vengono
    caricati come account predefiniti (0 lamport, dati vuoti, di proprietà di
@@ -127,15 +128,15 @@ il primo indice a livello di istruzione che vi corrisponde:
   della prima occorrenza.
 
 Poiché tutti i riferimenti allo stesso account condividono lo stesso
-_rs`AccountSharedData`_ sottostante, le modifiche attraverso qualsiasi
+`AccountSharedData` sottostante, le modifiche attraverso qualsiasi
 riferimento sono immediatamente visibili attraverso tutti gli altri riferimenti.
 Tuttavia, può essere mantenuto un solo prestito mutabile alla volta. Il
 tentativo di prendere in prestito lo stesso account in modo mutabile attraverso
 due indici di account dell'istruzione diversi contemporaneamente restituisce
-_rs`InstructionError::AccountBorrowFailed`_. I programmi devono rilasciare un
+`InstructionError::AccountBorrowFailed`. I programmi devono rilasciare un
 prestito prima di acquisirne un altro sullo stesso account sottostante.
 
 Dopo l'esecuzione del programma, il runtime deserializza il buffer
 ([`deserialize_parameters_aligned()`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/serialization.rs#L580-L667))
 e applica eventuali modifiche a `lamports`, `data` (incluse le modifiche di
-lunghezza fino a _rs`MAX_PERMITTED_DATA_INCREASE`_), e `owner`.
+lunghezza fino a `MAX_PERMITTED_DATA_INCREASE`), e `owner`.

@@ -1,0 +1,303 @@
+/**
+ * `docs-tooling verify` (spec §4.4, WP12): every repo-side check in one
+ * command. CI runs it on every change to apps/docs/** or
+ * packages/docs-tooling/**, followed by the Mintlify CLI checks (§4.4.7:
+ * `mint validate`, `mint broken-links`), which need the network and live in
+ * the workflow rather than here.
+ *
+ *  1. counts        pages per collection and locale (report)
+ *  2. residual      0 Fumadocs/Code Hike constructs (src/verify/residual.ts)
+ *     + math        0 prose blocks Mintlify would render as KaTeX (two or
+ *                   more `$` with one unescaped in text; see
+ *                   transforms/dollar-escape.ts). Pages and snippets.
+ *  3. navigation    exact nav coverage (src/nav/verify-nav.ts) + legacy URL
+ *                   parity (src/verify/verify-urls.ts)
+ *     + index pages whose sub-pages come earlier in nav order (Mintlify
+ *     307s those to the first sub-page; apps/web must rewrite them, see
+ *     MINTLIFY_INDEX_SHADOWED in apps/web/rewrites-redirects.ts)
+ *  4. frontmatter   parses; `type` in the allowed enum (dropped keys are
+ *                   residual patterns)
+ *  5. assets        every /docs-assets/* reference exists; themed pairs
+ *  6. generators    every generator passes --check
+ *  7. convert       `convert --check`: the tree is converted and idempotent
+ *
+ * Exit code 1 when any check fails. `--skip-generators` / `--skip-convert`
+ * shorten local runs.
+ */
+import { spawnSync } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
+import path from "node:path";
+import YAML from "yaml";
+import { repoRoot, toolingRoot } from "../lib/paths.ts";
+import { verifyNav } from "../nav/verify-nav.ts";
+import { runConvert } from "../convert/run.ts";
+import { loadRedirectIndex } from "./redirects.ts";
+import { layoutKey, listLayoutPages, runVerifyUrls } from "./verify-urls.ts";
+import { listSnippets, printResidual, scanResidual } from "./residual.ts";
+import { mdxCodec } from "../convert/codec.ts";
+import { findMathRisks } from "../convert/transforms/dollar-escape.ts";
+
+export const ALLOWED_TYPES = new Set([
+  "conceptual",
+  "reference",
+  "tutorial",
+  "guide",
+]);
+
+export const GENERATOR_CHECKS: [string, string[]][] = [
+  ["examples:build --check", ["src/cli.ts", "examples", "--check"]],
+  ["gen:surfpool --check", ["src/generators/surfpool-rpc.ts", "--check"]],
+  ["gen:paths --check", ["src/generators/paths.ts", "--check"]],
+  ["gen:concepts --check", ["src/generators/concepts.ts", "--check"]],
+  ["gen:addresses --check", ["src/generators/addresses.ts", "--check"]],
+  ["nav:build --check", ["src/cli.ts", "nav", "build", "--check"]],
+  ["gen:tags --check", ["src/generators/tags.ts", "--check"]],
+  [
+    "gen:manifest/llms/redirects --check",
+    ["src/manifest/cli.ts", "all", "--check"],
+  ],
+];
+
+interface Check {
+  name: string;
+  ok: boolean;
+  detail: string[];
+}
+
+function frontmatterOf(src: string): Record<string, unknown> | string {
+  const m = /^---\n([\s\S]*?)\n---/.exec(src);
+  if (!m) return {};
+  try {
+    return (YAML.parse(m[1]!) as Record<string, unknown>) ?? {};
+  } catch (err) {
+    return err instanceof Error ? err.message : String(err);
+  }
+}
+
+export function checkFrontmatterAndAssets(
+  files = [...listLayoutPages()].sort(),
+) {
+  const fm: string[] = [];
+  const assets: string[] = [];
+  const counts = new Map<string, number>();
+  const assetRe =
+    /(?:src=["']|\]\(|href=["']|poster=["'])(\/docs-assets\/[^"')\s#?]+)/g;
+  for (const f of files) {
+    const key = layoutKey(f);
+    const k = key ? `${key.collection}\t${key.locale}` : "other\t-";
+    counts.set(k, (counts.get(k) ?? 0) + 1);
+    const src = readFileSync(path.join(repoRoot, f), "utf8");
+    const data = frontmatterOf(src);
+    if (typeof data === "string")
+      fm.push(`${f}: frontmatter does not parse: ${data}`);
+    else if (data.type !== undefined && !ALLOWED_TYPES.has(String(data.type)))
+      fm.push(
+        `${f}: type "${String(data.type)}" not in ${[...ALLOWED_TYPES].join("|")}`,
+      );
+    for (const m of src.matchAll(assetRe)) {
+      let url = m[1]!;
+      try {
+        url = decodeURI(url);
+      } catch {
+        // keep
+      }
+      const abs = path.join(repoRoot, "apps/docs", url);
+      if (!existsSync(abs)) assets.push(`${f}: missing ${m[1]}`);
+      // Themed pair: X-light.svg needs X.svg and vice versa (themed-image).
+      const light = /^(.*)-light(\.\w+)$/.exec(url);
+      if (
+        light &&
+        !existsSync(path.join(repoRoot, "apps/docs", `${light[1]}${light[2]}`))
+      )
+        assets.push(`${f}: themed pair ${url} has no dark variant`);
+    }
+  }
+  return { fm, assets, counts };
+}
+
+/** Nav order, flattened (pages and group roots). */
+function flatNav(x: unknown, out: string[] = []): string[] {
+  if (typeof x === "string") out.push(x);
+  else if (Array.isArray(x)) for (const y of x) flatNav(y, out);
+  else if (x && typeof x === "object") {
+    const o = x as Record<string, unknown>;
+    if (typeof o.root === "string") out.push(o.root);
+    for (const k of ["tabs", "groups", "pages"]) if (o[k]) flatNav(o[k], out);
+  }
+  return out;
+}
+
+/** `docs/<section>/index` pages preceded in nav order by one of their sub-pages. */
+export function shadowedIndexPages(
+  navFile = path.join(repoRoot, "apps/docs/navigation/en.json"),
+) {
+  const order = flatNav(JSON.parse(readFileSync(navFile, "utf8")));
+  const out: string[] = [];
+  order.forEach((p, i) => {
+    if (!p.endsWith("/index")) return;
+    const prefix = `${p.slice(0, -"/index".length)}/`;
+    if (order.slice(0, i).some((q) => q.startsWith(prefix))) out.push(p);
+  });
+  return out;
+}
+
+/**
+ * Blocks where Mintlify's remark-math would turn prose dollar amounts into
+ * KaTeX. No page intends math; a page that does can opt out with
+ * `math: true` in its frontmatter.
+ */
+export function scanMathRisks(files: string[]): string[] {
+  const out: string[] = [];
+  for (const f of files) {
+    const src = readFileSync(path.join(repoRoot, f), "utf8");
+    if (!/\$[^]*\$/.test(src)) continue;
+    const fm = frontmatterOf(src);
+    if (typeof fm === "object" && fm.math === true) continue;
+    let tree;
+    try {
+      tree = mdxCodec.parse(src, { path: f }).tree;
+    } catch {
+      continue; // parse failures are reported by convert --check
+    }
+    for (const r of findMathRisks(tree, src))
+      out.push(`${f}:${r.line}: ${r.text.replace(/\s+/g, " ")}`);
+  }
+  return out;
+}
+
+export async function runVerify(
+  opts: { generators?: boolean; convert?: boolean; json?: boolean } = {},
+) {
+  const checks: Check[] = [];
+  const files = [...listLayoutPages()].sort();
+
+  // 1 + 4 + 5
+  const { fm, assets, counts } = checkFrontmatterAndAssets(files);
+  checks.push({
+    name: "counts",
+    ok: true,
+    detail: [...counts]
+      .sort()
+      .map(([k, n]) => `${k.replace("\t", " / ")}: ${n}`),
+  });
+
+  // 2
+  const residual = scanResidual();
+  printResidual(residual);
+  checks.push({
+    name: "residual syntax (0 hits)",
+    ok: residual.total === 0,
+    detail: residual.hits
+      .slice(0, 50)
+      .map((h) => `${h.pattern} ${h.file}:${h.line}`),
+  });
+
+  const math = scanMathRisks([...files, ...listSnippets()].sort());
+  checks.push({
+    name: "prose `$` rendered as KaTeX math (0 blocks)",
+    ok: math.length === 0,
+    detail: math.slice(0, 50),
+  });
+
+  // 3
+  const nav = verifyNav();
+  checks.push({
+    name: "navigation coverage",
+    ok: nav.errors.length === 0,
+    detail: [...nav.errors, ...nav.warnings],
+  });
+  const urls = runVerifyUrls({ web: await loadRedirectIndex() });
+  checks.push({
+    name: `legacy URL parity (${urls.total} URLs)`,
+    ok:
+      !urls.failures.length &&
+      !urls.moveMapProblems.length &&
+      !urls.stray.length,
+    detail: [
+      ...urls.failures
+        .slice(0, 50)
+        .map((f) => `FAIL ${f.cls} ${f.url} ${f.target}`),
+      ...urls.moveMapProblems.slice(0, 20),
+      ...urls.stray.map((s) => `stray ${s}`),
+      `missing translations (reported, not failing): ${urls.missingTranslations.length}`,
+    ],
+  });
+
+  const rewritesSrc = readFileSync(
+    path.join(repoRoot, "apps/web/rewrites-redirects.ts"),
+    "utf8",
+  );
+  const listed = new Set(
+    (/MINTLIFY_INDEX_SHADOWED = \[([^\]]*)\]/.exec(rewritesSrc)?.[1] ?? "")
+      .split(",")
+      .map((x) => x.trim().replace(/^"|"$/g, ""))
+      .filter(Boolean),
+  );
+  const shadowed = shadowedIndexPages();
+  const unhandled = shadowed.filter((p) => {
+    const m = /^docs\/([^/]+)\/index$/.exec(p);
+    return !m || !listed.has(m[1]!);
+  });
+  checks.push({
+    name: `index pages shadowed by earlier sub-pages handled by apps/web (${shadowed.join(", ") || "none"})`,
+    ok: unhandled.length === 0,
+    detail: unhandled.map(
+      (p) =>
+        `${p}: reorder navigation/en.json or add it to MINTLIFY_INDEX_SHADOWED`,
+    ),
+  });
+
+  checks.push({
+    name: "frontmatter",
+    ok: fm.length === 0,
+    detail: fm.slice(0, 50),
+  });
+  checks.push({
+    name: "assets",
+    ok: assets.length === 0,
+    detail: assets.slice(0, 50),
+  });
+
+  // 6
+  if (opts.generators !== false) {
+    for (const [name, args] of GENERATOR_CHECKS) {
+      const r = spawnSync("npx", ["tsx", ...args], {
+        cwd: toolingRoot,
+        encoding: "utf8",
+      });
+      const out = `${r.stdout ?? ""}${r.stderr ?? ""}`.trim().split("\n");
+      checks.push({
+        name: `generator ${name}`,
+        ok: r.status === 0,
+        detail: out.slice(-5),
+      });
+    }
+  }
+
+  // 7
+  if (opts.convert !== false) {
+    const r = await runConvert({ check: true });
+    const errors = r.diagnostics.filter((d) => d.level === "error");
+    checks.push({
+      name: `convert --check (${r.files} files)`,
+      ok: r.ok,
+      detail: [
+        ...r.changed.slice(0, 50).map((c) => `stale ${c}`),
+        ...errors
+          .slice(0, 20)
+          .map((d) => `error ${d.transform} ${d.file}: ${d.message}`),
+      ],
+    });
+  }
+
+  if (opts.json) console.log(JSON.stringify(checks, null, 2));
+  else {
+    console.log("\nverify:");
+    for (const c of checks) {
+      console.log(`  ${c.ok ? "PASS" : "FAIL"}  ${c.name}`);
+      if (!c.ok || c.name === "counts")
+        for (const d of c.detail) console.log(`        ${d}`);
+    }
+  }
+  return checks.every((c) => c.ok) ? 0 : 1;
+}

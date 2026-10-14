@@ -3,7 +3,6 @@ title: Siirtokelvottomat tokenit
 description:
   Luo mint, jonka tokeneita voidaan minttaa, polttaa ja sulkea, mutta joita ei
   voi siirtää token-tilien välillä.
-url: /docs/tokens/extensions/non-transferrable-tokens
 type: tutorial
 prerequisites:
   - /docs/tokens/basics/create-mint
@@ -18,10 +17,10 @@ related:
 
 ## Mitä ovat siirtokelvottomat tokenit?
 
-Token Extensions Programin _rs`NonTransferable`_ mint-laajennus tekee jokaisesta
+Token Extensions Programin `NonTransferable` mint-laajennus tekee jokaisesta
 kyseisen mintin token accountista siirtokelvottoman. Tokenien minttauksen
 jälkeen token-haltijat eivät voi siirtää niitä toiseen token accountiin
-_rs`Transfer`_- tai _rs`TransferChecked`_-komennoilla.
+`Transfer`- tai `TransferChecked`-komennoilla.
 
 Tämä malli on hyödyllinen omaisuuserille, joiden tulisi pysyä kiinnitettynä
 yhteen lompakkoon.
@@ -32,246 +31,232 @@ Siirtokelvottomia tokeneita voidaan edelleen:
 - Polttaa token accountin omistajan tai valtuutetun delegaatin toimesta
 - Token accountit voidaan sulkea sen jälkeen, kun saldo saavuttaa nollan
 
-<Callout type="info" title="Token Account -laajennukset">
-  Kun token account alustetaan mintille, jossa on _rs`NonTransferable`_, token
-  account alustetaan _rs`NonTransferableAccount`_- ja
-  _rs`ImmutableOwner`_-laajennuksilla. Kun token account luodaan [Associated
+<Info>
+  **Token Account -laajennukset**
+
+  Kun token account alustetaan mintille, jossa on `NonTransferable`, token
+  account alustetaan `NonTransferableAccount`- ja
+`ImmutableOwner`-laajennuksilla. Kun token account luodaan [Associated
   Token
   Programin](/docs/tokens/basics/create-token-account#how-to-create-an-associated-token-account)
   kautta, vaadittu tilin koko lasketaan ja token account luodaan vaaditun
   kokoisen ja rent-vapautuksen sisältävine lamportteineen.
-</Callout>
+</Info>
 
 ## Miten luoda siirtokelvoton mint
 
 Siirtokelvottoman mintin luominen:
 
 1. Laske mint accountin koko ja tarvittava rent mintille ja
-   _rs`NonTransferable`_-laajennukselle.
-2. Luo mint account _rs`CreateAccount`_-komennolla, alusta _rs`NonTransferable`_
-   ja alusta mint _rs`InitializeMint`_-komennolla.
-3. Luo token accountit mintille. _rs`NonTransferableAccount`_ ja
-   _rs`ImmutableOwner`_ otetaan automaattisesti käyttöön token accounteille.
-4. _rs`Transfer`_ ja _rs`TransferChecked`_ epäonnistuvat
-   _rs`TokenError::NonTransferable`_-virheellä.
+   `NonTransferable`-laajennukselle.
+2. Luo mint account `CreateAccount`-komennolla, alusta `NonTransferable`
+   ja alusta mint `InitializeMint`-komennolla.
+3. Luo token accountit mintille. `NonTransferableAccount` ja
+   `ImmutableOwner` otetaan automaattisesti käyttöön token accounteille.
+4. `Transfer` ja `TransferChecked` epäonnistuvat
+   `TokenError::NonTransferable`-virheellä.
 
-<ScrollyCoding>
+<Steps>
+  <Step title="Laske tilin koko">
+    Laske mint accountin koko perus-mintille sekä
+    `NonTransferable`-laajennukselle. Tämä on koko, jota käytetään
+    `CreateAccount`-komennossa.
 
-## !!steps Laske tilin koko
+    ```ts Example focus={15,17}
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
 
-Laske mint accountin koko perus-mintille sekä
-_rs`NonTransferable`_-laajennukselle. Tämä on koko, jota käytetään
-_rs`CreateAccount`_-komennossa.
+    const mint = await generateKeyPairSigner();
+    const recipient = await generateKeyPairSigner();
 
-<CodePlaceholder title="Example" />
+    const nonTransferableExtension = extension("NonTransferable", {});
 
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
+    const mintSpace = BigInt(getMintSize([nonTransferableExtension]));
+    ```
+  </Step>
 
-const mint = await generateKeyPairSigner();
-const recipient = await generateKeyPairSigner();
+  <Step title="Laske vuokra">
+    Laske vuokra käyttäen mint-tiliä varten tarvittavaa tilaa plus
+    `NonTransferable` -laajennus.
 
-// !focus(1:1)
-const nonTransferableExtension = extension("NonTransferable", {});
+    ```ts Example focus={19-21}
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
 
-// !focus(1:1)
-const mintSpace = BigInt(getMintSize([nonTransferableExtension]));
-```
+    const mint = await generateKeyPairSigner();
+    const recipient = await generateKeyPairSigner();
 
-## !!steps Laske vuokra
+    const nonTransferableExtension = extension("NonTransferable", {});
 
-Laske vuokra käyttäen mint-tiliä varten tarvittavaa tilaa plus
-_rs`NonTransferable`_ -laajennus.
+    const mintSpace = BigInt(getMintSize([nonTransferableExtension]));
 
-<CodePlaceholder title="Example" />
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
+    ```
+  </Step>
 
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
+  <Step title="Luo mint-tili">
+    Luo mint-tili lasketulla tilalla ja lamporteilla.
 
-const mint = await generateKeyPairSigner();
-const recipient = await generateKeyPairSigner();
+    ```ts Example focus={23-31}
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
 
-const nonTransferableExtension = extension("NonTransferable", {});
+    const mint = await generateKeyPairSigner();
+    const recipient = await generateKeyPairSigner();
 
-const mintSpace = BigInt(getMintSize([nonTransferableExtension]));
+    const nonTransferableExtension = extension("NonTransferable", {});
 
-// !focus(1:3)
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
-```
+    const mintSpace = BigInt(getMintSize([nonTransferableExtension]));
 
-## !!steps Luo mint-tili
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
 
-Luo mint-tili lasketulla tilalla ja lamporteilla.
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      })
+    ]);
+    ```
+  </Step>
 
-<CodePlaceholder title="Example" />
+  <Step title="Alusta NonTransferable">
+    Alusta `NonTransferable` -laajennus mintille.
 
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
+    ```ts Example focus={31-33}
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
 
-const mint = await generateKeyPairSigner();
-const recipient = await generateKeyPairSigner();
+    const mint = await generateKeyPairSigner();
+    const recipient = await generateKeyPairSigner();
 
-const nonTransferableExtension = extension("NonTransferable", {});
+    const nonTransferableExtension = extension("NonTransferable", {});
 
-const mintSpace = BigInt(getMintSize([nonTransferableExtension]));
+    const mintSpace = BigInt(getMintSize([nonTransferableExtension]));
 
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
 
-// !focus(1:9)
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  })
-]);
-```
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializeNonTransferableMintInstruction({
+        mint: mint.address
+      })
+    ]);
+    ```
+  </Step>
 
-## !!steps Alusta NonTransferable
+  <Step title="Alusta mint">
+    Alusta mint käyttäen `InitializeMint` samassa transaktiossa.
 
-Alusta _rs`NonTransferable`_ -laajennus mintille.
+    ```ts Example focus={34-39}
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
 
-<CodePlaceholder title="Example" />
+    const mint = await generateKeyPairSigner();
+    const recipient = await generateKeyPairSigner();
 
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
+    const nonTransferableExtension = extension("NonTransferable", {});
 
-const mint = await generateKeyPairSigner();
-const recipient = await generateKeyPairSigner();
+    const mintSpace = BigInt(getMintSize([nonTransferableExtension]));
 
-const nonTransferableExtension = extension("NonTransferable", {});
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
 
-const mintSpace = BigInt(getMintSize([nonTransferableExtension]));
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializeNonTransferableMintInstruction({
+        mint: mint.address
+      }),
+      getInitializeMintInstruction({
+        mint: mint.address,
+        decimals: 0,
+        mintAuthority: client.payer.address,
+        freezeAuthority: client.payer.address
+      })
+    ]);
+    ```
+  </Step>
+</Steps>
 
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
+<Info>
+  **Instruction Order**
 
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  }),
-  // !focus(1:3)
-  getInitializeNonTransferableMintInstruction({
-    mint: mint.address
-  })
-]);
-```
-
-## !!steps Alusta mint
-
-Alusta mint käyttäen _rs`InitializeMint`_ samassa transaktiossa.
-
-<CodePlaceholder title="Example" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-const recipient = await generateKeyPairSigner();
-
-const nonTransferableExtension = extension("NonTransferable", {});
-
-const mintSpace = BigInt(getMintSize([nonTransferableExtension]));
-
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
-
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  }),
-  getInitializeNonTransferableMintInstruction({
-    mint: mint.address
-  }),
-  // !focus(1:6)
-  getInitializeMintInstruction({
-    mint: mint.address,
-    decimals: 0,
-    mintAuthority: client.payer.address,
-    freezeAuthority: client.payer.address
-  })
-]);
-```
-
-</ScrollyCoding>
-
-<Callout type="info" title="Instruction Order">
-  _rs`InitializeNonTransferableMint`_ on tultava ennen komentoa
-  _rs`InitializeMint`_. _rs`CreateAccount`_, _rs`InitializeNonTransferableMint`_
-  ja _rs`InitializeMint`_ on sisällytettävä samaan transaktioon.
-</Callout>
+  `InitializeNonTransferableMint` on tultava ennen komentoa
+`InitializeMint`. `CreateAccount`, `InitializeNonTransferableMint`
+  ja `InitializeMint` on sisällytettävä samaan transaktioon.
+</Info>
 
 ### Lähdeviittaus
 
-| Kohde                                          | Kuvaus                                                                                                                                                                                                                                           | Lähde                                                                                                                            |
-| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
-| _rs`NonTransferable`_                          | Mint-laajennus, joka merkitsee mintin tokenit ei-siirrettäviksi.                                                                                                                                                                                 | [Lähde](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/non_transferable.rs#L8-L13)  |
-| _rs`NonTransferableAccount`_                   | Token account -laajennus, joka lisätään token-tileille ei-siirrettävissä minteissä.                                                                                                                                                              | [Lähde](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/non_transferable.rs#L15-L21) |
-| _rs`ImmutableOwner`_                           | Token account -laajennus, joka estää omistajuuden muutokset ja vaaditaan ei-siirrettäville token-tileille.                                                                                                                                       | [Lähde](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/immutable_owner.rs#L8-L16)   |
-| _rs`InitializeNonTransferableMint`_            | Komento, joka alustaa mint-tason ei-siirrettävä-laajennuksen ennen komentoa _rs`InitializeMint`_.                                                                                                                                                | [Lähde](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/instruction.rs#L642-L653)              |
-| _rs`process_initialize_non_transferable_mint`_ | Prosessorilogiikka, joka alustaa _rs`NonTransferable`_ mint-laajennuksen alustamattomalle mintille.                                                                                                                                              | [Lähde](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/processor.rs#L1646-L1655)                |
-| _rs`get_required_init_account_extensions`_     | Käytetään lisäämään automaattisesti token account -laajennuksia, kun token-tilejä alustetaan mintissä käytössä olevien laajennusten perusteella. _rs`NonTransferable`_ -minteille lisätään _rs`NonTransferableAccount`_ ja _rs`ImmutableOwner`_. | [Lähde](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/mod.rs#L1304-L1307)          |
+| Kohde                                      | Kuvaus                                                                                                                                                                                                                               | Lähde                                                                                                                            |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
+| `NonTransferable`                          | Mint-laajennus, joka merkitsee mintin tokenit ei-siirrettäviksi.                                                                                                                                                                     | [Lähde](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/non_transferable.rs#L8-L13)  |
+| `NonTransferableAccount`                   | Token account -laajennus, joka lisätään token-tileille ei-siirrettävissä minteissä.                                                                                                                                                  | [Lähde](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/non_transferable.rs#L15-L21) |
+| `ImmutableOwner`                           | Token account -laajennus, joka estää omistajuuden muutokset ja vaaditaan ei-siirrettäville token-tileille.                                                                                                                           | [Lähde](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/immutable_owner.rs#L8-L16)   |
+| `InitializeNonTransferableMint`            | Komento, joka alustaa mint-tason ei-siirrettävä-laajennuksen ennen komentoa `InitializeMint`.                                                                                                                                        | [Lähde](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/instruction.rs#L642-L653)              |
+| `process_initialize_non_transferable_mint` | Prosessorilogiikka, joka alustaa `NonTransferable` mint-laajennuksen alustamattomalle mintille.                                                                                                                                      | [Lähde](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/processor.rs#L1646-L1655)                |
+| `get_required_init_account_extensions`     | Käytetään lisäämään automaattisesti token account -laajennuksia, kun token-tilejä alustetaan mintissä käytössä olevien laajennusten perusteella. `NonTransferable` -minteille lisätään `NonTransferableAccount` ja `ImmutableOwner`. | [Lähde](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/mod.rs#L1304-L1307)          |
 
 ### Typescript
 
@@ -280,9 +265,7 @@ esimerkit käyttäen `@solana/web3.js` ovat mukana viitteenä.
 
 #### Kit
 
-<CodeTabs storage="token-ts-kit" flags="r">
-
-```ts !! title="Instructions"
+```ts Instructions highlight={47-49,92-99}
 import { lamports, createClient, generateKeyPairSigner } from "@solana/kit";
 import { solanaRpc, rpcAirdrop } from "@solana/kit-plugin-rpc";
 import { generatedPayer, airdropPayer } from "@solana/kit-plugin-signer";
@@ -329,7 +312,6 @@ await client.sendTransaction([
     space: mintSpace,
     programAddress: TOKEN_2022_PROGRAM_ADDRESS
   }),
-  // !mark(1:3)
   getInitializeNonTransferableMintInstruction({
     mint: mint.address // Mint account that stores the NonTransferable extension.
   }),
@@ -375,7 +357,6 @@ await client.sendTransaction([
 
 try {
   await client.sendTransaction([
-    // !mark(1:8)
     getTransferCheckedInstruction({
       source: sourceToken, // Token account sending the transfer.
       mint: mint.address, // Mint with the non-transferable configuration.
@@ -399,13 +380,9 @@ console.log("Source Token Extensions:", sourceTokenAccount.data.extensions);
 console.log("Destination ATA:", destinationToken);
 ```
 
-</CodeTabs>
-
 #### Web3.js
 
-<CodeTabs storage="token-ts-legacy" flags="r">
-
-```ts !! title="Instructions"
+```ts Instructions highlight={75-78,128-137}
 import {
   Connection,
   Keypair,
@@ -480,7 +457,6 @@ await sendAndConfirmTransaction(
       space: mintSpace,
       programId: TOKEN_2022_PROGRAM_ID
     }),
-    // !mark(1:4)
     createInitializeNonTransferableMintInstruction(
       mint.publicKey, // Mint account that stores the NonTransferable extension.
       TOKEN_2022_PROGRAM_ID // Token program that owns the mint.
@@ -534,7 +510,6 @@ try {
   await sendAndConfirmTransaction(
     connection,
     new Transaction().add(
-      // !mark(1:10)
       createTransferCheckedInstruction(
         sourceToken, // Token account sending the transfer.
         mint.publicKey, // Mint with the non-transferable configuration.
@@ -573,13 +548,9 @@ console.log("Source Token Account:", sourceTokenAccount);
 console.log("Destination ATA:", destinationToken.toBase58());
 ```
 
-</CodeTabs>
-
 ### Rust
 
-<CodeTabs storage="token-rs" flags="r">
-
-```rust !! title="Rust"
+```rust Rust highlight={122-131}
 use anyhow::Result;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_commitment_config::CommitmentConfig;
@@ -701,7 +672,6 @@ async fn main() -> Result<()> {
     let transfer_blockhash = client.get_latest_blockhash().await?;
     let transfer_transaction = Transaction::new_signed_with_payer(
         &[
-            // !mark(1:10)
             transfer_checked(
                 &TOKEN_2022_PROGRAM_ID, // Token program to invoke.
                 &source_token_address, // Token account sending the tokens.
@@ -750,5 +720,3 @@ async fn main() -> Result<()> {
     Ok(())
 }
 ```
-
-</CodeTabs>

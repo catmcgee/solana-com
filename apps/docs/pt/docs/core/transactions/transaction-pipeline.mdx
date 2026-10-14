@@ -2,7 +2,6 @@
 title: Pipeline de transações
 description:
   Como as transações Solana são processadas desde o envio até o commit, incluindo o pipeline completo de validação de 8 estágios, leitura de detalhes de transações da rede e erros comuns de validação.
-url: /docs/core/transactions/transaction-pipeline
 type: reference
 prerequisites:
   - /docs/core/transactions
@@ -14,11 +13,13 @@ related:
   - /docs/core/programs/program-execution
 ---
 
-<Callout type="info" title="Resumo">
+<Info>
+  **Resumo**
+
   As transações passam por 8 estágios: receção, sigverify, sanitização,
   verificações de orçamento/idade, validação do pagador de taxas, carregamento
   de contas, execução de instruções e commit.
-</Callout>
+</Info>
 
 ## Pipeline de processamento de transações
 
@@ -30,9 +31,9 @@ até o commit, com referências aos ficheiros de código-fonte no cliente valida
 ### 1. Receção e desserialização
 
 O validator recebe bytes de transação via UDP/QUIC. Os bytes brutos devem caber
-num único pacote (_rs`PACKET_DATA_SIZE`_ = 1.232 bytes). Os bytes são
-desserializados numa _rs`VersionedTransaction`_, que contém o array de
-assinaturas e uma _rs`VersionedMessage`_ (legacy ou v0).
+num único pacote (`PACKET_DATA_SIZE` = 1.232 bytes). Os bytes são
+desserializados numa `VersionedTransaction`, que contém o array de
+assinaturas e uma `VersionedMessage` (legacy ou v0).
 
 O próximo
 [formato v1](/docs/core/transactions/versioned-transactions#v1-message-format)
@@ -55,7 +56,7 @@ A verificação é paralelizada: o validator divide lotes de pacotes em blocos d
 ### 3. Sanitização
 
 A transação desserializada é sanitizada para produzir uma
-_rs`SanitizedTransaction`_ (ou
+`SanitizedTransaction` (ou
 [`RuntimeTransaction`](https://github.com/anza-xyz/agave/blob/v3.1.8/runtime-transaction/src/runtime_transaction.rs#L31)).
 A sanitização valida invariantes estruturais:
 
@@ -65,7 +66,7 @@ A sanitização valida invariantes estruturais:
 - O pagador de taxas (índice de conta 0) é um signatário com permissão de
   escrita
 
-O wrapper _rs`RuntimeTransaction`_ armazena em cache metadados pré-computados de
+O wrapper `RuntimeTransaction` armazena em cache metadados pré-computados de
 [`TransactionMeta`](https://github.com/anza-xyz/agave/blob/v3.1.8/runtime-transaction/src/transaction_meta.rs#L38-L44):
 o hash da mensagem, flag de transação de voto, contagens de assinaturas de
 precompilação (Ed25519/secp256k1/secp256r1), detalhes de instrução de orçamento
@@ -81,26 +82,26 @@ realiza várias verificações por transação:
 transação são analisadas e validadas primeiro. Os detalhes da taxa são
 calculados a partir dos limites do orçamento e taxa de priorização. Se o
 orçamento de computação for inválido ou conflituoso, a transação falha com erros
-de análise do orçamento de computação como _rs`DuplicateInstruction`_,
+de análise do orçamento de computação como `DuplicateInstruction`,
 `InstructionError(..., InvalidInstructionData)`, ou
-_rs`InvalidLoadedAccountsDataSizeLimit`_.
+`InvalidLoadedAccountsDataSizeLimit`.
 
 Para
 [transações v1](/docs/core/transactions/versioned-transactions#v1-message-format)
 não há instruções de orçamento de computação a serem analisadas: os limites e a taxa de prioridade
 vêm da configuração da mensagem, e quaisquer instruções ComputeBudget na mensagem
 são ignoradas para configuração. Os campos de configuração não preenchidos assumem o valor zero como padrão, o que
-surge posteriormente em [carregamento de contas](#6-load-accounts).
+surge posteriormente em [carregamento de contas](#6-carregar-contas).
 
 **Idade do blockhash**: O `recent_blockhash` da transação é procurado no
 [`BlockhashQueue`](https://github.com/anza-xyz/agave/blob/v3.1.8/accounts-db/src/blockhash_queue.rs#L33).
-Se o hash for encontrado e sua idade estiver dentro de _rs`MAX_PROCESSING_AGE`_
+Se o hash for encontrado e sua idade estiver dentro de `MAX_PROCESSING_AGE`
 (150 slots), a transação prossegue. Se não for encontrado, o validator verifica
 se há um [nonce durável](/docs/core/transactions/durable-nonces) válido.
 
 **Cache de estado**: O hash da mensagem da transação é verificado em relação a
 um cache de estado. Se encontrado, a transação é rejeitada com
-_rs`AlreadyProcessed`_.
+`AlreadyProcessed`.
 
 ### 5. Validar nonce e pagador de taxa
 
@@ -112,7 +113,7 @@ no SVM trata duas validações:
 carrega a conta de nonce e verifica:
 
 - A conta é propriedade do System Program
-- É analisada como _rs`State::Initialized`_
+- É analisada como `State::Initialized`
 - O nonce durável armazenado corresponde ao `recent_blockhash` da transação
 - O nonce pode ser avançado (seu nonce durável atual difere do próximo nonce
   durável, ou seja, o nonce ainda não foi usado no bloco atual)
@@ -125,18 +126,18 @@ Se válido, o nonce é avançado para o próximo valor de nonce durável. Consul
 carregada e verificada por
 [`validate_fee_payer`](https://github.com/anza-xyz/agave/blob/v3.1.8/svm/src/account_loader.rs#L369-L417):
 
-- A conta deve existir (lamports > 0), caso contrário _rs`AccountNotFound`_
+- A conta deve existir (lamports > 0), caso contrário `AccountNotFound`
 - A conta deve ser uma conta de sistema ou conta de nonce, caso contrário
-  _rs`InvalidAccountForFee`_
+  `InvalidAccountForFee`
 - Os lamports devem cobrir `min_balance + total_fee`, onde `min_balance` é 0
   para contas de sistema ou `rent.minimum_balance(NonceState::size())` para
-  contas de nonce; caso contrário _rs`InsufficientFundsForFee`_
+  contas de nonce; caso contrário `InsufficientFundsForFee`
 - Após a dedução da taxa, a conta deve permanecer isenta de renda (não pode
   fazer transição de isenta de renda para pagadora de renda)
 
 A taxa é deduzida do pagador de taxas nesta etapa. Um instantâneo do pagador de
 taxas com a taxa subtraída (e nonce avançado, se aplicável) é salvo como
-_rs`RollbackAccounts`_, que são as contas que são confirmadas mesmo se a
+`RollbackAccounts`, que são as contas que são confirmadas mesmo se a
 execução falhar.
 
 ### 6. Carregar contas
@@ -160,25 +161,27 @@ Para cada conta que não seja pagadora de taxas, o carregador:
 
 Para cada programa invocado pelas instruções da transação, o carregador verifica
 que a conta do programa existe e é propriedade de um carregador válido
-(`NativeLoader` ou um dos _rs`PROGRAM_OWNERS`_). Programas inválidos falham com
-_rs`ProgramAccountNotFound`_ ou _rs`InvalidProgramForExecution`_.
+(`NativeLoader` ou um dos `PROGRAM_OWNERS`). Programas inválidos falham com
+`ProgramAccountNotFound` ou `InvalidProgramForExecution`.
 
 Programas LoaderV3 (atualizáveis) carregam implicitamente a sua conta
 programdata associada, que também conta para o limite de tamanho de dados
 carregados.
 
-<Callout type="warn" title="As transações v1 definem esse limite como zero por padrão">
+<Warning>
+  **As transações v1 definem esse limite como zero por padrão**
+
   O padrão de 64 MiB se aplica a transações legadas e v0. No [formato
   v1](/docs/core/transactions/versioned-transactions#v1-message-format), o
   limite de tamanho dos dados de contas carregadas é lido da configuração da mensagem, e um campo
   não preenchido assume **0 bytes** como padrão, em vez de um padrão generoso. Uma transação v1
   com uma configuração vazia, portanto, falha nessa etapa com
-  _rs`MaxLoadedAccountsDataSizeExceeded`_ — o orçamento solicitado é pequeno demais
+`MaxLoadedAccountsDataSizeExceeded` — o orçamento solicitado é pequeno demais
   para a primeira conta carregada, de modo que a falha ocorre antes de qualquer instrução
   ser executada, com um erro que não menciona nem o v1 nem a configuração. Sempre defina explicitamente o
   limite de unidades de computação e o limite de tamanho dos dados de contas carregadas ao
   construir transações v1.
-</Callout>
+</Warning>
 
 Se o carregamento da conta falhar mas o pagador de taxas foi validado com
 sucesso, a transação torna-se um resultado
@@ -188,10 +191,10 @@ a taxa ainda é cobrada mas nenhuma instrução é executada.
 ### 7. Executar instruções
 
 [`execute_loaded_transaction`](https://github.com/anza-xyz/agave/blob/v3.1.8/svm/src/transaction_processor.rs#L847)
-cria um _rs`TransactionContext`_ com todas as contas carregadas e invoca
+cria um `TransactionContext` com todas as contas carregadas e invoca
 [`process_message`](https://github.com/anza-xyz/agave/blob/v3.1.8/svm/src/message_processor.rs).
 As instruções são executadas sequencialmente na ordem em que aparecem na
-mensagem. Cada invocação de instrução cria um _rs`InvokeContext`_ e chama o
+mensagem. Cada invocação de instrução cria um `InvokeContext` e chama o
 programa alvo.
 
 #### Detalhes do processamento de instruções
@@ -216,7 +219,7 @@ do runtime itera através de cada instrução e chama o programa alvo:
 4. Após a conclusão da instrução, o runtime
    [verifica](https://github.com/anza-xyz/agave/blob/v3.1.8/transaction-context/src/lib.rs#L366-L398)
    que o saldo total de lamports em todas as contas da instrução não foi
-   alterado (verificação _rs`UnbalancedInstruction`_).
+   alterado (verificação `UnbalancedInstruction`).
 5. Se qualquer instrução falhar, toda a transação é revertida. Nenhuma alteração
    de estado intermediária é confirmada.
 
@@ -224,8 +227,8 @@ Cada instrução incrementa o rastreamento de instruções. O rastreamento inclu
 tanto instruções de nível superior quanto quaisquer [CPIs](/docs/core/cpi) que
 elas invocam. O comprimento total do rastreamento (instruções de nível superior
 mais todos os CPIs aninhados) não pode exceder 64
-(_rs`MAX_INSTRUCTION_TRACE_LENGTH`_). Exceder este limite retorna
-_rs`InstructionError::MaxInstructionTraceLengthExceeded`_.
+(`MAX_INSTRUCTION_TRACE_LENGTH`). Exceder este limite retorna
+`InstructionError::MaxInstructionTraceLengthExceeded`.
 
 Após a execução, o runtime verifica que:
 
@@ -236,7 +239,7 @@ Após a execução, o runtime verifica que:
 
 Se a execução for bem-sucedida, os estados de conta modificados do
 `TransactionContext` são escritos de volta no cache local do lote do
-_rs`AccountLoader`_. Se a execução falhar, apenas o _rs`RollbackAccounts`_
+`AccountLoader`. Se a execução falhar, apenas o `RollbackAccounts`
 (pagador de taxa com taxa deduzida e nonce avançado) são escritos de volta. A
 taxa ainda é cobrada, mas todas as outras alterações de conta são descartadas.
 

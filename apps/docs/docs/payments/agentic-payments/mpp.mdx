@@ -1,9 +1,10 @@
 ---
 title: Machine Payments Protocol on Solana
-seoTitle: MPP Agentic Payments on Solana
 description:
   Use Machine Payments Protocol challenges, credentials, and receipts for
   one-time charges or metered payment sessions on Solana.
+"og:title": MPP Agentic Payments on Solana
+"twitter:title": MPP Agentic Payments on Solana
 ---
 
 The [Machine Payments Protocol (MPP)](https://mpp.dev/) applies HTTP
@@ -35,7 +36,7 @@ payment headers:
 | Successful receipt      | Resource response with `Payment-Receipt: ...`               |
 | Invalid payment details | Problem Details body using `application/problem+json`       |
 
-```mermaid title="MPP Charge Flow"
+```mermaid
 sequenceDiagram
     participant Client
     participant Server
@@ -49,6 +50,25 @@ sequenceDiagram
     Solana-->>Server: Confirmed transaction
     Server-->>Client: 200 + report + Payment-Receipt
 ```
+
+<div className="nojs-only" data-fallback="mermaid">
+  ```text Mermaid
+  sequenceDiagram
+      participant Client
+      participant Server
+      participant Solana
+      Client->>Server: GET /report
+      Server-->>Client: 402 + WWW-Authenticate: Payment
+      Note over Client: Validate terms and authorize payment
+      Client->>Server: GET /report + Authorization: Payment
+      Server->>Server: Verify challenge binding and transaction
+      Server->>Solana: Broadcast signed transfer
+      Solana-->>Server: Confirmed transaction
+      Server-->>Client: 200 + report + Payment-Receipt
+  ```
+</div>
+
+<p className="sol-caption">MPP Charge Flow</p>
 
 A challenge includes a server-generated ID, realm, method, intent, encoded
 payment request, and expiry. The credential echoes the challenge and adds the
@@ -87,7 +107,7 @@ pnpm add --save-dev @types/express tsx
 This smallest example uses the hosted Surfpool sandbox and the package's public
 demo recipient. It is for local development only:
 
-```ts filename=server.ts
+```ts server.ts
 import express from "express";
 import { createPayKit, usd } from "@solana/pay-kit";
 
@@ -117,11 +137,13 @@ pay --sandbox curl http://127.0.0.1:4567/report
 
 The route handler runs only after the middleware accepts the payment.
 
-<Callout type="warn" title="Replace every sandbox default in production">
+<Warning>
+  **Replace every sandbox default in production**
+
   Configure an explicit network, merchant recipient, dedicated RPC, stable
   challenge-binding secret, production signer, and durable replay store. Never
   route real payments to a package demo signer.
-</Callout>
+</Warning>
 
 ## Metered sessions
 
@@ -134,7 +156,7 @@ This is useful for token-metered inference, byte-metered downloads, live data,
 and repeated tool calls. It is not the same as sending a separate onchain
 payment for every event.
 
-```mermaid title="MPP Session Lifecycle"
+```mermaid
 sequenceDiagram
     participant Client
     participant Server
@@ -150,6 +172,27 @@ sequenceDiagram
     Server->>Solana: Settle highest accepted voucher
     Solana-->>Client: Return unused deposit when closed
 ```
+
+<div className="nojs-only" data-fallback="mermaid">
+  ```text Mermaid
+  sequenceDiagram
+      participant Client
+      participant Server
+      participant Solana
+      Client->>Server: Request + session support
+      Server-->>Client: 402 + capped session challenge
+      Client->>Solana: Open channel and deposit maximum
+      Solana-->>Server: Channel confirmed
+      loop Metered usage
+          Client->>Server: Request + increasing signed voucher
+          Server-->>Client: Resource + receipt
+      end
+      Server->>Solana: Settle highest accepted voucher
+      Solana-->>Client: Return unused deposit when closed
+  ```
+</div>
+
+<p className="sol-caption">MPP Session Lifecycle</p>
 
 Call a session a **session payment**, **payment channel**, or **capped repeated
 authorization**. Only call it a streamed payment when the service and payment

@@ -3,7 +3,6 @@ title: 账户运行时
 description:
   Solana
   运行时在执行前如何加载和验证账户，以及用于将账户数据传递给程序的序列化格式。
-url: /docs/core/accounts/account-runtime
 type: reference
 prerequisites:
   - /docs/core/accounts
@@ -15,14 +14,16 @@ related:
   - /docs/core/constants-reference
 ---
 
-<Callout type="info" title="概要">
-  在执行前，运行时会加载账户，验证手续费支付者，检查租金豁免，并将账户数据序列化为程序可访问的内存布局。
-</Callout>
+<Info>
+  **概要**
 
-<Callout>
+  在执行前，运行时会加载账户，验证手续费支付者，检查租金豁免，并将账户数据序列化为程序可访问的内存布局。
+</Info>
+
+<Note>
   本页介绍运行时内部机制。大多数开发者在构建程序时无需了解这些内容。开发者相关内容请参见
   [账户结构](/docs/core/accounts/account-structure)。
-</Callout>
+</Note>
 
 ## 账户加载
 
@@ -36,23 +37,23 @@ related:
    lamports。余额不能介于 0 与租金豁免最低值之间。nonce
    account 必须始终保留足够 lamports 以保持租金豁免。如果支付者既不是 system
    account 也不是 nonce account，交易将以
-   _rs`TransactionError::InvalidAccountForFee`_ 失败。
+   `TransactionError::InvalidAccountForFee` 失败。
 
 2. **加载数据大小限制**：所有加载账户的总数据大小（包括每个账户的
    [`TRANSACTION_ACCOUNT_BASE_SIZE`](https://github.com/anza-xyz/agave/blob/v3.1.8/svm/src/account_loader.rs#L45)
    64 字节）不得超过
    [`MAX_LOADED_ACCOUNTS_DATA_SIZE_BYTES`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/execution_budget.rs#L53)（64
    MiB）。超出该限制将导致
-   _rs`TransactionError::MaxLoadedAccountsDataSizeExceeded`_。
+   `TransactionError::MaxLoadedAccountsDataSizeExceeded`。
 
 3. **program
    account 验证**：每个被指令调用的 program 都必须存在，并且归属于有效的 loader：包括
    [`PROGRAM_OWNERS`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/account/src/lib.rs#L802)（BPF
    Loader Upgradeable、BPF Loader、BPF Loader Deprecated、Loader
    V4）或原生 loader。如果 program account 不存在，交易将以
-   _rs`TransactionError::ProgramAccountNotFound`_
+   `TransactionError::ProgramAccountNotFound`
    失败。如果存在但归属无效 owner，交易将以
-   _rs`TransactionError::InvalidProgramForExecution`_ 失败。
+   `TransactionError::InvalidProgramForExecution` 失败。
 
 4. **不存在的账户**：链上不存在的账户会被加载为默认账户（0
    lamport，空数据，由 System Program 拥有），其中 `rent_epoch` 设置为
@@ -106,9 +107,9 @@ VM。序列化格式（标准对齐格式，所有加载器都使用，除了已
 - 否则，返回 `Some(first_index)`，其中 `first_index` 是首次出现的索引。
 
 由于所有指向同一账户的引用共享同一底层
-_rs`AccountSharedData`_，通过任意引用进行的修改会立即反映到所有其他引用中。但同一时间只能持有一个可变借用。如果尝试通过两个不同的指令账户索引同时对同一账户进行可变借用，则会返回
-_rs`InstructionError::AccountBorrowFailed`_。程序必须在对同一底层账户进行新的借用前，先释放已有的借用。
+`AccountSharedData`，通过任意引用进行的修改会立即反映到所有其他引用中。但同一时间只能持有一个可变借用。如果尝试通过两个不同的指令账户索引同时对同一账户进行可变借用，则会返回
+`InstructionError::AccountBorrowFailed`。程序必须在对同一底层账户进行新的借用前，先释放已有的借用。
 
 程序执行完毕后，运行时会将缓冲区反序列化回去（[`deserialize_parameters_aligned()`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/serialization.rs#L580-L667)），并将所有更改应用到
 `lamports`、`data`（包括长度变化，最大到
-_rs`MAX_PERMITTED_DATA_INCREASE`_），以及 `owner`。
+`MAX_PERMITTED_DATA_INCREASE`），以及 `owner`。

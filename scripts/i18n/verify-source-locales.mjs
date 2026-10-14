@@ -1,27 +1,55 @@
-import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
-import { fileURLToPath } from "node:url";
+import { loadProjects, repoRoot } from "./projects.mjs";
 
-const scriptDir = path.dirname(fileURLToPath(import.meta.url));
-const rootDir = path.resolve(scriptDir, "../..");
-const configPath = ".lingo/config.json";
-const absolutePath = path.join(rootDir, configPath);
-const config = JSON.parse(fs.readFileSync(absolutePath, "utf8"));
-const sourceLocale = config.sourceLocale;
-const targetLocales = config.targetLocales;
+// Locales the docs never target (decisions.md: Mintlify has no Greek). The UI
+// bundles keep translating them.
+const DOCS_DROPPED_LOCALES = ["el"];
 
 let hasError = false;
+const projects = loadProjects();
 
-if (!sourceLocale || !Array.isArray(targetLocales)) {
-  console.error(`${configPath}: missing sourceLocale or targetLocales`);
-  hasError = true;
-}
+for (const { name, configPath, config } of projects) {
+  const shown = path.relative(repoRoot, configPath);
+  const { sourceLocale, targetLocales } = config;
 
-if (sourceLocale && Array.isArray(targetLocales)) {
+  if (!sourceLocale || !Array.isArray(targetLocales)) {
+    console.error(`${shown}: missing sourceLocale or targetLocales`);
+    hasError = true;
+    continue;
+  }
+
   if (targetLocales.includes(sourceLocale)) {
     console.error(
-      `${configPath}: source locale "${sourceLocale}" must not be listed in targetLocales`,
+      `${shown}: source locale "${sourceLocale}" must not be listed in targetLocales`,
+    );
+    hasError = true;
+  }
+
+  if (name === "docs") {
+    for (const locale of DOCS_DROPPED_LOCALES) {
+      if (targetLocales.includes(locale)) {
+        console.error(
+          `${shown}: "${locale}" is dropped from the docs (decisions.md) and must not be a target`,
+        );
+        hasError = true;
+      }
+    }
+  }
+}
+
+const [ui, docs] = projects;
+if (ui && docs) {
+  if (ui.config.sourceLocale !== docs.config.sourceLocale) {
+    console.error("The ui and docs Lingo projects must share a source locale");
+    hasError = true;
+  }
+  const extra = docs.config.targetLocales.filter(
+    (l) => !ui.config.targetLocales.includes(l),
+  );
+  if (extra.length) {
+    console.error(
+      `Docs target locales missing from the UI project: ${extra.join(", ")}`,
     );
     hasError = true;
   }

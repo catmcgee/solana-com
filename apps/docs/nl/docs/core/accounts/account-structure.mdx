@@ -2,7 +2,6 @@
 title: Accountstructuur
 description:
   Accountadressen, de vijf velden die elk Solana-account bevat — lamports, data, owner, executable en rent_epoch — met interactieve code-uitleg.
-url: /docs/core/accounts/account-structure
 type: conceptual
 prerequisites:
   - /docs/core/accounts
@@ -15,12 +14,14 @@ related:
 
 {/* TOC: Account Address, Account Fields, ScrollyCoding walkthrough (Lamports, Data, Owner, Executable, Rent Epoch), AccountSharedData, Rent State Machine */}
 
-<Callout type="info" title="Samenvatting">
+<Info>
+  **Samenvatting**
+
   Accounts hebben 5 velden: lamports, data, owner, executable en rent_epoch. Elk
   account wordt geïdentificeerd door een uniek 32-byte adres. Accounts moeten
   een minimum lamport-saldo aanhouden dat evenredig is aan hun datagrootte om
   onchain te blijven.
-</Callout>
+</Info>
 
 ## Accountadres
 
@@ -32,17 +33,21 @@ string. Een adres kan een van twee typen zijn:
 2. **Program Derived Address (PDA)**: deterministisch afgeleid van een program
    ID en seeds (geen private key)
 
-![Een account met zijn base58-gecodeerde public key-adres](/assets/docs/core/accounts/account-address.svg)
+<Frame caption="Een account met zijn base58-gecodeerde public key-adres">
+  <img className="block dark:hidden" src="/docs-assets/assets/docs/core/accounts/account-address-light.svg" alt="Een account met zijn base58-gecodeerde public key-adres" />
+
+  <img className="hidden dark:block" src="/docs-assets/assets/docs/core/accounts/account-address.svg" alt="Een account met zijn base58-gecodeerde public key-adres" />
+</Frame>
 
 ### Public key
 
-Een _rs`Keypair`_ bestaat uit een public key (gebruikt als accountadres) en een
+Een `Keypair` bestaat uit een public key (gebruikt als accountadres) en een
 private key (gebruikt om transacties te ondertekenen). Het volgende voorbeeld
 genereert een keypair met behulp van de Solana SDK.
 
-<CodeTabs storage="accounts" flags="r">
+<CodeGroup>
 
-```ts !! title="Kit"
+```ts Kit
 import { generateKeyPairSigner } from "@solana/kit";
 
 // Kit does not enable extractable private keys
@@ -50,7 +55,7 @@ const keypairSigner = await generateKeyPairSigner();
 console.log(keypairSigner);
 ```
 
-```ts !! title="Legacy"
+```ts Legacy
 import { Keypair } from "@solana/web3.js";
 
 const keypair = Keypair.generate();
@@ -58,7 +63,7 @@ console.log(`Public Key: ${keypair.publicKey}`);
 console.log(`Secret Key: ${keypair.secretKey}`);
 ```
 
-```rs !! title="Rust"
+```rs Rust
 use solana_sdk::signer::{keypair::Keypair, Signer};
 
 #[tokio::main]
@@ -69,7 +74,7 @@ async fn main() {
 }
 ```
 
-</CodeTabs>
+</CodeGroup>
 
 ### Program Derived Address
 
@@ -78,9 +83,9 @@ afgeleid van een program ID en een of meer optionele seeds. PDA's hebben geen
 corresponderende private key. Het volgende voorbeeld leidt een PDA af met behulp
 van de Solana SDK.
 
-<CodeTabs storage="accounts" flags="r">
+<CodeGroup>
 
-```ts !! title="Kit"
+```ts Kit
 import { Address, getProgramDerivedAddress } from "@solana/kit";
 
 const programAddress = "11111111111111111111111111111111" as Address;
@@ -95,7 +100,7 @@ console.log(`PDA: ${pda}`);
 console.log(`Bump: ${bump}`);
 ```
 
-```ts !! title="Legacy"
+```ts Legacy
 import { PublicKey } from "@solana/web3.js";
 
 const programAddress = new PublicKey("11111111111111111111111111111111");
@@ -110,7 +115,7 @@ console.log(`PDA: ${pda}`);
 console.log(`Bump: ${bump}`);
 ```
 
-```rs !! title="Rust"
+```rs Rust
 use solana_sdk::pubkey; // macro
 use solana_sdk::pubkey::Pubkey;
 
@@ -124,7 +129,7 @@ async fn main() {
 }
 ```
 
-</CodeTabs>
+</CodeGroup>
 
 ## Accountvelden
 
@@ -132,236 +137,213 @@ Elk
 [`Account`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/account/src/lib.rs#L32-L56)
 heeft een maximale grootte van
 [`MAX_ACCOUNT_DATA_LEN`](https://github.com/anza-xyz/agave/blob/v3.1.8/transaction-context/src/lib.rs#L34)
-(10 MiB, equivalent aan _rs`MAX_PERMITTED_DATA_LENGTH`_) en bevat vijf velden:
+(10 MiB, equivalent aan `MAX_PERMITTED_DATA_LENGTH`) en bevat vijf velden:
 
-<WithMentions>
+| Veld         | Type      | Beschrijving                                                                        |
+| ------------ | --------- | ----------------------------------------------------------------------------------- |
+| `lamports`   | `u64`     | Saldo in lamports. Eigenaar kan debiteren; elk programma kan crediteren.            |
+| `data`       | `Vec<u8>` | Accountstatus of programma-bytecode. Max 10 MiB. Alleen door eigenaar te schrijven. |
+| `owner`      | `Pubkey`  | Programma met schrijftoegang. Alleen opnieuw toewijsbaar wanneer data op nul staat. |
+| `executable` | `bool`    | True = program account.                                                             |
+| `rent_epoch` | `Epoch`   | Verouderd. Ingesteld op `u64::MAX` voor rent-exempt accounts.                       |
 
-| Veld                               | Type      | Beschrijving                                                                        |
-| ---------------------------------- | --------- | ----------------------------------------------------------------------------------- |
-| [`lamports`](mention:lamports)     | `u64`     | Saldo in lamports. Eigenaar kan debiteren; elk programma kan crediteren.            |
-| [`data`](mention:data)             | `Vec<u8>` | Accountstatus of programma-bytecode. Max 10 MiB. Alleen door eigenaar te schrijven. |
-| [`owner`](mention:owner)           | `Pubkey`  | Programma met schrijftoegang. Alleen opnieuw toewijsbaar wanneer data op nul staat. |
-| [`executable`](mention:executable) | `bool`    | True = program account.                                                             |
-| [`rent_epoch`](mention:rent_epoch) | `Epoch`   | Verouderd. Ingesteld op `u64::MAX` voor rent-exempt accounts.                       |
-
-```rust title="Account"
+```rust Account
 pub struct Account {
     /// lamports in the account
-    // !mention lamports
     pub lamports: u64,
     /// data held in this account
     #[cfg_attr(feature = "serde", serde(with = "serde_bytes"))]
-    // !mention data
     pub data: Vec<u8>,
     /// the program that owns this account. If executable, the program that loads this account.
-    // !mention owner
     pub owner: Pubkey,
     /// if true, this account's data contains a program (and is now read-only)
-    // !mention executable
     pub executable: bool,
     /// deprecated
-    // !mention rent_epoch
     pub rent_epoch: Epoch,
 }
 ```
 
-</WithMentions>
+<Steps>
+  <Step title="Lamports">
+    Het `lamports` veld bevat het saldo van het account in
+    [lamports](/docs/references/terminology#lamport) (1 SOL = 1.000.000.000
+    lamports).
 
-<ScrollyCoding>
+    Elk account moet een minimaal lamport-saldo aanhouden om de opgeslagen gegevens
+    onchain te bewaren. Dit terugbetaalbare opslagsaldo is evenredig aan de
+    gegevensgrootte van het account.
 
-## !!steps Lamports
+    <Info>
+      De runtime en RPC-methodenamen noemen dit het "rent-exempt minimum", maar
+      doorlopende rent-inning is uitgeschakeld. Beschouw het saldo als een terugbetaalbare
+      opslagdeposito voor het account: het volledige saldo kan worden teruggevorderd wanneer het account wordt gesloten.
+    </Info>
 
-Het `lamports` veld bevat het saldo van het account in
-[lamports](/docs/references/terminology#lamport) (1 SOL = 1.000.000.000
-lamports).
+    Zie
+    [`minimum_balance()`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/rent/src/lib.rs#L93)
+    en de rent
+    [constanten](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/rent/src/lib.rs#L47-L80).
 
-Elk account moet een minimaal lamport-saldo aanhouden om de opgeslagen gegevens
-onchain te bewaren. Dit terugbetaalbare opslagsaldo is evenredig aan de
-gegevensgrootte van het account.
+    ```rust title="Account Examples" focus={3,13}
+    // Example Token Mint Account
+    Account {
+        lamports: 1461600,
+        data.len: 82,
+        owner: TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb,
+        executable: false,
+        rent_epoch: 0,
+        data: 010000001e213c90625a7e643d9555bb01b6c3fe6416d7afd523ce8c7ddd9b923ceafb9d00000000000000000901010000001e213c90625a7e643d9555bb01b6,
+    }
 
-<Callout type="info">
-  De runtime en RPC-methodenamen noemen dit het "rent-exempt minimum", maar
-  doorlopende rent-inning is uitgeschakeld. Beschouw het saldo als een terugbetaalbare
-  opslagdeposito voor het account: het volledige saldo kan worden teruggevorderd wanneer het account wordt gesloten.
-</Callout>
+    // Example Token Program Account
+    Account {
+        lamports: 4513200894,
+        data.len: 134080,
+        owner: BPFLoader2111111111111111111111111111111111,
+        executable: true,
+        rent_epoch: 18446744073709551615,
+        data: 7f454c460201010000000000000000000300f70001000000d8f90000000000004000000000000000800902000000000000000000400038000400400009000800,
+    }
+    ```
+  </Step>
 
-Zie
-[`minimum_balance()`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/rent/src/lib.rs#L93)
-en de rent
-[constanten](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/rent/src/lib.rs#L47-L80).
+  <Step title="Data">
+    Het `data` veld slaat een willekeurige byte-array op. De inhoud hangt af van het
+    accounttype:
 
-```rust !! title="Account Examples"
-// Example Token Mint Account
-Account {
-    // !focus
-    lamports: 1461600,
-    data.len: 82,
-    owner: TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb,
-    executable: false,
-    rent_epoch: 0,
-    data: 010000001e213c90625a7e643d9555bb01b6c3fe6416d7afd523ce8c7ddd9b923ceafb9d00000000000000000901010000001e213c90625a7e643d9555bb01b6,
-}
+    - **Program accounts**: Bevat uitvoerbare bytecode of het adres van een
+      [program data account](/docs/core/accounts/account-types#program-data-accounts)
+      dat de bytecode opslaat.
+    - **Data accounts**: Bevat door het programma gedefinieerde statusdata. Het
+      eigenaar-programma definieert het serialisatieformaat.
 
-// Example Token Program Account
-Account {
-    // !focus
-    lamports: 4513200894,
-    data.len: 134080,
-    owner: BPFLoader2111111111111111111111111111111111,
-    executable: true,
-    rent_epoch: 18446744073709551615,
-    data: 7f454c460201010000000000000000000300f70001000000d8f90000000000004000000000000000800902000000000000000000400038000400400009000800,
-}
-```
+    Het lezen van accountdata vereist twee stappen:
 
-## !!steps Data
+    1. Haal het account op via zijn [adres](#accountadres).
+    2. Deserialiseer het `data` veld van ruwe bytes naar de door het programma
+       gedefinieerde data structuur.
 
-Het `data` veld slaat een willekeurige byte-array op. De inhoud hangt af van het
-accounttype:
+    ```rust title="Account Examples" focus={4,8,14,18}
+    // Example Token Mint Account
+    Account {
+        lamports: 1461600,
+        data.len: 82,
+        owner: TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb,
+        executable: false,
+        rent_epoch: 0,
+        data: 010000001e213c90625a7e643d9555bb01b6c3fe6416d7afd523ce8c7ddd9b923ceafb9d00000000000000000901010000001e213c90625a7e643d9555bb01b6,
+    }
 
-- **Program accounts**: Bevat uitvoerbare bytecode of het adres van een
-  [program data account](/docs/core/accounts/account-types#program-data-accounts)
-  dat de bytecode opslaat.
-- **Data accounts**: Bevat door het programma gedefinieerde statusdata. Het
-  eigenaar-programma definieert het serialisatieformaat.
+    // Example Token Program Account
+    Account {
+        lamports: 4513200894,
+        data.len: 134080,
+        owner: BPFLoader2111111111111111111111111111111111,
+        executable: true,
+        rent_epoch: 18446744073709551615,
+        data: 7f454c460201010000000000000000000300f70001000000d8f90000000000004000000000000000800902000000000000000000400038000400400009000800,
+    }
+    ```
+  </Step>
 
-Het lezen van accountdata vereist twee stappen:
+  <Step title="Eigenaar">
+    Het veld `owner` bevat de program-ID (publieke sleutel) van het programma dat
+    dit account bezit.
 
-1. Haal het account op via zijn [adres](#account-address).
-2. Deserialiseer het `data` veld van ruwe bytes naar de door het programma
-   gedefinieerde data structuur.
+    Het eigenaar-programma is het enige programma dat:
 
-```rust !! title="Account Examples"
-// Example Token Mint Account
-Account {
-    lamports: 1461600,
-    // !focus
-    data.len: 82,
-    owner: TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb,
-    executable: false,
-    rent_epoch: 0,
-    // !focus
-    data: 010000001e213c90625a7e643d9555bb01b6c3fe6416d7afd523ce8c7ddd9b923ceafb9d00000000000000000901010000001e213c90625a7e643d9555bb01b6,
-}
+    - Het veld `data` van het account kan wijzigen
+    - Lamports kan aftrekken van het veld `lamports` van het account
 
-// Example Token Program Account
-Account {
-    lamports: 4513200894,
-    // !focus
-    data.len: 134080,
-    owner: BPFLoader2111111111111111111111111111111111,
-    executable: true,
-    rent_epoch: 18446744073709551615,
-    // !focus
-    data: 7f454c460201010000000000000000000300f70001000000d8f90000000000004000000000000000800902000000000000000000400038000400400009000800,
-}
-```
+    Elk programma kan lamports toevoegen aan een ander account, maar alleen de
+    eigenaar kan lamports ervan aftrekken.
 
-## !!steps Eigenaar
+    Voor program accounts is de eigenaar het
+    [loader-programma](/docs/core/programs/builtin-programs#loader-programs) van het
+    account.
 
-Het veld `owner` bevat de program-ID (publieke sleutel) van het programma dat
-dit account bezit.
+    ```rust title="Account Examples" focus={5,15}
+    // Example Token Mint Account
+    Account {
+        lamports: 1461600,
+        data.len: 82,
+        owner: TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb,
+        executable: false,
+        rent_epoch: 0,
+        data: 010000001e213c90625a7e643d9555bb01b6c3fe6416d7afd523ce8c7ddd9b923ceafb9d00000000000000000901010000001e213c90625a7e643d9555bb01b6,
+    }
 
-Het eigenaar-programma is het enige programma dat:
+    // Example Token Program Account
+    Account {
+        lamports: 4513200894,
+        data.len: 134080,
+        owner: BPFLoader2111111111111111111111111111111111,
+        executable: true,
+        rent_epoch: 18446744073709551615,
+        data: 7f454c460201010000000000000000000300f70001000000d8f90000000000004000000000000000800902000000000000000000400038000400400009000800,
+    }
+    ```
+  </Step>
 
-- Het veld `data` van het account kan wijzigen
-- Lamports kan aftrekken van het veld `lamports` van het account
+  <Step title="Uitvoerbaar">
+    Het veld `executable` is een boolean die bepaalt of het account een
+    [program account](/docs/core/accounts/account-types#program-accounts) of een
+    [data account](/docs/core/accounts/account-types#data-accounts) is:
 
-Elk programma kan lamports toevoegen aan een ander account, maar alleen de
-eigenaar kan lamports ervan aftrekken.
+    - `true` = program account (bevat uitvoerbare code)
+    - `false` = data account (slaat status op)
 
-Voor program accounts is de eigenaar het
-[loader-programma](/docs/core/programs/builtin-programs#loader-programs) van het
-account.
+    ```rust title="Account Examples" focus={6,16}
+    // Example Token Mint Account
+    Account {
+        lamports: 1461600,
+        data.len: 82,
+        owner: TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb,
+        executable: false,
+        rent_epoch: 0,
+        data: 010000001e213c90625a7e643d9555bb01b6c3fe6416d7afd523ce8c7ddd9b923ceafb9d00000000000000000901010000001e213c90625a7e643d9555bb01b6,
+    }
 
-```rust !! title="Account Examples"
-// Example Token Mint Account
-Account {
-    lamports: 1461600,
-    data.len: 82,
-    // !focus
-    owner: TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb,
-    executable: false,
-    rent_epoch: 0,
-    data: 010000001e213c90625a7e643d9555bb01b6c3fe6416d7afd523ce8c7ddd9b923ceafb9d00000000000000000901010000001e213c90625a7e643d9555bb01b6,
-}
+    // Example Token Program Account
+    Account {
+        lamports: 4513200894,
+        data.len: 134080,
+        owner: BPFLoader2111111111111111111111111111111111,
+        executable: true,
+        rent_epoch: 18446744073709551615,
+        data: 7f454c460201010000000000000000000300f70001000000d8f90000000000004000000000000000800902000000000000000000400038000400400009000800,
+    }
+    ```
+  </Step>
 
-// Example Token Program Account
-Account {
-    lamports: 4513200894,
-    data.len: 134080,
-    // !focus
-    owner: BPFLoader2111111111111111111111111111111111,
-    executable: true,
-    rent_epoch: 18446744073709551615,
-    data: 7f454c460201010000000000000000000300f70001000000d8f90000000000004000000000000000800902000000000000000000400038000400400009000800,
-}
-```
+  <Step title="Rent epoch">
+    **Het veld `rent_epoch` is verouderd.**
 
-## !!steps Uitvoerbaar
+    Eerder bijgehouden wanneer bij een account automatisch lamports werden afgetrokken
+    om de opslag van gegevens onchain te bekostigen. Omdat doorlopende rent-inning is uitgeschakeld,
+    wordt `rent_epoch` ingesteld op `u64::MAX` voor alle nieuwe accounts die voldoen aan het minimale
+    opslagsaldo.
 
-Het veld `executable` is een boolean die bepaalt of het account een
-[program account](/docs/core/accounts/account-types#program-accounts) of een
-[data account](/docs/core/accounts/account-types#data-accounts) is:
+    ```rust title="Account Examples" focus={7,17}
+    // Example Token Mint Account
+    Account {
+        lamports: 1461600,
+        data.len: 82,
+        owner: TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb,
+        executable: false,
+        rent_epoch: 0,
+        data: 010000001e213c90625a7e643d9555bb01b6c3fe6416d7afd523ce8c7ddd9b923ceafb9d00000000000000000901010000001e213c90625a7e643d9555bb01b6,
+    }
 
-- `true` = program account (bevat uitvoerbare code)
-- `false` = data account (slaat status op)
-
-```rust !! title="Account Examples"
-// Example Token Mint Account
-Account {
-    lamports: 1461600,
-    data.len: 82,
-    owner: TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb,
-    // !focus
-    executable: false,
-    rent_epoch: 0,
-    data: 010000001e213c90625a7e643d9555bb01b6c3fe6416d7afd523ce8c7ddd9b923ceafb9d00000000000000000901010000001e213c90625a7e643d9555bb01b6,
-}
-
-// Example Token Program Account
-Account {
-    lamports: 4513200894,
-    data.len: 134080,
-    owner: BPFLoader2111111111111111111111111111111111,
-    // !focus
-    executable: true,
-    rent_epoch: 18446744073709551615,
-    data: 7f454c460201010000000000000000000300f70001000000d8f90000000000004000000000000000800902000000000000000000400038000400400009000800,
-}
-```
-
-## !!steps Rent epoch
-
-**Het veld `rent_epoch` is verouderd.**
-
-Eerder bijgehouden wanneer bij een account automatisch lamports werden afgetrokken
-om de opslag van gegevens onchain te bekostigen. Omdat doorlopende rent-inning is uitgeschakeld,
-wordt `rent_epoch` ingesteld op `u64::MAX` voor alle nieuwe accounts die voldoen aan het minimale
-opslagsaldo.
-
-```rust !! title="Account Examples"
-// Example Token Mint Account
-Account {
-    lamports: 1461600,
-    data.len: 82,
-    owner: TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb,
-    executable: false,
-    // !focus
-    rent_epoch: 0,
-    data: 010000001e213c90625a7e643d9555bb01b6c3fe6416d7afd523ce8c7ddd9b923ceafb9d00000000000000000901010000001e213c90625a7e643d9555bb01b6,
-}
-
-// Example Token Program Account
-Account {
-    lamports: 4513200894,
-    data.len: 134080,
-    owner: BPFLoader2111111111111111111111111111111111,
-    executable: true,
-    // !focus
-    rent_epoch: 18446744073709551615,
-    data: 7f454c460201010000000000000000000300f70001000000d8f90000000000004000000000000000800902000000000000000000400038000400400009000800,
-}
-```
-
-</ScrollyCoding>
+    // Example Token Program Account
+    Account {
+        lamports: 4513200894,
+        data.len: 134080,
+        owner: BPFLoader2111111111111111111111111111111111,
+        executable: true,
+        rent_epoch: 18446744073709551615,
+        data: 7f454c460201010000000000000000000300f70001000000d8f90000000000004000000000000000800902000000000000000000400038000400400009000800,
+    }
+    ```
+  </Step>
+</Steps>

@@ -3,7 +3,6 @@ title: 可暂停铸造
 description:
   创建一个具有暂停权限的 Token-2022
   铸造账户,在铸造账户暂停时阻止转账,并稍后恢复活动。
-url: /docs/tokens/extensions/pausable
 type: tutorial
 prerequisites:
   - /docs/tokens/basics/create-mint
@@ -15,7 +14,7 @@ related:
 
 ## 什么是可暂停铸造?
 
-Token Extensions Program 的 _rs`PausableConfig`_
+Token Extensions Program 的 `PausableConfig`
 铸造扩展使暂停权限能够暂停和恢复整个铸造账户的代币活动。
 
 当铸造账户被暂停时,Token Extensions Program 会拒绝:
@@ -30,374 +29,352 @@ Token Extensions Program 的 _rs`PausableConfig`_
 
 要创建、暂停和恢复铸造账户:
 
-1. 计算铸造账户大小以及铸造账户和 _rs`PausableConfig`_ 扩展所需的租金。
-2. 使用 _rs`CreateAccount`_ 创建铸造账户,初始化 _rs`PausableConfig`_,并使用
-   _rs`InitializeMint`_ 初始化铸造账户。
+1. 计算铸造账户大小以及铸造账户和 `PausableConfig` 扩展所需的租金。
+2. 使用 `CreateAccount` 创建铸造账户,初始化 `PausableConfig`,并使用
+   `InitializeMint` 初始化铸造账户。
 3. 为铸造账户铸造代币并创建代币账户。
-4. 使用 _rs`Pause`_ 阻止铸造账户的代币活动。
-5. 使用 _rs`Resume`_ 再次允许代币活动。
-
-<ScrollyCoding>
-
-## !!steps 计算账户大小
-
-计算基础铸造账户加上 _rs`PausableConfig`_ 扩展的铸造账户大小。这是在
-_rs`CreateAccount`_ 中使用的大小。
-
-<CodePlaceholder title="示例" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-const recipient = await generateKeyPairSigner();
-
-// !focus(1:4)
-const pausableExtension = extension("PausableConfig", {
-  authority: client.payer.address,
-  paused: false
-});
-
-// !focus(1:1)
-const mintSpace = BigInt(getMintSize([pausableExtension]));
-```
-
-## !!steps 计算租金
-
-使用铸造账户加上 _rs`PausableConfig`_ 扩展所需的大小计算租金。
-
-<CodePlaceholder title="示例" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-const recipient = await generateKeyPairSigner();
-
-const pausableExtension = extension("PausableConfig", {
-  authority: client.payer.address,
-  paused: false
-});
-
-const mintSpace = BigInt(getMintSize([pausableExtension]));
-
-// !focus(1:3)
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
-```
-
-## !!steps 创建铸造账户
-
-使用计算的空间和 lamport 创建 mint account。
-
-<CodePlaceholder title="示例" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-const recipient = await generateKeyPairSigner();
-
-const pausableExtension = extension("PausableConfig", {
-  authority: client.payer.address,
-  paused: false
-});
-
-const mintSpace = BigInt(getMintSize([pausableExtension]));
-
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
-
-// !focus(1:9)
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  })
-]);
-```
-
-## !!steps 初始化 PausableConfig
-
-在铸币账户上初始化 _rs`PausableConfig`_ 扩展。
-
-<CodePlaceholder title="示例" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-const recipient = await generateKeyPairSigner();
-
-const pausableExtension = extension("PausableConfig", {
-  authority: client.payer.address,
-  paused: false
-});
-
-const mintSpace = BigInt(getMintSize([pausableExtension]));
-
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
-
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  }),
-  // !focus(1:4)
-  getInitializePausableConfigInstruction({
-    mint: mint.address,
-    authority: client.payer.address
-  })
-]);
-```
-
-## !!steps 初始化铸币账户
-
-在同一交易中使用 _rs`InitializeMint`_ 初始化铸币账户。
-
-<CodePlaceholder title="示例" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-const recipient = await generateKeyPairSigner();
-
-const pausableExtension = extension("PausableConfig", {
-  authority: client.payer.address,
-  paused: false
-});
-
-const mintSpace = BigInt(getMintSize([pausableExtension]));
-
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
-
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  }),
-  getInitializePausableConfigInstruction({
-    mint: mint.address,
-    authority: client.payer.address
-  }),
-  // !focus(1:6)
-  getInitializeMintInstruction({
-    mint: mint.address,
-    decimals: 0,
-    mintAuthority: client.payer.address,
-    freezeAuthority: client.payer.address
-  })
-]);
-```
-
-## !!steps 暂停铸币
-
-使用 _rs`Pause`_ 暂停铸币。
-
-<CodePlaceholder title="示例" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-const recipient = await generateKeyPairSigner();
-
-const pausableExtension = extension("PausableConfig", {
-  authority: client.payer.address,
-  paused: false
-});
-
-const mintSpace = BigInt(getMintSize([pausableExtension]));
-
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
-
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  }),
-  getInitializePausableConfigInstruction({
-    mint: mint.address,
-    authority: client.payer.address
-  }),
-  getInitializeMintInstruction({
-    mint: mint.address,
-    decimals: 0,
-    mintAuthority: client.payer.address,
-    freezeAuthority: client.payer.address
-  })
-]);
-
-await client.sendTransaction([
-  // !focus(1:4)
-  getPauseInstruction({
-    mint: mint.address,
-    authority: client.payer
-  })
-]);
-```
-
-## !!steps 恢复铸币
-
-使用 _rs`Resume`_ 恢复铸币。
-
-<CodePlaceholder title="示例" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-const recipient = await generateKeyPairSigner();
-
-const pausableExtension = extension("PausableConfig", {
-  authority: client.payer.address,
-  paused: false
-});
-
-const mintSpace = BigInt(getMintSize([pausableExtension]));
-
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
-
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  }),
-  getInitializePausableConfigInstruction({
-    mint: mint.address,
-    authority: client.payer.address
-  }),
-  getInitializeMintInstruction({
-    mint: mint.address,
-    decimals: 0,
-    mintAuthority: client.payer.address,
-    freezeAuthority: client.payer.address
-  })
-]);
-
-await client.sendTransaction([
-  getPauseInstruction({
-    mint: mint.address,
-    authority: client.payer
-  })
-]);
-
-await client.sendTransaction([
-  // !focus(1:4)
-  getResumeInstruction({
-    mint: mint.address,
-    authority: client.payer
-  })
-]);
-```
-
-</ScrollyCoding>
-
-<Callout type="info" title="指令顺序">
-  _rs`PausableInstruction::Initialize`_ 必须在 _rs`InitializeMint`_ 之前执行。
-  _rs`CreateAccount`_、_rs`PausableInstruction::Initialize`_ 和
-  _rs`InitializeMint`_ 必须包含在同一交易中。
-</Callout>
+4. 使用 `Pause` 阻止铸造账户的代币活动。
+5. 使用 `Resume` 再次允许代币活动。
+
+<Steps>
+  <Step title="计算账户大小">
+    计算基础铸造账户加上 `PausableConfig` 扩展的铸造账户大小。这是在
+    `CreateAccount` 中使用的大小。
+
+    ```ts 示例 focus={15-18,20}
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+    const recipient = await generateKeyPairSigner();
+
+    const pausableExtension = extension("PausableConfig", {
+      authority: client.payer.address,
+      paused: false
+    });
+
+    const mintSpace = BigInt(getMintSize([pausableExtension]));
+    ```
+  </Step>
+
+  <Step title="计算租金">
+    使用铸造账户加上 `PausableConfig` 扩展所需的大小计算租金。
+
+    ```ts 示例 focus={22-24}
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+    const recipient = await generateKeyPairSigner();
+
+    const pausableExtension = extension("PausableConfig", {
+      authority: client.payer.address,
+      paused: false
+    });
+
+    const mintSpace = BigInt(getMintSize([pausableExtension]));
+
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
+    ```
+  </Step>
+
+  <Step title="创建铸造账户">
+    使用计算的空间和 lamport 创建 mint account。
+
+    ```ts 示例 focus={26-34}
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+    const recipient = await generateKeyPairSigner();
+
+    const pausableExtension = extension("PausableConfig", {
+      authority: client.payer.address,
+      paused: false
+    });
+
+    const mintSpace = BigInt(getMintSize([pausableExtension]));
+
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
+
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      })
+    ]);
+    ```
+  </Step>
+
+  <Step title="初始化 PausableConfig">
+    在铸币账户上初始化 `PausableConfig` 扩展。
+
+    ```ts 示例 focus={34-37}
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+    const recipient = await generateKeyPairSigner();
+
+    const pausableExtension = extension("PausableConfig", {
+      authority: client.payer.address,
+      paused: false
+    });
+
+    const mintSpace = BigInt(getMintSize([pausableExtension]));
+
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
+
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializePausableConfigInstruction({
+        mint: mint.address,
+        authority: client.payer.address
+      })
+    ]);
+    ```
+  </Step>
+
+  <Step title="初始化铸币账户">
+    在同一交易中使用 `InitializeMint` 初始化铸币账户。
+
+    ```ts 示例 focus={38-43} expandable
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+    const recipient = await generateKeyPairSigner();
+
+    const pausableExtension = extension("PausableConfig", {
+      authority: client.payer.address,
+      paused: false
+    });
+
+    const mintSpace = BigInt(getMintSize([pausableExtension]));
+
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
+
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializePausableConfigInstruction({
+        mint: mint.address,
+        authority: client.payer.address
+      }),
+      getInitializeMintInstruction({
+        mint: mint.address,
+        decimals: 0,
+        mintAuthority: client.payer.address,
+        freezeAuthority: client.payer.address
+      })
+    ]);
+    ```
+  </Step>
+
+  <Step title="暂停铸币">
+    使用 `Pause` 暂停铸币。
+
+    ```ts 示例 focus={47-50} expandable
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+    const recipient = await generateKeyPairSigner();
+
+    const pausableExtension = extension("PausableConfig", {
+      authority: client.payer.address,
+      paused: false
+    });
+
+    const mintSpace = BigInt(getMintSize([pausableExtension]));
+
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
+
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializePausableConfigInstruction({
+        mint: mint.address,
+        authority: client.payer.address
+      }),
+      getInitializeMintInstruction({
+        mint: mint.address,
+        decimals: 0,
+        mintAuthority: client.payer.address,
+        freezeAuthority: client.payer.address
+      })
+    ]);
+
+    await client.sendTransaction([
+      getPauseInstruction({
+        mint: mint.address,
+        authority: client.payer
+      })
+    ]);
+    ```
+  </Step>
+
+  <Step title="恢复铸币">
+    使用 `Resume` 恢复铸币。
+
+    ```ts 示例 focus={54-57} expandable
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+    const recipient = await generateKeyPairSigner();
+
+    const pausableExtension = extension("PausableConfig", {
+      authority: client.payer.address,
+      paused: false
+    });
+
+    const mintSpace = BigInt(getMintSize([pausableExtension]));
+
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
+
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializePausableConfigInstruction({
+        mint: mint.address,
+        authority: client.payer.address
+      }),
+      getInitializeMintInstruction({
+        mint: mint.address,
+        decimals: 0,
+        mintAuthority: client.payer.address,
+        freezeAuthority: client.payer.address
+      })
+    ]);
+
+    await client.sendTransaction([
+      getPauseInstruction({
+        mint: mint.address,
+        authority: client.payer
+      })
+    ]);
+
+    await client.sendTransaction([
+      getResumeInstruction({
+        mint: mint.address,
+        authority: client.payer
+      })
+    ]);
+    ```
+  </Step>
+</Steps>
+
+<Info>
+  **指令顺序**
+
+  `PausableInstruction::Initialize` 必须在 `InitializeMint` 之前执行。
+`CreateAccount`、`PausableInstruction::Initialize` 和
+`InitializeMint` 必须包含在同一交易中。
+</Info>
 
 ### 源代码参考
 
-| 项目                                  | 描述                                                                           | 源代码                                                                                                                                |
-| ------------------------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
-| _rs`PausableConfig`_                  | 存储暂停权限以及铸币账户当前是否处于暂停状态的铸币扩展。                       | [源代码](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/pausable/mod.rs#L17-L22)         |
-| _rs`PausableInstruction::Initialize`_ | 在 _rs`InitializeMint`_ 之前初始化可暂停配置的指令。                           | [源代码](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/pausable/instruction.rs#L20-L32) |
-| _rs`PausableInstruction::Pause`_      | 将铸币账户标记为已暂停的指令。                                                 | [源代码](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/pausable/instruction.rs#L33-L44) |
-| _rs`PausableInstruction::Resume`_     | 将铸币账户标记为未暂停的指令。                                                 | [源代码](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/pausable/instruction.rs#L45-L56) |
-| _rs`process_initialize`_              | 在未初始化的铸币账户上初始化 _rs`PausableConfig`_ 并存储暂停权限的处理器逻辑。 | [源代码](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/extension/pausable/processor.rs#L22-L35)     |
-| _rs`process_toggle_pause`_            | 在切换铸币账户的暂停标志之前验证暂停权限的处理器逻辑。                         | [源代码](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/extension/pausable/processor.rs#L39-L64)     |
+| 项目                                | 描述                                             | 源代码                                                                                                                                |
+| --------------------------------- | ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `PausableConfig`                  | 存储暂停权限以及铸币账户当前是否处于暂停状态的铸币扩展。                   | [源代码](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/pausable/mod.rs#L17-L22)         |
+| `PausableInstruction::Initialize` | 在 `InitializeMint` 之前初始化可暂停配置的指令。              | [源代码](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/pausable/instruction.rs#L20-L32) |
+| `PausableInstruction::Pause`      | 将铸币账户标记为已暂停的指令。                                | [源代码](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/pausable/instruction.rs#L33-L44) |
+| `PausableInstruction::Resume`     | 将铸币账户标记为未暂停的指令。                                | [源代码](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/pausable/instruction.rs#L45-L56) |
+| `process_initialize`              | 在未初始化的铸币账户上初始化 `PausableConfig` 并存储暂停权限的处理器逻辑。 | [源代码](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/extension/pausable/processor.rs#L22-L35)     |
+| `process_toggle_pause`            | 在切换铸币账户的暂停标志之前验证暂停权限的处理器逻辑。                    | [源代码](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/extension/pausable/processor.rs#L39-L64)     |
 
 ### Typescript
 
@@ -406,9 +383,7 @@ await client.sendTransaction([
 
 #### 工具包
 
-<CodeTabs storage="token-ts-kit" flags="r">
-
-```ts !! title="Instructions"
+```ts Instructions highlight={57-60,101-104,133-136}
 import {
   lamports,
   createClient,
@@ -465,7 +440,6 @@ await client.sendTransaction([
     space: mintSpace, // Account size in bytes for the mint plus PausableConfig.
     programAddress: TOKEN_2022_PROGRAM_ADDRESS // Program that owns the mint account.
   }),
-  // !mark(1:4)
   getInitializePausableConfigInstruction({
     mint: mint.address, // Mint account that stores the PausableConfig extension.
     authority: client.payer.address // Authority allowed to pause and resume the mint.
@@ -510,7 +484,6 @@ await client.sendTransaction([
 ]);
 
 await client.sendTransaction([
-  // !mark(1:4)
   getPauseInstruction({
     mint: mint.address, // Mint account to pause.
     authority: client.payer // Signer authorized to pause the mint.
@@ -543,7 +516,6 @@ if (!pausedTransferFailure) {
 }
 
 await client.sendTransaction([
-  // !mark(1:4)
   getResumeInstruction({
     mint: mint.address, // Mint account to resume.
     authority: client.payer // Signer authorized to resume the mint.
@@ -572,13 +544,9 @@ console.log("\nError From Failed Transaction:", pausedTransferFailure);
 console.log("\nConfig After Resume:", configAfterResume);
 ```
 
-</CodeTabs>
-
 #### Web3.js
 
-<CodeTabs storage="token-ts-legacy" flags="r">
-
-```ts !! title="Instructions"
+```ts Instructions highlight={56-60,124-129,173-178}
 import {
   Connection,
   Keypair,
@@ -634,7 +602,6 @@ await sendAndConfirmTransaction(
       lamports: mintRent, // Lamports funding the mint account rent.
       programId: TOKEN_2022_PROGRAM_ID // Program that owns the mint account.
     }),
-    // !mark(1:5)
     createInitializePausableConfigInstruction(
       mint.publicKey, // Mint account that stores the PausableConfig extension.
       feePayer.publicKey, // Authority allowed to pause and resume the mint.
@@ -703,7 +670,6 @@ await sendAndConfirmTransaction(
 await sendAndConfirmTransaction(
   connection,
   new Transaction().add(
-    // !mark(1:6)
     createPauseInstruction(
       mint.publicKey, // Mint account to pause.
       feePayer.publicKey, // Authority allowed to pause the mint.
@@ -753,7 +719,6 @@ if (!pausedTransferFailure) {
 await sendAndConfirmTransaction(
   connection,
   new Transaction().add(
-    // !mark(1:6)
     createResumeInstruction(
       mint.publicKey, // Mint account to resume.
       feePayer.publicKey, // Authority allowed to resume the mint.
@@ -797,13 +762,9 @@ console.log("\nError From Failed Transaction:", pausedTransferFailure);
 console.log("\nConfig After Resume:", configAfterResume);
 ```
 
-</CodeTabs>
-
 ### Rust
 
-<CodeTabs storage="token-rs" flags="r">
-
-```rust !! title="Rust"
+```rust Rust highlight={59-63,123-128,168-173}
 use anyhow::{anyhow, Result};
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_commitment_config::CommitmentConfig;
@@ -862,7 +823,6 @@ async fn main() -> Result<()> {
                 mint_space as u64, // Account size in bytes for the mint plus PausableConfig.
                 &TOKEN_2022_PROGRAM_ID, // Program that owns the mint account.
             ),
-            // !mark(1:5)
             pausable_ix::initialize(
                 &TOKEN_2022_PROGRAM_ID, // Token program that owns the mint.
                 &mint.pubkey(), // Mint account that stores the PausableConfig extension.
@@ -927,7 +887,6 @@ async fn main() -> Result<()> {
         .send_and_confirm_transaction(&create_token_accounts_transaction)
         .await?;
 
-    // !mark(1:6)
     let pause_ix = pausable_ix::pause(
         &TOKEN_2022_PROGRAM_ID, // Token program that owns the mint.
         &mint.pubkey(), // Mint account to pause.
@@ -973,7 +932,6 @@ async fn main() -> Result<()> {
         .err
         .ok_or_else(|| anyhow!("Expected the paused transfer to fail"))?;
 
-    // !mark(1:6)
     let resume_ix = pausable_ix::resume(
         &TOKEN_2022_PROGRAM_ID, // Token program that owns the mint.
         &mint.pubkey(), // Mint account to resume.
@@ -1025,5 +983,3 @@ async fn main() -> Result<()> {
     Ok(())
 }
 ```
-
-</CodeTabs>

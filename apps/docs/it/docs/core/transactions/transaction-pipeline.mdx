@@ -2,7 +2,6 @@
 title: Pipeline delle transazioni
 description:
   Come le transazioni Solana vengono elaborate dall'invio al commit, inclusa la pipeline di validazione completa a 8 fasi, la lettura dei dettagli delle transazioni dalla rete e gli errori di validazione comuni.
-url: /docs/core/transactions/transaction-pipeline
 type: reference
 prerequisites:
   - /docs/core/transactions
@@ -14,11 +13,13 @@ related:
   - /docs/core/programs/program-execution
 ---
 
-<Callout type="info" title="Riepilogo">
+<Info>
+  **Riepilogo**
+
   Le transazioni attraversano 8 fasi: ricezione, verifica delle firme,
   sanitizzazione, controlli di budget/età, validazione del pagatore delle
   commissioni, caricamento degli account, esecuzione delle istruzioni e commit.
-</Callout>
+</Info>
 
 ## Pipeline di elaborazione delle transazioni
 
@@ -30,9 +31,9 @@ ricezione al commit, con riferimenti ai file sorgente nel client validator
 ### 1. Ricezione e deserializzazione
 
 Il validator riceve i byte della transazione tramite UDP/QUIC. I byte grezzi
-devono rientrare in un singolo pacchetto (_rs`PACKET_DATA_SIZE`_ = 1.232 byte).
-I byte vengono deserializzati in una _rs`VersionedTransaction`_, che contiene
-l'array delle firme e un _rs`VersionedMessage`_ (legacy o v0).
+devono rientrare in un singolo pacchetto (`PACKET_DATA_SIZE` = 1.232 byte).
+I byte vengono deserializzati in una `VersionedTransaction`, che contiene
+l'array delle firme e un `VersionedMessage` (legacy o v0).
 
 Il prossimo
 [formato v1](/docs/core/transactions/versioned-transactions#v1-message-format)
@@ -56,7 +57,7 @@ blocchi di
 ### 3. Sanitizzazione
 
 La transazione deserializzata viene sanitizzata per produrre una
-_rs`SanitizedTransaction`_ (o
+`SanitizedTransaction` (o
 [`RuntimeTransaction`](https://github.com/anza-xyz/agave/blob/v3.1.8/runtime-transaction/src/runtime_transaction.rs#L31)).
 La sanitizzazione valida gli invarianti strutturali:
 
@@ -65,7 +66,7 @@ La sanitizzazione valida gli invarianti strutturali:
   limiti
 - Il pagatore delle commissioni (indice account 0) è un firmatario scrivibile
 
-Il wrapper _rs`RuntimeTransaction`_ memorizza nella cache i metadati
+Il wrapper `RuntimeTransaction` memorizza nella cache i metadati
 precalcolati da
 [`TransactionMeta`](https://github.com/anza-xyz/agave/blob/v3.1.8/runtime-transaction/src/transaction_meta.rs#L38-L44):
 l'hash del messaggio, il flag di transazione di voto, i conteggi delle firme
@@ -82,27 +83,27 @@ esegue diversi controlli per transazione:
 vengono prima analizzate e validate. I dettagli delle commissioni vengono
 calcolati dai limiti del budget e dalla commissione di prioritizzazione. Se il
 budget di calcolo non è valido o è in conflitto, la transazione fallisce con
-errori di analisi del budget di calcolo come _rs`DuplicateInstruction`_,
+errori di analisi del budget di calcolo come `DuplicateInstruction`,
 `InstructionError(..., InvalidInstructionData)`, o
-_rs`InvalidLoadedAccountsDataSizeLimit`_.
+`InvalidLoadedAccountsDataSizeLimit`.
 
 Per le
 [transazioni v1](/docs/core/transactions/versioned-transactions#v1-message-format)
 non vi sono istruzioni di budget di calcolo da analizzare: i limiti e la commissione di priorità
 provengono dalla configurazione del messaggio, e qualsiasi istruzione ComputeBudget nel messaggio
 viene ignorata ai fini della configurazione. I campi di configurazione lasciati non impostati hanno come valore predefinito zero, il che
-si manifesta in seguito al [caricamento degli account](#6-load-accounts).
+si manifesta in seguito al [caricamento degli account](#6-caricamento-degli-account).
 
 **Età del blockhash**: il `recent_blockhash` della transazione viene cercato
 nella
 [`BlockhashQueue`](https://github.com/anza-xyz/agave/blob/v3.1.8/accounts-db/src/blockhash_queue.rs#L33).
-Se l'hash viene trovato e la sua età rientra in _rs`MAX_PROCESSING_AGE`_ (150
+Se l'hash viene trovato e la sua età rientra in `MAX_PROCESSING_AGE` (150
 slot), la transazione procede. Se non viene trovato, il validator verifica la
 presenza di un [nonce durevole](/docs/core/transactions/durable-nonces) valido.
 
 **Cache dello stato**: l'hash del messaggio della transazione viene verificato
 rispetto a una cache dello stato. Se trovato, la transazione viene rifiutata con
-_rs`AlreadyProcessed`_.
+`AlreadyProcessed`.
 
 ### 5. Valida nonce e pagatore delle commissioni
 
@@ -114,7 +115,7 @@ nella SVM gestisce due validazioni:
 validator carica l'account nonce e verifica:
 
 - L'account è di proprietà del System Program
-- Viene analizzato come _rs`State::Initialized`_
+- Viene analizzato come `State::Initialized`
 - Il nonce durevole memorizzato corrisponde al `recent_blockhash` della
   transazione
 - Il nonce può essere avanzato (il suo nonce durevole corrente differisce dal
@@ -129,18 +130,18 @@ Se valido, il nonce viene avanzato al valore del prossimo nonce durevole. Vedi
 commissioni (sempre indice 0) viene caricato e verificato da
 [`validate_fee_payer`](https://github.com/anza-xyz/agave/blob/v3.1.8/svm/src/account_loader.rs#L369-L417):
 
-- L'account deve esistere (lamports > 0), altrimenti _rs`AccountNotFound`_
+- L'account deve esistere (lamports > 0), altrimenti `AccountNotFound`
 - L'account deve essere un account di sistema o un account nonce, altrimenti
-  _rs`InvalidAccountForFee`_
+  `InvalidAccountForFee`
 - I lamports devono coprire `min_balance + total_fee`, dove `min_balance` è 0
   per gli account di sistema o `rent.minimum_balance(NonceState::size())` per
-  gli account nonce; altrimenti _rs`InsufficientFundsForFee`_
+  gli account nonce; altrimenti `InsufficientFundsForFee`
 - Dopo la detrazione della commissione, l'account deve rimanere esente da
   affitto (non può passare da esente da affitto a soggetto ad affitto)
 
 La commissione viene detratta dal pagatore della commissione in questa fase.
 Viene salvata un'istantanea del pagatore della commissione con la commissione
-sottratta (e del nonce avanzato, se applicabile) come _rs`RollbackAccounts`_,
+sottratta (e del nonce avanzato, se applicabile) come `RollbackAccounts`,
 che sono gli account che vengono committati anche se l'esecuzione fallisce.
 
 ### 6. Caricamento degli account
@@ -164,24 +165,26 @@ Per ogni account non pagatore di commissioni, il loader:
 
 Per ogni programma invocato dalle istruzioni della transazione, il loader
 verifica che il program account esista e sia di proprietà di un loader valido
-(`NativeLoader` o uno dei _rs`PROGRAM_OWNERS`_). I programmi non validi
-falliscono con _rs`ProgramAccountNotFound`_ o _rs`InvalidProgramForExecution`_.
+(`NativeLoader` o uno dei `PROGRAM_OWNERS`). I programmi non validi
+falliscono con `ProgramAccountNotFound` o `InvalidProgramForExecution`.
 
 I programmi LoaderV3 (aggiornabili) caricano implicitamente il loro programdata
 account associato, che conta anch'esso verso il limite di dimensione dei dati
 caricati.
 
-<Callout type="warn" title="Le transazioni v1 impostano questo limite a zero per impostazione predefinita">
+<Warning>
+  **Le transazioni v1 impostano questo limite a zero per impostazione predefinita**
+
   Il valore predefinito di 64 MiB si applica alle transazioni legacy e v0. Nel [formato
   v1](/docs/core/transactions/versioned-transactions#v1-message-format) il
   limite della dimensione dei dati degli account caricati viene letto dalla configurazione del messaggio, e un campo
   lasciato non impostato ha come valore predefinito **0 byte** anziché un valore predefinito generoso. Una transazione v1
   con una configurazione vuota fallisce quindi in questa fase con
-  _rs`MaxLoadedAccountsDataSizeExceeded`_ — il budget richiesto è troppo piccolo
+`MaxLoadedAccountsDataSizeExceeded` — il budget richiesto è troppo piccolo
   per il primo account caricato, quindi il fallimento avviene prima che venga eseguita qualsiasi istruzione,
   con un errore che non menziona né v1 né la configurazione. Imposta sempre il limite delle unità di calcolo e il limite della dimensione dei dati degli account caricati esplicitamente durante
   la costruzione di transazioni v1.
-</Callout>
+</Warning>
 
 Se il caricamento dell'account fallisce ma il pagatore della commissione è stato
 validato con successo, la transazione diventa un risultato
@@ -191,10 +194,10 @@ la commissione viene comunque riscossa ma nessuna istruzione viene eseguita.
 ### 7. Esecuzione delle istruzioni
 
 [`execute_loaded_transaction`](https://github.com/anza-xyz/agave/blob/v3.1.8/svm/src/transaction_processor.rs#L847)
-crea un _rs`TransactionContext`_ con tutti gli account caricati e invoca
+crea un `TransactionContext` con tutti gli account caricati e invoca
 [`process_message`](https://github.com/anza-xyz/agave/blob/v3.1.8/svm/src/message_processor.rs).
 Le istruzioni vengono eseguite sequenzialmente nell'ordine in cui appaiono nel
-messaggio. Ogni invocazione di istruzione crea un _rs`InvokeContext`_ e chiama
+messaggio. Ogni invocazione di istruzione crea un `InvokeContext` e chiama
 il programma di destinazione.
 
 #### Dettagli dell'elaborazione delle istruzioni
@@ -221,16 +224,16 @@ destinazione:
 4. Dopo il completamento dell'istruzione, il runtime
    [verifica](https://github.com/anza-xyz/agave/blob/v3.1.8/transaction-context/src/lib.rs#L366-L398)
    che il saldo totale di lamport in tutti gli account dell'istruzione non sia
-   cambiato (controllo _rs`UnbalancedInstruction`_).
+   cambiato (controllo `UnbalancedInstruction`).
 5. Se un'istruzione fallisce, l'intera transazione viene annullata. Nessuna
    modifica di stato intermedia viene salvata.
 
 Ogni istruzione incrementa la traccia delle istruzioni. La traccia include sia
 le istruzioni di livello superiore che qualsiasi [CPI](/docs/core/cpi) da esse
 invocata. La lunghezza totale della traccia (istruzioni di livello superiore più
-tutte le CPI annidate) non può superare 64 (_rs`MAX_INSTRUCTION_TRACE_LENGTH`_).
+tutte le CPI annidate) non può superare 64 (`MAX_INSTRUCTION_TRACE_LENGTH`).
 Il superamento di questo limite restituisce
-_rs`InstructionError::MaxInstructionTraceLengthExceeded`_.
+`InstructionError::MaxInstructionTraceLengthExceeded`.
 
 Dopo l'esecuzione, il runtime verifica che:
 
@@ -241,8 +244,8 @@ Dopo l'esecuzione, il runtime verifica che:
 
 Se l'esecuzione ha successo, gli stati degli account modificati dal
 `TransactionContext` vengono scritti nella cache locale del batch del
-_rs`AccountLoader`_. Se l'esecuzione fallisce, vengono scritti solo i
-_rs`RollbackAccounts`_ (fee payer con commissione dedotta e nonce avanzato). La
+`AccountLoader`. Se l'esecuzione fallisce, vengono scritti solo i
+`RollbackAccounts` (fee payer con commissione dedotta e nonce avanzato). La
 commissione viene comunque riscossa, ma tutte le altre modifiche agli account
 vengono scartate.
 

@@ -19,10 +19,32 @@ Commands:
   remove-next-app [--dry-run] git rm the Fumadocs Next.js app files from apps/docs (spec §1.2)
   verify-redirects            Show apps/web redirect coverage for R8 and Greek removals
   verify-urls                 Legacy URL parity against the new layout + move map
-  convert [--files p] [--locale l] [--check]   Run the transform registry (WP2+)
-  nav [--check]               Build locale navigation (WP6, stub)
-  examples [--check]          Build runnable example snippets (WP5, stub)
+  convert [--files p1,p2] [--exclude p1,p2] [--locale l] [--check|--dry-run]
+                              Run the auto-discovered transforms (src/convert/transforms/*.ts).
+                              --exclude: comma-separated path prefixes (relative to apps/docs) to skip
+  verify [--skip-generators] [--skip-convert]   All spec §4.4 checks except the Mintlify CLI (src/verify/index.ts)
+  residual                    Residual Fumadocs/Code Hike syntax scan (spec §4.4.2)
+  nav [compile-legacy|stubs|build|swap|verify] [--check] [--force]   Navigation (WP6, src/nav/index.ts)
+  examples [--check]          Build runnable example snippets (WP5)
 `;
+
+/**
+ * Flags each command accepts. Anything else is rejected before the command
+ * runs: an unknown flag (e.g. `convert --help`) used to be ignored, which
+ * ran `convert` in WRITE mode over the whole corpus.
+ */
+const KNOWN_FLAGS: Record<string, string[]> = {
+  "legacy-urls": ["ref"],
+  move: ["dry-run"],
+  "remove-next-app": ["dry-run", "force"],
+  "verify-redirects": [],
+  "verify-urls": [],
+  convert: ["files", "exclude", "locale", "check", "dry-run"],
+  nav: ["check", "force"],
+  examples: ["check"],
+  verify: ["skip-generators", "skip-convert", "json"],
+  residual: ["json"],
+};
 
 function parseArgs(argv: string[]) {
   const [cmd, ...rest] = argv;
@@ -51,6 +73,17 @@ function table(rows: string[][]) {
 
 async function main() {
   const { cmd, flags } = parseArgs(process.argv.slice(2));
+  if (cmd && cmd in KNOWN_FLAGS) {
+    const bad = Object.keys(flags).filter(
+      (f) => !KNOWN_FLAGS[cmd]!.includes(f),
+    );
+    if (bad.length) {
+      console.error(
+        `docs-tooling ${cmd}: unknown option(s) ${bad.map((b) => `--${b}`).join(", ")}; nothing was run.\n\n${USAGE}`,
+      );
+      return 2;
+    }
+  }
   switch (cmd) {
     case "legacy-urls": {
       const r = runLegacyUrls({
@@ -185,23 +218,52 @@ async function main() {
         : 0;
     }
     case "convert": {
-      const r = runConvert({
+      const r = await runConvert({
         files: typeof flags.files === "string" ? flags.files : undefined,
+        exclude:
+          typeof flags.exclude === "string"
+            ? flags.exclude
+                .split(",")
+                .map((x) => x.trim())
+                .filter(Boolean)
+            : undefined,
         locale: typeof flags.locale === "string" ? flags.locale : undefined,
         check: Boolean(flags.check),
+        dryRun: Boolean(flags["dry-run"]),
       });
+      const inMemory = flags.check || flags["dry-run"];
       console.log(
-        `convert: ${r.transforms.length} transforms, ${r.files} files, ${r.changed.length} ${flags.check ? "would change" : "changed"}`,
+        `convert: ${r.transforms.length} transforms [${r.transforms.join(", ")}], ${r.files} files, ${r.changed.length} ${inMemory ? "would change" : "changed"}`,
       );
       for (const d of r.diagnostics)
         console.log(`  ${d.level} ${d.transform} ${d.file}: ${d.message}`);
-      if (flags.check)
+      if (inMemory)
         for (const c of r.changed.slice(0, 50)) console.log(`  stale: ${c}`);
       return r.ok ? 0 : 1;
     }
     case "nav": {
-      console.log(runNav({ check: Boolean(flags.check) }).message);
-      return 0;
+      const sub = process.argv.slice(3).find((a) => !a.startsWith("--"));
+      const r = runNav(sub, {
+        check: Boolean(flags.check),
+        force: Boolean(flags.force),
+      });
+      console.log(r.message);
+      return r.code;
+    }
+    case "verify": {
+      const { runVerify } = await import("./verify/index.ts");
+      return runVerify({
+        generators: !flags["skip-generators"],
+        convert: !flags["skip-convert"],
+        json: Boolean(flags.json),
+      });
+    }
+    case "residual": {
+      const { scanResidual, printResidual } =
+        await import("./verify/residual.ts");
+      const r = scanResidual();
+      printResidual(r, Boolean(flags.json));
+      return r.total ? 1 : 0;
     }
     case "examples": {
       console.log(runExamples({ check: Boolean(flags.check) }).message);

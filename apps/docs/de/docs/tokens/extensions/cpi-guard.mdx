@@ -3,7 +3,6 @@ title: CPI Guard
 description:
   Aktivieren Sie die CpiGuard-Kontoerweiterung, um Token- Anweisungen zu
   blockieren, die über Cross Program Invocation aufgerufen werden.
-url: /docs/tokens/extensions/cpi-guard
 type: tutorial
 prerequisites:
   - /docs/tokens/basics/create-token-account
@@ -14,38 +13,38 @@ related:
 
 ## Was ist CPI Guard?
 
-Die _rs`CpiGuard`_-Kontoerweiterung des Token Extensions Program verhindert,
+Die `CpiGuard`-Kontoerweiterung des Token Extensions Program verhindert,
 dass ein anderes Onchain-Programm ein token account für bestimmte Token-
 Anweisungen über eine Cross Program Invocation (CPI) verwendet.
 
 Wenn CPI Guard aktiviert ist, lehnt das Token Extensions Program diese
 Anweisungen ab, wenn ein anderes Onchain-Programm sie über CPI aufruft:
 
-- _rs`Transfer`_, _rs`TransferChecked`_ und _rs`TransferCheckedWithFee`_, wenn
+- `Transfer`, `TransferChecked` und `TransferCheckedWithFee`, wenn
   der token account-Besitzer als Anweisungsautorität verwendet wird
-- _rs`Burn`_ und _rs`BurnChecked`_, wenn der token account-Besitzer als
+- `Burn` und `BurnChecked`, wenn der token account-Besitzer als
   Anweisungsautorität verwendet wird
-- _rs`Approve`_ und _rs`ApproveChecked`_
-- _rs`CloseAccount`_, wenn lamport an eine andere Stelle als den token
+- `Approve` und `ApproveChecked`
+- `CloseAccount`, wenn lamport an eine andere Stelle als den token
   account-Besitzer gesendet würden
-- _rs`SetAuthority`_ beim Hinzufügen oder Ersetzen der Schließungsautorität
+- `SetAuthority` beim Hinzufügen oder Ersetzen der Schließungsautorität
 
 Wenn CPI Guard aktiviert ist, sind diese Fälle weiterhin zulässig:
 
-- _rs`Transfer`_, _rs`TransferChecked`_, _rs`TransferCheckedWithFee`_,
-  _rs`Burn`_ und _rs`BurnChecked`_ über CPI, wenn ein Delegat oder permanenter
+- `Transfer`, `TransferChecked`, `TransferCheckedWithFee`,
+  `Burn` und `BurnChecked` über CPI, wenn ein Delegat oder permanenter
   Delegat anstelle des token account-Besitzers signiert
-- _rs`CloseAccount`_ über CPI, wenn lamport an den token account- Besitzer
+- `CloseAccount` über CPI, wenn lamport an den token account- Besitzer
   gesendet werden
-- _rs`SetAuthority`_ zum Entfernen einer bestehenden Schließungsautorität
-- _rs`Revoke`_
+- `SetAuthority` zum Entfernen einer bestehenden Schließungsautorität
+- `Revoke`
 
 Wenn der token account-Besitzer als Anweisungsautorität verwendet wird, können
 Token Extensions Program- Anweisungen weiterhin verarbeitet werden, wenn die
 Anweisung direkt zur Transaktion hinzugefügt wird, anstatt über CPI aufgerufen
-zu werden. Das Ändern des token account-Besitzers mit _rs`SetAuthority`_ bleibt
+zu werden. Das Ändern des token account-Besitzers mit `SetAuthority` bleibt
 blockiert, während CPI Guard aktiviert ist, auch außerhalb von CPI.
-_rs`EnableCpiGuard`_ und _rs`DisableCpiGuard`_ können ebenfalls nicht über CPI
+`EnableCpiGuard` und `DisableCpiGuard` können ebenfalls nicht über CPI
 aufgerufen werden.
 
 ## So aktivieren Sie CPI Guard
@@ -54,399 +53,379 @@ Um CPI Guard zu aktivieren:
 
 1. Erstellen und initialisieren Sie eine Mint.
 2. Berechnen Sie die Größe des Token-Kontos und die benötigte Miete für ein
-   Token-Konto mit _rs`CpiGuard`_.
+   Token-Konto mit `CpiGuard`.
 3. Erstellen und initialisieren Sie ein Token-Konto für die Mint.
-4. Rufen Sie _rs`EnableCpiGuard`_ auf dem Token-Konto auf.
-5. Rufen Sie _rs`DisableCpiGuard`_ auf dem Token-Konto auf, um diese Anweisungen
+4. Rufen Sie `EnableCpiGuard` auf dem Token-Konto auf.
+5. Rufen Sie `DisableCpiGuard` auf dem Token-Konto auf, um diese Anweisungen
    erneut über CPI zuzulassen.
 
-<ScrollyCoding>
+<Steps>
+  <Step title="Mint erstellen und initialisieren">
+    Erstellen und initialisieren Sie die Mint, die das Token-Konto verwenden wird.
 
-## !!steps Mint erstellen und initialisieren
+    ```ts Beispiel focus={20-34}
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
 
-Erstellen und initialisieren Sie die Mint, die das Token-Konto verwenden wird.
+    const mint = await generateKeyPairSigner();
+    const tokenAccount = await generateKeyPairSigner();
 
-<CodePlaceholder title="Beispiel" />
+    const mintSpace = BigInt(getMintSize());
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
 
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializeMintInstruction({
+        mint: mint.address,
+        decimals: 0,
+        mintAuthority: client.payer.address,
+        freezeAuthority: client.payer.address
+      })
+    ]);
+    ```
+  </Step>
 
-const mint = await generateKeyPairSigner();
-const tokenAccount = await generateKeyPairSigner();
+  <Step title="Token-Konto-Größe berechnen">
+    Berechnen Sie die Token-Konto-Größe für das Basis-Token-Konto plus der
+    `CpiGuard`-Erweiterung. Dies ist die Größe, die in `CreateAccount`
+    verwendet wird.
 
-const mintSpace = BigInt(getMintSize());
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
+    ```ts Beispiel focus={36-39}
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
 
-// !focus(1:15)
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  }),
-  getInitializeMintInstruction({
-    mint: mint.address,
-    decimals: 0,
-    mintAuthority: client.payer.address,
-    freezeAuthority: client.payer.address
-  })
-]);
-```
+    const mint = await generateKeyPairSigner();
+    const tokenAccount = await generateKeyPairSigner();
 
-## !!steps Token-Konto-Größe berechnen
+    const mintSpace = BigInt(getMintSize());
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
 
-Berechnen Sie die Token-Konto-Größe für das Basis-Token-Konto plus der
-_rs`CpiGuard`_-Erweiterung. Dies ist die Größe, die in _rs`CreateAccount`_
-verwendet wird.
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializeMintInstruction({
+        mint: mint.address,
+        decimals: 0,
+        mintAuthority: client.payer.address,
+        freezeAuthority: client.payer.address
+      })
+    ]);
 
-<CodePlaceholder title="Beispiel" />
+    const cpiGuardExtension = extension("CpiGuard", {
+      lockCpi: false
+    });
+    const tokenSpace = BigInt(getTokenSize([cpiGuardExtension]));
+    ```
+  </Step>
 
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
+  <Step title="Miete berechnen">
+    Berechnen Sie die Miete anhand der für die `CpiGuard`-Erweiterung benötigten
+    Token-Konto-Größe.
 
-const mint = await generateKeyPairSigner();
-const tokenAccount = await generateKeyPairSigner();
+    ```ts Beispiel focus={41-43} expandable
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
 
-const mintSpace = BigInt(getMintSize());
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
+    const mint = await generateKeyPairSigner();
+    const tokenAccount = await generateKeyPairSigner();
 
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  }),
-  getInitializeMintInstruction({
-    mint: mint.address,
-    decimals: 0,
-    mintAuthority: client.payer.address,
-    freezeAuthority: client.payer.address
-  })
-]);
+    const mintSpace = BigInt(getMintSize());
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
 
-// !focus(1:4)
-const cpiGuardExtension = extension("CpiGuard", {
-  lockCpi: false
-});
-const tokenSpace = BigInt(getTokenSize([cpiGuardExtension]));
-```
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializeMintInstruction({
+        mint: mint.address,
+        decimals: 0,
+        mintAuthority: client.payer.address,
+        freezeAuthority: client.payer.address
+      })
+    ]);
 
-## !!steps Miete berechnen
+    const cpiGuardExtension = extension("CpiGuard", {
+      lockCpi: false
+    });
+    const tokenSpace = BigInt(getTokenSize([cpiGuardExtension]));
 
-Berechnen Sie die Miete anhand der für die _rs`CpiGuard`_-Erweiterung benötigten
-Token-Konto-Größe.
+    const tokenRent = await client.rpc
+      .getMinimumBalanceForRentExemption(tokenSpace)
+      .send();
+    ```
+  </Step>
 
-<CodePlaceholder title="Beispiel" />
+  <Step title="Token-Konto erstellen und initialisieren">
+    Erstellen Sie das Token-Konto mit dem berechneten Speicherplatz und den Lamports
+    und initialisieren Sie es dann für die Mint.
 
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
+    ```ts Beispiel focus={45-58} expandable
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
 
-const mint = await generateKeyPairSigner();
-const tokenAccount = await generateKeyPairSigner();
+    const mint = await generateKeyPairSigner();
+    const tokenAccount = await generateKeyPairSigner();
 
-const mintSpace = BigInt(getMintSize());
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
+    const mintSpace = BigInt(getMintSize());
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
 
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  }),
-  getInitializeMintInstruction({
-    mint: mint.address,
-    decimals: 0,
-    mintAuthority: client.payer.address,
-    freezeAuthority: client.payer.address
-  })
-]);
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializeMintInstruction({
+        mint: mint.address,
+        decimals: 0,
+        mintAuthority: client.payer.address,
+        freezeAuthority: client.payer.address
+      })
+    ]);
 
-const cpiGuardExtension = extension("CpiGuard", {
-  lockCpi: false
-});
-const tokenSpace = BigInt(getTokenSize([cpiGuardExtension]));
+    const cpiGuardExtension = extension("CpiGuard", {
+      lockCpi: false
+    });
+    const tokenSpace = BigInt(getTokenSize([cpiGuardExtension]));
 
-// !focus(1:3)
-const tokenRent = await client.rpc
-  .getMinimumBalanceForRentExemption(tokenSpace)
-  .send();
-```
+    const tokenRent = await client.rpc
+      .getMinimumBalanceForRentExemption(tokenSpace)
+      .send();
 
-## !!steps Token-Konto erstellen und initialisieren
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: tokenAccount,
+        lamports: tokenRent,
+        space: tokenSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializeAccountInstruction({
+        account: tokenAccount.address,
+        mint: mint.address,
+        owner: client.payer.address
+      })
+    ]);
+    ```
+  </Step>
 
-Erstellen Sie das Token-Konto mit dem berechneten Speicherplatz und den Lamports
-und initialisieren Sie es dann für die Mint.
+  <Step title="CPI-Schutz aktivieren">
+    Aktivieren Sie `CpiGuard` auf dem Token-Konto.
 
-<CodePlaceholder title="Beispiel" />
+    ```ts Beispiel focus={60-65} expandable
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
 
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
+    const mint = await generateKeyPairSigner();
+    const tokenAccount = await generateKeyPairSigner();
 
-const mint = await generateKeyPairSigner();
-const tokenAccount = await generateKeyPairSigner();
+    const mintSpace = BigInt(getMintSize());
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
 
-const mintSpace = BigInt(getMintSize());
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializeMintInstruction({
+        mint: mint.address,
+        decimals: 0,
+        mintAuthority: client.payer.address,
+        freezeAuthority: client.payer.address
+      })
+    ]);
 
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  }),
-  getInitializeMintInstruction({
-    mint: mint.address,
-    decimals: 0,
-    mintAuthority: client.payer.address,
-    freezeAuthority: client.payer.address
-  })
-]);
+    const cpiGuardExtension = extension("CpiGuard", {
+      lockCpi: false
+    });
+    const tokenSpace = BigInt(getTokenSize([cpiGuardExtension]));
 
-const cpiGuardExtension = extension("CpiGuard", {
-  lockCpi: false
-});
-const tokenSpace = BigInt(getTokenSize([cpiGuardExtension]));
+    const tokenRent = await client.rpc
+      .getMinimumBalanceForRentExemption(tokenSpace)
+      .send();
 
-const tokenRent = await client.rpc
-  .getMinimumBalanceForRentExemption(tokenSpace)
-  .send();
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: tokenAccount,
+        lamports: tokenRent,
+        space: tokenSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializeAccountInstruction({
+        account: tokenAccount.address,
+        mint: mint.address,
+        owner: client.payer.address
+      })
+    ]);
 
-// !focus(1:14)
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: tokenAccount,
-    lamports: tokenRent,
-    space: tokenSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  }),
-  getInitializeAccountInstruction({
-    account: tokenAccount.address,
-    mint: mint.address,
-    owner: client.payer.address
-  })
-]);
-```
+    await client.sendTransaction([
+      getEnableCpiGuardInstruction({
+        token: tokenAccount.address,
+        owner: client.payer
+      })
+    ]);
+    ```
+  </Step>
 
-## !!steps CPI-Schutz aktivieren
+  <Step title="CPI-Schutz deaktivieren">
+    Deaktivieren Sie `CpiGuard` auf dem Token-Konto.
 
-Aktivieren Sie _rs`CpiGuard`_ auf dem Token-Konto.
+    ```ts Beispiel focus={67-72} expandable
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
 
-<CodePlaceholder title="Beispiel" />
+    const mint = await generateKeyPairSigner();
+    const tokenAccount = await generateKeyPairSigner();
 
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
+    const mintSpace = BigInt(getMintSize());
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
 
-const mint = await generateKeyPairSigner();
-const tokenAccount = await generateKeyPairSigner();
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializeMintInstruction({
+        mint: mint.address,
+        decimals: 0,
+        mintAuthority: client.payer.address,
+        freezeAuthority: client.payer.address
+      })
+    ]);
 
-const mintSpace = BigInt(getMintSize());
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
+    const cpiGuardExtension = extension("CpiGuard", {
+      lockCpi: false
+    });
+    const tokenSpace = BigInt(getTokenSize([cpiGuardExtension]));
 
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  }),
-  getInitializeMintInstruction({
-    mint: mint.address,
-    decimals: 0,
-    mintAuthority: client.payer.address,
-    freezeAuthority: client.payer.address
-  })
-]);
+    const tokenRent = await client.rpc
+      .getMinimumBalanceForRentExemption(tokenSpace)
+      .send();
 
-const cpiGuardExtension = extension("CpiGuard", {
-  lockCpi: false
-});
-const tokenSpace = BigInt(getTokenSize([cpiGuardExtension]));
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: tokenAccount,
+        lamports: tokenRent,
+        space: tokenSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializeAccountInstruction({
+        account: tokenAccount.address,
+        mint: mint.address,
+        owner: client.payer.address
+      })
+    ]);
 
-const tokenRent = await client.rpc
-  .getMinimumBalanceForRentExemption(tokenSpace)
-  .send();
+    await client.sendTransaction([
+      getEnableCpiGuardInstruction({
+        token: tokenAccount.address,
+        owner: client.payer
+      })
+    ]);
 
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: tokenAccount,
-    lamports: tokenRent,
-    space: tokenSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  }),
-  getInitializeAccountInstruction({
-    account: tokenAccount.address,
-    mint: mint.address,
-    owner: client.payer.address
-  })
-]);
-
-// !focus(1:6)
-await client.sendTransaction([
-  getEnableCpiGuardInstruction({
-    token: tokenAccount.address,
-    owner: client.payer
-  })
-]);
-```
-
-## !!steps CPI-Schutz deaktivieren
-
-Deaktivieren Sie _rs`CpiGuard`_ auf dem Token-Konto.
-
-<CodePlaceholder title="Beispiel" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-const tokenAccount = await generateKeyPairSigner();
-
-const mintSpace = BigInt(getMintSize());
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
-
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  }),
-  getInitializeMintInstruction({
-    mint: mint.address,
-    decimals: 0,
-    mintAuthority: client.payer.address,
-    freezeAuthority: client.payer.address
-  })
-]);
-
-const cpiGuardExtension = extension("CpiGuard", {
-  lockCpi: false
-});
-const tokenSpace = BigInt(getTokenSize([cpiGuardExtension]));
-
-const tokenRent = await client.rpc
-  .getMinimumBalanceForRentExemption(tokenSpace)
-  .send();
-
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: tokenAccount,
-    lamports: tokenRent,
-    space: tokenSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  }),
-  getInitializeAccountInstruction({
-    account: tokenAccount.address,
-    mint: mint.address,
-    owner: client.payer.address
-  })
-]);
-
-await client.sendTransaction([
-  getEnableCpiGuardInstruction({
-    token: tokenAccount.address,
-    owner: client.payer
-  })
-]);
-
-// !focus(1:6)
-await client.sendTransaction([
-  getDisableCpiGuardInstruction({
-    token: tokenAccount.address,
-    owner: client.payer
-  })
-]);
-```
-
-</ScrollyCoding>
+    await client.sendTransaction([
+      getDisableCpiGuardInstruction({
+        token: tokenAccount.address,
+        owner: client.payer
+      })
+    ]);
+    ```
+  </Step>
+</Steps>
 
 ### Quellreferenz
 
-| Element                            | Beschreibung                                                                                                                                                                                                                                                    | Quelle                                                                                                                                 |
-| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| _rs`CpiGuard`_                     | Konten-Erweiterung, die speichert, ob CPI Guard derzeit für das token account aktiviert ist.                                                                                                                                                                    | [Quelle](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/cpi_guard/mod.rs#L20-L25)         |
-| _rs`CpiGuardInstruction::Enable`_  | Anweisungen, die CPI Guard auf einem token account aktivieren.                                                                                                                                                                                                  | [Quelle](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/cpi_guard/instruction.rs#L20-L38) |
-| _rs`CpiGuardInstruction::Disable`_ | Anweisungen, die CPI Guard auf einem token account deaktivieren.                                                                                                                                                                                                | [Quelle](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/cpi_guard/instruction.rs#L39-L53) |
-| _rs`process_toggle_cpi_guard`_     | Prozessor-Logik, die von _rs`Enable`_ und _rs`Disable`_ verwendet wird, um die Konto-Eigentümerschaft zu validieren, CPI-Änderungen am Guard selbst abzulehnen und _rs`CpiGuard`_ zu initialisieren, falls noch nicht vorhanden, bevor `lock_cpi` gesetzt wird. | [Quelle](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/extension/cpi_guard/processor.rs#L19-L52)     |
+| Element                        | Beschreibung                                                                                                                                                                                                                                        | Quelle                                                                                                                                 |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `CpiGuard`                     | Konten-Erweiterung, die speichert, ob CPI Guard derzeit für das token account aktiviert ist.                                                                                                                                                        | [Quelle](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/cpi_guard/mod.rs#L20-L25)         |
+| `CpiGuardInstruction::Enable`  | Anweisungen, die CPI Guard auf einem token account aktivieren.                                                                                                                                                                                      | [Quelle](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/cpi_guard/instruction.rs#L20-L38) |
+| `CpiGuardInstruction::Disable` | Anweisungen, die CPI Guard auf einem token account deaktivieren.                                                                                                                                                                                    | [Quelle](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/cpi_guard/instruction.rs#L39-L53) |
+| `process_toggle_cpi_guard`     | Prozessor-Logik, die von `Enable` und `Disable` verwendet wird, um die Konto-Eigentümerschaft zu validieren, CPI-Änderungen am Guard selbst abzulehnen und `CpiGuard` zu initialisieren, falls noch nicht vorhanden, bevor `lock_cpi` gesetzt wird. | [Quelle](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/extension/cpi_guard/processor.rs#L19-L52)     |
 
 ### Typescript
 
@@ -456,9 +435,7 @@ enthalten.
 
 #### Kit
 
-<CodeTabs storage="token-ts-kit" flags="r">
-
-```ts !! title="Instructions"
+```ts Instructions highlight={81-84,93-96}
 import {
   lamports,
   createClient,
@@ -539,7 +516,6 @@ await client.sendTransaction([
 ]);
 
 await client.sendTransaction([
-  // !mark(1:4)
   getEnableCpiGuardInstruction({
     token: tokenAccount.address, // Token account that stores the CpiGuard extension.
     owner: client.payer // Token account owner authorized to enable CPI guard.
@@ -552,7 +528,6 @@ const enabledCpiGuard = (
 ).find((item) => isExtension("CpiGuard", item));
 
 await client.sendTransaction([
-  // !mark(1:4)
   getDisableCpiGuardInstruction({
     token: tokenAccount.address, // Token account that stores the CpiGuard extension.
     owner: client.payer // Token account owner authorized to disable CPI guard.
@@ -570,13 +545,9 @@ console.log("\nEnabled CPI Guard:", enabledCpiGuard);
 console.log("\nDisabled CPI Guard:", disabledCpiGuard);
 ```
 
-</CodeTabs>
-
 #### Web3.js
 
-<CodeTabs storage="token-ts-legacy" flags="r">
-
-```ts !! title="Instructions"
+```ts Instructions highlight={92-97,114-119}
 import {
   Connection,
   Keypair,
@@ -668,7 +639,6 @@ await sendAndConfirmTransaction(
 await sendAndConfirmTransaction(
   connection,
   new Transaction().add(
-    // !mark(1:6)
     createEnableCpiGuardInstruction(
       tokenAccount.publicKey, // Token account that stores the CpiGuard extension.
       feePayer.publicKey, // Token account owner authorized to enable CPI guard.
@@ -691,7 +661,6 @@ const enabledCpiGuard = getCpiGuard(enabledTokenAccount);
 await sendAndConfirmTransaction(
   connection,
   new Transaction().add(
-    // !mark(1:6)
     createDisableCpiGuardInstruction(
       tokenAccount.publicKey, // Token account that stores the CpiGuard extension.
       feePayer.publicKey, // Token account owner authorized to disable CPI guard.
@@ -717,13 +686,9 @@ console.log("\nEnabled CPI Guard:", enabledCpiGuard);
 console.log("\nDisabled CPI Guard:", disabledCpiGuard);
 ```
 
-</CodeTabs>
-
 ### Rust
 
-<CodeTabs storage="token-rs" flags="r">
-
-```rust !! title="Rust"
+```rust Rust highlight={106-111,128-133}
 use anyhow::Result;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_commitment_config::CommitmentConfig;
@@ -829,7 +794,6 @@ async fn main() -> Result<()> {
         .send_and_confirm_transaction(&create_token_account_transaction)
         .await?;
 
-    // !mark(1:6)
     let enable_cpi_guard_instruction = enable_cpi_guard(
         &TOKEN_2022_PROGRAM_ID, // Token program that owns the token account.
         &token_account.pubkey(), // Token account that stores the CpiGuard extension.
@@ -852,7 +816,6 @@ async fn main() -> Result<()> {
         StateWithExtensions::<Account>::unpack(&enabled_token_account_data.data)?;
     let enabled_cpi_guard = enabled_token_account_state.get_extension::<CpiGuard>()?;
 
-    // !mark(1:6)
     let disable_cpi_guard_instruction = disable_cpi_guard(
         &TOKEN_2022_PROGRAM_ID, // Token program that owns the token account.
         &token_account.pubkey(), // Token account that stores the CpiGuard extension.
@@ -883,5 +846,3 @@ async fn main() -> Result<()> {
     Ok(())
 }
 ```
-
-</CodeTabs>

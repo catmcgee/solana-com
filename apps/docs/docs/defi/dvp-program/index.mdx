@@ -5,13 +5,13 @@ description:
   program-owned escrow until a settlement authority named in the trade settles
   both in one transaction. Covers the program ID, roles, account layout, errors,
   supported tokens, and step-by-step guides in TypeScript and Rust.
-seoTitle: Solana DvP Program for Atomic Delivery versus Payment
-url: /docs/defi/dvp-program
 type: reference
 related:
   - /docs/defi/dvp-program/create-a-trade
   - /docs/tokenization/dvp
   - /docs/tokenization/token-acl
+"og:title": Solana DvP Program for Atomic Delivery versus Payment
+"twitter:title": Solana DvP Program for Atomic Delivery versus Payment
 ---
 
 The DvP program is the standard program for delivery versus payment on Solana,
@@ -25,14 +25,16 @@ token transfer (`TransferChecked`) can fund a leg with no DvP-specific
 integration. Until settlement, either party can take its own leg back or unwind
 the trade.
 
-<Callout type="warn" title="Read the record before acting on it">
+<Warning>
+
+**Read the record before acting on it**
 
 Creating a trade record is permissionless, so a record is not proof of
 agreement. Each party reads the stored terms before it funds, and the settlement
 authority before it settles (see
 [verification](#verification-before-funding-and-settlement)).
 
-</Callout>
+</Warning>
 
 ## How it works
 
@@ -56,7 +58,7 @@ also leaves a permanent marker account (see [State](#state)).
 The step pages take one trade from creation to settlement, with TypeScript and
 Rust for each instruction.
 
-<Cards>
+<Columns cols={2}>
   <Card title="Create a trade" href="/docs/defi/dvp-program/create-a-trade">
     Install the clients and record the trade's terms with CreateDvp
   </Card>
@@ -69,7 +71,7 @@ Rust for each instruction.
   <Card title="Unwind a trade" href="/docs/defi/dvp-program/unwind-a-trade">
     Reclaim a leg, cancel or reject the trade, and recover late deposits
   </Card>
-</Cards>
+</Columns>
 
 A [devnet demo](https://solana.com/delivery-vs-payment/demo) runs a trade end to
 end: it creates the trade, funds both escrows with standard token transfers, and
@@ -137,6 +139,21 @@ flowchart TD
   S -.->|escrow recreated and funded after close| V["RecoverDvp<br/>party drains the recreated escrow"]
 ```
 
+<div className="nojs-only" data-fallback="mermaid">
+  ```text Mermaid
+  flowchart TD
+    C["CreateDvp<br/>permissionless, rent payer signs"] --> FA["Asset-leg party funds escrow A<br/>plain TransferChecked"]
+    C --> FB["Cash-leg party funds escrow B<br/>plain TransferChecked"]
+    FA --> G{Both legs hold<br/>the agreed amounts}
+    FB --> G
+    G -->|settlement authority| S["SettleDvp<br/>cash to A, asset to B,<br/>surplus refunded, accounts closed"]
+    G -->|settlement authority| X["CancelDvp<br/>both legs refunded, accounts closed"]
+    G -->|either party| R["RejectDvp<br/>both legs refunded, accounts closed"]
+    FA -.->|asset-leg party, while open| L["ReclaimDvp<br/>own leg back, trade stays open"]
+    S -.->|escrow recreated and funded after close| V["RecoverDvp<br/>party drains the recreated escrow"]
+  ```
+</div>
+
 A trade is open from `CreateDvp` until one of Settle, Cancel, or Reject closes
 it. Funding has no instruction of its own: a leg is funded when its escrow
 account holds at least the agreed amount. Reclaim is per leg and leaves the
@@ -162,6 +179,16 @@ flowchart TD
   R -->|token account owner| EB["Escrow B<br/>Associated token account of the trade record for mint_b"]
   R -.->|created with the trade| N["Nonce tombstone<br/>Seeds: #quot;nonce#quot;, SwapDvp address<br/>Holds no data; never closed"]
 ```
+
+<div className="nojs-only" data-fallback="mermaid">
+  ```text Mermaid
+  flowchart TD
+    R["SwapDvp record, 458 bytes<br/>PDA seeds: #quot;dvp#quot;, settlement_authority, user_a, user_b, mint_a, mint_b, nonce"]
+    R -->|token account owner| EA["Escrow A<br/>Associated token account of the trade record for mint_a"]
+    R -->|token account owner| EB["Escrow B<br/>Associated token account of the trade record for mint_b"]
+    R -.->|created with the trade| N["Nonce tombstone<br/>Seeds: #quot;nonce#quot;, SwapDvp address<br/>Holds no data; never closed"]
+  ```
+</div>
 
 | Field                                  | Type          | Meaning                                                                                                 |
 | -------------------------------------- | ------------- | ------------------------------------------------------------------------------------------------------- |

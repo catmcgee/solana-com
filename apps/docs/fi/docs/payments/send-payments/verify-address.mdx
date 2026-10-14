@@ -17,12 +17,12 @@ Validointi riippuu siitä, mitä lähetät:
   käsittelee SPL-tokenien lähetystä.
 - **Natiivilla SOL:lla** ei ole tällaista suojaa. System Program -siirto
   onnistuu mille tahansa tilille, joten väärä vastaanottaja lukitsee SOL:n
-  pysyvästi. Katso [Natiivin SOL:n lähettäminen](#sending-native-sol).
+  pysyvästi. Katso [Natiivin SOL:n lähettäminen](#natiivin-soln-lähettäminen).
 
-<Callout>
+<Note>
   Katso [Miten maksut toimivat Solanassa](/docs/payments/how-payments-work)
   keskeisten maksukäsitteiden osalta.
-</Callout>
+</Note>
 
 ## Solana-osoitteiden ymmärtäminen
 
@@ -53,12 +53,12 @@ läpi koko oppaan.
 Käytä osoitetta hakeaksesi [tilin](/docs/core/accounts) verkosta, tarkista sen
 ohjelman omistaja ja tilityyppi määrittääksesi, kuinka osoitetta käsitellään.
 
-<Callout>
+<Note>
   Se, onko osoite käyrällä vai käyrän ulkopuolella, ei kerro sinulle, minkä
   tyyppinen tili on kyseessä, mikä ohjelma omistaa sen tai onko kyseisessä
   osoitteessa olemassa tiliä. Sinun on haettava tili verkosta näiden tietojen
   selvittämiseksi.
-</Callout>
+</Note>
 
 ### System Program -tilit (lompakot)
 
@@ -77,12 +77,12 @@ SOL:ia.
 Järjestelmätilit voivat olla olemassa off-curve-muodossa. Jos käyttäjäsi haluaa lähettää tokeneita off-curve-osoitteeseen, on suositeltavaa kehottaa käyttäjää vahvistamaan, että hän aikoo
 lähettää varoja älykkääseen lompakkoon.
 
-<Callout type="warn">
+<Warning>
   Ilman suojatoimia ATA:n luomisen subventoimista voidaan hyödyntää
   haitallisesti. Pahantahtoinen käyttäjä voi pyytää siirtoa, antaa ATA:nsa luoda
   kulujesi kustannuksella, sulkea ATA:n periäkseen rent SOL:in takaisin ja
   toistaa prosessin.
-</Callout>
+</Warning>
 
 ### Token Accountit
 
@@ -92,11 +92,11 @@ Jos vastaanottamasi osoite on token-ohjelman omistama, sinun tulee varmistaa,
 että tili on token account (ei mint account) ja vastaa odotettua token mint
 accountia ennen lähettämistä.
 
-<Callout type="info">
+<Info>
   Token Programs vahvistavat automaattisesti, että siirron molemmat token
   accountit sisältävät saman mintin tokeneita. Jos vahvistus epäonnistuu,
   transaktio hylätään eikä varoja menetetä.
-</Callout>
+</Info>
 
 ### Mint Accountit
 
@@ -129,18 +129,18 @@ Natiivia SOL:a lähetettäessä hyväksyttävä tulos on vain `IS_WALLET`.
 `IS_TOKEN_ACCOUNT` **ei** ole: token account sisältää SPL-tokeneita, ja sinne
 lähetetty SOL on lähettäjän hallinnan ulkopuolella.
 
-<Callout type="warn">
+<Warning>
   Tämä on yleinen tapa menettää SOL: käyttäjä liittää tokenin mint-osoitteen
   (tai ohjelman osoitteen) SOL-nostoon. Siirto onnistuu ja SOL on
   palautumattomasti menetetty. Luokittele vastaanottaja aina ennen SOL-siirron
   allekirjoittamista.
-</Callout>
+</Warning>
 
 ## Vahvistusprosessi
 
 Seuraava kaavio näyttää viitemuotoisen päätöspuun osoitteen vahvistamiseksi:
 
-```mermaid title="Address Verification Flow"
+```mermaid
 flowchart TD
     A["Input address"]
     B["Fetch account info"]
@@ -169,17 +169,46 @@ flowchart TD
     K -- "No" --> V2["VERIFY: Confirm the recipient intends to use a smart wallet"]
 ```
 
-<Steps>
-<Step>
+<div className="nojs-only" data-fallback="mermaid">
+  ```text Mermaid
+  flowchart TD
+      A["Input address"]
+      B["Fetch account info"]
 
-### Hae tili
+      A --> B
+      B --> C{"Account exists onchain?"}
+
+      %% --- Non-existent account path ---
+      C -- "No" --> D{"Is address off-curve (PDA)?"}
+      D -- "Yes" --> V1["VERIFY: Confirm the recipient intends to use a smart wallet"]
+      D -- "No" --> W1["IS_WALLET: Valid unfunded public key address"]
+
+      %% --- Existing account path ---
+      C -- "Yes" --> F{"Check program owner"}
+
+      F -- "Token Program / Token-2022" --> G{"Is token account for expected mint?"}
+      G -- "Yes" --> T1["IS_TOKEN_ACCOUNT: Send directly"]
+      G -- "No" --> R1["REJECT: Wrong account type or mint"]
+
+      F -- "System Program" --> H{"Is address off-curve?"}
+      H -- "No" --> W2["IS_WALLET: Derive ATA and send"]
+      H -- "Yes" --> V3["VERIFY: Confirm the recipient intends to use a smart wallet"]
+
+      F -- "Other Program" --> K{"Allowed by policy?"}
+      K -- "Yes" --> W3["IS_WALLET: Derive ATA and send"]
+      K -- "No" --> V2["VERIFY: Confirm the recipient intends to use a smart wallet"]
+  ```
+</div>
+
+<p className="sol-caption">Address Verification Flow</p>
+
+<Steps titleSize="h3">
+<Step title="Hae tili">
 
 Käytä osoitetta tilin tietojen hakemiseen verkosta.
 
 </Step>
-<Step>
-
-### Tiliä ei ole olemassa
+<Step title="Tiliä ei ole olemassa">
 
 Jos tässä osoitteessa ei ole tiliä, tarkista onko osoite on-curve vai
 off-curve:
@@ -195,9 +224,7 @@ off-curve:
   ei ole olemassa.
 
 </Step>
-<Step>
-
-### Tili on olemassa
+<Step title="Tili on olemassa">
 
 Jos tili on olemassa, tarkista mikä ohjelma omistaa sen:
 
@@ -227,12 +254,12 @@ Jos tili on olemassa, tarkista mikä ohjelma omistaa sen:
 Seuraava esimerkki näyttää ainoastaan osoitteen validointilogiikan. Tämä on
 viitekoodi havainnollistamista varten.
 
-<Callout>
+<Note>
   Demo ei näytä, miten ATA johdetaan tai miten rakennetaan transaktio tokeneiden
   lähettämiseksi. Katso esimerkkikoodia [token
   account](/docs/tokens/basics/create-token-account#how-to-create-an-associated-token-account)
   - ja [token transfer](/docs/tokens/basics/transfer-tokens) -dokumentaatiosta.
-</Callout>
+</Note>
 
 Demo alla käyttää kolmea mahdollista lopputulosta:
 
@@ -249,10 +276,7 @@ tulee pyytää käyttäjää vahvistamaan aikomuksensa ennen SPL-tokenien lähet
 account palauttaa `IS_TOKEN_ACCOUNT`, joten se voi vastaanottaa SPL-tokeneita, mutta **ei**
 nativia SOL — tämä ero estää SOL:n lukittumisen.
 
-<CodeTabs flags="r">
-
-```ts !! title="Demo"
-// !collapse(1:35) collapsed
+```ts Demo expandable
 
 import {
   type Address,
@@ -382,7 +406,6 @@ function canReceiveSplToken(result: ValidationResult): boolean {
 // =============================================================================
 // Examples
 // =============================================================================
-// !collapse(1:1000) collapsed
 
 // Wallets
 const EXISTING_WALLET =
@@ -457,5 +480,3 @@ console.log("\n" + "═".repeat(60));
 console.log("  Done!");
 console.log("═".repeat(60) + "\n");
 ```
-
-</CodeTabs>

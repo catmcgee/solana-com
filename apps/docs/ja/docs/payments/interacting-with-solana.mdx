@@ -12,17 +12,19 @@ SDKと[Solana CLI](https://solana.com/docs/intro/installation)を使用した接
 SolanaのRPC APIは、ネットワークとプログラム的に対話するための主要な方法です。RPC
 URLは、事実上ネットワークへのAPIキーです。
 
-<Callout type="caution" title="本番環境では公開RPCを使用しないでください">
+<Danger>
+  **本番環境では公開RPCを使用しないでください**
+
   パブリックエンドポイント（`api.mainnet.solana.com`、`api.devnet.solana.com`）はレート制限があり、SLAもなく、本番環境の決済フローには適していません。本番環境へのデプロイには、[RPCプロバイダー](https://solana.com/rpc)を利用してプライベートRPCエンドポイントを確保してください。
-</Callout>
+</Danger>
 
 開発とテストには、レート制限付きの公開エンドポイントを使用できます。
 
 ネットワークと対話するためのRPCクライアントを作成します。
 
-<CodeTabs storage="kit-cli">
+<CodeGroup>
 
-```ts !! title="Kit"
+```ts Kit
 import { createSolanaRpc, createSolanaRpcSubscriptions } from "@solana/kit";
 
 const rpc = createSolanaRpc("https://api.mainnet.solana.com");
@@ -31,16 +33,16 @@ const rpcSubscriptions = createSolanaRpcSubscriptions(
 );
 ```
 
-```bash !! title="CLI"
+```bash CLI
 solana config set --url https://api.mainnet.solana.com
 solana config get # to verify the connection
 ```
 
-</CodeTabs>
+</CodeGroup>
 
-<Callout>
+<Note>
   開発には、devnet(`https://api.devnet.solana.com`)または[Surfpool](/docs/intro/installation/surfpool-cli-basics)のようなローカルvalidatorを使用してください。
-</Callout>
+</Note>
 
 ## 一般的なRPCメソッド
 
@@ -53,9 +55,9 @@ RPCメソッドを使用して、任意のアカウントに関する情報を�
 
 `data`フィールドは、アカウントのデータをbase64エンコードした文字列です。`@solana/kit`パッケージの`getBase64Codec`メソッドを使用してバイトにエンコードし、アカウントのデータに期待されるコーデック(既知の場合)を使用して読み取り可能なオブジェクトにデコードできます(例: トークンアカウントの場合は`getTokenCodec`)。
 
-<CodeTabs storage="kit-cli">
+<CodeGroup>
 
-```ts !! title="Kit"
+```ts Kit
 const accountInfo = await rpc
   .getAccountInfo(address("7EcDhSYGxXyscszYEp35KHN8vvw3svAuLKTzXwCFLtV"), {
     encoding: "base64"
@@ -67,48 +69,48 @@ const parsedTokenData = getTokenCodec().decode(dataBytes);
 console.log(parsedTokenData);
 ```
 
-```bash !! title="CLI"
+```bash CLI
 solana account 7EcDhSYGxXyscszYEp35KHN8vvw3svAuLKTzXwCFLtV
 ```
 
-</CodeTabs>
+</CodeGroup>
 
 ### トークン残高の取得
 
 [`getTokenAccountBalance`](/docs/rpc/http/gettokenaccountbalance)
 RPCメソッドを使用して、トークンアカウントの残高を確認します:
 
-<CodeTabs storage="kit-cli">
+<CodeGroup>
 
-```ts !! title="Kit"
+```ts Kit
 const balance = await rpc.getTokenAccountBalance(tokenAccountAddress).send();
 
 console.log(balance.value.uiAmount); // Human-readable (e.g., 100.50)
 console.log(balance.value.amount); // Base units (e.g., "100500000")
 ```
 
-```bash !! title="CLI"
+```bash CLI
 spl-token balance --address 7v45FoihixmfocS3LbANUrEGZQKEJ7QQUg8K9jtZd3St
 ```
 
-</CodeTabs>
+</CodeGroup>
 
 ### トランザクションの構築
 
 すべてのトランザクションは、有効であること(古くないこと)を保証するために、最新のブロックハッシュが必要です。[`getLatestBlockhash`](/docs/rpc/http/getlatestblockhash)
 RPCメソッドを使用して、支払いトランザクションを作成する前に取得してください:
 
-<CodeTabs storage="kit-cli">
+<CodeGroup>
 
-```ts !! title="Kit"
+```ts Kit
 const { value: latestBlockhash } = await rpc.getLatestBlockhash().send();
 ```
 
-```bash !! title="CLI"
+```bash CLI
 solana block-height
 ```
 
-</CodeTabs>
+</CodeGroup>
 
 > ブロックハッシュは約60秒後に期限切れになります。署名と送信の直前に新しいものを取得してください。
 
@@ -117,62 +119,62 @@ solana block-height
 [`getSignatureStatuses`](/docs/rpc/http/getsignaturestatuses)
 RPCメソッドを使用して、トランザクションが確定したことを確認します:
 
-<CodeTabs storage="kit-cli">
+<CodeGroup>
 
-```ts !! title="Kit"
+```ts Kit
 const status = await rpc.getSignatureStatuses([signature]).send();
 
 const result = status.value[0];
 // result.confirmationStatus: "processed" | "confirmed" | "finalized"
 ```
 
-```bash !! title="CLI"
+```bash CLI
 solana confirm <SIGNATURE>
 # For more details:
 solana confirm <SIGNATURE> -v
 ```
 
-</CodeTabs>
+</CodeGroup>
 
 ### トランザクション詳細の取得
 
 [`getTransaction`](/docs/rpc/http/gettransaction)
 RPCメソッドを使用して、確認済みトランザクションの完全な詳細を取得します:
 
-<CodeTabs storage="kit-cli">
+<CodeGroup>
 
-```ts !! title="Kit"
+```ts Kit
 const transaction = await rpc
   .getTransaction(signature, { maxSupportedTransactionVersion: 1 })
   .send();
 ```
 
-```bash !! title="CLI"
+```bash CLI
 solana transaction-history <ADDRESS> --limit 1 -v
 # Or decode a specific transaction:
 solana confirm <SIGNATURE> -v
 ```
 
-</CodeTabs>
+</CodeGroup>
 
 ### トランザクション履歴
 
 [`getSignaturesForAddress`](/docs/rpc/http/getsignaturesforaddress)
 RPCメソッドを使用して、アドレスの最近のトランザクションを取得します:
 
-<CodeTabs storage="kit-cli">
+<CodeGroup>
 
-```ts !! title="Kit"
+```ts Kit
 const signatures = await rpc
   .getSignaturesForAddress(walletAddress, { limit: 10 })
   .send();
 ```
 
-```bash !! title="CLI"
+```bash CLI
 solana transaction-history <ADDRESS> --limit 10
 ```
 
-</CodeTabs>
+</CodeGroup>
 
 > 包括的な支払い監視については、webhookとリアルタイムトランザクション検出をカバーする[支払いの受け入れ](/docs/payments/accept-payments)を参照してください。
 

@@ -1,7 +1,6 @@
 ---
 title: アカウントランタイム
 description: Solanaランタイムが実行前にアカウントを読み込んで検証する方法と、プログラムにアカウントデータを渡すために使用されるシリアライゼーション形式について説明します。
-url: /docs/core/accounts/account-runtime
 type: reference
 prerequisites:
   - /docs/core/accounts
@@ -13,13 +12,15 @@ related:
   - /docs/core/constants-reference
 ---
 
-<Callout type="info" title="概要">
-  実行前に、ランタイムはアカウントを読み込み、手数料支払者を検証し、レント免除を確認し、プログラムがアクセスできるメモリレイアウトにアカウントデータをシリアライズします。
-</Callout>
+<Info>
+  **概要**
 
-<Callout>
+  実行前に、ランタイムはアカウントを読み込み、手数料支払者を検証し、レント免除を確認し、プログラムがアクセスできるメモリレイアウトにアカウントデータをシリアライズします。
+</Info>
+
+<Note>
   このページはランタイムの内部構造について説明しています。ほとんどの開発者は、プログラムを構築する際にこの情報を必要としません。開発者向けの説明については、[アカウント構造](/docs/core/accounts/account-structure)を参照してください。
-</Callout>
+</Note>
 
 ## アカウントの読み込み
 
@@ -27,18 +28,18 @@ related:
 
 1. **手数料支払者の検証**: 手数料支払者(最初のアカウント)は存在し、システムアカウントまたはnonceアカウントである必要があり、手数料をカバーするのに十分なlamportを持っている必要があります([`validate_fee_payer()`](https://github.com/anza-xyz/agave/blob/v3.1.8/svm/src/account_loader.rs#L369-L417))。手数料の支払い後、アカウントはレント免除を維持するか、正確に0
    lamportになる必要があります。0とレント免除最小値の間になることはできません。nonceアカウントは常にレント免除を維持するのに十分なlamportを保持する必要があります。支払者がシステムアカウントでもnonceアカウントでもない場合、トランザクションは
-   _rs`TransactionError::InvalidAccountForFee`_ で失敗します。
+   `TransactionError::InvalidAccountForFee` で失敗します。
 
 2. **読み込みデータサイズの制限**: 読み込まれたすべてのアカウントの合計サイズ(アカウントごとに64バイトの[`TRANSACTION_ACCOUNT_BASE_SIZE`](https://github.com/anza-xyz/agave/blob/v3.1.8/svm/src/account_loader.rs#L45)を含む)は、[`MAX_LOADED_ACCOUNTS_DATA_SIZE_BYTES`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/execution_budget.rs#L53)(64
    MiB)を超えてはなりません。この制限を超えると、
-   _rs`TransactionError::MaxLoadedAccountsDataSizeExceeded`_ が発生します。
+   `TransactionError::MaxLoadedAccountsDataSizeExceeded` が発生します。
 
 3. **プログラムアカウントの検証**: インストラクションによって呼び出されるすべてのプログラムは存在し、有効なローダーによって所有されている必要があります。有効なローダーとは、[`PROGRAM_OWNERS`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/account/src/lib.rs#L802)(BPF
    Loader Upgradeable、BPF Loader、BPF Loader Deprecated、Loader
    V4)またはネイティブローダーのいずれかです。プログラムアカウントが存在しない場合、トランザクションは
-   _rs`TransactionError::ProgramAccountNotFound`_
+   `TransactionError::ProgramAccountNotFound`
    で失敗します。存在するが無効な所有者を持つ場合、トランザクションは
-   _rs`TransactionError::InvalidProgramForExecution`_ で失敗します。
+   `TransactionError::InvalidProgramForExecution` で失敗します。
 
 4. **存在しないアカウント**: オンチェーン上に存在しないアカウントは、デフォルトアカウント(0
    lamport、空のデータ、System
@@ -85,10 +86,10 @@ VMに渡します。シリアライゼーション形式(非推奨のloader-v1�
 - 現在のインストラクションアカウントインデックスが最初のマッピングされたインデックスと等しい場合、それは重複**ではありません**（`None`を返します）。
 - それ以外の場合、`Some(first_index)`を返します。ここで`first_index`は最初の出現のインデックスです。
 
-同じアカウントへのすべての参照は同じ基礎 _rs`AccountSharedData`_
+同じアカウントへのすべての参照は同じ基礎 `AccountSharedData`
 を共有するため、任意の参照を通じた変更は他のすべての参照を通じて即座に可視化されます。ただし、一度に保持できる可変借用は1つだけです。2つの異なるインストラクションアカウントインデックスを通じて同じアカウントを同時に可変的に借用しようとすると、
-_rs`InstructionError::AccountBorrowFailed`_
+`InstructionError::AccountBorrowFailed`
 が返されます。プログラムは、同じ基礎アカウントで別の借用を取得する前に、1つの借用をドロップする必要があります。
 
-プログラムの実行後、ランタイムはバッファを逆シリアル化し（[`deserialize_parameters_aligned()`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/serialization.rs#L580-L667)）、`lamports`、`data`（_rs`MAX_PERMITTED_DATA_INCREASE`_
+プログラムの実行後、ランタイムはバッファを逆シリアル化し（[`deserialize_parameters_aligned()`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/serialization.rs#L580-L667)）、`lamports`、`data`（`MAX_PERMITTED_DATA_INCREASE`
 までの長さの変更を含む）、および`owner`への変更を適用します。

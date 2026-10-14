@@ -17,12 +17,12 @@ Doğrulama, ne gönderdiğinize bağlıdır:
   sayfanın büyük bölümü SPL token gönderimleri ile ilgilidir.
 - **Yerel SOL** için böyle bir koruma yoktur. System Program transferi herhangi
   bir hesaba başarıyla gerçekleşir; bu nedenle yanlış bir alıcı SOL'u kalıcı
-  olarak kilitler. Bkz. [Yerel SOL Gönderimi](#sending-native-sol).
+  olarak kilitler. Bkz. [Yerel SOL Gönderimi](#yerel-sol-gönderimi).
 
-<Callout>
+<Note>
   Temel ödeme kavramları için bkz. [Solana'da Ödemeler Nasıl
   Çalışır](/docs/payments/how-payments-work).
-</Callout>
+</Note>
 
 ## Solana Adreslerini Anlamak
 
@@ -54,12 +54,12 @@ tüm içerikte "akıllı cüzdan" terimi kullanılmaktadır.
 Ağdan bir [hesap](/docs/core/accounts) çekmek için adresi kullanın; adresi nasıl
 işleyeceğinizi belirlemek için program sahibini ve hesap türünü kontrol edin.
 
-<Callout>
+<Note>
   Bir adresin eğri üzerinde mi yoksa eğri dışında mı olduğunu bilmek, hesabın
   türünü, hangi programın sahibi olduğunu veya o adreste bir hesabın var olup
   olmadığını söylemez. Bu ayrıntıları belirlemek için hesabı ağdan çekmeniz
   gerekir.
-</Callout>
+</Note>
 
 ### System Program Hesapları (Cüzdanlar)
 
@@ -78,12 +78,12 @@ Sistem hesapları eğri dışında bulunabilir. Kullanıcınız eğri dışı bi
 token göndermek istiyorsa, kullanıcıya fonları bir akıllı cüzdana göndermek
 isteyip istemediğini doğrulaması için uyarı yapılması önerilir.
 
-<Callout type="warn">
+<Warning>
   Güvenlik önlemleri olmadan, ATA oluşturma maliyetinin karşılanması istismar
   edilebilir. Kötü niyetli bir kullanıcı transfer talep edebilir, ATA'sını sizin
   hesabınıza oluşturabilir, rent SOL'unu geri almak için ATA'yı kapatabilir ve
   bunu tekrarlayabilir.
-</Callout>
+</Warning>
 
 ### Token Hesapları
 
@@ -93,11 +93,11 @@ Aldığınız adres bir token programına aitse, token göndermeden önce hesab�
 token account olduğunu (mint account değil) ve beklenen token mint account ile
 eşleştiğini doğrulamalısınız.
 
-<Callout type="info">
+<Info>
   Token Program'lar, bir transferdeki her iki token account'ın da aynı mint'e
   ait token tuttuğunu otomatik olarak doğrular. Doğrulama başarısız olursa işlem
   reddedilir ve hiçbir varlık kaybolmaz.
-</Callout>
+</Info>
 
 ### Mint Hesapları
 
@@ -132,19 +132,19 @@ Yerel SOL gönderilirken yalnızca `IS_WALLET` sonucu kabul edilebilirdir.
 `IS_TOKEN_ACCOUNT` ise **kabul edilemez**: bir token account, SPL tokenları
 barındırır ve oraya gönderilen SOL, gönderenin kontrolü dışına çıkar.
 
-<Callout type="warn">
+<Warning>
   Bu, SOL'un kaybolmasının yaygın bir yoludur: bir kullanıcı, token'ın mint
   adresini (veya bir program adresini) SOL çekme işlemine yapıştırır. Transfer
   başarıyla tamamlanır ve SOL kurtarılamaz. Bir SOL transferini imzalamadan önce
   her zaman alıcıyı sınıflandırın.
-</Callout>
+</Warning>
 
 ## Doğrulama Akışı
 
 Aşağıdaki diyagram, bir adresi doğrulamak için referans karar ağacını
 göstermektedir:
 
-```mermaid title="Address Verification Flow"
+```mermaid
 flowchart TD
     A["Input address"]
     B["Fetch account info"]
@@ -173,17 +173,46 @@ flowchart TD
     K -- "No" --> V2["VERIFY: Confirm the recipient intends to use a smart wallet"]
 ```
 
-<Steps>
-<Step>
+<div className="nojs-only" data-fallback="mermaid">
+  ```text Mermaid
+  flowchart TD
+      A["Input address"]
+      B["Fetch account info"]
 
-### Hesabı Getir
+      A --> B
+      B --> C{"Account exists onchain?"}
+
+      %% --- Non-existent account path ---
+      C -- "No" --> D{"Is address off-curve (PDA)?"}
+      D -- "Yes" --> V1["VERIFY: Confirm the recipient intends to use a smart wallet"]
+      D -- "No" --> W1["IS_WALLET: Valid unfunded public key address"]
+
+      %% --- Existing account path ---
+      C -- "Yes" --> F{"Check program owner"}
+
+      F -- "Token Program / Token-2022" --> G{"Is token account for expected mint?"}
+      G -- "Yes" --> T1["IS_TOKEN_ACCOUNT: Send directly"]
+      G -- "No" --> R1["REJECT: Wrong account type or mint"]
+
+      F -- "System Program" --> H{"Is address off-curve?"}
+      H -- "No" --> W2["IS_WALLET: Derive ATA and send"]
+      H -- "Yes" --> V3["VERIFY: Confirm the recipient intends to use a smart wallet"]
+
+      F -- "Other Program" --> K{"Allowed by policy?"}
+      K -- "Yes" --> W3["IS_WALLET: Derive ATA and send"]
+      K -- "No" --> V2["VERIFY: Confirm the recipient intends to use a smart wallet"]
+  ```
+</div>
+
+<p className="sol-caption">Address Verification Flow</p>
+
+<Steps titleSize="h3">
+<Step title="Hesabı Getir">
 
 Ağdan hesap ayrıntılarını getirmek için adresi kullanın.
 
 </Step>
-<Step>
-
-### Hesap mevcut değil
+<Step title="Hesap mevcut değil">
 
 Bu adreste herhangi bir hesap yoksa, adresin eğri üzerinde mi yoksa eğri dışında mı
 olduğunu kontrol edin:
@@ -198,9 +227,7 @@ olduğunu kontrol edin:
   değilse oluşturulmasını finanse edip etmeyeceğinize dair bir politika kararı vermeniz gerekir.
 
 </Step>
-<Step>
-
-### Hesap mevcut
+<Step title="Hesap mevcut">
 
 Bir hesap mevcutsa, hangi programın sahibi olduğunu kontrol edin:
 
@@ -232,12 +259,12 @@ Bir hesap mevcutsa, hangi programın sahibi olduğunu kontrol edin:
 Aşağıdaki örnek yalnızca adres doğrulama mantığını göstermektedir. Bu, yalnızca
 açıklama amacıyla hazırlanmış referans kodudur.
 
-<Callout>
+<Note>
   Demo, bir ATA türetmeyi veya token göndermek için bir işlem oluşturmayı
   göstermemektedir. Örnek kod için [token
   account](/docs/tokens/basics/create-token-account#how-to-create-an-associated-token-account)
   ve [token transfer](/docs/tokens/basics/transfer-tokens) belgelerine başvurun.
-</Callout>
+</Note>
 
 Aşağıdaki demo üç olası sonucu kullanmaktadır:
 
@@ -255,10 +282,7 @@ SPL token göndermeden önce kullanıcının niyetini onaylamasını sağlaması
 Bir token account, `IS_TOKEN_ACCOUNT` döndürür; bu nedenle SPL token alabilir
 ancak yerel SOL **alamaz** — bu ayrım, SOL'un kilitlenmesini önler.
 
-<CodeTabs flags="r">
-
-```ts !! title="Demo"
-// !collapse(1:35) collapsed
+```ts Demo expandable
 
 import {
   type Address,
@@ -388,7 +412,6 @@ function canReceiveSplToken(result: ValidationResult): boolean {
 // =============================================================================
 // Examples
 // =============================================================================
-// !collapse(1:1000) collapsed
 
 // Wallets
 const EXISTING_WALLET =
@@ -463,5 +486,3 @@ console.log("\n" + "═".repeat(60));
 console.log("  Done!");
 console.log("═".repeat(60) + "\n");
 ```
-
-</CodeTabs>

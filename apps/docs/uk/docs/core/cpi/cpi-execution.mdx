@@ -4,7 +4,6 @@ description:
   11-крокова послідовність виконання CPI через середовище виконання Solana,
   правила розширення привілеїв, обмеження повторного входу та перевірки
   авторизованих програм.
-url: /docs/core/cpi/cpi-execution
 type: reference
 prerequisites:
   - /docs/core/cpi
@@ -18,12 +17,14 @@ related:
 
 {/* TOC: CPI execution flow, Privilege rules */}
 
-<Callout type="info" title="Підсумок">
+<Info>
+  **Підсумок**
+
   CPI проходять через 11 кроків середовища виконання, включаючи перевірку
   привілеїв, трансляцію акаунтів та синхронізацію даних. Максимальна глибина
   викликів: 5 (9 з SIMD-0268). Правила привілеїв запобігають підвищенню прав
   викликаної програми понад те, що надав викликач.
-</Callout>
+</Info>
 
 ## Правила привілеїв
 
@@ -53,7 +54,7 @@ CPI розширюють привілеї акаунтів викликача н
 2. **Привілей підписанта вимагає авторизації.** Обліковий запис може бути
    підписантом у викликаному лише якщо (а) він уже був підписантом у викликачі,
    АБО (б) це PDA, отриманий із seeds викликаючої програми через
-   _rs`invoke_signed`_.
+   `invoke_signed`.
 3. **Зменшення привілеїв завжди дозволено.** Викликаний може використовувати
    менше привілеїв, ніж надав викликач.
 
@@ -64,7 +65,7 @@ CPI проходить через кілька рівнів середовища
 виконання і назад. Кожен крок посилається на файл вихідного коду, який його
 реалізує.
 
-<Callout>
+<Note>
   Максимальна висота виклику інструкції програми називається
   [`max_instruction_stack_depth`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/execution_budget.rs#L66)
   і встановлена на константу
@@ -75,7 +76,7 @@ CPI проходить через кілька рівнів середовища
 на 1. Максимум 5 означає, що програма може виконувати CPI на глибину до 4 рівнів
 (8 рівнів з SIMD-0268).
 
-</Callout>
+</Note>
 
 ### Крок 1: програма викликає `invoke` або `invoke_signed`
 
@@ -83,9 +84,9 @@ CPI проходить через кілька рівнів середовища
 [`invoke`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/program/src/program.rs#L26)
 або
 [`invoke_signed`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/program/src/program.rs#L51).
-_rs`invoke`_ — це тонка обгортка, яка викликає _rs`invoke_signed`_ з порожнім
-масивом seeds підписанта. Функція SDK серіалізує _rs`Instruction`_, зріз
-_rs`AccountInfo`_ і seeds підписанта в пам'ять VM, а потім ініціює syscall.
+`invoke` — це тонка обгортка, яка викликає `invoke_signed` з порожнім
+масивом seeds підписанта. Функція SDK серіалізує `Instruction`, зріз
+`AccountInfo` і seeds підписанта в пам'ять VM, а потім ініціює syscall.
 
 ### Крок 2: вхід у syscall
 
@@ -96,7 +97,7 @@ _rs`AccountInfo`_ і seeds підписанта в пам'ять VM, а поті
 
 ### Крок 3: Споживання вартості виклику
 
-Перша дія всередині _rs`cpi_common`_ полягає в
+Перша дія всередині `cpi_common` полягає в
 [стягненні фіксованої вартості виклику](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/cpi.rs#L815-L818)
 з загального лічильника обчислень:
 [`invoke_units`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/execution_budget.rs#L108)
@@ -107,7 +108,7 @@ _rs`AccountInfo`_ і seeds підписанта в пам'ять VM, а поті
 Обробник системного виклику транслює інструкцію з адресного простору VM програми
 в типи Rust на стороні хоста через
 [`translate_instruction_rust`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/cpi.rs#L529-L590),
-який зчитує структуру _rs`StableInstruction`_, перевіряє довжину даних
+який зчитує структуру `StableInstruction`, перевіряє довжину даних
 відповідно до
 [`MAX_INSTRUCTION_DATA_LEN`](https://github.com/anza-xyz/agave/blob/v3.1.8/transaction-context/src/lib.rs#L33)
 (10 240 байтів), а потім стягує
@@ -156,8 +157,8 @@ _rs`AccountInfo`_ і seeds підписанта в пам'ять VM, а поті
 
 Середовище виконання викликає
 [`prepare_next_instruction`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/invoke_context.rs#L293-L432),
-який будує список _rs`InstructionAccount`_ викликуваної програми та застосовує
-правила привілеїв. Див. [Правила привілеїв](#privilege-rules) нижче для повної
+який будує список `InstructionAccount` викликуваної програми та застосовує
+правила привілеїв. Див. [Правила привілеїв](#правила-привілеїв) нижче для повної
 таблиці рішень.
 
 ### Крок 8: Трансляція інформації про облікові записи
@@ -165,7 +166,7 @@ _rs`AccountInfo`_ і seeds підписанта в пам'ять VM, а поті
 Обробник викликає `translate_accounts`, який:
 
 1. [Перевіряє кількість інформації про облікові записи](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/cpi.rs#L164-L190)
-   відносно _rs`MAX_CPI_ACCOUNT_INFOS`_ (128 або 255 з SIMD-0339).
+   відносно `MAX_CPI_ACCOUNT_INFOS` (128 або 255 з SIMD-0339).
 2. [Стягує вартість трансляції інформації про облікові записи](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/cpi.rs#L969-L981)
    (тільки SIMD-0339): `(num_account_infos * 80) / 250` обчислювальних одиниць.
 3. Для кожного невиконуваного, недубльованого облікового запису створює
@@ -193,11 +194,11 @@ _rs`AccountInfo`_ і seeds підписанта в пам'ять VM, а поті
 
 1. Викликає
    [`push()`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/invoke_context.rs#L233-L265)
-   для додавання нового фрейму до стеку інструкцій. _rs`push()`_ застосовує
+   для додавання нового фрейму до стеку інструкцій. `push()` застосовує
    [правило реентерабельності](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/invoke_context.rs#L243-L259):
    програма може викликати саму себе лише якщо вона є безпосереднім викликачем
    (тобто програма A може викликати A, але A не може викликати B, яка викликає
-   A). Порушення повертає _rs`ReentrancyNotAllowed`_.
+   A). Порушення повертає `ReentrancyNotAllowed`.
 2. Викликає
    [`process_executable_chain`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/invoke_context.rs#L507-L602),
    яка визначає точку входу програми викликаного та викликає її. Викликаний
@@ -206,7 +207,7 @@ _rs`AccountInfo`_ і seeds підписанта в пам'ять VM, а поті
 3. Викликає
    [`pop()`](https://github.com/anza-xyz/agave/blob/v3.1.8/transaction-context/src/lib.rs#L366-L398)
    для видалення фрейму викликаного та перевірки незмінності балансів lamport
-   (_rs`UnbalancedInstruction`_ у разі порушення).
+   (`UnbalancedInstruction` у разі порушення).
 
 ### Крок 11: Синхронізація облікових записів після CPI (від викликаного до викликача)
 

@@ -17,11 +17,11 @@ gewährleisten.
 
 Fügen Sie `mollusk-svm` als Abhängigkeit in `Cargo.toml` hinzu:
 
-```terminal
-$ cargo add mollusk-svm --dev
+```bash Terminal
+cargo add mollusk-svm --dev
 ```
 
-```toml title="Cargo.toml"
+```toml Cargo.toml
 [dev-dependencies]
 mollusk-svm = "0.7"
 ```
@@ -29,11 +29,11 @@ mollusk-svm = "0.7"
 Um die Compute-Unit-Nutzung zu benchmarken, fügen Sie `mollusk-svm-bencher` als
 Abhängigkeit in `Cargo.toml` hinzu:
 
-```terminal
-$ cargo add mollusk-svm-bencher --dev
+```bash Terminal
+cargo add mollusk-svm-bencher --dev
 ```
 
-```toml title="Cargo.toml"
+```toml Cargo.toml
 [dev-dependencies]
 mollusk-svm-bencher = "0.7"
 ```
@@ -42,11 +42,11 @@ Um das Token Program, Token2022 Program (Token Extensions) und Associated Token
 Program für Tests mit Mollusk zu verwenden, fügen Sie
 `mollusk-svm-programs-token` als Abhängigkeit in `Cargo.toml` hinzu:
 
-```terminal
-$ cargo add mollusk-svm-programs-token --dev
+```bash Terminal
+cargo add mollusk-svm-programs-token --dev
 ```
 
-```toml title="Cargo.toml"
+```toml Cargo.toml
 [dev-dependencies]
 mollusk-svm-programs-token = "0.7"
 ```
@@ -56,128 +56,116 @@ mollusk-svm-programs-token = "0.7"
 Das folgende Beispiel zeigt ein minimales Setup zum Testen eines einfachen
 Solana-Programms mit Mollusk.
 
-<ScrollyCoding>
+<Steps>
+  <Step title="Hello World-Programm">
+    Dieses Beispiel demonstriert, wie man ein einfaches Solana-Programm mit Mollusk
+    testet. Das Programm gibt beim Aufruf einfach "Hello, world!" in den
+    Programm-Logs aus.
 
-## !!steps Hello World-Programm
+    Das Ausführen von `cargo build-sbf` generiert das kompilierte Programm unter
+    `/target/deploy/<program_name>.so`.
 
-Dieses Beispiel demonstriert, wie man ein einfaches Solana-Programm mit Mollusk
-testet. Das Programm gibt beim Aufruf einfach "Hello, world!" in den
-Programm-Logs aus.
+    ```rs src/lib.rs focus={16-30}
+    use solana_program::{
+        account_info::AccountInfo, entrypoint, entrypoint::ProgramResult, msg, pubkey::Pubkey,
+    };
 
-Das Ausführen von `cargo build-sbf` generiert das kompilierte Programm unter
-`/target/deploy/<program_name>.so`.
+    entrypoint!(process_instruction);
 
-<CodePlaceholder title="src/lib.rs" />
-
-<WithMentions>
-
-Um ein Solana-Programm mit Mollusk zu testen:
-
-1. [Erstellen Sie eine `Mollusk`-Instanz](mention:mollusk) - Initialisieren Sie
-   Mollusk mit einer Programm-ID und dem Pfad zum kompilierten Programm
-   (`.so`-Datei)
-2. [Erstellen Sie eine Anweisung](mention:instruction) - Erstellen Sie eine
-   Anweisung zum Aufrufen des Programms
-3. [Verarbeiten und validieren](mention:process) - Verarbeiten Sie die Anweisung
-   mit Mollusk und validieren Sie das Ergebnis
-
-```rs title="src/lib.rs"
-#[cfg(test)]
-mod tests {
-    use mollusk_svm::{result::Check, Mollusk};
-    use solana_sdk::{instruction::Instruction, pubkey::Pubkey};
-
-    #[test]
-    fn test_hello_world() {
-        let program_id = Pubkey::new_unique();
-        // !mention mollusk
-        let mollusk = Mollusk::new(&program_id, "target/deploy/hello_world");
-
-        // !mention instruction
-        let instruction = Instruction::new_with_bytes(program_id, &[], vec![]);
-
-        // !mention process
-        mollusk.process_and_validate_instruction(&instruction, &[], &[Check::success()]);
+    pub fn process_instruction(
+        _program_id: &Pubkey,
+        _accounts: &[AccountInfo],
+        _instruction_data: &[u8],
+    ) -> ProgramResult {
+        msg!("Hello, world!");
+        Ok(())
     }
-}
-```
 
-</WithMentions>
+    #[cfg(test)]
+    mod tests {
+        use mollusk_svm::{result::Check, Mollusk};
+        use solana_sdk::{instruction::Instruction, pubkey::Pubkey};
 
-Um den Test auszuführen, führen Sie `cargo test` aus.
+        #[test]
+        fn test_hello_world() {
+            let program_id = Pubkey::new_unique();
+            let mollusk = Mollusk::new(&program_id, "target/deploy/hello_world");
 
-Wenn der Test erfolgreich ausgeführt wird, sehen Sie eine Ausgabe ähnlich der
-folgenden:
+            let instruction = Instruction::new_with_bytes(program_id, &[], vec![]);
 
-```txt title="Terminal"
-running 1 test
-[2025-09-22T19:25:50.427685000Z DEBUG solana_runtime::message_processor::stable_log] Program 11157t3sqMV725NVRLrVQbAu98Jjfk1uCKehJnXXQs invoke [1]
-[2025-09-22T19:25:50.429669000Z DEBUG solana_runtime::message_processor::stable_log] Program log: Hello, world!
-[2025-09-22T19:25:50.429690000Z DEBUG solana_runtime::message_processor::stable_log] Program 11157t3sqMV725NVRLrVQbAu98Jjfk1uCKehJnXXQs consumed 211 of 1400000 compute units
-[2025-09-22T19:25:50.429726000Z DEBUG solana_runtime::message_processor::stable_log] Program 11157t3sqMV725NVRLrVQbAu98Jjfk1uCKehJnXXQs success
-test tests::test_hello_world ... ok
-
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
-
-   Doc-tests hello_world
-```
-
-```rs !! title="src/lib.rs"
-use solana_program::{
-    account_info::AccountInfo, entrypoint, entrypoint::ProgramResult, msg, pubkey::Pubkey,
-};
-
-entrypoint!(process_instruction);
-
-pub fn process_instruction(
-    _program_id: &Pubkey,
-    _accounts: &[AccountInfo],
-    _instruction_data: &[u8],
-) -> ProgramResult {
-    msg!("Hello, world!");
-    Ok(())
-}
-
-// !focus(1:15)
-#[cfg(test)]
-mod tests {
-    use mollusk_svm::{result::Check, Mollusk};
-    use solana_sdk::{instruction::Instruction, pubkey::Pubkey};
-
-    #[test]
-    fn test_hello_world() {
-        let program_id = Pubkey::new_unique();
-        let mollusk = Mollusk::new(&program_id, "target/deploy/hello_world");
-
-        let instruction = Instruction::new_with_bytes(program_id, &[], vec![]);
-
-        mollusk.process_and_validate_instruction(&instruction, &[], &[Check::success()]);
+            mollusk.process_and_validate_instruction(&instruction, &[], &[Check::success()]);
+        }
     }
-}
-```
+    ```
 
-```toml !! title="Cargo.toml"
-[package]
-name = "hello_world"
-version = "0.1.0"
-edition = "2021"
+    Um ein Solana-Programm mit Mollusk zu testen:
 
-[lib]
-crate-type = ["cdylib", "lib"]
+    1. Erstellen Sie eine `Mollusk`-Instanz - Initialisieren Sie
+       Mollusk mit einer Programm-ID und dem Pfad zum kompilierten Programm
+       (`.so`-Datei)
+    2. Erstellen Sie eine Anweisung - Erstellen Sie eine
+       Anweisung zum Aufrufen des Programms
+    3. Verarbeiten und validieren - Verarbeiten Sie die Anweisung
+       mit Mollusk und validieren Sie das Ergebnis
 
-[dependencies]
-solana-program = "2.2.0"
+    ```rs src/lib.rs
+    #[cfg(test)]
+    mod tests {
+        use mollusk_svm::{result::Check, Mollusk};
+        use solana_sdk::{instruction::Instruction, pubkey::Pubkey};
 
-[dev-dependencies]
-mollusk-svm = "0.5.0"
-solana-sdk = "2.2.0"
-```
+        #[test]
+        fn test_hello_world() {
+            let program_id = Pubkey::new_unique();
+            let mollusk = Mollusk::new(&program_id, "target/deploy/hello_world");
 
-```txt !! title="target/deploy/hello_world.so"
-[binary]
-```
+            let instruction = Instruction::new_with_bytes(program_id, &[], vec![]);
 
-</ScrollyCoding>
+            mollusk.process_and_validate_instruction(&instruction, &[], &[Check::success()]);
+        }
+    }
+    ```
+
+    Um den Test auszuführen, führen Sie `cargo test` aus.
+
+    Wenn der Test erfolgreich ausgeführt wird, sehen Sie eine Ausgabe ähnlich der
+    folgenden:
+
+    ```txt Terminal
+    running 1 test
+    [2025-09-22T19:25:50.427685000Z DEBUG solana_runtime::message_processor::stable_log] Program 11157t3sqMV725NVRLrVQbAu98Jjfk1uCKehJnXXQs invoke [1]
+    [2025-09-22T19:25:50.429669000Z DEBUG solana_runtime::message_processor::stable_log] Program log: Hello, world!
+    [2025-09-22T19:25:50.429690000Z DEBUG solana_runtime::message_processor::stable_log] Program 11157t3sqMV725NVRLrVQbAu98Jjfk1uCKehJnXXQs consumed 211 of 1400000 compute units
+    [2025-09-22T19:25:50.429726000Z DEBUG solana_runtime::message_processor::stable_log] Program 11157t3sqMV725NVRLrVQbAu98Jjfk1uCKehJnXXQs success
+    test tests::test_hello_world ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+       Doc-tests hello_world
+    ```
+
+    ```toml Cargo.toml
+    [package]
+    name = "hello_world"
+    version = "0.1.0"
+    edition = "2021"
+
+    [lib]
+    crate-type = ["cdylib", "lib"]
+
+    [dependencies]
+    solana-program = "2.2.0"
+
+    [dev-dependencies]
+    mollusk-svm = "0.5.0"
+    solana-sdk = "2.2.0"
+    ```
+
+    ```txt target/deploy/hello_world.so
+    [binary]
+    ```
+  </Step>
+</Steps>
 
 Die
 [`Mollusk`](https://docs.rs/mollusk-svm/0.5.0/mollusk_svm/struct.Mollusk.html)-Struktur
@@ -189,7 +177,7 @@ wünschen.
 Um Mollusk mit einer Standardinstanz zu initialisieren, verwenden Sie die
 Methode `Mollusk::default`.
 
-```rust title="Example"
+```rust Example
 // Default instance with no custom programs
 let mollusk = Mollusk::default();
 ```
@@ -197,7 +185,7 @@ let mollusk = Mollusk::default();
 Um Mollusk mit einem bestimmten Programm zu initialisieren, verwenden Sie die
 Methode `Mollusk::new`.
 
-```rust title="Example"
+```rust Example
 // Initialize Mollusk with a specific program from a file path
 let program_id = Pubkey::new_unique();
 let mollusk = Mollusk::new(&program_id, "target/deploy/my_program");
@@ -206,7 +194,7 @@ let mollusk = Mollusk::new(&program_id, "target/deploy/my_program");
 Um ein Programm zu Mollusk hinzuzufügen, verwenden Sie die Methode
 `Mollusk::add_program`.
 
-```rust title="Example"
+```rust Example
 let mollusk = Mollusk::default();
 let program_id = Pubkey::new_unique();
 
@@ -218,11 +206,11 @@ mollusk.add_program(
 );
 ```
 
-<Callout type="info">
+<Info>
   Geben Sie beim Angeben des Dateipfads nicht die Erweiterung `.so` an. Zum
   Beispiel ist `"path/to/my_program"` korrekt, aber `"path/to/my_program.so"`
   nicht.
-</Callout>
+</Info>
 
 ### Verarbeitung von Anweisungen
 
@@ -230,10 +218,10 @@ Mollusk bietet vier Hauptmethoden zur Verarbeitung von Anweisungen:
 
 | Methode                                                                        | Beschreibung                                                                                                                                               |
 | ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`process_instruction`](#single-instruction)                                   | Verarbeitet eine Anweisung und gibt das Ergebnis zurück.                                                                                                   |
-| [`process_and_validate_instruction`](#single-instruction-with-checks)          | Verarbeitet eine Anweisung und führt eine Reihe von Prüfungen am Ergebnis durch, wobei bei fehlgeschlagenen Prüfungen ein Panic ausgelöst wird.            |
-| [`process_instruction_chain`](#multiple-instructions)                          | Verarbeitet mehrere Anweisungen und gibt das Ergebnis zurück.                                                                                              |
-| [`process_and_validate_instruction_chain`](#multiple-instructions-with-checks) | Verarbeitet mehrere Anweisungen und führt eine Reihe von Prüfungen an jedem Ergebnis durch, wobei bei fehlgeschlagenen Prüfungen ein Panic ausgelöst wird. |
+| [`process_instruction`](#einzelne-anweisung)                                   | Verarbeitet eine Anweisung und gibt das Ergebnis zurück.                                                                                                   |
+| [`process_and_validate_instruction`](#einzelne-anweisung-mit-prüfungen)        | Verarbeitet eine Anweisung und führt eine Reihe von Prüfungen am Ergebnis durch, wobei bei fehlgeschlagenen Prüfungen ein Panic ausgelöst wird.            |
+| [`process_instruction_chain`](#mehrere-anweisungen)                            | Verarbeitet mehrere Anweisungen und gibt das Ergebnis zurück.                                                                                              |
+| [`process_and_validate_instruction_chain`](#mehrere-anweisungen-mit-prüfungen) | Verarbeitet mehrere Anweisungen und führt eine Reihe von Prüfungen an jedem Ergebnis durch, wobei bei fehlgeschlagenen Prüfungen ein Panic ausgelöst wird. |
 
 Das
 [`InstructionResult`](https://docs.rs/mollusk-svm-result/0.5.0/mollusk_svm_result/types/struct.InstructionResult.html)
@@ -256,17 +244,15 @@ pub fn process_instruction(
 Das folgende Beispiel verarbeitet eine SOL-Transfer-Anweisung ohne
 Validierungsprüfungen.
 
-<Callout type="info">
+<Info>
 
 Die folgenden Beispiele führen Mollusk in der `main`-Funktion zu
 Demonstrationszwecken aus. In der Praxis verwenden Sie Mollusk normalerweise in
 einem Testmodul, das mit dem `#[test]`-Attribut annotiert ist.
 
-</Callout>
+</Info>
 
-<CodeTabs flags="r">
-
-```rs !! title="Single Instruction"
+```rs title="Single Instruction"
 use mollusk_svm::Mollusk;
 use solana_sdk::{account::Account, pubkey::Pubkey};
 use solana_system_interface::{instruction::transfer, program::ID as SYSTEM_PROGRAM_ID};
@@ -320,8 +306,6 @@ fn main() {
 }
 ```
 
-</CodeTabs>
-
 #### Einzelne Anweisung mit Prüfungen
 
 Verwenden Sie die `process_and_validate_instruction`-Methode, um eine einzelne
@@ -340,9 +324,7 @@ pub fn process_and_validate_instruction(
 Das folgende Beispiel verarbeitet eine SOL-Transfer-Anweisung mit
 Validierungsprüfungen.
 
-<CodeTabs flags="r">
-
-```rs !! title="With Validation"
+```rs title="With Validation"
 use {
     mollusk_svm::{result::Check, Mollusk},
     solana_sdk::{account::Account, pubkey::Pubkey},
@@ -396,8 +378,6 @@ fn main() {
 }
 ```
 
-</CodeTabs>
-
 #### Mehrere Anweisungen
 
 Verwenden Sie die `process_instruction_chain`-Methode, um mehrere Anweisungen
@@ -414,9 +394,7 @@ pub fn process_instruction_chain(
 Das folgende Beispiel verarbeitet zwei SOL-Transfer-Anweisungen ohne
 Validierungsprüfungen.
 
-<CodeTabs flags="r">
-
-```rs !! title="Multiple Instructions"
+```rs title="Multiple Instructions"
 use {
     mollusk_svm::Mollusk,
     solana_sdk::{account::Account, pubkey::Pubkey},
@@ -483,8 +461,6 @@ fn main() {
 }
 ```
 
-</CodeTabs>
-
 #### Mehrere Anweisungen mit Prüfungen
 
 Verwenden Sie die `process_and_validate_instruction_chain`-Methode, um mehrere
@@ -502,9 +478,7 @@ pub fn process_and_validate_instruction_chain(
 Das folgende Beispiel verarbeitet eine Kette von zwei SOL-Transfer-Anweisungen
 mit Validierungsprüfungen nach jeder Anweisung.
 
-<CodeTabs flags="r">
-
-```rs !! title="With Validation"
+```rs title="With Validation"
 use {
     mollusk_svm::{result::Check, Mollusk},
     solana_sdk::{account::Account, pubkey::Pubkey},
@@ -599,21 +573,19 @@ fn main() {
 }
 ```
 
-</CodeTabs>
-
 ### Validierungsprüfungen
 
 Mollusk bietet eine Reihe von
 [Hilfsmethoden](https://docs.rs/mollusk-svm-result/0.5.0/mollusk_svm_result/check/struct.Check.html),
 um die Ergebnisse einer verarbeiteten Anweisung zu überprüfen.
 
-```rust title="Example"
+```rust Example
 use mollusk_svm::result::Check;
 ```
 
 Verwenden Sie die folgenden Methoden, um Anweisungsergebnisse zu validieren:
 
-```rust title="Example"
+```rust Example
 // Program execution succeeded
 Check::success()
 
@@ -638,7 +610,7 @@ Check::return_data(&[1, 2, 3, 4])
 
 Verwenden Sie Folgendes, um Kontenzustände zu validieren:
 
-```rust title="Example"
+```rust Example
 // Single account validation
 Check::account(&pubkey)
     .lamports(1_000_000)           // Exact lamports
@@ -670,7 +642,7 @@ Verarbeitung von Anweisungen überflüssig.
 
 Erstellen Sie einen `account_store` mit der `with_context`-Methode:
 
-```rust title="Example"
+```rust Example highlight={21} focus={9-19,21}
 use std::collections::HashMap;
 use solana_sdk::{account::Account, pubkey::Pubkey};
 use solana_system_interface::program::ID as SYSTEM_PROGRAM_ID;
@@ -679,7 +651,6 @@ use mollusk_svm::Mollusk;
 let mollusk = Mollusk::default();
 let account_address = Pubkey::new_unique();
 
-// !focus(1:11)
 let mut account_store = HashMap::new();
 account_store.insert(
     account_address,
@@ -692,17 +663,13 @@ account_store.insert(
     },
 );
 
-// !focus
-// !mark
 let context = mollusk.with_context(account_store);
 ```
 
 Das folgende Beispiel verarbeitet zwei separate SOL-Transfer-Anweisungen mit
 persistentem Kontenzustand zwischen den Anweisungen durch den `account_store`.
 
-<CodeTabs flags="r">
-
-```rs !! title="Stateful Testing"
+```rs title="Stateful Testing"
 use {
     mollusk_svm::Mollusk,
     solana_sdk::{account::Account, pubkey::Pubkey},
@@ -761,8 +728,6 @@ fn main() {
 }
 ```
 
-</CodeTabs>
-
 ### Mollusk Sysvars
 
 Mollusk bietet eine benutzerdefinierte
@@ -773,9 +738,7 @@ Verwenden Sie die `warp_to_slot`-Methode, um die Sysvar-Clock zu aktualisieren
 und das Vor- oder Zurückspringen in der Zeit zu einem bestimmten Slot zu
 simulieren.
 
-<CodeTabs flags="r">
-
-```rust !! title="Warp to Slot"
+```rust title="Warp to Slot"
 use mollusk_svm::Mollusk;
 
 fn main() {
@@ -795,15 +758,11 @@ fn main() {
 }
 ```
 
-</CodeTabs>
-
 Das folgende Beispiel zeigt, wie man die Mollusk-Sysvar direkt modifiziert,
 indem man auf das Feld `sysvars` zugreift, um die Rent-Parameter zu ändern.
 Andere Sysvar-Werte können auf die gleiche Weise geändert werden.
 
-<CodeTabs flags="r">
-
-```rust !! title="Modify Sysvars"
+```rust title="Modify Sysvars"
 use {mollusk_svm::Mollusk, solana_sdk::rent::Rent};
 
 fn main() {
@@ -830,8 +789,6 @@ fn main() {
 }
 ```
 
-</CodeTabs>
-
 ## Compute-Unit-Benchmarking
 
 [`MolluskComputeUnitBencher`](https://docs.rs/mollusk-svm-bencher/0.5.0/mollusk_svm_bencher/struct.MolluskComputeUnitBencher.html)
@@ -845,9 +802,7 @@ als Abhängigkeit.
 Das folgende Beispiel benchmarkt die Compute-Unit-Nutzung einer
 SOL-Transfer-Anweisung.
 
-<CodeTabs>
-
-```rs !! title="Benchmark Compute Units"
+```rs title="Benchmark Compute Units" highlight={42-46} focus={42-46}
 use {
     mollusk_svm::Mollusk,
     mollusk_svm_bencher::MolluskComputeUnitBencher,
@@ -889,8 +844,6 @@ fn main() {
     ];
 
     // Run benchmark
-    // !focus(1:5)
-    // !mark(1:5)
     MolluskComputeUnitBencher::new(mollusk)
         .bench(("transfer", &transfer, &accounts))
         .must_pass(true)
@@ -899,12 +852,10 @@ fn main() {
 }
 ```
 
-</CodeTabs>
-
 Die Benchmark-Ergebnisse werden in den angegebenen `out_dir` als Markdown-Datei
 mit dem Namen `compute_units.md` geschrieben.
 
-```md title="comput_units.md"
+```md comput_units.md
 #### 2025-09-19 22:28:53.691839 UTC
 
 Solana CLI Version: solana-cli 2.2.20 (src:dabc99a5; feat:3073396398,
@@ -922,16 +873,14 @@ Verwende die
 Crate, um das Token Program, Token2022 Program (Token Extensions) und Associated
 Token Program zu Mollusk für Tests hinzuzufügen.
 
-```rust title="Example"
+```rust Example focus={3,8-13}
 use {
     mollusk_svm::Mollusk,
-    // !focus
     mollusk_svm_programs_token::{associated_token, token, token2022},
 };
 
 let mut mollusk = Mollusk::default();
 
-// !focus(1:6)
 // Add SPL Token Program
 token::add_program(&mut mollusk);
 // Add SPL Token-2022 Program
@@ -942,15 +891,13 @@ associated_token::add_program(&mut mollusk);
 
 Das folgende Beispiel demonstriert das Testen eines Token-Transfers mit Mollusk.
 
-<Callout type="info">
+<Info>
   Das folgende Beispiel definiert die Test-Accounts manuell zu
   Demonstrationszwecken. Die `mollusk-svm-programs-token` enthält auch
   Hilfsfunktionen zum Erstellen der Mint- und Token-Accounts.
-</Callout>
+</Info>
 
-<CodeTabs flags="r">
-
-```rs !! title="Token Transfer Example"
+```rs title="Token Transfer Example"
 use {
     mollusk_svm::{result::Check, Mollusk},
     mollusk_svm_programs_token::token,
@@ -1115,5 +1062,3 @@ fn main() {
     println!("Destination Token Account: {:#?}", dest_token);
 }
 ```
-
-</CodeTabs>

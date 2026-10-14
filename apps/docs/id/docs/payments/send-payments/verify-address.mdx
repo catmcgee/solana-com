@@ -15,12 +15,12 @@ Validasi bergantung pada apa yang Anda kirim:
 - **SOL native** tidak memiliki perlindungan seperti itu. Transfer System
   Program berhasil masuk ke akun mana pun, sehingga penerima yang salah akan
   mengunci SOL secara permanen. Lihat
-  [Mengirim SOL native](#sending-native-sol).
+  [Mengirim SOL native](#mengirim-sol-native).
 
-<Callout>
+<Note>
   Lihat [Cara Pembayaran Bekerja di Solana](/docs/payments/how-payments-work)
   untuk konsep pembayaran inti.
-</Callout>
+</Note>
 
 ## Memahami Alamat Solana
 
@@ -49,12 +49,12 @@ Gunakan alamat untuk mengambil [akun](/docs/core/accounts) dari jaringan,
 periksa pemilik program dan jenis akunnya untuk menentukan cara menangani alamat
 tersebut.
 
-<Callout>
+<Note>
   Mengetahui apakah suatu alamat berada on-curve atau off-curve tidak memberi
   tahu Anda jenis akun apa itu, program apa yang memilikinya, atau apakah akun
   ada di alamat tersebut. Anda harus mengambil akun dari jaringan untuk
   menentukan detail ini.
-</Callout>
+</Note>
 
 ### Akun System Program (Dompet)
 
@@ -71,12 +71,12 @@ kepada pengirim.
 
 Akun sistem dapat berada di off-curve. Jika pengguna Anda ingin mengirim token ke alamat off-curve, disarankan untuk meminta pengguna memverifikasi bahwa mereka bermaksud mengirim dana ke smart wallet.
 
-<Callout type="warn">
+<Warning>
   Tanpa pengamanan yang memadai, subsidi pembuatan ATA dapat dieksploitasi.
   Pengguna yang berniat jahat dapat meminta transfer, membuat ATA mereka atas
   biaya Anda, menutup ATA untuk mengklaim kembali SOL dari rent, lalu
   mengulanginya.
-</Callout>
+</Warning>
 
 ### Token Accounts
 
@@ -86,11 +86,11 @@ terima dimiliki oleh token program, Anda harus memverifikasi bahwa akun tersebut
 adalah token account (bukan mint account) dan sesuai dengan mint account token
 yang diharapkan sebelum mengirim.
 
-<Callout type="info">
+<Info>
   Token Programs secara otomatis memvalidasi bahwa kedua token account dalam
   sebuah transfer menyimpan token dari mint yang sama. Jika validasi gagal,
   transaksi akan ditolak dan tidak ada dana yang hilang.
-</Callout>
+</Info>
 
 ### Mint Accounts
 
@@ -122,19 +122,19 @@ Saat mengirim SOL native, hanya hasil `IS_WALLET` yang dapat diterima.
 `IS_TOKEN_ACCOUNT` **tidak**: sebuah token account menyimpan token SPL, dan SOL
 yang dikirim ke sana berada di luar kendali pengirim.
 
-<Callout type="warn">
+<Warning>
   Ini adalah cara umum SOL hilang: pengguna menempel alamat mint token (atau
   alamat program) ke dalam penarikan SOL. Transfer berhasil dan SOL tidak dapat
   dipulihkan. Selalu klasifikasikan penerima sebelum menandatangani transfer
   SOL.
-</Callout>
+</Warning>
 
 ## Alur Verifikasi
 
 Diagram berikut menunjukkan pohon keputusan referensi untuk memvalidasi sebuah
 alamat:
 
-```mermaid title="Address Verification Flow"
+```mermaid
 flowchart TD
     A["Input address"]
     B["Fetch account info"]
@@ -163,17 +163,46 @@ flowchart TD
     K -- "No" --> V2["VERIFY: Confirm the recipient intends to use a smart wallet"]
 ```
 
-<Steps>
-<Step>
+<div className="nojs-only" data-fallback="mermaid">
+  ```text Mermaid
+  flowchart TD
+      A["Input address"]
+      B["Fetch account info"]
 
-### Ambil Akun
+      A --> B
+      B --> C{"Account exists onchain?"}
+
+      %% --- Non-existent account path ---
+      C -- "No" --> D{"Is address off-curve (PDA)?"}
+      D -- "Yes" --> V1["VERIFY: Confirm the recipient intends to use a smart wallet"]
+      D -- "No" --> W1["IS_WALLET: Valid unfunded public key address"]
+
+      %% --- Existing account path ---
+      C -- "Yes" --> F{"Check program owner"}
+
+      F -- "Token Program / Token-2022" --> G{"Is token account for expected mint?"}
+      G -- "Yes" --> T1["IS_TOKEN_ACCOUNT: Send directly"]
+      G -- "No" --> R1["REJECT: Wrong account type or mint"]
+
+      F -- "System Program" --> H{"Is address off-curve?"}
+      H -- "No" --> W2["IS_WALLET: Derive ATA and send"]
+      H -- "Yes" --> V3["VERIFY: Confirm the recipient intends to use a smart wallet"]
+
+      F -- "Other Program" --> K{"Allowed by policy?"}
+      K -- "Yes" --> W3["IS_WALLET: Derive ATA and send"]
+      K -- "No" --> V2["VERIFY: Confirm the recipient intends to use a smart wallet"]
+  ```
+</div>
+
+<p className="sol-caption">Address Verification Flow</p>
+
+<Steps titleSize="h3">
+<Step title="Ambil Akun">
 
 Gunakan alamat untuk mengambil detail akun dari jaringan.
 
 </Step>
-<Step>
-
-### Akun tidak ada
+<Step title="Akun tidak ada">
 
 Jika tidak ada akun di alamat ini, periksa apakah alamat tersebut berada di on-curve atau off-curve:
 
@@ -182,9 +211,7 @@ Jika tidak ada akun di alamat ini, periksa apakah alamat tersebut berada di on-c
 - **On-curve**: Ini adalah alamat dompet yang valid (kunci publik) yang belum didanai. Turunkan ATA, periksa apakah sudah ada, dan kirim token ke sana. Anda harus membuat keputusan kebijakan apakah akan mendanai pembuatan ATA jika belum ada.
 
 </Step>
-<Step>
-
-### Akun ada
+<Step title="Akun ada">
 
 Jika akun ada, periksa program mana yang memilikinya:
 
@@ -209,12 +236,12 @@ Jika akun ada, periksa program mana yang memilikinya:
 Contoh berikut hanya menampilkan logika validasi alamat. Ini adalah kode
 referensi untuk tujuan ilustrasi.
 
-<Callout>
+<Note>
   Demo tidak menampilkan cara menurunkan ATA atau membangun transaksi untuk
   mengirim token. Lihat dokumentasi [token
   account](/docs/tokens/basics/create-token-account#how-to-create-an-associated-token-account)
   dan [transfer token](/docs/tokens/basics/transfer-tokens) untuk contoh kode.
-</Callout>
+</Note>
 
 Demo di bawah ini menggunakan tiga kemungkinan hasil:
 
@@ -227,10 +254,7 @@ Demo di bawah ini menggunakan tiga kemungkinan hasil:
 
 Kemudian memetakan setiap hasil ke kelayakan per-aset dengan `canReceiveNativeSol` (hanya dompet) dan `canReceiveSplToken` (dompet atau token account). Hasil `USER_VERIFICATION` tidak diterima secara otomatis; aplikasi Anda harus meminta pengguna mengonfirmasi niat mereka sebelum mengirim token SPL. Sebuah token account mengembalikan `IS_TOKEN_ACCOUNT`, sehingga dapat menerima token SPL tetapi **tidak** SOL native — perbedaan yang mencegah SOL terkunci.
 
-<CodeTabs flags="r">
-
-```ts !! title="Demo"
-// !collapse(1:35) collapsed
+```ts Demo expandable
 
 import {
   type Address,
@@ -360,7 +384,6 @@ function canReceiveSplToken(result: ValidationResult): boolean {
 // =============================================================================
 // Examples
 // =============================================================================
-// !collapse(1:1000) collapsed
 
 // Wallets
 const EXISTING_WALLET =
@@ -435,5 +458,3 @@ console.log("\n" + "═".repeat(60));
 console.log("  Done!");
 console.log("═".repeat(60) + "\n");
 ```
-
-</CodeTabs>

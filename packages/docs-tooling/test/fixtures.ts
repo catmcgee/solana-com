@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 import type { Collection, Transform } from "../src/types.ts";
 import { toolingRoot } from "../src/lib/paths.ts";
 import { TransformRegistry } from "../src/convert/registry.ts";
-import { convertSource, rawCodec, type Codec } from "../src/convert/run.ts";
+import { convertSource, mdxCodec, type Codec } from "../src/convert/run.ts";
 
 export const FIXTURE_ROOT = path.join(toolingRoot, "__fixtures__", "convert");
 
@@ -54,7 +54,7 @@ export function loadFixtureCases(
 /** Register vitest cases for a transform's fixtures (golden + idempotency). */
 export function describeTransformFixtures(
   t: Transform,
-  codec: Codec = rawCodec,
+  codec: Codec = mdxCodec,
   root = FIXTURE_ROOT,
 ) {
   const registry = new TransformRegistry().register(t);

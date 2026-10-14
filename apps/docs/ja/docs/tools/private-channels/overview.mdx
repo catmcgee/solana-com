@@ -3,13 +3,13 @@ title: 概要
 description: Private Channelsプロトコルのアーキテクチャとデータフロー
 ---
 
-<Callout type="warning">
+<Warning>
   Private Channelsはセキュリティ監査を受けておらず、十分なセキュリティレビューなしに実際の資金を使用する本番環境での利用は推奨されません。
-</Callout>
+</Warning>
 
-<Callout type="info">
+<Info>
   **インスタンスをデプロイしますか？** [オペレーターガイド](/docs/tools/private-channels/operators)をご覧ください。**既存のインスタンスに統合しますか？** [クイックスタート](/docs/tools/private-channels/quickstart/installation)をご覧ください。このページは両方の読者向けのアーキテクチャリファレンスです。
-</Callout>
+</Info>
 
 ## アーキテクチャ
 
@@ -63,9 +63,9 @@ StreamerはWebSocketサーバーで、チャネルの状態更新をリアルタ
 - 接続: `ws://localhost:8902`
 - ヘルスエンドポイント: `GET /health` - 内部ポーリングループが30秒以上停止した場合に`503`を返します
 
-<Callout type="warning">
+<Warning>
   WebSocketイベントスキーマはまだ公式にドキュメント化されていません。正式なドキュメントが公開されるまでは、実装の詳細について[`core/src/bin/streamer.rs`](https://github.com/solana-foundation/solana-private-channels/blob/main/core/src/bin/streamer.rs)を参照してください。
-</Callout>
+</Warning>
 
 ```mermaid
 flowchart TB
@@ -107,6 +107,48 @@ flowchart TB
     PG_P --> ST
 ```
 
+<div className="nojs-only" data-fallback="mermaid">
+  ```text Mermaid
+  flowchart TB
+      Wallet([User Wallet])
+      Escrow[Escrow Program<br/><i>Solana Mainnet</i>]
+      IS[Solana Mainnet Indexer]
+      IC[Private Channel Indexer]
+      PG_I[(Indexer DB)]
+      OS[Operator - Solana Side]
+      OC[Operator - Channel Side]
+      GW[Gateway :8899]
+      WN[Write Node :8900]
+      WP[Withdraw Program]
+      PG_P[(Postgres Primary)]
+      PG_R[(Postgres Replica)]
+      RN[Read Node :8901]
+      ST[Streamer :8902]
+
+      Wallet -- deposit --> Escrow
+      Wallet -- transact / withdraw --> GW
+      ST -. WebSocket .-> Wallet
+
+      Escrow -- watch --> IS
+      IS -- deposit events --> PG_I
+      PG_I -- pending deposits --> OS
+      OS -- mint --> GW
+
+      GW -- sendTransaction --> WN
+      WN --> WP
+      GW -- watch --> IC
+      IC -- withdrawal events --> PG_I
+      PG_I -- pending withdrawals --> OC
+      OC -- release --> Escrow
+
+      WN -- settle --> PG_P
+      PG_P -- replication --> PG_R
+      PG_R --> RN
+      RN --> GW
+      PG_P --> ST
+  ```
+</div>
+
 ## トランザクションパイプライン
 
 ```text
@@ -147,9 +189,9 @@ Gatewayに送信されたトランザクションは、状態がコミットさ�
 
 ## 運用キーのセキュリティ
 
-<Callout type="warning">
+<Warning>
   オフチェーンサービスは独自の署名者体系を使用しており、上記のセキュリティモデルで説明されたオンチェーンの管理者/オペレーター権限とは無関係です。`ADMIN_PRIVATE_KEY`はすべてのオペレーターサービスで必須であり、トランザクション手数料を支払います。別途オプションの`OPERATOR_PRIVATE_KEY`は`ReleaseFunds`と`ResetSmtRoot`のオンチェーンOperator署名を提供し、未設定の場合は`ADMIN_PRIVATE_KEY`の値にフォールバックします。プロトコルレベルのインスタンス管理者キー（`CreateInstance` / `AddOperator` / `SetNewAdmin`に使用）をいずれの変数にも設定したり、ランタイムで公開したりしないでください。そのキーはコールドかつオフラインで保管してください。
-</Callout>
+</Warning>
 
 `ReleaseFunds`と`ResetSmtRoot`には2つのオンチェーン署名が必要です。手数料支払者（`ADMIN_PRIVATE_KEY`から）とOperator PDAの権限（`OPERATOR_PRIVATE_KEY`から、または未設定の場合は`ADMIN_PRIVATE_KEY`）です。このデプロイガイドのdevnetウォークスルーでは、生成されたオペレーターkeypairを`ADMIN_PRIVATE_KEY`に設定し、`OPERATOR_PRIVATE_KEY`を未設定のままにします。そのため、同じkeypairが両方の署名者ロールを担います。`ADMIN_PRIVATE_KEY`に設定されるキーは、ホットウォレットの秘密鍵と同等の管理を行ってください:
 
@@ -161,7 +203,7 @@ Gatewayに送信されたトランザクションは、状態がコミットさ�
 
 ## 次のステップ
 
-<Cards>
+<Columns cols={2}>
   <Card
     title="クイックスタート"
     href="/docs/tools/private-channels/quickstart/installation"
@@ -183,4 +225,4 @@ Gatewayに送信されたトランザクションは、状態がコミットさ�
   >
     すべてのプログラムの完全なinstructionsリファレンス。
   </Card>
-</Cards>
+</Columns>

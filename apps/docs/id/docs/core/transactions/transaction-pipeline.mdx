@@ -2,7 +2,6 @@
 title: Pipeline transaksi
 description:
   Bagaimana transaksi Solana diproses dari pengiriman hingga commit, termasuk pipeline validasi 8 tahap lengkap, membaca detail transaksi dari jaringan, dan kesalahan validasi umum.
-url: /docs/core/transactions/transaction-pipeline
 type: reference
 prerequisites:
   - /docs/core/transactions
@@ -14,10 +13,12 @@ related:
   - /docs/core/programs/program-execution
 ---
 
-<Callout type="info" title="Ringkasan">
+<Info>
+  **Ringkasan**
+
   Transaksi melewati 8 tahap: receive, sigverify, sanitize, pemeriksaan
   budget/age, validasi fee payer, pemuatan akun, eksekusi instruksi, dan commit.
-</Callout>
+</Info>
 
 ## Pipeline pemrosesan transaksi
 
@@ -29,9 +30,9 @@ hingga commit, dengan referensi file sumber ke klien validator
 ### 1. Receive dan deserialize
 
 Validator menerima byte transaksi melalui UDP/QUIC. Byte mentah harus sesuai
-dalam satu paket (_rs`PACKET_DATA_SIZE`_ = 1.232 byte). Byte tersebut
-dideserialisasi menjadi _rs`VersionedTransaction`_, yang berisi array signature
-dan _rs`VersionedMessage`_ (baik legacy atau v0).
+dalam satu paket (`PACKET_DATA_SIZE` = 1.232 byte). Byte tersebut
+dideserialisasi menjadi `VersionedTransaction`, yang berisi array signature
+dan `VersionedMessage` (baik legacy atau v0).
 
 Format
 [v1](/docs/core/transactions/versioned-transactions#v1-message-format)
@@ -54,7 +55,7 @@ Verifikasi diparalelkan: validator membagi batch paket menjadi chunk sebesar
 ### 3. Sanitize
 
 Transaksi yang dideserialisasi disanitasi untuk menghasilkan
-_rs`SanitizedTransaction`_ (atau
+`SanitizedTransaction` (atau
 [`RuntimeTransaction`](https://github.com/anza-xyz/agave/blob/v3.1.8/runtime-transaction/src/runtime_transaction.rs#L31)).
 Sanitasi memvalidasi invarian struktural:
 
@@ -62,7 +63,7 @@ Sanitasi memvalidasi invarian struktural:
 - Semua `program_id_index` dan `account_indices` instruksi berada dalam batas
 - Fee payer (indeks akun 0) adalah signer yang dapat ditulis
 
-Wrapper _rs`RuntimeTransaction`_ menyimpan cache metadata yang telah dihitung
+Wrapper `RuntimeTransaction` menyimpan cache metadata yang telah dihitung
 sebelumnya dari
 [`TransactionMeta`](https://github.com/anza-xyz/agave/blob/v3.1.8/runtime-transaction/src/transaction_meta.rs#L38-L44):
 hash message, flag transaksi vote, jumlah signature precompile
@@ -79,24 +80,24 @@ melakukan beberapa pemeriksaan per transaksi:
 divalidasi terlebih dahulu. Detail biaya dihitung dari batas anggaran dan biaya
 prioritas. Jika anggaran komputasi tidak valid atau bertentangan, transaksi
 gagal dengan error parsing anggaran komputasi seperti
-_rs`DuplicateInstruction`_, `InstructionError(..., InvalidInstructionData)`,
-atau _rs`InvalidLoadedAccountsDataSizeLimit`_.
+`DuplicateInstruction`, `InstructionError(..., InvalidInstructionData)`,
+atau `InvalidLoadedAccountsDataSizeLimit`.
 
 Untuk
 [transaksi v1](/docs/core/transactions/versioned-transactions#v1-message-format)
 tidak ada instruksi anggaran komputasi yang perlu diurai: batas dan biaya prioritas
 berasal dari konfigurasi pesan, dan instruksi ComputeBudget apa pun dalam pesan
 diabaikam untuk konfigurasi. Kolom konfigurasi yang tidak diatur akan diatur ke nol secara default, yang
-muncul kemudian di [pemuatan akun](#6-load-accounts).
+muncul kemudian di [pemuatan akun](#6-muat-akun).
 
 **Usia blockhash**: `recent_blockhash` transaksi dicari di
 [`BlockhashQueue`](https://github.com/anza-xyz/agave/blob/v3.1.8/accounts-db/src/blockhash_queue.rs#L33).
-Jika hash ditemukan dan usianya dalam _rs`MAX_PROCESSING_AGE`_ (150 slot),
+Jika hash ditemukan dan usianya dalam `MAX_PROCESSING_AGE` (150 slot),
 transaksi dilanjutkan. Jika tidak ditemukan, validator memeriksa
 [durable nonce](/docs/core/transactions/durable-nonces) yang valid.
 
 **Cache status**: Hash pesan transaksi diperiksa terhadap cache status. Jika
-ditemukan, transaksi ditolak dengan _rs`AlreadyProcessed`_.
+ditemukan, transaksi ditolak dengan `AlreadyProcessed`.
 
 ### 5. Validasi nonce dan pembayar biaya
 
@@ -108,7 +109,7 @@ di SVM menangani dua validasi:
 nonce dan memverifikasi:
 
 - Akun dimiliki oleh System Program
-- Dapat diurai sebagai _rs`State::Initialized`_
+- Dapat diurai sebagai `State::Initialized`
 - Durable nonce yang tersimpan cocok dengan `recent_blockhash` transaksi
 - Nonce dapat dimajukan (durable nonce saat ini berbeda dari durable nonce
   berikutnya, yaitu nonce belum digunakan dalam blok saat ini)
@@ -121,18 +122,18 @@ Jika valid, nonce dimajukan ke nilai durable nonce berikutnya. Lihat
 diperiksa oleh
 [`validate_fee_payer`](https://github.com/anza-xyz/agave/blob/v3.1.8/svm/src/account_loader.rs#L369-L417):
 
-- Akun harus ada (lamports > 0), jika tidak _rs`AccountNotFound`_
+- Akun harus ada (lamports > 0), jika tidak `AccountNotFound`
 - Akun harus berupa akun sistem atau akun nonce, jika tidak
-  _rs`InvalidAccountForFee`_
+  `InvalidAccountForFee`
 - Lamports harus mencakup `min_balance + total_fee`, di mana `min_balance`
   adalah 0 untuk akun sistem atau `rent.minimum_balance(NonceState::size())`
-  untuk akun nonce; jika tidak _rs`InsufficientFundsForFee`_
+  untuk akun nonce; jika tidak `InsufficientFundsForFee`
 - Setelah pengurangan biaya, akun harus tetap bebas sewa (tidak dapat
   bertransisi dari bebas sewa menjadi membayar sewa)
 
 Biaya dipotong dari pembayar biaya pada tahap ini. Snapshot dari pembayar biaya
 yang telah dipotong (dan nonce lanjutan, jika berlaku) disimpan sebagai
-_rs`RollbackAccounts`_, yang merupakan akun yang di-commit bahkan jika eksekusi
+`RollbackAccounts`, yang merupakan akun yang di-commit bahkan jika eksekusi
 gagal.
 
 ### 6. Muat akun
@@ -156,23 +157,25 @@ Untuk setiap akun non-pembayar biaya, loader:
 
 Untuk setiap program yang dipanggil oleh instruksi transaksi, loader
 memverifikasi bahwa program account ada dan dimiliki oleh loader yang valid
-(`NativeLoader` atau salah satu dari _rs`PROGRAM_OWNERS`_). Program yang tidak
-valid gagal dengan _rs`ProgramAccountNotFound`_ atau
-_rs`InvalidProgramForExecution`_.
+(`NativeLoader` atau salah satu dari `PROGRAM_OWNERS`). Program yang tidak
+valid gagal dengan `ProgramAccountNotFound` atau
+`InvalidProgramForExecution`.
 
 Program LoaderV3 (upgradeable) secara implisit memuat programdata account
 terkait, yang juga dihitung terhadap batas ukuran data yang dimuat.
 
-<Callout type="warn" title="Transaksi v1 menetapkan batas ini ke nol secara default">
+<Warning>
+  **Transaksi v1 menetapkan batas ini ke nol secara default**
+
   Default 64 MiB berlaku untuk transaksi legacy dan v0. Dalam [format
   v1](/docs/core/transactions/versioned-transactions#v1-message-format), batas ukuran data akun yang dimuat dibaca dari konfigurasi pesan, dan kolom
   yang tidak diatur akan diatur ke **0 byte** secara default, bukan ke nilai default yang besar. Oleh karena itu, transaksi v1
   dengan konfigurasi kosong akan gagal pada tahap ini dengan
-  _rs`MaxLoadedAccountsDataSizeExceeded`_ — anggaran yang diminta terlalu kecil
+`MaxLoadedAccountsDataSizeExceeded` — anggaran yang diminta terlalu kecil
   untuk akun pertama yang dimuat, sehingga kegagalan terjadi sebelum instruksi apa pun
   berjalan, dengan kesalahan yang tidak menyebutkan v1 maupun konfigurasi. Selalu tetapkan batas unit komputasi dan batas ukuran data akun yang dimuat secara eksplisit saat
   membangun transaksi v1.
-</Callout>
+</Warning>
 
 Jika pemuatan akun gagal tetapi pembayar biaya berhasil divalidasi, transaksi
 menjadi hasil
@@ -182,10 +185,10 @@ biaya tetap dikumpulkan tetapi tidak ada instruksi yang dieksekusi.
 ### 7. Eksekusi instruksi
 
 [`execute_loaded_transaction`](https://github.com/anza-xyz/agave/blob/v3.1.8/svm/src/transaction_processor.rs#L847)
-membuat _rs`TransactionContext`_ dengan semua akun yang dimuat dan memanggil
+membuat `TransactionContext` dengan semua akun yang dimuat dan memanggil
 [`process_message`](https://github.com/anza-xyz/agave/blob/v3.1.8/svm/src/message_processor.rs).
 Instruksi dieksekusi secara berurutan sesuai urutan kemunculannya dalam pesan.
-Setiap pemanggilan instruksi membuat _rs`InvokeContext`_ dan memanggil program
+Setiap pemanggilan instruksi membuat `InvokeContext` dan memanggil program
 target.
 
 #### Detail pemrosesan instruksi
@@ -209,15 +212,15 @@ runtime melakukan iterasi melalui setiap instruksi dan memanggil program target:
 4. Setelah instruksi selesai, runtime
    [memverifikasi](https://github.com/anza-xyz/agave/blob/v3.1.8/transaction-context/src/lib.rs#L366-L398)
    bahwa total saldo lamport di semua akun instruksi tidak berubah (pemeriksaan
-   _rs`UnbalancedInstruction`_).
+   `UnbalancedInstruction`).
 5. Jika ada instruksi yang gagal, seluruh transaksi akan di-rollback. Tidak ada
    perubahan state perantara yang di-commit.
 
 Setiap instruksi menambah instruction trace. Trace mencakup instruksi tingkat
 atas dan semua [CPI](/docs/core/cpi) yang dipanggilnya. Total panjang trace
 (instruksi tingkat atas ditambah semua CPI bersarang) tidak boleh melebihi 64
-(_rs`MAX_INSTRUCTION_TRACE_LENGTH`_). Melebihi batas ini akan mengembalikan
-_rs`InstructionError::MaxInstructionTraceLengthExceeded`_.
+(`MAX_INSTRUCTION_TRACE_LENGTH`). Melebihi batas ini akan mengembalikan
+`InstructionError::MaxInstructionTraceLengthExceeded`.
 
 Setelah eksekusi, runtime memverifikasi bahwa:
 
@@ -227,8 +230,8 @@ Setelah eksekusi, runtime memverifikasi bahwa:
 ### 8. Commit atau rollback
 
 Jika eksekusi berhasil, state akun yang dimodifikasi dari `TransactionContext`
-ditulis kembali ke cache lokal batch _rs`AccountLoader`_. Jika eksekusi gagal,
-hanya _rs`RollbackAccounts`_ (fee payer dengan biaya yang dikurangi dan nonce
+ditulis kembali ke cache lokal batch `AccountLoader`. Jika eksekusi gagal,
+hanya `RollbackAccounts` (fee payer dengan biaya yang dikurangi dan nonce
 yang dimajukan) yang ditulis kembali. Biaya tetap dikumpulkan, tetapi semua
 perubahan akun lainnya dibuang.
 

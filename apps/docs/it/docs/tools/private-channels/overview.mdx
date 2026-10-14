@@ -3,18 +3,18 @@ title: Panoramica
 description: Architettura e flusso dei dati del protocollo Private Channels
 ---
 
-<Callout type="warning">
+<Warning>
   Private Channels non è stato sottoposto a un audit di sicurezza e non è consigliato per
   l'uso in produzione con fondi reali senza una revisione approfondita della sicurezza.
-</Callout>
+</Warning>
 
-<Callout type="info">
+<Info>
   **Stai effettuando un deployment?** Vai alla [guida per gli
   operatori](/docs/tools/private-channels/operators). **Stai integrando un'istanza
   esistente?** Vai alla
   [Quickstart](/docs/tools/private-channels/quickstart/installation). Questa pagina
   è il riferimento architetturale per entrambi i tipi di utenti.
-</Callout>
+</Info>
 
 ## Architettura
 
@@ -104,11 +104,11 @@ dello stack devnet che questa guida distribuisce; consulta il
 - Endpoint di health: `GET /health` - restituisce `503` se un loop di polling interno
   si blocca per più di 30 secondi
 
-<Callout type="warning">
+<Warning>
   Lo schema degli eventi WebSocket non è ancora documentato pubblicamente. Fare riferimento a
   [`core/src/bin/streamer.rs`](https://github.com/solana-foundation/solana-private-channels/blob/main/core/src/bin/streamer.rs)
   per i dettagli implementativi fino a quando non sarà disponibile la documentazione ufficiale.
-</Callout>
+</Warning>
 
 ```mermaid
 flowchart TB
@@ -149,6 +149,48 @@ flowchart TB
     RN --> GW
     PG_P --> ST
 ```
+
+<div className="nojs-only" data-fallback="mermaid">
+  ```text Mermaid
+  flowchart TB
+      Wallet([User Wallet])
+      Escrow[Escrow Program<br/><i>Solana Mainnet</i>]
+      IS[Solana Mainnet Indexer]
+      IC[Private Channel Indexer]
+      PG_I[(Indexer DB)]
+      OS[Operator - Solana Side]
+      OC[Operator - Channel Side]
+      GW[Gateway :8899]
+      WN[Write Node :8900]
+      WP[Withdraw Program]
+      PG_P[(Postgres Primary)]
+      PG_R[(Postgres Replica)]
+      RN[Read Node :8901]
+      ST[Streamer :8902]
+
+      Wallet -- deposit --> Escrow
+      Wallet -- transact / withdraw --> GW
+      ST -. WebSocket .-> Wallet
+
+      Escrow -- watch --> IS
+      IS -- deposit events --> PG_I
+      PG_I -- pending deposits --> OS
+      OS -- mint --> GW
+
+      GW -- sendTransaction --> WN
+      WN --> WP
+      GW -- watch --> IC
+      IC -- withdrawal events --> PG_I
+      PG_I -- pending withdrawals --> OC
+      OC -- release --> Escrow
+
+      WN -- settle --> PG_P
+      PG_P -- replication --> PG_R
+      PG_R --> RN
+      RN --> GW
+      PG_P --> ST
+  ```
+</div>
 
 ## Pipeline delle Transazioni
 
@@ -220,7 +262,7 @@ nonce dell'epoch dell'albero precedente, fornendo una base pulita per i nuovi ci
 
 ## Sicurezza Operativa delle Chiavi
 
-<Callout type="warning">
+<Warning>
   I servizi off-chain utilizzano un proprio vocabolario di firmatari, non correlato alle
   autorità admin/operatore on-chain descritte nel Modello di Sicurezza sopra.
   `ADMIN_PRIVATE_KEY` è richiesta per ogni servizio operatore e paga le
@@ -229,7 +271,7 @@ nonce dell'epoch dell'albero precedente, fornendo una base pulita per i nuovi ci
   `ADMIN_PRIVATE_KEY` come fallback quando non è impostato. Non inserire mai la chiave admin dell'istanza a livello di protocollo
   (usata per `CreateInstance` / `AddOperator` / `SetNewAdmin`)
   in nessuna delle due variabili né esporla a runtime; tenere quella chiave cold e offline.
-</Callout>
+</Warning>
 
 `ReleaseFunds` e `ResetSmtRoot` richiedono due firme on-chain: il fee payer
 (da `ADMIN_PRIVATE_KEY`) e l'autorità del PDA Operator (da
@@ -253,7 +295,7 @@ chiamarlo senza aver verificato l'indirizzo di destinazione.
 
 ## Prossimi Passi
 
-<Cards>
+<Columns cols={2}>
   <Card
     title="Quickstart"
     href="/docs/tools/private-channels/quickstart/installation"
@@ -275,4 +317,4 @@ chiamarlo senza aver verificato l'indirizzo di destinazione.
   >
     Riferimento completo alle istruzioni per tutti i programmi.
   </Card>
-</Cards>
+</Columns>

@@ -130,6 +130,11 @@ export interface ConvertFile {
   collection: Collection;
   /** Parsed frontmatter (mutable; serialized back by the runner). */
   frontmatter: Record<string, unknown>;
+  /**
+   * The file's original source, as parsed (set by the runner). Node
+   * `position` offsets index into it. Read-only.
+   */
+  source?: string;
 }
 
 export interface ConvertContext {

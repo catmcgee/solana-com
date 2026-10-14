@@ -190,6 +190,13 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      // Applies to every path, including the docs that rewrites-redirects.ts
+      // proxies to Mintlify (/docs, /:locale/docs, /learn/*,
+      // /developers/{cookbook,bootcamp}, /_mintlify, /mintlify-assets,
+      // /docs-assets): X-Frame-Options, nosniff, X-XSS-Protection and
+      // frame-ancestors, plus X-Robots-Tag: noindex on previews (spec §5.12).
+      // No cache headers are added for docs paths; Mintlify's own
+      // Cache-Control passes through.
       {
         source: "/:path*",
         headers: securityHeaders,

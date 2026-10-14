@@ -17,7 +17,7 @@ Rust:
 Aggiungi il crate come dev-dependency. L'SDK è async-first e richiede un runtime
 Tokio, quindi includi `tokio` con la feature `full` per i test.
 
-```toml title="Cargo.toml"
+```toml Cargo.toml
 [dev-dependencies]
 surfpool-sdk = "1"
 tokio = { version = "1", features = ["full"] }
@@ -89,12 +89,14 @@ installati automaticamente come `optionalDependencies`:
 | macOS Intel          | `x86_64-apple-darwin`      | `@solana/surfpool-darwin-x64`    |
 | Linux x86-64 (glibc) | `x86_64-unknown-linux-gnu` | `@solana/surfpool-linux-x64-gnu` |
 
-<Callout type="warn" title="Piattaforma non supportata">
+<Warning>
+  **Piattaforma non supportata**
+
   Se il pacchetto viene installato su una piattaforma priva di un binario
   corrispondente, l'installazione viene completata ma `Surfnet.start()` genererà
   un errore in fase di esecuzione. Apri una issue se hai bisogno di un target
   aggiuntivo.
-</Callout>
+</Warning>
 
 ### Requisiti
 
@@ -109,60 +111,68 @@ installati automaticamente come `optionalDependencies`:
 Un semplice test in una riga conferma che il runtime si avvia e che l'endpoint
 RPC accetta richieste.
 
-<CodeTabs storage="surfpool-lang">
+<Tabs>
+  <Tab title="Rust">
+    ```rust Rust
+    use surfpool_sdk::{Signer, Surfnet};
 
-```rust !! title="Rust"
-use surfpool_sdk::{Signer, Surfnet};
+    #[tokio::test]
+    async fn surfpool_sdk_smoke() {
+        let surfnet = Surfnet::start().await.expect("start surfnet");
+        let balance = surfnet
+            .rpc_client()
+            .get_balance(&surfnet.payer().pubkey())
+            .expect("get balance");
+        assert!(balance > 0);
+    }
+    ```
 
-#[tokio::test]
-async fn surfpool_sdk_smoke() {
-    let surfnet = Surfnet::start().await.expect("start surfnet");
-    let balance = surfnet
-        .rpc_client()
-        .get_balance(&surfnet.payer().pubkey())
-        .expect("get balance");
-    assert!(balance > 0);
-}
-```
+    Esegui con `cargo test --test smoke`.
+  </Tab>
 
-Esegui con `cargo test --test smoke`.
+  <Tab title="TypeScript">
+    ```ts TypeScript
+    import { after, test } from "node:test";
+    import assert from "node:assert/strict";
+    import { Surfnet } from "@solana/surfpool";
 
-```ts !! title="TypeScript"
-import { after, test } from "node:test";
-import assert from "node:assert/strict";
-import { Surfnet } from "@solana/surfpool";
+    const surfnet = Surfnet.start();
+    after(() => surfnet.stop());
 
-const surfnet = Surfnet.start();
-after(() => surfnet.stop());
+    test("surfpool sdk smoke", () => {
+      assert.match(surfnet.rpcUrl, /^http:\/\/127\.0\.0\.1:\d+$/);
+      assert.ok(surfnet.payer.length > 0);
+    });
+    ```
 
-test("surfpool sdk smoke", () => {
-  assert.match(surfnet.rpcUrl, /^http:\/\/127\.0\.0\.1:\d+$/);
-  assert.ok(surfnet.payer.length > 0);
-});
-```
-
-Esegui con `node --test smoke.test.ts` (con un loader TS) o
-`tsx --test smoke.test.ts`.
-
-</CodeTabs>
+    Esegui con `node --test smoke.test.ts` (con un loader TS) o
+    `tsx --test smoke.test.ts`.
+  </Tab>
+</Tabs>
 
 ## Risoluzione dei Problemi
 
-<Callout type="warn" title="`failed to bind to port` on Rust">
+<Warning>
+  **\`failed to bind to port\` on Rust**
+
   Un altro processo sta occupando la porta `0.0.0.0` in modo aggressivo.
   Riesegui il test — l'SDK sceglie una nuova porta ad ogni chiamata. Se il
   problema persiste, verifica la presenza di processi `surfpool` orfani.
-</Callout>
+</Warning>
 
-<Callout type="warn" title="`Cannot find module '@solana/surfpool-...'`">
+<Warning>
+  **\`Cannot find module '@solana/surfpool-...'\`**
+
   Il pacchetto `optionalDependencies` per la tua piattaforma non è stato
   installato. Riesegui l'installazione con `--include=optional`, oppure verifica
   che la tua piattaforma sia presente nella tabella delle piattaforme
   supportate.
-</Callout>
+</Warning>
 
-<Callout type="warn" title="`stop()` si blocca in JS">
+<Warning>
+  **\`stop()\` si blocca in JS**
+
   Assicurati di chiamare `stop()` una volta per `start()`. Il wrapper Node
   mantiene i server RPC e WebSocket in ascolto fino al completamento di
   `stop()`.
-</Callout>
+</Warning>

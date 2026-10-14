@@ -10,7 +10,7 @@ Kora는 [x402 V2 퍼실리테이터](/docs/tools/x402-facilitator) 뒤에서 Sol
 
 ## 아키텍처
 
-```mermaid title="x402 with Kora"
+```mermaid
 sequenceDiagram
     participant Client
     participant API as Resource server
@@ -34,6 +34,34 @@ sequenceDiagram
     API-->>Client: 200 + resource + PAYMENT-RESPONSE
 ```
 
+<div className="nojs-only" data-fallback="mermaid">
+  ```text Mermaid
+  sequenceDiagram
+      participant Client
+      participant API as Resource server
+      participant Facilitator
+      participant Kora
+      participant Solana
+      Client->>API: GET /protected
+      API-->>Client: 402 + PAYMENT-REQUIRED
+      Client->>API: GET /protected + PAYMENT-SIGNATURE
+      API->>Facilitator: POST /verify
+      Facilitator->>Kora: signTransaction
+      Kora->>Kora: Enforce transaction policy
+      Kora-->>Facilitator: Validated transaction
+      Facilitator-->>API: Payment is valid
+      API->>Facilitator: POST /settle
+      Facilitator->>Kora: signAndSendTransaction
+      Kora->>Solana: Sign as fee payer and submit
+      Solana-->>Kora: Transaction signature
+      Kora-->>Facilitator: Transaction signature
+      Facilitator-->>API: Settlement result
+      API-->>Client: 200 + resource + PAYMENT-RESPONSE
+  ```
+</div>
+
+<p className="sol-caption">x402 with Kora</p>
+
 네 가지 애플리케이션 역할은 분리되어 있습니다:
 
 - **클라이언트**는 결제 요건을 선택하고 결제 승인에 서명합니다.
@@ -55,9 +83,11 @@ cp .env.example .env
 
 `.env`의 `KORA_PRIVATE_KEY`를 일회용 Devnet keypair로 설정하세요. 데모의 서명자 구성은 base58 시크릿, 바이트 배열 keypair, 또는 JSON keypair 파일 경로를 허용합니다. 트랜잭션 수수료를 후원할 수 있도록 해당 공개 주소에 Devnet SOL을 충전하세요.
 
-<Callout type="caution" title="일회용 Devnet 서명자 사용">
+<Danger>
+  **일회용 Devnet 서명자 사용**
+
   Docker 데모는 환경 변수에서 Kora 서명자를 로드합니다. 이 데모에 프로덕션 서명 키를 입력하거나 `.env` 파일을 커밋하지 마세요.
-</Callout>
+</Danger>
 
 Kora와 퍼실리테이터를 시작합니다:
 

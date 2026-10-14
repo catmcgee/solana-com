@@ -18,7 +18,7 @@ Tambahkan crate sebagai dev-dependency. SDK ini mengutamakan async dan
 membutuhkan runtime Tokio, jadi sertakan `tokio` dengan fitur `full` untuk
 pengujian.
 
-```toml title="Cargo.toml"
+```toml Cargo.toml
 [dev-dependencies]
 surfpool-sdk = "1"
 tokio = { version = "1", features = ["full"] }
@@ -90,11 +90,13 @@ otomatis sebagai `optionalDependencies`:
 | macOS Intel          | `x86_64-apple-darwin`      | `@solana/surfpool-darwin-x64`    |
 | Linux x86-64 (glibc) | `x86_64-unknown-linux-gnu` | `@solana/surfpool-linux-x64-gnu` |
 
-<Callout type="warn" title="Platform tidak didukung">
+<Warning>
+  **Platform tidak didukung**
+
   Jika paket diinstal pada platform yang tidak memiliki binary yang sesuai,
   proses instalasi akan selesai tetapi `Surfnet.start()` akan melempar error
   saat runtime. Buka sebuah issue jika Anda memerlukan target tambahan.
-</Callout>
+</Warning>
 
 ### Persyaratan
 
@@ -108,58 +110,66 @@ otomatis sebagai `optionalDependencies`:
 Pengujian smoke satu baris mengonfirmasi bahwa runtime berhasil dijalankan dan
 endpoint RPC menerima permintaan.
 
-<CodeTabs storage="surfpool-lang">
+<Tabs>
+  <Tab title="Rust">
+    ```rust Rust
+    use surfpool_sdk::{Signer, Surfnet};
 
-```rust !! title="Rust"
-use surfpool_sdk::{Signer, Surfnet};
+    #[tokio::test]
+    async fn surfpool_sdk_smoke() {
+        let surfnet = Surfnet::start().await.expect("start surfnet");
+        let balance = surfnet
+            .rpc_client()
+            .get_balance(&surfnet.payer().pubkey())
+            .expect("get balance");
+        assert!(balance > 0);
+    }
+    ```
 
-#[tokio::test]
-async fn surfpool_sdk_smoke() {
-    let surfnet = Surfnet::start().await.expect("start surfnet");
-    let balance = surfnet
-        .rpc_client()
-        .get_balance(&surfnet.payer().pubkey())
-        .expect("get balance");
-    assert!(balance > 0);
-}
-```
+    Jalankan dengan `cargo test --test smoke`.
+  </Tab>
 
-Jalankan dengan `cargo test --test smoke`.
+  <Tab title="TypeScript">
+    ```ts TypeScript
+    import { after, test } from "node:test";
+    import assert from "node:assert/strict";
+    import { Surfnet } from "@solana/surfpool";
 
-```ts !! title="TypeScript"
-import { after, test } from "node:test";
-import assert from "node:assert/strict";
-import { Surfnet } from "@solana/surfpool";
+    const surfnet = Surfnet.start();
+    after(() => surfnet.stop());
 
-const surfnet = Surfnet.start();
-after(() => surfnet.stop());
+    test("surfpool sdk smoke", () => {
+      assert.match(surfnet.rpcUrl, /^http:\/\/127\.0\.0\.1:\d+$/);
+      assert.ok(surfnet.payer.length > 0);
+    });
+    ```
 
-test("surfpool sdk smoke", () => {
-  assert.match(surfnet.rpcUrl, /^http:\/\/127\.0\.0\.1:\d+$/);
-  assert.ok(surfnet.payer.length > 0);
-});
-```
-
-Jalankan dengan `node --test smoke.test.ts` (dengan loader TS) atau
-`tsx --test smoke.test.ts`.
-
-</CodeTabs>
+    Jalankan dengan `node --test smoke.test.ts` (dengan loader TS) atau
+    `tsx --test smoke.test.ts`.
+  </Tab>
+</Tabs>
 
 ## Pemecahan Masalah
 
-<Callout type="warn" title="`failed to bind to port` on Rust">
+<Warning>
+  **\`failed to bind to port\` on Rust**
+
   Proses lain sedang mengikat `0.0.0.0` secara agresif. Jalankan ulang pengujian
   — SDK memilih port baru pada setiap pemanggilan. Jika kegagalan terus
   berlanjut, periksa apakah ada proses `surfpool` yang tidak terhenti.
-</Callout>
+</Warning>
 
-<Callout type="warn" title="`Cannot find module '@solana/surfpool-...'`">
+<Warning>
+  **\`Cannot find module '@solana/surfpool-...'\`**
+
   Entri `optionalDependencies` untuk platform Anda tidak berhasil diinstal.
   Jalankan ulang instalasi dengan `--include=optional`, atau periksa apakah
   platform Anda tercantum dalam tabel yang didukung di atas.
-</Callout>
+</Warning>
 
-<Callout type="warn" title="`stop()` hangs in JS">
+<Warning>
+  **\`stop()\` hangs in JS**
+
   Pastikan Anda memanggil `stop()` satu kali per `start()`. Wrapper Node menjaga
   server RPC dan WebSocket tetap terikat hingga `stop()` selesai.
-</Callout>
+</Warning>

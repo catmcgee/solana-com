@@ -2,7 +2,6 @@
 title: Program Yürütme
 description:
   Solana'nın programları nasıl derlediği ve yürüttüğü; sBPF VM, hesaplama birimi modeli, program önbelleği ve sistem çağrıları dahil.
-url: /docs/core/programs/program-execution
 type: conceptual
 prerequisites:
   - /docs/core/programs
@@ -16,12 +15,14 @@ related:
 
 {/* TOC: Compilation, Write programs, Program execution model, Program cache, Syscalls */}
 
-<Callout type="info" title="Özet">
+<Info>
+  **Özet**
+
   Programlar, LLVM aracılığıyla sBPF'e derlenir ve işlem başına 1,4 milyon CU
   bütçesiyle korumalı bir VM'de çalışır. Çalışma zamanı, derlenmiş 512 programa kadar önbelleğe alır,
   loglama, CPI, kripto ve bellek için sistem çağrıları sağlar ve yeni
   dağıtımları 1 slot geciktirir.
-</Callout>
+</Info>
 
 ## Derleme
 
@@ -30,18 +31,18 @@ Solana, programları Solana Bytecode Format (sBPF) içeren
 binaries dosyalarına derlemek için [LLVM](https://llvm.org/) kullanır. ELF ikili dosyası, zincir üzerinde
 yürütülebilir bir hesapta depolanır.
 
-<Callout>
+<Note>
   sBPF, Solana'nın [eBPF](https://en.wikipedia.org/wiki/EBPF)
   bayt kodunun özel bir varyantıdır ve Solana çalışma zamanına göre özelleştirilmiştir. Standart eBPF değildir ve
   Solana'ya özgü değişiklikler içerir.
-</Callout>
+</Note>
 
 ## Program yazma
 
 Solana programları öncelikli olarak üç yaklaşımdan biri kullanılarak
 [Rust](https://rust-book.cs.brown.edu/title-page.html) ile yazılır:
 
-<Cards>
+<Columns cols={2}>
   <Card title="Anchor" href="https://www.anchor-lang.com/docs">
     Ortak kod tekrarını azaltmak için Rust makrolarını kullanan bir çerçeve. Çoğu
     geliştirici için önerilir.
@@ -54,7 +55,7 @@ Solana programları öncelikli olarak üç yaklaşımdan biri kullanılarak
     Çerçevesiz doğrudan Rust. Tam kontrol sağlar ancak daha fazla manuel
     uygulama gerektirir.
   </Card>
-</Cards>
+</Columns>
 
 Bu yaklaşımlarda geçerli olan CPI kavramları ve örnekleri için [Cross-Program Invocations](/docs/core/cpi) bölümüne bakın.
 
@@ -74,12 +75,12 @@ Her talimat için çalışma zamanı:
 2. **Ön derlemeleri kontrol eder.** Program bir
    [precompile](/docs/core/programs/precompiles) ise, çalışma zamanı
    [`process_precompile()`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/invoke_context.rs#L491)
-   işlevini çağırır; bu işlev yine bir yığın çerçevesi iter ve çeker (_rs`push()`_ ve _rs`pop()`_ aracılığıyla)
+   işlevini çağırır; bu işlev yine bir yığın çerçevesi iter ve çeker (`push()` ve `pop()` aracılığıyla)
    ancak sBPF VM ve program önbelleği aramasını atlayarak yerel kodu
    doğrudan yürütür.
 
 3. **Bir yığın çerçevesi iter.** (3-6. adımlar,
-   _rs`process_message()`_'den çağrılan
+   `process_message()`'den çağrılan
    [`InvokeContext::process_instruction()`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/invoke_context.rs#L481)
    ve
    [`process_executable_chain()`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/invoke_context.rs#L507)
@@ -92,7 +93,7 @@ Her talimat için çalışma zamanı:
    program) aynı program ise kendisini yeniden çağırabilir.
    Derin öz-özyineleme (A -> A -> A) yığın derinlik sınırlarına tabi olarak izin verilir.
    Diğer yeniden giriş desenleri (örneğin, A, B'yi çağırır, B, A'yı çağırır)
-   _rs`InstructionError::ReentrancyNotAllowed`_ döndürür.
+   `InstructionError::ReentrancyNotAllowed` döndürür.
 
 4. **Programı çözer.** Çalışma zamanı, yükleyiciyi belirleyen
    [`process_executable_chain()`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/invoke_context.rs#L507)
@@ -113,7 +114,7 @@ Her talimat için çalışma zamanı:
    - Hesap verilerini düz bir parametre tamponuna serileştirir
    - Yığın, heap ve bellek bölgeleriyle sBPF VM'i oluşturur
    - Derlenmiş kodu çalıştırır ve yürütme sırasında hesaplama birimleri tüketir. Bütçe aşılırsa
-     _rs`ComputationalBudgetExceeded`_ döndürür.
+     `ComputationalBudgetExceeded` döndürür.
    - Hesap verilerini tampondan hesap durumuna geri seri dışı bırakır
 
 6. **Yığın çerçevesini çıkarır.**
@@ -153,14 +154,14 @@ değeri vardır:
 Yeni dağıtılan veya yükseltilen programlar hemen etkin olmaz.
 [`DELAY_VISIBILITY_SLOT_OFFSET`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/loaded_programs.rs#L32)
 sabiti `1`'dir; yani slot N'de dağıtılan bir program slot N+1'de etkin hale gelir. Dağıtım slot'u süresince, yeni sürümü çağırma girişimi
-_rs`DelayVisibility`_ döndürür ve çalışma zamanı "Program is not deployed." hatasını raporlar.
+`DelayVisibility` döndürür ve çalışma zamanı "Program is not deployed." hatasını raporlar.
 
 ### Tahliye politikası
 
 Önbellek en fazla
 [`MAX_LOADED_ENTRY_COUNT`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/loaded_programs.rs#L31)
 (512) derlenmiş program girdisi tutar. Sınıra ulaşıldığında, en az kullanılan
-programlar _rs`Unloaded`_ durumuna tahliye edilir. Kullanım,
+programlar `Unloaded` durumuna tahliye edilir. Kullanım,
 [`tx_usage_counter`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/loaded_programs.rs#L197)
 (her işlem programı referans aldığında artırılır) ve
 [`latest_access_slot`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/loaded_programs.rs#L199)
@@ -178,4 +179,4 @@ değerini değiştirirse, önbelleğe alınan tüm programlar yeni ortama karş�
 Programlar, `sol_set_return_data` sistem çağrısı aracılığıyla dönüş verisi ayarlayabilir. Veriler, veri baytlarını ve sistem çağrısını çağıran talimatın `program_id`'sini tutan bir işlem düzeyindeki
 [`TransactionReturnData`](https://github.com/anza-xyz/agave/blob/v3.1.8/transaction-context/src/lib.rs#L499)
 yapısında depolanır. Maksimum boyut 1.024 bayttır
-(_rs`MAX_RETURN_DATA`_).
+(`MAX_RETURN_DATA`).

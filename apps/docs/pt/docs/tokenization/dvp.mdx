@@ -20,7 +20,13 @@ keywords:
   - compliance
 ---
 
-<Embed url="https://www.youtube.com/embed/dRCiYa1rkrY" />
+<Frame>
+  <iframe src="https://www.youtube-nocookie.com/embed/dRCiYa1rkrY" title="YouTube video player" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerPolicy="strict-origin-when-cross-origin" allowFullScreen className="w-full aspect-video" />
+</Frame>
+
+<div className="nojs-only">
+  [https://www.youtube.com/watch?v=dRCiYa1rkrY](https://www.youtube.com/watch?v=dRCiYa1rkrY)
+</div>
 
 Entrega contra Pagamento (DvP) é um método de liquidação de valores mobiliários que garante que a transferência de títulos ocorre simultaneamente com a transferência do pagamento. Isso elimina o risco de contraparte ao garantir que ambas as etapas da transação sejam executadas atomicamente — ou ambas são concluídas, ou nenhuma delas é.
 
@@ -53,7 +59,9 @@ Se isso acontecer separadamente, há risco — e se você pagar mas nunca recebe
 
 Este guia demonstra como implementar um fluxo de trabalho completo de DvP na Solana usando extensões SPL Token 2022 para emissão de títulos em conformidade regulatória e USDC padrão para liquidação, tudo sem escrever programas Rust personalizados.
 
-<Callout type="info" title="Implementação de Referência Educacional">
+<Info>
+
+**Implementação de Referência Educacional**
 
 Você pode usar o [código-fonte](https://github.com/Woody4618/dvp) desta
 implementação para experimentar uma implementação de DvP localmente.
@@ -67,19 +75,19 @@ Este guia fornece uma implementação de referência apenas para fins de explora
 - Consulta jurídica
 - Testes extensivos e modificações
 
-</Callout>
+</Info>
 
 ## Por que Solana para DvP?
 
 A arquitetura da Solana oferece vantagens significativas em relação à liquidação tradicional de valores mobiliários:
 
-| Aspecto            | Tradicional (T+2)     | Solana                      |
-| ----------------- | --------------------- | --------------------------- |
-| Lógica de Liquidação  | Câmaras de Compensação        | Agrupamento atômico de transações |
-| Tempo de Liquidação   | 2 dias                | &lt;1 segundo                |
-| Custo da Transação  | $50-500               | &lt;$0,01                   |
-| Risco de Contraparte | Alto (intermediários) | Zero (execução atômica)     |
-| Finalidade          | Fim do dia            | ~400ms                      |
+| Aspecto              | Tradicional (T+2)      | Solana                            |
+| -------------------- | ---------------------- | --------------------------------- |
+| Lógica de Liquidação | Câmaras de Compensação | Agrupamento atômico de transações |
+| Tempo de Liquidação  | 2 dias                 | &lt;1 segundo                     |
+| Custo da Transação   | \$50-500               | &lt;\$0,01                        |
+| Risco de Contraparte | Alto (intermediários)  | Zero (execução atômica)           |
+| Finalidade           | Fim do dia             | ~400ms                            |
 
 O agrupamento atômico de transações da Solana elimina intermediários, proporcionando liquidações instantâneas, econômicas e seguras.
 
@@ -159,11 +167,11 @@ O SPL Token 2022 oferece extensões poderosas que permitem a emissão de valores
 - **Autoridade de Congelamento**: Agente de Liquidação (gerencia a lista de permissões)
 - **Autoridade de Atualização**: Agente de Liquidação (pode atualizar metadados)
 
-<Callout type="info">
+<Info>
 
 O estado congelado padrão é fundamental para a conformidade regulatória. Ele garante que apenas os endereços explicitamente incluídos na lista de permissões possam receber e deter os valores mobiliários, atendendo aos requisitos de KYC/AML.
 
-</Callout>
+</Info>
 
 ## Implementação Completa de DvP
 
@@ -798,9 +806,9 @@ runDvPExample().catch(console.error);
 
 O agente de liquidação (com autoridade de atualização) pode atualizar campos de metadados:
 
-<Tabs items={["Helper Function", "Usage Example"]}>
+<Tabs>
 
-<Tab value="Helper Function">
+<Tab title="Helper Function">
 
 ```typescript
 import { createUpdateFieldInstruction } from "@solana/spl-token-metadata";
@@ -828,7 +836,7 @@ async function updateBondMetadata(
 
 </Tab>
 
-<Tab value="Usage Example">
+<Tab title="Usage Example">
 
 ```typescript
 // Update coupon rate after rate adjustment
@@ -863,22 +871,24 @@ método integrado `removeFromWhitelist`:
 await dvp.removeFromWhitelist(bondMint, investorBondAccount);
 ```
 
-<Callout type="caution" title="Congelamento vs. Queima">
+<Danger>
+
+**Congelamento vs. Queima**
 
 Congelar uma conta impede transferências, mas preserva a conta e o saldo.
 Para remoção completa, talvez você queira primeiro transferir os títulos de volta ao emissor,
 em seguida congelar a conta.
 
-</Callout>
+</Danger>
 
 ### Liquidação Multipartes
 
 Para cenários mais complexos envolvendo múltiplas partes, você pode agrupar múltiplas
 transferências em uma única transação atômica:
 
-<Tabs items={["Function Definition", "Three-Way Swap Example"]}>
+<Tabs>
 
-<Tab value="Function Definition">
+<Tab title="Function Definition">
 
 ```typescript
 import { sendAndConfirmTransaction } from "@solana/web3.js";
@@ -946,7 +956,7 @@ async function executeMultiPartyDvP(
 
 </Tab>
 
-<Tab value="Three-Way Swap Example">
+<Tab title="Three-Way Swap Example">
 
 ```typescript
 // Example: Three-way swap (Bond A → Bond B → Cash)
@@ -985,7 +995,9 @@ const signature = await executeMultiPartyDvP(connection, settlementAgent, [
 
 </Tabs>
 
-<Callout type="info" title="Limites de Tamanho de Transação">
+<Info>
+
+**Limites de Tamanho de Transação**
 
 As transações do Solana têm um limite de tamanho (~1232 bytes). Cada instrução de transferência
 adiciona ~200 bytes. Para liquidações multipartes de grande escala, considere usar
@@ -998,7 +1010,7 @@ aumenta o limite para 4096 bytes, mas remove o suporte a Address Lookup Tables, 
 liquidações v1 incorporam seus endereços diretamente. De qualquer forma, o runtime carrega no máximo
 64 contas por transação.
 
-</Callout>
+</Info>
 
 ## Considerações para Produção
 
@@ -1016,13 +1028,15 @@ Antes de implantar em produção, certifique-se de abordar:
    e suporte ao cliente
 6. **Monitoramento**: Rastreamento em tempo real, alertas e relatórios regulatórios automatizados
 
-<Callout type="caution" title="Limitação do SPL Token">
+<Danger>
+
+**Limitação do SPL Token**
 
 As token accounts do SPL Token só podem ter **um delegado por vez**. Isso significa que, para
 cenários multipartes, pode ser necessário projetar em torno dessa restrição usando
 múltiplas delegações sequenciais ou diferentes padrões de arquitetura.
 
-</Callout>
+</Danger>
 
 ### Inspecionando o Estado da Conta
 
@@ -1030,9 +1044,9 @@ O `DvPEngine` inclui um utilitário para inspecionar o estado de token accounts.
 para verificar o status na lista de permissões, confirmar a conclusão da liquidação, depurar
 problemas de transferência e auditar estados de contas.
 
-<Tabs items={["Get Account Info", "Pre-Settlement Check"]}>
+<Tabs>
 
-<Tab value="Get Account Info">
+<Tab title="Get Account Info">
 
 ```typescript
 // Get detailed account information
@@ -1051,7 +1065,7 @@ console.log(`  Frozen: ${accountInfo.isFrozen}`);
 
 </Tab>
 
-<Tab value="Pre-Settlement Check">
+<Tab title="Pre-Settlement Check">
 
 ```typescript
 // Check if investor is whitelisted before settlement

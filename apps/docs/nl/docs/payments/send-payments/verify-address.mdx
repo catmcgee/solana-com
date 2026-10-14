@@ -16,12 +16,12 @@ Validatie hangt af van wat je verstuurt:
 - **Natieve SOL** heeft geen dergelijke beveiliging. Een System
   Program-overdracht slaagt naar elk account, dus een onjuiste ontvanger
   vergrendelt de SOL permanent. Zie
-  [Natieve SOL versturen](#sending-native-sol).
+  [Natieve SOL versturen](#native-sol-versturen).
 
-<Callout>
+<Note>
   Zie [Hoe betalingen werken op Solana](/docs/payments/how-payments-work) voor
   de belangrijkste betalingsconcepten.
-</Callout>
+</Note>
 
 ## Solana-adressen begrijpen
 
@@ -51,11 +51,11 @@ Gebruik het adres om een [account](/docs/core/accounts) op te halen uit het
 netwerk, controleer de programma-eigenaar en het accounttype om te bepalen hoe
 het adres verwerkt moet worden.
 
-<Callout>
+<Note>
   Of een adres on-curve of off-curve is, vertelt je niet wat voor type account
   het is, welk programma het beheert, of er een account bestaat op dat adres. Je
   moet het account ophalen uit het netwerk om deze details te bepalen.
-</Callout>
+</Note>
 
 ### System Program Accounts (Wallets)
 
@@ -72,12 +72,12 @@ worden teruggevorderd door de afzender.
 
 Systeemaccounts kunnen off-curve bestaan. Als je gebruiker tokens wil sturen naar een off-curve adres, wordt het aanbevolen de gebruiker te vragen te bevestigen dat ze van plan zijn fondsen naar een smart wallet te sturen.
 
-<Callout type="warn">
+<Warning>
   Zonder beveiligingsmaatregelen kan het subsidiëren van ATA-aanmaak worden
   misbruikt. Een kwaadwillende gebruiker kan een overdracht aanvragen, hun ATA
   op jouw kosten laten aanmaken, het ATA sluiten om de rent SOL terug te
   vorderen, en dit herhalen.
-</Callout>
+</Warning>
 
 ### Token Accounts
 
@@ -87,11 +87,11 @@ je ontvangt eigendom is van een token program, moet je controleren of het
 account een token account is (geen mint account) en of het overeenkomt met het
 verwachte token mint account voordat je verstuurt.
 
-<Callout type="info">
+<Info>
   De Token Programs valideren automatisch dat beide token accounts in een
   overdracht tokens van dezelfde mint bevatten. Als de validatie mislukt, wordt
   de transactie afgewezen en gaan er geen fondsen verloren.
-</Callout>
+</Info>
 
 ### Mint Accounts
 
@@ -124,19 +124,19 @@ Bij het versturen van native SOL is alleen een `IS_WALLET`-resultaat acceptabel.
 `IS_TOKEN_ACCOUNT` is **niet** acceptabel: een token account bevat SPL-tokens,
 en SOL dat daarheen wordt gestuurd valt buiten de controle van de verzender.
 
-<Callout type="warn">
+<Warning>
   Dit is een veelvoorkomende manier waarop SOL verloren gaat: een gebruiker
   plakt het mint-adres van een token (of een programma-adres) in een SOL-opname.
   De overdracht slaagt en de SOL is onherstelbaar. Classificeer altijd de
   ontvanger voordat u een SOL-overdracht ondertekent.
-</Callout>
+</Warning>
 
 ## Verificatiestroom
 
 Het volgende diagram toont een referentiebeslisboom voor het valideren van een
 adres:
 
-```mermaid title="Address Verification Flow"
+```mermaid
 flowchart TD
     A["Input address"]
     B["Fetch account info"]
@@ -165,17 +165,46 @@ flowchart TD
     K -- "No" --> V2["VERIFY: Confirm the recipient intends to use a smart wallet"]
 ```
 
-<Steps>
-<Step>
+<div className="nojs-only" data-fallback="mermaid">
+  ```text Mermaid
+  flowchart TD
+      A["Input address"]
+      B["Fetch account info"]
 
-### Account ophalen
+      A --> B
+      B --> C{"Account exists onchain?"}
+
+      %% --- Non-existent account path ---
+      C -- "No" --> D{"Is address off-curve (PDA)?"}
+      D -- "Yes" --> V1["VERIFY: Confirm the recipient intends to use a smart wallet"]
+      D -- "No" --> W1["IS_WALLET: Valid unfunded public key address"]
+
+      %% --- Existing account path ---
+      C -- "Yes" --> F{"Check program owner"}
+
+      F -- "Token Program / Token-2022" --> G{"Is token account for expected mint?"}
+      G -- "Yes" --> T1["IS_TOKEN_ACCOUNT: Send directly"]
+      G -- "No" --> R1["REJECT: Wrong account type or mint"]
+
+      F -- "System Program" --> H{"Is address off-curve?"}
+      H -- "No" --> W2["IS_WALLET: Derive ATA and send"]
+      H -- "Yes" --> V3["VERIFY: Confirm the recipient intends to use a smart wallet"]
+
+      F -- "Other Program" --> K{"Allowed by policy?"}
+      K -- "Yes" --> W3["IS_WALLET: Derive ATA and send"]
+      K -- "No" --> V2["VERIFY: Confirm the recipient intends to use a smart wallet"]
+  ```
+</div>
+
+<p className="sol-caption">Address Verification Flow</p>
+
+<Steps titleSize="h3">
+<Step title="Account ophalen">
 
 Gebruik het adres om de accountgegevens op te halen uit het netwerk.
 
 </Step>
-<Step>
-
-### Account bestaat niet
+<Step title="Account bestaat niet">
 
 Als er geen account bestaat op dit adres, controleer dan of het adres on-curve of off-curve is:
 
@@ -184,9 +213,7 @@ Als er geen account bestaat op dit adres, controleer dan of het adres on-curve o
 - **On-curve**: Dit is een geldig walletadres (publieke sleutel) dat nog niet gefinancierd is. Leid de ATA af, controleer of die bestaat, en stuur er tokens naartoe. Je moet een beleidsbeslissing nemen of je de aanmaak van de ATA wilt financieren als die niet bestaat.
 
 </Step>
-<Step>
-
-### Account bestaat
+<Step title="Account bestaat">
 
 Als er een account bestaat, controleer dan welk programma het bezit:
 
@@ -211,12 +238,12 @@ Als er een account bestaat, controleer dan welk programma het bezit:
 Het volgende voorbeeld toont alleen de logica voor adresvalidatie. Dit is
 referentiecode ter illustratie.
 
-<Callout>
+<Note>
   De demo laat niet zien hoe u een ATA afleidt of een transactie bouwt om tokens
   te versturen. Raadpleeg de documentatie over [token
   account](/docs/tokens/basics/create-token-account#how-to-create-an-associated-token-account)
   en [token transfer](/docs/tokens/basics/transfer-tokens) voor voorbeeldcode.
-</Callout>
+</Note>
 
 De onderstaande demo gebruikt drie mogelijke uitkomsten:
 
@@ -229,10 +256,7 @@ De onderstaande demo gebruikt drie mogelijke uitkomsten:
 
 Vervolgens wordt elk resultaat gekoppeld aan acceptabiliteit per activum met `canReceiveNativeSol` (alleen wallets) en `canReceiveSplToken` (wallets of token accounts). Een `USER_VERIFICATION`-resultaat wordt niet automatisch geaccepteerd; je applicatie moet een gebruiker hun intentie laten bevestigen voordat SPL-tokens worden verzonden. Een token account geeft `IS_TOKEN_ACCOUNT` terug, zodat het SPL-tokens kan ontvangen maar **geen** native SOL — het onderscheid dat voorkomt dat SOL wordt vergrendeld.
 
-<CodeTabs flags="r">
-
-```ts !! title="Demo"
-// !collapse(1:35) collapsed
+```ts Demo expandable
 
 import {
   type Address,
@@ -362,7 +386,6 @@ function canReceiveSplToken(result: ValidationResult): boolean {
 // =============================================================================
 // Examples
 // =============================================================================
-// !collapse(1:1000) collapsed
 
 // Wallets
 const EXISTING_WALLET =
@@ -437,5 +460,3 @@ console.log("\n" + "═".repeat(60));
 console.log("  Done!");
 console.log("═".repeat(60) + "\n");
 ```
-
-</CodeTabs>

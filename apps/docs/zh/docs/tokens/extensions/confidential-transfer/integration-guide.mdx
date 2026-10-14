@@ -85,9 +85,9 @@ keypair**，以及用于快速余额解密的
 
 `@solana-program/token-2022` 客户端为推荐路径提供了辅助工具：
 
-<CodeTabs>
+<CodeGroup>
 
-```ts !! title="JS-derive-keys.ts"
+```ts JS-derive-keys.ts
 import {
   deriveElGamalKeypairForOwnerMint,
   deriveAeKeyForOwnerMint
@@ -106,7 +106,7 @@ const aesKey = await deriveAeKeyForOwnerMint({
 });
 ```
 
-```rust !! title="rust-derive-keys.rs"
+```rust rust-derive-keys.rs
 use solana_zk_sdk::encryption::derivation::derive_confidential_keys;
 
 // `signer` is the account owner; the token account address is the public seed.
@@ -117,16 +117,16 @@ let (elgamal_keypair, aes_key) =
         .expect("Failed to derive confidential keys");
 ```
 
-</CodeTabs>
+</CodeGroup>
 
-<Callout type="warn">
+<Warning>
   机密密钥是解密密钥。请将签署派生消息的请求视同解锁用户余额的私密视图。建议按需派生而非持久存储；如确需存储（例如在托管服务中），请以与签名密钥同等级别的严格措施加以保护。
-</Callout>
+</Warning>
 
 派生辅助函数返回序列化的密钥材料。高级操作辅助函数（稍后展示）接受 WASM
 `ElGamalKeypair` 和 `AeKey` 对象，因此在需要时请从字节重新构建它们：
 
-```ts !! title="JS-rebuild-keys.ts"
+```ts JS-rebuild-keys.ts
 import {
   ElGamalKeypair,
   ElGamalSecretKey,
@@ -154,13 +154,13 @@ account，但若没有该签名，则无法代表用户配置保密扩展。
 `ConfigureAccountWithRegistry`
 为用户配置保密账户，配置时无需所有者签名或证明，只需一个支付 rent 的付款方。如果您希望为用户顺畅地预配置保密账户，这是推荐使用的机制。
 
-<Callout type="info">
+<Info>
   注册表配置目前已在 Rust `spl-token-client`
   （`confidential_transfer_configure_token_account_with_registry`）及
   `spl-elgamal-registry` 程序中提供。`@solana-program/token-2022` JS
   客户端中尚无对应的辅助函数，因此需要使用注册表路径的 JS
   集成应关注该客户端的后续版本发布。
-</Callout>
+</Info>
 
 ## 显示余额
 
@@ -170,9 +170,9 @@ account，但若没有该签名，则无法代表用户配置保密扩展。
 使用 AES 密钥读取，该操作为常数时间。直接解密 ElGamal `available_balance`
 需要求解离散对数，应避免在日常显示中使用。
 
-<CodeTabs>
+<CodeGroup>
 
-```ts !! title="JS-display-balance.ts"
+```ts JS-display-balance.ts
 import { AeCiphertext } from "@solana/zk-sdk/bundler";
 import { fetchToken } from "@solana-program/token-2022";
 import { unwrapOption } from "@solana/kit";
@@ -194,7 +194,7 @@ if (ct) {
 }
 ```
 
-```rust !! title="rust-display-balance.rs"
+```rust rust-display-balance.rs
 // `token` is an spl_token_client `Token`. These helpers decrypt for you.
 let pending = token
     .confidential_transfer_get_pending_balance(&token_account, elgamal_keypair.secret())
@@ -207,7 +207,7 @@ let total = token
     .await?;
 ```
 
-</CodeTabs>
+</CodeGroup>
 
 当用户尚未解锁密钥时，应显示公开余额并提示存在保密余额但处于锁定状态，而非显示零。
 
@@ -222,9 +222,9 @@ let total = token
 - 分别显示待处理余额与可用余额，让用户了解为何刚收到的金额尚不可用。
 - 在适当时机（例如发送前）代表用户应用待处理余额，以防余额卡滞。
 
-<CodeTabs>
+<CodeGroup>
 
-```ts !! title="JS-apply-pending.ts"
+```ts JS-apply-pending.ts
 import { getApplyConfidentialPendingBalanceInstructionFromToken } from "@solana-program/token-2022";
 
 // Builds a single instruction; no proofs are needed to apply.
@@ -237,7 +237,7 @@ const instruction = getApplyConfidentialPendingBalanceInstructionFromToken({
 });
 ```
 
-```rust !! title="rust-apply-pending.rs"
+```rust rust-apply-pending.rs
 token
     .confidential_transfer_apply_pending_balance(
         &token_account,
@@ -250,7 +250,7 @@ token
     .await?;
 ```
 
-</CodeTabs>
+</CodeGroup>
 
 请参阅
 [应用待处理余额](/docs/tokens/extensions/confidential-transfer/apply-pending-balance)
@@ -269,9 +269,9 @@ v4.2 一同发布）提高了大小限制，预计可让机密转账在单笔链
 
 您无需手动组装证明。两个客户端都提供了高级辅助工具，可自动构建证明并生成待提交的指令：
 
-<CodeTabs>
+<CodeGroup>
 
-```ts !! title="JS-transfer.ts"
+```ts JS-transfer.ts
 import { getConfidentialTransferInstructionPlan } from "@solana-program/token-2022";
 
 // Returns an instruction plan covering proof setup, the transfer, and cleanup.
@@ -294,7 +294,7 @@ const plan = await getConfidentialTransferInstructionPlan({
 // Execute the plan with your instruction-plan executor of choice.
 ```
 
-```rust !! title="rust-transfer.rs"
+```rust rust-transfer.rs
 // Verify the three proofs into context state accounts first (see the Transfer
 // Tokens page), then reference them here. Passing None for a proof account
 // inlines that proof instead, which a full transfer cannot fit within today's
@@ -318,7 +318,7 @@ token
     .await?;
 ```
 
-</CodeTabs>
+</CodeGroup>
 
 如果您需要更精细的控制，也可以使用底层构建模块：`@solana/zk-sdk`
 生成各证明的数据（`CiphertextCommitmentEqualityProofData`、`BatchedGroupedCiphertext3HandlesValidityProofData`、`BatchedRangeProofU128Data`），`@solana-program/zk-elgamal-proof`
@@ -355,9 +355,7 @@ token
 来对每条 Token-2022 指令进行分类，并提供各指令对应的解析器（例如
 `parseConfidentialTransferInstruction`）以解码账户和非机密字段。加密金额保持密文形式：应将其显示为"保密"，而非将字节渲染为数字。
 
-<CodeTabs>
-
-```ts !! title="JS-parse-instruction.ts"
+```ts JS-parse-instruction.ts
 import {
   identifyToken2022Instruction,
   Token2022Instruction,
@@ -387,8 +385,6 @@ for (const ix of instructions) {
   }
 }
 ```
-
-</CodeTabs>
 
 索引限制注意事项：
 

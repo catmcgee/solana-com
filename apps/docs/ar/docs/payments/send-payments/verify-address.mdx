@@ -13,12 +13,12 @@ description:
   الأموال. تغطي معظم هذه الصفحة عمليات إرسال رموز SPL.
 - **SOL الأصلي** لا يمتلك هذه الحماية. ينجح تحويل System Program إلى أي حساب،
   لذا فإن مستلمًا خاطئًا يُقفل SOL بشكل دائم. انظر
-  [إرسال SOL الأصلي](#sending-native-sol).
+  [إرسال SOL الأصلي](#إرسال-sol-الأصلي).
 
-<Callout>
+<Note>
   انظر [كيف تعمل المدفوعات على سولانا](/docs/payments/how-payments-work) لمفاهيم
   الدفع الأساسية.
-</Callout>
+</Note>
 
 ## فهم عناوين سولانا
 
@@ -47,11 +47,11 @@ description:
 استخدم العنوان لجلب [حساب](/docs/core/accounts) من الشبكة، وتحقق من مالك
 البرنامج ونوع الحساب لتحديد كيفية التعامل مع العنوان.
 
-<Callout>
+<Note>
   معرفة ما إذا كان العنوان على المنحنى أو خارجه لا تخبرك بنوع الحساب، ولا
   بالبرنامج الذي يمتلكه، ولا بوجود حساب في ذلك العنوان. يجب عليك جلب الحساب من
   الشبكة لتحديد هذه التفاصيل.
-</Callout>
+</Note>
 
 ### حسابات System Program (المحافظ)
 
@@ -68,11 +68,11 @@ description:
 
 يمكن أن تتواجد حسابات النظام خارج المنحنى. إذا أراد مستخدمك إرسال رموز مميزة إلى عنوان خارج المنحنى، يُنصح بمطالبته بالتأكيد على أنه يقصد إرسال الأموال إلى محفظة ذكية.
 
-<Callout type="warn">
+<Warning>
   بدون ضمانات كافية، يمكن استغلال دعم إنشاء ATA. إذ يمكن لمستخدم خبيث أن يطلب
   تحويلًا، وتُنشأ ATA الخاصة به على نفقتك، ثم يغلق ATA لاستعادة rent SOL، ويكرر
   العملية.
-</Callout>
+</Warning>
 
 ### Token Accounts
 
@@ -81,10 +81,10 @@ Program أو Token-2022 Program وتحتفظ بأرصدة الرموز. إذا �
 مملوكًا لبرنامج رموز، فيجب عليك التحقق من أن الحساب هو token account (وليس mint
 account) وأنه يطابق mint account الرمز المتوقع قبل الإرسال.
 
-<Callout type="info">
+<Info>
   يتحقق Token Programs تلقائيًا من أن كلا token accounts في التحويل يحتفظان
   برموز من نفس الـ mint. وإذا فشل التحقق، يُرفض التحويل ولا تُفقد أي أموال.
-</Callout>
+</Info>
 
 ### حسابات Mint
 
@@ -115,17 +115,17 @@ token accounts والبرامج وعناوين PDA. ولا يمكن نقل lampo
 يُقبل: إذ يحتفظ token account برموز SPL، وأي SOL يُرسل إليه يخرج عن سيطرة
 المرسل.
 
-<Callout type="warn">
+<Warning>
   هذه طريقة شائعة لفقدان SOL: يقوم المستخدم بلصق عنوان سك الرمز (أو عنوان
   برنامج) في خانة سحب SOL. تنجح عملية النقل ولا يمكن استرداد SOL. احرص دائماً
   على تصنيف المستلم قبل التوقيع على أي عملية نقل SOL.
-</Callout>
+</Warning>
 
 ## تدفق التحقق
 
 يوضح المخطط التالي شجرة قرار مرجعية للتحقق من صحة العنوان:
 
-```mermaid title="Address Verification Flow"
+```mermaid
 flowchart TD
     A["Input address"]
     B["Fetch account info"]
@@ -154,17 +154,46 @@ flowchart TD
     K -- "No" --> V2["VERIFY: Confirm the recipient intends to use a smart wallet"]
 ```
 
-<Steps>
-<Step>
+<div className="nojs-only" data-fallback="mermaid">
+  ```text Mermaid
+  flowchart TD
+      A["Input address"]
+      B["Fetch account info"]
 
-### جلب الحساب
+      A --> B
+      B --> C{"Account exists onchain?"}
+
+      %% --- Non-existent account path ---
+      C -- "No" --> D{"Is address off-curve (PDA)?"}
+      D -- "Yes" --> V1["VERIFY: Confirm the recipient intends to use a smart wallet"]
+      D -- "No" --> W1["IS_WALLET: Valid unfunded public key address"]
+
+      %% --- Existing account path ---
+      C -- "Yes" --> F{"Check program owner"}
+
+      F -- "Token Program / Token-2022" --> G{"Is token account for expected mint?"}
+      G -- "Yes" --> T1["IS_TOKEN_ACCOUNT: Send directly"]
+      G -- "No" --> R1["REJECT: Wrong account type or mint"]
+
+      F -- "System Program" --> H{"Is address off-curve?"}
+      H -- "No" --> W2["IS_WALLET: Derive ATA and send"]
+      H -- "Yes" --> V3["VERIFY: Confirm the recipient intends to use a smart wallet"]
+
+      F -- "Other Program" --> K{"Allowed by policy?"}
+      K -- "Yes" --> W3["IS_WALLET: Derive ATA and send"]
+      K -- "No" --> V2["VERIFY: Confirm the recipient intends to use a smart wallet"]
+  ```
+</div>
+
+<p className="sol-caption">Address Verification Flow</p>
+
+<Steps titleSize="h3">
+<Step title="جلب الحساب">
 
 استخدم العنوان لجلب تفاصيل الحساب من الشبكة.
 
 </Step>
-<Step>
-
-### الحساب غير موجود
+<Step title="الحساب غير موجود">
 
 إذا لم يكن ثمة حساب على هذا العنوان، تحقق مما إذا كان العنوان على المنحنى أم خارجه:
 
@@ -176,9 +205,7 @@ flowchart TD
 - **على المنحنى**: هذا عنوان محفظة صالح (مفتاح عام) لم يُموَّل بعد. اشتق ATA، وتحقق من وجوده، وأرسل الرموز المميزة إليه. يجب عليك اتخاذ قرار بشأن السياسة المتعلقة بتمويل إنشاء ATA إذا لم يكن موجودًا.
 
 </Step>
-<Step>
-
-### الحساب موجود
+<Step title="الحساب موجود">
 
 إذا كان الحساب موجودًا، تحقق من البرنامج المالك له:
 
@@ -202,13 +229,13 @@ flowchart TD
 
 يوضح المثال التالي منطق التحقق من صحة العنوان فقط. هذا كود مرجعي لأغراض توضيحية.
 
-<Callout>
+<Note>
   لا يوضح العرض التوضيحي كيفية اشتقاق ATA أو بناء معاملة لإرسال الرموز. راجع
   وثائق [token
   account](/docs/tokens/basics/create-token-account#how-to-create-an-associated-token-account)
   و[token transfer](/docs/tokens/basics/transfer-tokens) للاطلاع على أمثلة
   الكود.
-</Callout>
+</Note>
 
 يستخدم العرض التوضيحي أدناه ثلاثة نتائج محتملة:
 
@@ -222,10 +249,7 @@ flowchart TD
 ثم يُعيّن كل نتيجة إلى قابلية القبول لكل أصل على حدة عبر `canReceiveNativeSol`
 (للمحافظ فقط) و`canReceiveSplToken` (للمحافظ أو token accounts). نتيجة `USER_VERIFICATION` لا تُقبل تلقائيًا؛ يجب أن يطلب تطبيقك من المستخدم تأكيد نيته قبل إرسال SPL tokens. يُعيد token account النتيجة `IS_TOKEN_ACCOUNT`، وبالتالي يمكنه استقبال SPL tokens لكن **لا** يمكنه استقبال SOL الأصلي — وهذا التمييز هو ما يمنع قفل SOL.
 
-<CodeTabs flags="r">
-
-```ts !! title="Demo"
-// !collapse(1:35) collapsed
+```ts Demo expandable
 
 import {
   type Address,
@@ -355,7 +379,6 @@ function canReceiveSplToken(result: ValidationResult): boolean {
 // =============================================================================
 // Examples
 // =============================================================================
-// !collapse(1:1000) collapsed
 
 // Wallets
 const EXISTING_WALLET =
@@ -430,5 +453,3 @@ console.log("\n" + "═".repeat(60));
 console.log("  Done!");
 console.log("═".repeat(60) + "\n");
 ```
-
-</CodeTabs>

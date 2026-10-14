@@ -2,7 +2,6 @@
 title: Cấu trúc giao dịch
 description:
   Cấu trúc chi tiết của giao dịch Solana bao gồm chữ ký, định dạng thông điệp, tiêu đề, địa chỉ tài khoản, blockhash, lệnh đã biên dịch, mã hóa nhị phân và giới hạn kích thước.
-url: /docs/core/transactions/transaction-structure
 type: conceptual
 prerequisites:
   - /docs/core/transactions
@@ -16,49 +15,51 @@ related:
 
 {/* TOC: Signatures, Message (Header, Account addresses, Recent blockhash, Instructions), Transaction binary format, SOL transfer example */}
 
-<Callout type="info" title="Tóm tắt">
+<Info>
+  **Tóm tắt**
+
   Một giao dịch bao gồm chữ ký và một thông điệp. Thông điệp chứa tiêu đề,
   địa chỉ tài khoản, blockhash gần đây và các lệnh đã được biên dịch. Kích thước
   tuần tự hóa tối đa: 1.232 byte (4.096 byte cho định dạng v1 sắp ra mắt).
-</Callout>
+</Info>
 
 Một
 [`Transaction`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/transaction/src/lib.rs#L193)
 có hai trường cấp cao nhất:
 
-<WithMentions>
-
-- [`signatures`](mention:signatures): Một mảng các chữ ký
-- [`message`](mention:message): Thông tin giao dịch, bao gồm danh sách các lệnh
+- `signatures`: Một mảng các chữ ký
+- `message`: Thông tin giao dịch, bao gồm danh sách các lệnh
   cần được xử lý
 
-```rust title="Transaction"
+```rust Transaction
 pub struct Transaction {
-    // !mention signatures
     pub signatures: Vec<Signature>,
-    // !mention message
     pub message: Message,
 }
 ```
 
-</WithMentions>
-
-![Sơ đồ hiển thị hai phần của giao dịch](/assets/docs/core/transactions/tx_format.png)
+<Frame caption="Sơ đồ hiển thị hai phần của giao dịch">
+  ![Sơ đồ hiển thị hai phần của giao dịch](/docs-assets/assets/docs/core/transactions/tx_format.png)
+</Frame>
 
 Tổng kích thước sau khi serialize của một giao dịch không được vượt quá
 [`PACKET_DATA_SIZE`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/packet/src/lib.rs#L32)
 (1.232 byte). Giới hạn này bằng 1.280 byte (MTU tối thiểu của IPv6) trừ đi 48
 byte cho tiêu đề mạng (40 byte IPv6 + 8 byte tiêu đề phân mảnh). 1.232 byte bao
-gồm cả mảng [`signatures`](#signatures) và struct [`message`](#message).
+gồm cả mảng [`signatures`](#chữ-ký) và struct [`message`](#thông-điệp).
 
-<Callout type="info" title="Giao dịch v1 nâng giới hạn lên 4.096 byte">
+<Info>
+  **Giao dịch v1 nâng giới hạn lên 4.096 byte**
+
   Trang này mô tả định dạng giao dịch kế thừa (legacy), mà định dạng v0 cũng
   tuân theo ngoại trừ tiền tố phiên bản và bảng tra cứu địa chỉ. Định dạng
   [v1](/docs/core/transactions/versioned-transactions#v1-message-format) sắp ra mắt
   sẽ nâng giới hạn kích thước lên 4.096 byte và sử dụng bố cục wire khác.
-</Callout>
+</Info>
 
-![Sơ đồ hiển thị định dạng giao dịch và giới hạn kích thước](/assets/docs/core/transactions/issues_with_legacy_txs.png)
+<Frame caption="Sơ đồ hiển thị định dạng giao dịch và giới hạn kích thước">
+  ![Sơ đồ hiển thị định dạng giao dịch và giới hạn kích thước](/docs-assets/assets/docs/core/transactions/issues_with_legacy_txs.png)
+</Frame>
 
 ## Chữ ký
 
@@ -66,7 +67,7 @@ Trường `signatures` là một mảng được mã hóa compact của các gi�
 [`Signature`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/signature/src/lib.rs#L34).
 Mỗi `Signature` là một chữ ký Ed25519 64 byte của `Message` đã được serialize,
 được ký bằng khóa riêng của tài khoản người ký. Một chữ ký được yêu cầu cho mỗi
-[tài khoản người ký](#account-addresses) được tham chiếu bởi các lệnh của giao
+[tài khoản người ký](#địa-chỉ-tài-khoản) được tham chiếu bởi các lệnh của giao
 dịch.
 
 Mỗi chữ ký được tạo ra bởi một khóa riêng tư. Khóa đó lưu trữ ở đâu — một
@@ -86,7 +87,7 @@ Yêu cầu đối với người trả phí:
   (được xác thực bởi
   [`validate_fee_payer`](https://github.com/anza-xyz/agave/blob/v3.1.8/svm/src/account_loader.rs#L369-L417)).
 - Phải giữ đủ lamport để trang trải `rent_exempt_minimum + total_fee`; nếu không
-  giao dịch sẽ thất bại với lỗi _rs`InsufficientFundsForFee`_.
+  giao dịch sẽ thất bại với lỗi `InsufficientFundsForFee`.
 
 ## Thông điệp
 
@@ -94,88 +95,77 @@ Trường `message` là một struct
 [`Message`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/message/src/legacy.rs#L161)
 chứa nội dung tải của giao dịch:
 
-<WithMentions>
-
-- [`header`](mention:message-header): [Tiêu đề](#header) của thông điệp
-- [`account_keys`](mention:account-addresses): Một mảng các
-  [địa chỉ tài khoản](#account-addresses) được yêu cầu bởi các lệnh của giao
+- `header`: [Tiêu đề](#tiêu-đề) của thông điệp
+- `account_keys`: Một mảng các
+  [địa chỉ tài khoản](#địa-chỉ-tài-khoản) được yêu cầu bởi các lệnh của giao
   dịch
-- [`recent_blockhash`](mention:recent-blockhash): Một
-  [blockhash](#recent-blockhash) đóng vai trò là dấu thời gian cho giao dịch
-- [`instructions`](mention:instructions): Một mảng các [lệnh](#instructions)
+- `recent_blockhash`: Một
+  [blockhash](#blockhash-gần-đây) đóng vai trò là dấu thời gian cho giao dịch
+- `instructions`: Một mảng các [lệnh](#lệnh-instructions)
 
-```rust title="Message"
+```rust Message
 pub struct Message {
     /// The message header, identifying signed and read-only `account_keys`.
-    // !mention message-header
     pub header: MessageHeader,
 
     /// All the account keys used by this transaction.
     #[serde(with = "short_vec")]
-    // !mention account-addresses
     pub account_keys: Vec<Pubkey>,
 
     /// The id of a recent ledger entry.
-    // !mention recent-blockhash
     pub recent_blockhash: Hash,
 
     /// Programs that will be executed in sequence and committed in
     /// one atomic transaction if all succeed.
     #[serde(with = "short_vec")]
-    // !mention instructions
     pub instructions: Vec<CompiledInstruction>,
 }
 ```
 
-</WithMentions>
-
 ### Tiêu đề
-
-<WithMentions>
 
 Trường `header` là một struct
 [`MessageHeader`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/message/src/lib.rs#L109)
 với ba trường `u8` phân chia mảng `account_keys` thành các nhóm quyền:
 
-- [`num_required_signatures`](mention:num_required_signatures): Tổng số chữ ký
+- `num_required_signatures`: Tổng số chữ ký
   mà giao dịch yêu cầu.
-- [`num_readonly_signed_accounts`](mention:num_readonly_signed_accounts): Số tài
+- `num_readonly_signed_accounts`: Số tài
   khoản đã ký chỉ có quyền đọc.
-- [`num_readonly_unsigned_accounts`](mention:num_readonly_unsigned_accounts): Số
+- `num_readonly_unsigned_accounts`: Số
   tài khoản chưa ký chỉ có quyền đọc.
 
-```rust title="MessageHeader"
+```rust MessageHeader
 pub struct MessageHeader {
     /// The number of signatures required for this message to be considered
     /// valid. The signers of those signatures must match the first
     /// `num_required_signatures` of [`Message::account_keys`].
-    // !mention num_required_signatures
     pub num_required_signatures: u8,
 
     /// The last `num_readonly_signed_accounts` of the signed keys are read-only
     /// accounts.
-    // !mention num_readonly_signed_accounts
     pub num_readonly_signed_accounts: u8,
 
     /// The last `num_readonly_unsigned_accounts` of the unsigned keys are
     /// read-only accounts.
-    // !mention num_readonly_unsigned_accounts
     pub num_readonly_unsigned_accounts: u8,
 }
 ```
 
-</WithMentions>
+<Info>
+  **Tiền tố thông điệp kế thừa và có phiên bản**
 
-<Callout type="info" title="Tiền tố thông điệp kế thừa và có phiên bản">
   Trong thông điệp giao dịch kế thừa, byte đầu tiên của thông điệp là
   `num_required_signatures`, theo sau là hai byte `MessageHeader` còn lại. Trong
   thông điệp giao dịch có phiên bản, byte đầu tiên là tiền tố phiên bản thay thế;
   `MessageHeader` ba byte bắt đầu ngay sau tiền tố đó. Xem
   [giao dịch có phiên bản](/docs/core/transactions/versioned-transactions) để biết
   bố cục thông điệp đầy đủ của v0 và v1.
-</Callout>
+</Info>
 
-![Sơ đồ hiển thị ba phần của tiêu đề thông điệp](/assets/docs/core/transactions/message_header.png)
+<Frame caption="Sơ đồ hiển thị ba phần của tiêu đề thông điệp">
+  ![Sơ đồ hiển thị ba phần của tiêu đề thông điệp](/docs-assets/assets/docs/core/transactions/message_header.png)
+</Frame>
 
 ### Địa chỉ tài khoản
 
@@ -190,14 +180,16 @@ khoản và phải tuân theo thứ tự nghiêm ngặt sau:
 3. Không phải người ký + Có thể ghi
 4. Không phải người ký + Chỉ đọc
 
-<Callout>
+<Note>
   Thứ tự nghiêm ngặt này cho phép mảng `account_keys` được kết hợp với ba số đếm
-  trong [`header`](#header) của thông điệp để xác định quyền cho từng tài khoản
+  trong [`header`](#tiêu-đề) của thông điệp để xác định quyền cho từng tài khoản
   mà không cần lưu trữ cờ siêu dữ liệu theo từng tài khoản. Các số đếm trong
   tiêu đề phân chia mảng thành bốn nhóm quyền được liệt kê ở trên.
-</Callout>
+</Note>
 
-![Sơ đồ hiển thị thứ tự của mảng địa chỉ tài khoản](/assets/docs/core/transactions/compat_array_of_account_addresses.png)
+<Frame caption="Sơ đồ hiển thị thứ tự của mảng địa chỉ tài khoản">
+  ![Sơ đồ hiển thị thứ tự của mảng địa chỉ tài khoản](/docs-assets/assets/docs/core/transactions/compat_array_of_account_addresses.png)
+</Frame>
 
 ### Blockhash gần đây
 
@@ -207,14 +199,14 @@ Trường `recent_blockhash` là một hàm băm 32 byte phục vụ hai mục �
 2. **Loại trùng lặp**: ngăn chặn cùng một giao dịch được xử lý hai lần.
 
 Một blockhash hết hạn sau 150 slot. Nếu blockhash không còn hợp lệ khi giao dịch
-đến, nó sẽ bị từ chối với _rs`BlockhashNotFound`_, trừ khi nó là một
+đến, nó sẽ bị từ chối với `BlockhashNotFound`, trừ khi nó là một
 [giao dịch nonce bền vững](/docs/core/transactions/durable-nonces) hợp lệ.
 
-<Callout>
+<Note>
   Phương thức RPC [`getLatestBlockhash`](/docs/rpc/http/getlatestblockhash) cho
   phép bạn lấy blockhash hiện tại và chiều cao khối cuối cùng mà blockhash sẽ
   còn hợp lệ.
-</Callout>
+</Note>
 
 ### Lệnh (Instructions)
 
@@ -222,37 +214,32 @@ Trường
 [`instructions`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/message/src/legacy.rs#L176)
 là một mảng mã hóa compact gồm các struct
 [`CompiledInstruction`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/message/src/compiled_instruction.rs#L21).
-Mỗi _rs`CompiledInstruction`_ tham chiếu các tài khoản theo chỉ số trong mảng
+Mỗi `CompiledInstruction` tham chiếu các tài khoản theo chỉ số trong mảng
 `account_keys` thay vì dùng public key đầy đủ. Nó bao gồm:
 
-<WithMentions>
-
-1. [`program_id_index`](mention:program-id-index): Chỉ số trong `account_keys`
+1. `program_id_index`: Chỉ số trong `account_keys`
    xác định chương trình cần gọi.
-2. [`accounts`](mention:account-indexes): Mảng các chỉ số trong `account_keys`
+2. `accounts`: Mảng các chỉ số trong `account_keys`
    chỉ định các tài khoản được truyền vào chương trình.
-3. [`data`](mention:instruction-data): Mảng byte chứa bộ phân biệt lệnh và các
+3. `data`: Mảng byte chứa bộ phân biệt lệnh và các
    đối số đã được serialize.
 
-```rust title="CompiledInstruction"
+```rust CompiledInstruction
 pub struct CompiledInstruction {
     /// Index into the transaction keys array indicating the program account that executes this instruction.
-    // !mention program-id-index
     pub program_id_index: u8,
     /// Ordered indices into the transaction keys array indicating which accounts to pass to the program.
     #[serde(with = "short_vec")]
-    // !mention account-indexes
     pub accounts: Vec<u8>,
     /// The program input data.
     #[serde(with = "short_vec")]
-    // !mention instruction-data
     pub data: Vec<u8>,
 }
 ```
 
-</WithMentions>
-
-![Mảng compact các Instructions](/assets/docs/core/transactions/compact_array_of_ixs.png)
+<Frame caption="Mảng compact các Instructions">
+  ![Mảng compact các Instructions](/docs-assets/assets/docs/core/transactions/compact_array_of_ixs.png)
+</Frame>
 
 ## Định dạng nhị phân của giao dịch
 
@@ -263,18 +250,18 @@ giá trị lớn hơn.
 
 **Cấu trúc giao dịch Legacy** (trên đường truyền):
 
-| Trường                     | Kích thước                          | Mô tả                                     |
-| ------------------------- | ----------------------------- | ----------------------------------------------- |
-| `num_signatures`          | 1-3 byte (compact-u16)       | Số lượng chữ ký                            |
-| `signatures`              | `num_signatures` x 64 byte   | Chữ ký Ed25519                              |
-| `num_required_signatures` | 1 byte                        | Trường 1 của `MessageHeader`                         |
-| `num_readonly_signed`     | 1 byte                        | Trường 2 của `MessageHeader`                         |
-| `num_readonly_unsigned`   | 1 byte                        | Trường 3 của `MessageHeader`                         |
-| `num_account_keys`        | 1-3 byte (compact-u16)       | Số lượng khóa tài khoản tĩnh                   |
-| `account_keys`            | `num_account_keys` x 32 byte | Các public key                                     |
-| `recent_blockhash`        | 32 byte                      | Blockhash                                       |
-| `num_instructions`        | 1-3 byte (compact-u16)       | Số lượng lệnh                          |
-| `instructions`            | thay đổi                      | Mảng các [lệnh đã biên dịch](#instructions) |
+| Trường                    | Kích thước                   | Mô tả                                            |
+| ------------------------- | ---------------------------- | ------------------------------------------------ |
+| `num_signatures`          | 1-3 byte (compact-u16)       | Số lượng chữ ký                                  |
+| `signatures`              | `num_signatures` x 64 byte   | Chữ ký Ed25519                                   |
+| `num_required_signatures` | 1 byte                       | Trường 1 của `MessageHeader`                     |
+| `num_readonly_signed`     | 1 byte                       | Trường 2 của `MessageHeader`                     |
+| `num_readonly_unsigned`   | 1 byte                       | Trường 3 của `MessageHeader`                     |
+| `num_account_keys`        | 1-3 byte (compact-u16)       | Số lượng khóa tài khoản tĩnh                     |
+| `account_keys`            | `num_account_keys` x 32 byte | Các public key                                   |
+| `recent_blockhash`        | 32 byte                      | Blockhash                                        |
+| `num_instructions`        | 1-3 byte (compact-u16)       | Số lượng lệnh                                    |
+| `instructions`            | thay đổi                     | Mảng các [lệnh đã biên dịch](#lệnh-instructions) |
 
 Mỗi lệnh đã biên dịch được serialize như sau:
 
@@ -288,7 +275,7 @@ Mỗi lệnh đã biên dịch được serialize như sau:
 
 ### Tính toán kích thước
 
-Cho _rs`PACKET_DATA_SIZE`_ = 1.232 byte, không gian khả dụng có thể được tính
+Cho `PACKET_DATA_SIZE` = 1.232 byte, không gian khả dụng có thể được tính
 như sau:
 
 ```
@@ -316,14 +303,24 @@ phải có quyền ghi, để số dư lamport của chúng có thể thay đổ
 này, ví của người gửi sẽ gửi giao dịch chứa chữ ký và thông điệp bao gồm lệnh
 chuyển SOL.
 
-![Sơ đồ chuyển SOL](/assets/docs/core/transactions/sol-transfer.svg)
+<Frame caption="Sơ đồ chuyển SOL">
+  <img className="block dark:hidden" src="/docs-assets/assets/docs/core/transactions/sol-transfer-light.svg" alt="Sơ đồ chuyển SOL" />
+
+  <img className="hidden dark:block" src="/docs-assets/assets/docs/core/transactions/sol-transfer.svg" alt="Sơ đồ chuyển SOL" />
+</Frame>
 
 Sau khi giao dịch được gửi đi, System Program xử lý lệnh chuyển và cập nhật số
 dư lamport của cả hai tài khoản.
 
-![Sơ đồ quy trình chuyển SOL](/assets/docs/core/transactions/sol-transfer-process.svg)
+<Frame caption="Sơ đồ quy trình chuyển SOL">
+  <img className="block dark:hidden" src="/docs-assets/assets/docs/core/transactions/sol-transfer-process-light.svg" alt="Sơ đồ quy trình chuyển SOL" />
 
-<Callout type="warn" title="Xác minh người nhận trước khi gửi SOL">
+  <img className="hidden dark:block" src="/docs-assets/assets/docs/core/transactions/sol-transfer-process.svg" alt="Sơ đồ quy trình chuyển SOL" />
+</Frame>
+
+<Warning>
+
+**Xác minh người nhận trước khi gửi SOL**
 
 Một lệnh chuyển của System Program sẽ thêm lamport vào **bất kỳ** tài khoản nào.
 Không có kiểm tra ở cấp độ giao thức để đảm bảo người nhận có thể chuyển SOL ra
@@ -342,15 +339,15 @@ người nhận trước khi ký. Xem
 [Xác minh địa chỉ](/docs/payments/send-payments/verify-address) để biết logic
 phân loại đầy đủ.
 
-</Callout>
+</Warning>
 
 Ví dụ dưới đây hiển thị mã liên quan đến các sơ đồ trên. Xem
 [hàm `transfer`](https://github.com/anza-xyz/agave/blob/v3.1.8/programs/system/src/system_processor.rs#L210)
 của System Program.
 
-<CodeTabs storage="sol-transfer" flags="r">
+<CodeGroup>
 
-```ts !! title="Kit"
+```ts Kit highlight={32-37}
 import { createClient, generateKeyPairSigner, lamports } from "@solana/kit";
 import { solanaRpc, rpcAirdrop } from "@solana/kit-plugin-rpc";
 import { generatedPayer, airdropPayer } from "@solana/kit-plugin-signer";
@@ -382,7 +379,6 @@ const { value: preBalance2 } = await client.rpc
   .getBalance(recipient.address)
   .send();
 
-// !mark(1:6)
 // Create a transfer instruction for transferring SOL from sender to recipient
 const transferInstruction = client.system.instructions.transferSol({
   source: sender,
@@ -421,7 +417,7 @@ console.log(
 console.log("Transaction Signature:", transactionSignature.context.signature);
 ```
 
-```ts !! title="Legacy"
+```ts Legacy highlight={31-36}
 import {
   LAMPORTS_PER_SOL,
   SystemProgram,
@@ -452,7 +448,6 @@ const preBalance2 = await connection.getBalance(recipient.publicKey);
 // Define the amount to transfer
 const transferAmount = 0.01; // 0.01 SOL
 
-// !mark(1:6)
 // Create a transfer instruction for transferring SOL from sender to recipient
 const transferInstruction = SystemProgram.transfer({
   fromPubkey: sender.publicKey,
@@ -481,7 +476,7 @@ console.log("Recipient postbalance:", postBalance2 / LAMPORTS_PER_SOL);
 console.log("Transaction Signature:", transactionSignature);
 ```
 
-```rs !! title="Rust"
+```rs Rust
 use anyhow::Result;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_commitment_config::CommitmentConfig;
@@ -561,14 +556,14 @@ async fn main() -> Result<()> {
 }
 ```
 
-</CodeTabs>
+</CodeGroup>
 
 Ví dụ dưới đây hiển thị cấu trúc của một giao dịch chứa một lệnh chuyển SOL duy
 nhất.
 
-<CodeTabs storage="sol-transfer" flags="r">
+<CodeGroup>
 
-```ts !! title="Kit"
+```ts Kit
 import {
   createClient,
   generateKeyPairSigner,
@@ -631,7 +626,7 @@ const compiledTransactionMessage =
 console.log(JSON.stringify(compiledTransactionMessage, null, 2));
 ```
 
-```ts !! title="Legacy"
+```ts Legacy
 import {
   LAMPORTS_PER_SOL,
   SystemProgram,
@@ -669,7 +664,7 @@ const compiledMessage = transaction.compileMessage();
 console.log(JSON.stringify(compiledMessage, null, 2));
 ```
 
-```rs !! title="Rust"
+```rs Rust
 use anyhow::Result;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_commitment_config::CommitmentConfig;
@@ -710,33 +705,28 @@ async fn main() -> Result<()> {
 }
 ```
 
-</CodeTabs>
+</CodeGroup>
 
-<WithMentions>
 Đoạn mã bên dưới hiển thị đầu ra từ các đoạn mã trước.
 Định dạng khác nhau giữa các SDK,
 nhưng lưu ý rằng mỗi lệnh đều chứa cùng thông tin bắt buộc.
 
-<CodeTabs storage="sol-transfer">
+<CodeGroup>
 
-```json !! title="Kit"
+```json Kit
 {
   "version": 0,
-  // !mention header
   "header": {
     "numSignerAccounts": 1,
     "numReadonlySignerAccounts": 0,
     "numReadonlyNonSignerAccounts": 1
   },
-  // !mention account_keys
   "staticAccounts": [
     "HoCy8p5xxDDYTYWEbQZasEjVNM5rxvidx8AfyqA4ywBa",
     "5T388jBjovy7d8mQ3emHxMDTbUF8b7nWvAnSiP3EAdFL",
     "11111111111111111111111111111111"
   ],
-  // !mention recent_blockhash
   "lifetimeToken": "EGCWPUEXhqHJWYBfDirq3mHZb4qDpATmYqBZMBy9TBC1",
-  // !mention instructions
   "instructions": [
     {
       "programAddressIndex": 2,
@@ -760,22 +750,19 @@ nhưng lưu ý rằng mỗi lệnh đều chứa cùng thông tin bắt buộc.
 }
 ```
 
-```json !! title="Legacy"
+```json Legacy
 {
-  // !mention header
   "header": {
     "numRequiredSignatures": 1,
     "numReadonlySignedAccounts": 0,
     "numReadonlyUnsignedAccounts": 1
   },
-  // !mention account_keys
   "accountKeys": [
     "EPLUagqZZAuAtJ5LSbK7eeXjqeTdesd4q8WhoqVrfG3g",
     "9Txf5pi5jzm7FydFAsQafk7xn5wY9yN2UNm5LW15qvcK",
     "11111111111111111111111111111111"
   ],
   "recentBlockhash": "2qYPgehzMKXcMt4Ku1tKAk9DACKUbtYEY9EUEN42cseT",
-  // !mention instructions
   "instructions": [
     {
       "programIdIndex": 2,
@@ -787,13 +774,12 @@ nhưng lưu ý rằng mỗi lệnh đều chứa cùng thông tin bắt buộc.
 }
 ```
 
-```json !! title="Rust"
+```json Rust
 {
   "signatures": [
     "2fPXZtQGWWj6suxfc55FBQiexS8hEhNELqasSL5DRYa1RB1GChHz86Cyy8ukiVwA6qbq91P4cY1FuvTuYtmTHmJP"
   ],
   "message": {
-    // !mention header
     "header": {
       "num_required_signatures": 1,
       "num_readonly_signed_accounts": 0,
@@ -805,7 +791,6 @@ nhưng lưu ý rằng mỗi lệnh đều chứa cùng thông tin bắt buộc.
       "11111111111111111111111111111111"
     ],
     "recent_blockhash": "3P7CVQ9nwXx4B37MvBzghzbcM9K9p5xo7ivDE8W78dCi",
-    // !mention instructions
     "instructions": [
       {
         "program_id_index": 2,
@@ -817,8 +802,7 @@ nhưng lưu ý rằng mỗi lệnh đều chứa cùng thông tin bắt buộc.
 }
 ```
 
-</CodeTabs>
-</WithMentions>
+</CodeGroup>
 
 ### Xác minh người nhận trước khi chuyển
 
@@ -828,9 +812,7 @@ trước khi ký. Tải tài khoản và chỉ gửi đến ví System Program (
 chưa được cấp vốn); từ chối các mint, token account, chương trình và PDA mà bạn
 không kiểm soát.
 
-<CodeTabs flags="r">
-
-```ts !! title="Kit"
+```ts Kit
 import {
   type Address,
   createSolanaRpc,
@@ -880,23 +862,21 @@ await assertSafeSolRecipient(
 );
 ```
 
-</CodeTabs>
-
-<Callout>
+<Note>
   Đoạn mã này kiểm tra người nhận SOL gốc. Để xem toàn bộ phân loại cũng xử lý
   việc gửi SPL token (token account, ATA, Token-2022), xem [Xác minh Địa
   chỉ](/docs/payments/send-payments/verify-address).
-</Callout>
+</Note>
 
 ## Lấy thông tin chi tiết giao dịch
 
 Sau khi gửi, hãy truy xuất thông tin chi tiết giao dịch bằng chữ ký giao dịch và
 phương thức RPC [getTransaction](/docs/rpc/http/gettransaction).
 
-<Callout>
+<Note>
   Bạn cũng có thể tìm giao dịch bằng [Solana
   Explorer](https://explorer.solana.com).
-</Callout>
+</Note>
 
 ```json title="Transaction Data"
 {

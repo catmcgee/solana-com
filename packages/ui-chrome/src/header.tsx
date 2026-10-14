@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
+import { languages } from "@workspace/i18n/config";
 import { useTheme } from "./theme-provider";
 import { usePathname } from "@workspace/i18n/routing";
 import { Link } from "./link";
@@ -15,6 +16,71 @@ import { shouldShowDevelopersNav } from "./developer-routes";
 import SolanaLogo from "./assets/logotype.inline.svg";
 import Moon from "./assets/icons/moon.inline.svg";
 import Sun from "./assets/icons/sun.inline.svg";
+
+const NOSCRIPT_LINKS = [
+  { href: "/developers", labelKey: "nav.build.start.items.hub.title" },
+  { href: "/docs", labelKey: "nav.build.start.items.docs.title" },
+  {
+    href: "/developers/cookbook",
+    labelKey: "nav.build.resources.items.cookbook.title",
+  },
+  { href: "/developers/bootcamp", labelKey: "developers.nav.bootcamp" },
+  { href: "/learn", labelKey: "nav.useSolana.wallets.items.learn.title" },
+] as const;
+
+function withLocale(locale: string, path: string) {
+  if (locale === "en") return path;
+  return path === "/" ? `/${locale}` : `/${locale}${path}`;
+}
+
+/**
+ * Plain-link fallback for readers without JavaScript: the dropdown menus and
+ * the language selector need JS, so this lists the developer destinations and
+ * every language for the current page. React renders <noscript> children only
+ * in the server HTML, so JS users never see or hydrate it.
+ */
+function NoScriptNav({ pathname }: { pathname: string }) {
+  const t = useTranslations();
+  const locale = useLocale();
+  const linkClass = "text-white/80 underline-offset-4 hover:text-white";
+
+  return (
+    <noscript>
+      <nav
+        aria-label="Site"
+        className="border-b border-white/10 bg-black px-4 py-2 text-sm sm:px-5 xl:px-6"
+      >
+        <ul className="m-0 flex list-none flex-wrap gap-x-5 gap-y-1 p-0">
+          {NOSCRIPT_LINKS.map((link) => (
+            <li key={link.href}>
+              <a href={withLocale(locale, link.href)} className={linkClass}>
+                {t(link.labelKey)}
+              </a>
+            </li>
+          ))}
+        </ul>
+        <ul
+          aria-label="Languages"
+          className="m-0 mt-1 flex list-none flex-wrap gap-x-3 gap-y-1 p-0 text-xs"
+        >
+          {Object.entries(languages).map(([code, name]) => (
+            <li key={code}>
+              <a
+                href={withLocale(code, pathname || "/")}
+                hrefLang={code}
+                lang={code}
+                aria-current={code === locale ? "true" : undefined}
+                className={linkClass}
+              >
+                {name}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </nav>
+    </noscript>
+  );
+}
 
 function Header({
   className = "",
@@ -89,6 +155,7 @@ function Header({
             </div>
           </div>
         </nav>
+        <NoScriptNav pathname={pathname} />
       </header>
       {/* Secondary nav for docs-owned developer routes. */}
       {showDevelopersNav && showSecondaryDevelopersNav && (

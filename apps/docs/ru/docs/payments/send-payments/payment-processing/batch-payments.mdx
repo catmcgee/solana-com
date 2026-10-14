@@ -17,7 +17,9 @@ description: Узнайте, как отправлять платежи неск
 «дропами») объединяются в одну транзакцию, а для обработки большого количества
 платежей отправляется несколько транзакций.
 
-![Диаграмма пакетных платежей](/assets/docs/payments/qn-bulk-send.png)
+<Frame caption="Диаграмма пакетных платежей">
+  ![Диаграмма пакетных платежей](/docs-assets/assets/docs/payments/qn-bulk-send.png)
+</Frame>
 
 _Источник:
 [QuickNode — Как отправлять массовые транзакции в Solana](https://www.quicknode.com/guides/solana-development/transactions/how-to-send-bulk-transactions-on-solana)_
@@ -35,203 +37,188 @@ _Источник:
 выполняются одновременно. Если какой-либо перевод не удастся, вся транзакция
 будет отклонена.
 
-<Callout>
+<Note>
   См. раздел [Как работают платежи в Solana](/docs/payments/how-payments-work)
   для ознакомления с основными понятиями.
-</Callout>
+</Note>
 
 Для объединения нескольких переводов необходимо создать каждую инструкцию
 отдельно, а затем собрать их в одну транзакцию.
 
 Далее приведены основные этапы процесса. Полный рабочий код смотрите в разделе
-[Демо](#demo).
+[Демо](#демонстрация).
 
-<ScrollyCoding>
+<Steps>
+  <Step title="Получение адресов token account">
+    Сначала получите адреса Associated Token Account (ATA) для отправителя и каждого
+    получателя. ATA — это детерминированные адреса, основанные на кошельке и mint.
 
-## !!steps Получение адресов token account
+    ```ts title="Batch Payments"
+    const [senderAta] = await findAssociatedTokenPda({
+      mint: mint.address,
+      owner: sender.address,
+      tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
+    });
 
-Сначала получите адреса Associated Token Account (ATA) для отправителя и каждого
-получателя. ATA — это детерминированные адреса, основанные на кошельке и mint.
+    const [recipient1Ata] = await findAssociatedTokenPda({
+      mint: mint.address,
+      owner: recipient1.address,
+      tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
+    });
 
-<CodePlaceholder title="Batch Payments" />
+    const [recipient2Ata] = await findAssociatedTokenPda({
+      mint: mint.address,
+      owner: recipient2.address,
+      tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
+    });
+    ```
+  </Step>
 
-```ts !! title="Batch Payments"
-const [senderAta] = await findAssociatedTokenPda({
-  mint: mint.address,
-  owner: sender.address,
-  tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
-});
+  <Step title="Создание инструкций для перевода">
+    Создайте отдельную инструкцию перевода для каждого получателя. В каждой
+    инструкции указываются:
 
-const [recipient1Ata] = await findAssociatedTokenPda({
-  mint: mint.address,
-  owner: recipient1.address,
-  tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
-});
+    - адрес исходного token account
+    - адрес целевого token account
+    - authority (адрес владельца исходного token account)
+    - сумма в базовых единицах (с учётом знаков после запятой у mint)
 
-const [recipient2Ata] = await findAssociatedTokenPda({
-  mint: mint.address,
-  owner: recipient2.address,
-  tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
-});
-```
+    ```ts title="Batch Payments" focus={19-30}
+    const [senderAta] = await findAssociatedTokenPda({
+      mint: mint.address,
+      owner: sender.address,
+      tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
+    });
 
-## !!steps Создание инструкций для перевода
+    const [recipient1Ata] = await findAssociatedTokenPda({
+      mint: mint.address,
+      owner: recipient1.address,
+      tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
+    });
 
-Создайте отдельную инструкцию перевода для каждого получателя. В каждой
-инструкции указываются:
+    const [recipient2Ata] = await findAssociatedTokenPda({
+      mint: mint.address,
+      owner: recipient2.address,
+      tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
+    });
 
-- адрес исходного token account
-- адрес целевого token account
-- authority (адрес владельца исходного token account)
-- сумма в базовых единицах (с учётом знаков после запятой у mint)
+    const transfer1Instruction = getTransferInstruction({
+      source: senderAta,
+      destination: recipient1Ata,
+      authority: sender.address,
+      amount: 250_000n
+    });
 
-<CodePlaceholder title="Batch Payments" />
+    const transfer2Instruction = getTransferInstruction({
+      source: senderAta,
+      destination: recipient2Ata,
+      authority: sender.address,
+      amount: 250_000n
+    });
+    ```
+  </Step>
 
-```ts !! title="Batch Payments"
-const [senderAta] = await findAssociatedTokenPda({
-  mint: mint.address,
-  owner: sender.address,
-  tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
-});
+  <Step title="Отправка одной транзакцией">
+    Добавьте все инструкции перевода в одну транзакцию. Это позволит выполнить все
+    переводы атомарно: либо все переводы проходят успешно, либо вся транзакция
+    откатывается.
 
-const [recipient1Ata] = await findAssociatedTokenPda({
-  mint: mint.address,
-  owner: recipient1.address,
-  tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
-});
+    ```ts title="Batch Payments" highlight={34-35} focus={33-36}
+    const [senderAta] = await findAssociatedTokenPda({
+      mint: mint.address,
+      owner: sender.address,
+      tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
+    });
 
-const [recipient2Ata] = await findAssociatedTokenPda({
-  mint: mint.address,
-  owner: recipient2.address,
-  tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
-});
+    const [recipient1Ata] = await findAssociatedTokenPda({
+      mint: mint.address,
+      owner: recipient1.address,
+      tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
+    });
 
-// !focus(1:12)
-const transfer1Instruction = getTransferInstruction({
-  source: senderAta,
-  destination: recipient1Ata,
-  authority: sender.address,
-  amount: 250_000n
-});
+    const [recipient2Ata] = await findAssociatedTokenPda({
+      mint: mint.address,
+      owner: recipient2.address,
+      tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
+    });
 
-const transfer2Instruction = getTransferInstruction({
-  source: senderAta,
-  destination: recipient2Ata,
-  authority: sender.address,
-  amount: 250_000n
-});
-```
+    const transfer1Instruction = getTransferInstruction({
+      source: senderAta,
+      destination: recipient1Ata,
+      authority: sender.address,
+      amount: 250_000n
+    });
 
-## !!steps Отправка одной транзакцией
+    const transfer2Instruction = getTransferInstruction({
+      source: senderAta,
+      destination: recipient2Ata,
+      authority: sender.address,
+      amount: 250_000n
+    });
 
-Добавьте все инструкции перевода в одну транзакцию. Это позволит выполнить все
-переводы атомарно: либо все переводы проходят успешно, либо вся транзакция
-откатывается.
+    const result = await client.sendTransaction([
+      transfer1Instruction,
+      transfer2Instruction
+    ]);
+    ```
+  </Step>
 
-```ts !! title="Batch Payments"
-const [senderAta] = await findAssociatedTokenPda({
-  mint: mint.address,
-  owner: sender.address,
-  tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
-});
+  <Step title="Проверка балансов">
+    После пакетного перевода проверьте балансы токенов для всех сторон, получив
+    каждый token account через RPC-соединение клиента.
 
-const [recipient1Ata] = await findAssociatedTokenPda({
-  mint: mint.address,
-  owner: recipient1.address,
-  tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
-});
+    ```ts title="Batch Payments" focus={38-44} expandable
+    const [senderAta] = await findAssociatedTokenPda({
+      mint: mint.address,
+      owner: sender.address,
+      tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
+    });
 
-const [recipient2Ata] = await findAssociatedTokenPda({
-  mint: mint.address,
-  owner: recipient2.address,
-  tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
-});
+    const [recipient1Ata] = await findAssociatedTokenPda({
+      mint: mint.address,
+      owner: recipient1.address,
+      tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
+    });
 
-const transfer1Instruction = getTransferInstruction({
-  source: senderAta,
-  destination: recipient1Ata,
-  authority: sender.address,
-  amount: 250_000n
-});
+    const [recipient2Ata] = await findAssociatedTokenPda({
+      mint: mint.address,
+      owner: recipient2.address,
+      tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
+    });
 
-const transfer2Instruction = getTransferInstruction({
-  source: senderAta,
-  destination: recipient2Ata,
-  authority: sender.address,
-  amount: 250_000n
-});
+    const transfer1Instruction = getTransferInstruction({
+      source: senderAta,
+      destination: recipient1Ata,
+      authority: sender.address,
+      amount: 250_000n
+    });
 
-// !focus(1:4)
-const result = await client.sendTransaction([
-  // !mark(1:2)
-  transfer1Instruction,
-  transfer2Instruction
-]);
-```
+    const transfer2Instruction = getTransferInstruction({
+      source: senderAta,
+      destination: recipient2Ata,
+      authority: sender.address,
+      amount: 250_000n
+    });
 
-## !!steps Проверка балансов
+    const result = await client.sendTransaction([
+      transfer1Instruction,
+      transfer2Instruction
+    ]);
 
-После пакетного перевода проверьте балансы токенов для всех сторон, получив
-каждый token account через RPC-соединение клиента.
-
-<CodePlaceholder title="Batch Payments" />
-
-```ts !! title="Batch Payments"
-const [senderAta] = await findAssociatedTokenPda({
-  mint: mint.address,
-  owner: sender.address,
-  tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
-});
-
-const [recipient1Ata] = await findAssociatedTokenPda({
-  mint: mint.address,
-  owner: recipient1.address,
-  tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
-});
-
-const [recipient2Ata] = await findAssociatedTokenPda({
-  mint: mint.address,
-  owner: recipient2.address,
-  tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
-});
-
-const transfer1Instruction = getTransferInstruction({
-  source: senderAta,
-  destination: recipient1Ata,
-  authority: sender.address,
-  amount: 250_000n
-});
-
-const transfer2Instruction = getTransferInstruction({
-  source: senderAta,
-  destination: recipient2Ata,
-  authority: sender.address,
-  amount: 250_000n
-});
-
-const result = await client.sendTransaction([
-  transfer1Instruction,
-  transfer2Instruction
-]);
-
-// !focus(1:7)
-const senderBalance = await client.rpc.getTokenAccountBalance(senderAta).send();
-const recipient1Balance = await client.rpc
-  .getTokenAccountBalance(recipient1Ata)
-  .send();
-const recipient2Balance = await client.rpc
-  .getTokenAccountBalance(recipient2Ata)
-  .send();
-```
-
-</ScrollyCoding>
+    const senderBalance = await client.rpc.getTokenAccountBalance(senderAta).send();
+    const recipient1Balance = await client.rpc
+      .getTokenAccountBalance(recipient1Ata)
+      .send();
+    const recipient2Balance = await client.rpc
+      .getTokenAccountBalance(recipient2Ata)
+      .send();
+    ```
+  </Step>
+</Steps>
 
 ### Демонстрация
 
-<CodeTabs flags="r">
-
-```ts !! title="Demo"
-// !collapse(1:16) collapsed
+```ts Demo highlight={32-36,38-42,44-48,60-65,67-72,76-77} expandable
 // Click ">" icon on left to expand demo imports
 import { createClient, generateKeyPairSigner, lamports } from "@solana/kit";
 import type { KeyPairSigner } from "@solana/kit";
@@ -263,21 +250,18 @@ const { client, mint } = await demoSetup(sender, recipient1, recipient2);
 console.log("\nMint Address:", mint.address);
 
 // Derive the Associated Token Accounts addresses (ATAs) for sender and recipients
-// !mark(1:5)
 const [senderAta] = await findAssociatedTokenPda({
   mint: mint.address,
   owner: sender.address,
   tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
 });
 
-// !mark(1:5)
 const [recipient1Ata] = await findAssociatedTokenPda({
   mint: mint.address,
   owner: recipient1.address,
   tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
 });
 
-// !mark(1:5)
 const [recipient2Ata] = await findAssociatedTokenPda({
   mint: mint.address,
   owner: recipient2.address,
@@ -294,7 +278,6 @@ console.log("Recipient 2 Token Account:", recipient2Ata.toString());
 
 // Create instructions to transfer tokens from sender to both recipients
 // Transferring 250,000 base units = 0.25 tokens (with 6 decimals) to each
-// !mark(1:6)
 const transfer1Instruction = getTransferInstruction({
   source: senderAta,
   destination: recipient1Ata,
@@ -302,7 +285,6 @@ const transfer1Instruction = getTransferInstruction({
   amount: 250_000n // 0.25 tokens
 });
 
-// !mark(1:6)
 const transfer2Instruction = getTransferInstruction({
   source: senderAta,
   destination: recipient2Ata,
@@ -312,7 +294,6 @@ const transfer2Instruction = getTransferInstruction({
 
 // Send both transfers in a single transaction using @solana/kit
 const result = await client.sendTransaction([
-  // !mark(1:2)
   transfer1Instruction,
   transfer2Instruction
 ]);
@@ -345,7 +326,6 @@ console.log(
 // =============================================================================
 // Demo Setup Helper Function
 // =============================================================================
-// !collapse(1:1000) collapsed
 
 /**
  * Sets up for a batch token transfer demo:
@@ -460,8 +440,6 @@ async function demoSetup(
   };
 }
 ```
-
-</CodeTabs>
 
 ## Масштабирование с помощью планирования транзакций
 

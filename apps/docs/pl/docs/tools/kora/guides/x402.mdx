@@ -10,7 +10,7 @@ Ten przewodnik uruchamia referencyjny fasiliatator Kora w sieci Solana Devnet. J
 
 ## Architektura
 
-```mermaid title="x402 with Kora"
+```mermaid
 sequenceDiagram
     participant Client
     participant API as Resource server
@@ -34,6 +34,34 @@ sequenceDiagram
     API-->>Client: 200 + resource + PAYMENT-RESPONSE
 ```
 
+<div className="nojs-only" data-fallback="mermaid">
+  ```text Mermaid
+  sequenceDiagram
+      participant Client
+      participant API as Resource server
+      participant Facilitator
+      participant Kora
+      participant Solana
+      Client->>API: GET /protected
+      API-->>Client: 402 + PAYMENT-REQUIRED
+      Client->>API: GET /protected + PAYMENT-SIGNATURE
+      API->>Facilitator: POST /verify
+      Facilitator->>Kora: signTransaction
+      Kora->>Kora: Enforce transaction policy
+      Kora-->>Facilitator: Validated transaction
+      Facilitator-->>API: Payment is valid
+      API->>Facilitator: POST /settle
+      Facilitator->>Kora: signAndSendTransaction
+      Kora->>Solana: Sign as fee payer and submit
+      Solana-->>Kora: Transaction signature
+      Kora-->>Facilitator: Transaction signature
+      Facilitator-->>API: Settlement result
+      API-->>Client: 200 + resource + PAYMENT-RESPONSE
+  ```
+</div>
+
+<p className="sol-caption">x402 with Kora</p>
+
 Cztery role aplikacji pozostają oddzielne:
 
 - **Klient** wybiera wymaganie płatnicze i podpisuje autoryzację płatności.
@@ -55,9 +83,11 @@ cp .env.example .env
 
 Ustaw `KORA_PRIVATE_KEY` w pliku `.env` na jednorazowy keypair Devnet. Konfiguracja sygnatariusza demo akceptuje sekret w formacie base58, keypair w postaci tablicy bajtów lub ścieżkę do pliku keypair JSON. Zasilij jego publiczny adres SOL z Devnet, aby mógł sponsorować opłaty transakcyjne.
 
-<Callout type="caution" title="Używaj jednorazowego sygnatariusza Devnet">
+<Danger>
+  **Używaj jednorazowego sygnatariusza Devnet**
+
   Demo Docker ładuje sygnatariusza Kora ze zmiennej środowiskowej. Nie umieszczaj produkcyjnego klucza podpisującego w tym demo ani nie commituj pliku `.env`.
-</Callout>
+</Danger>
 
 Uruchom Kora i fasiliatator:
 

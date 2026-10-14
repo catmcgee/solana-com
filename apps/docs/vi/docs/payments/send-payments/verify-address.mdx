@@ -17,12 +17,12 @@ Việc xác thực phụ thuộc vào những gì bạn gửi:
   cập đến việc gửi token SPL.
 - **SOL gốc** không có biện pháp bảo vệ như vậy. Giao dịch chuyển tiền qua
   System Program thành công vào bất kỳ tài khoản nào, vì vậy một người nhận
-  không đúng sẽ khóa vĩnh viễn SOL đó. Xem [Gửi SOL gốc](#sending-native-sol).
+  không đúng sẽ khóa vĩnh viễn SOL đó. Xem [Gửi SOL gốc](#gửi-sol-gốc).
 
-<Callout>
+<Note>
   Xem [Cách Thanh Toán Hoạt Động trên Solana](/docs/payments/how-payments-work)
   để hiểu các khái niệm thanh toán cơ bản.
-</Callout>
+</Note>
 
 ## Hiểu về Địa Chỉ Solana
 
@@ -53,12 +53,12 @@ xuyên suốt.
 Sử dụng địa chỉ để truy xuất một [tài khoản](/docs/core/accounts) từ mạng, kiểm
 tra chủ sở hữu chương trình và loại tài khoản để xác định cách xử lý địa chỉ đó.
 
-<Callout>
+<Note>
   Biết một địa chỉ nằm trên đường cong hay ngoài đường cong không cho bạn biết
   loại tài khoản đó là gì, chương trình nào sở hữu nó, hay liệu tài khoản có tồn
   tại tại địa chỉ đó hay không. Bạn phải truy xuất tài khoản từ mạng để xác định
   các chi tiết này.
-</Callout>
+</Note>
 
 ### Tài Khoản System Program (Ví)
 
@@ -77,11 +77,11 @@ Tài khoản hệ thống có thể tồn tại off-curve. Nếu người dùng 
 một địa chỉ off-curve, bạn nên nhắc người dùng xác nhận rằng họ có ý định
 gửi tiền đến một smart wallet.
 
-<Callout type="warn">
+<Warning>
   Nếu không có các biện pháp bảo vệ, việc trợ cấp tạo ATA có thể bị lợi dụng.
   Một người dùng độc hại có thể yêu cầu chuyển tiền, để ATA của họ được tạo với
   chi phí của bạn, đóng ATA để lấy lại rent SOL, rồi lặp lại.
-</Callout>
+</Warning>
 
 ### Token Accounts
 
@@ -91,11 +91,11 @@ nhận được thuộc sở hữu của một token program, bạn nên xác mi
 là một token account (không phải mint account) và khớp với mint account token dự
 kiến trước khi gửi.
 
-<Callout type="info">
+<Info>
   Các Token Programs tự động xác thực rằng cả hai token account trong một lần
   chuyển đều chứa token của cùng một mint. Nếu xác thực thất bại, giao dịch sẽ
   bị từ chối và không có khoản tiền nào bị mất.
-</Callout>
+</Info>
 
 ### Mint Accounts
 
@@ -129,18 +129,18 @@ Khi gửi SOL gốc, chỉ kết quả `IS_WALLET` mới được chấp nhận.
 thì **không**: một token account chứa token SPL, và SOL được gửi đến đó nằm
 ngoài tầm kiểm soát của người gửi.
 
-<Callout type="warn">
+<Warning>
   Đây là cách phổ biến khiến SOL bị mất: người dùng dán địa chỉ mint của token
   (hoặc địa chỉ chương trình) vào lệnh rút SOL. Lệnh chuyển thành công và SOL
   không thể thu hồi được. Luôn phân loại người nhận trước khi ký một lệnh chuyển
   SOL.
-</Callout>
+</Warning>
 
 ## Luồng Xác Minh
 
 Sơ đồ sau đây hiển thị một cây quyết định tham chiếu để xác thực một địa chỉ:
 
-```mermaid title="Address Verification Flow"
+```mermaid
 flowchart TD
     A["Input address"]
     B["Fetch account info"]
@@ -169,17 +169,46 @@ flowchart TD
     K -- "No" --> V2["VERIFY: Confirm the recipient intends to use a smart wallet"]
 ```
 
-<Steps>
-<Step>
+<div className="nojs-only" data-fallback="mermaid">
+  ```text Mermaid
+  flowchart TD
+      A["Input address"]
+      B["Fetch account info"]
 
-### Lấy Thông Tin Tài Khoản
+      A --> B
+      B --> C{"Account exists onchain?"}
+
+      %% --- Non-existent account path ---
+      C -- "No" --> D{"Is address off-curve (PDA)?"}
+      D -- "Yes" --> V1["VERIFY: Confirm the recipient intends to use a smart wallet"]
+      D -- "No" --> W1["IS_WALLET: Valid unfunded public key address"]
+
+      %% --- Existing account path ---
+      C -- "Yes" --> F{"Check program owner"}
+
+      F -- "Token Program / Token-2022" --> G{"Is token account for expected mint?"}
+      G -- "Yes" --> T1["IS_TOKEN_ACCOUNT: Send directly"]
+      G -- "No" --> R1["REJECT: Wrong account type or mint"]
+
+      F -- "System Program" --> H{"Is address off-curve?"}
+      H -- "No" --> W2["IS_WALLET: Derive ATA and send"]
+      H -- "Yes" --> V3["VERIFY: Confirm the recipient intends to use a smart wallet"]
+
+      F -- "Other Program" --> K{"Allowed by policy?"}
+      K -- "Yes" --> W3["IS_WALLET: Derive ATA and send"]
+      K -- "No" --> V2["VERIFY: Confirm the recipient intends to use a smart wallet"]
+  ```
+</div>
+
+<p className="sol-caption">Address Verification Flow</p>
+
+<Steps titleSize="h3">
+<Step title="Lấy Thông Tin Tài Khoản">
 
 Sử dụng địa chỉ để lấy thông tin chi tiết của tài khoản từ mạng.
 
 </Step>
-<Step>
-
-### Tài khoản không tồn tại
+<Step title="Tài khoản không tồn tại">
 
 Nếu không có tài khoản nào tồn tại tại địa chỉ này, hãy kiểm tra xem địa chỉ đó là on-curve hay
 off-curve:
@@ -195,9 +224,7 @@ off-curve:
   chưa tồn tại hay không.
 
 </Step>
-<Step>
-
-### Tài khoản tồn tại
+<Step title="Tài khoản tồn tại">
 
 Nếu một tài khoản tồn tại, hãy kiểm tra chương trình nào sở hữu nó:
 
@@ -229,12 +256,12 @@ Nếu một tài khoản tồn tại, hãy kiểm tra chương trình nào sở 
 Ví dụ sau đây chỉ hiển thị logic xác thực địa chỉ. Đây là mã tham khảo dùng cho
 mục đích minh họa.
 
-<Callout>
+<Note>
   Demo không hướng dẫn cách dẫn xuất ATA hoặc xây dựng giao dịch để gửi token.
   Tham khảo tài liệu về [token
   account](/docs/tokens/basics/create-token-account#how-to-create-an-associated-token-account)
   và [chuyển token](/docs/tokens/basics/transfer-tokens) để xem mã ví dụ.
-</Callout>
+</Note>
 
 Demo dưới đây sử dụng ba kết quả có thể xảy ra:
 
@@ -252,10 +279,7 @@ nên yêu cầu người dùng xác nhận ý định của họ trước khi g�
 account trả về `IS_TOKEN_ACCOUNT`, vì vậy nó có thể nhận SPL token nhưng **không**
 nhận SOL gốc — sự phân biệt giúp ngăn SOL bị khóa.
 
-<CodeTabs flags="r">
-
-```ts !! title="Demo"
-// !collapse(1:35) collapsed
+```ts Demo expandable
 
 import {
   type Address,
@@ -385,7 +409,6 @@ function canReceiveSplToken(result: ValidationResult): boolean {
 // =============================================================================
 // Examples
 // =============================================================================
-// !collapse(1:1000) collapsed
 
 // Wallets
 const EXISTING_WALLET =
@@ -460,5 +483,3 @@ console.log("\n" + "═".repeat(60));
 console.log("  Done!");
 console.log("═".repeat(60) + "\n");
 ```
-
-</CodeTabs>

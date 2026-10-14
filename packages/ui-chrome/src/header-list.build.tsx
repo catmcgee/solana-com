@@ -11,6 +11,7 @@ import {
   SectionHeading,
 } from "./nav-section-renderers";
 import {
+  buildJobItems,
   buildResourceItems,
   buildStartItems,
   buildUseCaseItems,
@@ -22,16 +23,19 @@ const HeaderListBuild = () => {
   return (
     <HeaderDropdownLayout>
       <NavDropdownColumn width="primary">
-        <SectionHeading title={t("nav.build.start.title")} />
-        <NavItemsList items={buildStartItems} />
+        <SectionHeading title={t("nav.build.jobs.title")} />
+        <NavItemsList items={buildJobItems} />
+      </NavDropdownColumn>
+      <NavDropdownColumn>
+        <NavGroup title={t("nav.build.start.title")}>
+          <NavItemsList items={buildStartItems} />
+        </NavGroup>
       </NavDropdownColumn>
       <NavDropdownColumn>
         <NavGroup title={t("nav.build.resources.title")}>
           <NavItemsList items={buildResourceItems} />
         </NavGroup>
-      </NavDropdownColumn>
-      <NavDropdownColumn>
-        <NavGroup title={t("nav.build.useCases.title")}>
+        <NavGroup title={t("nav.build.useCases.title")} className="mt-4">
           <NavItemsList items={buildUseCaseItems} />
         </NavGroup>
       </NavDropdownColumn>

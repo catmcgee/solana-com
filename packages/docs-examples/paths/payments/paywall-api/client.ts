@@ -1,0 +1,92 @@
+// #region client
+import {
+  address,
+  appendTransactionMessageInstructions,
+  createTransactionMessage,
+  getBase64EncodedWireTransaction,
+  pipe,
+  setTransactionMessageFeePayerSigner,
+  setTransactionMessageLifetimeUsingBlockhash,
+  signTransactionMessageWithSigners,
+  type TransactionSigner,
+} from "@solana/kit";
+import {
+  findAssociatedTokenPda,
+  getTransferCheckedInstruction,
+  TOKEN_PROGRAM_ADDRESS,
+} from "@solana-program/token";
+import { rpc, USDC_DECIMALS, USDC_MINT } from "../checkout/config";
+import {
+  encodeHeader,
+  NETWORK,
+  X402_VERSION,
+  type PaymentPayload,
+  type PaymentRequired,
+} from "./x402";
+
+/**
+ * fetch() that pays: on a 402 it picks the USDC "exact" option, refuses
+ * anything above `maxAmount`, signs a USDC transfer to `payTo` and retries
+ * with the signed transaction in the X-PAYMENT header.
+ */
+export async function fetchWithPayment(
+  url: string,
+  options: { signer: TransactionSigner; maxAmount: bigint },
+): Promise<Response> {
+  const first = await fetch(url);
+  if (first.status !== 402) return first;
+
+  const { accepts } = (await first.json()) as PaymentRequired;
+  const option = accepts.find(
+    (a) =>
+      a.scheme === "exact" && a.network === NETWORK && a.asset === USDC_MINT,
+  );
+  if (!option) throw new Error("no supported payment option");
+  const price = BigInt(option.maxAmountRequired);
+  if (price > options.maxAmount) {
+    throw new Error(
+      `price ${price} is above maxAmount ${options.maxAmount}; not paying`,
+    );
+  }
+
+  const [source] = await findAssociatedTokenPda({
+    owner: options.signer.address,
+    mint: USDC_MINT,
+    tokenProgram: TOKEN_PROGRAM_ADDRESS,
+  });
+  const [destination] = await findAssociatedTokenPda({
+    owner: address(option.payTo),
+    mint: USDC_MINT,
+    tokenProgram: TOKEN_PROGRAM_ADDRESS,
+  });
+  const { value: latestBlockhash } = await rpc.getLatestBlockhash().send();
+  const message = pipe(
+    createTransactionMessage({ version: 0 }),
+    (m) => setTransactionMessageFeePayerSigner(options.signer, m),
+    (m) => setTransactionMessageLifetimeUsingBlockhash(latestBlockhash, m),
+    (m) =>
+      appendTransactionMessageInstructions(
+        [
+          getTransferCheckedInstruction({
+            source,
+            mint: USDC_MINT,
+            destination,
+            authority: options.signer,
+            amount: price,
+            decimals: USDC_DECIMALS,
+          }),
+        ],
+        m,
+      ),
+  );
+  const signed = await signTransactionMessageWithSigners(message);
+
+  const payment: PaymentPayload = {
+    x402Version: X402_VERSION,
+    scheme: "exact",
+    network: option.network,
+    payload: { transaction: getBase64EncodedWireTransaction(signed) },
+  };
+  return fetch(url, { headers: { "X-PAYMENT": encodeHeader(payment) } });
+}
+// #endregion client

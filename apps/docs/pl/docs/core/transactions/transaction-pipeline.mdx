@@ -2,7 +2,6 @@
 title: Pipeline transakcji
 description:
   Jak transakcje Solana są przetwarzane od momentu przesłania do zatwierdzenia, w tym pełny 8-etapowy pipeline walidacji, odczytywanie szczegółów transakcji z sieci oraz najczęstsze błędy walidacji.
-url: /docs/core/transactions/transaction-pipeline
 type: reference
 prerequisites:
   - /docs/core/transactions
@@ -14,11 +13,13 @@ related:
   - /docs/core/programs/program-execution
 ---
 
-<Callout type="info" title="Podsumowanie">
+<Info>
+  **Podsumowanie**
+
   Transakcje przechodzą przez 8 etapów: odbiór, weryfikacja podpisu,
   sanityzacja, sprawdzenie budżetu/wieku, walidacja płatnika opłat, ładowanie
   kont, wykonanie instrukcji oraz zatwierdzenie.
-</Callout>
+</Info>
 
 ## Pipeline przetwarzania transakcji
 
@@ -30,9 +31,9 @@ odwołaniami do plików źródłowych w
 ### 1. Odbiór i deserializacja
 
 Validator odbiera bajty transakcji przez UDP/QUIC. Surowe bajty muszą zmieścić
-się w jednym pakiecie (_rs`PACKET_DATA_SIZE`_ = 1232 bajtów). Bajty są
-deserializowane do _rs`VersionedTransaction`_, który zawiera tablicę podpisów
-oraz _rs`VersionedMessage`_ (legacy lub v0).
+się w jednym pakiecie (`PACKET_DATA_SIZE` = 1232 bajtów). Bajty są
+deserializowane do `VersionedTransaction`, który zawiera tablicę podpisów
+oraz `VersionedMessage` (legacy lub v0).
 
 Nadchodzący
 [format v1](/docs/core/transactions/versioned-transactions#v1-message-format)
@@ -55,7 +56,7 @@ Weryfikacja jest zrównoleglona: validator dzieli pakiety na fragmenty po
 
 ### 3. Sanityzacja
 
-Zdeserializowana transakcja jest sanityzowana do _rs`SanitizedTransaction`_ (lub
+Zdeserializowana transakcja jest sanityzowana do `SanitizedTransaction` (lub
 [`RuntimeTransaction`](https://github.com/anza-xyz/agave/blob/v3.1.8/runtime-transaction/src/runtime_transaction.rs#L31)).
 Sanityzacja sprawdza niezmienniki strukturalne:
 
@@ -64,7 +65,7 @@ Sanityzacja sprawdza niezmienniki strukturalne:
   dozwolonych granicach
 - Płatnik opłat (indeks konta 0) jest podpisującym z prawem zapisu
 
-Wrapper _rs`RuntimeTransaction`_ buforuje wstępnie obliczone metadane z
+Wrapper `RuntimeTransaction` buforuje wstępnie obliczone metadane z
 [`TransactionMeta`](https://github.com/anza-xyz/agave/blob/v3.1.8/runtime-transaction/src/transaction_meta.rs#L38-L44):
 hash wiadomości, flagę transakcji głosowania, liczbę podpisów prekompilowanych
 (Ed25519/secp256k1/secp256r1), szczegóły instrukcji budżetowych oraz całkowitą
@@ -81,26 +82,26 @@ są najpierw analizowane i weryfikowane. Szczegóły opłat są wyliczane na
 podstawie limitów budżetowych oraz opłaty za priorytet. Jeśli budżet
 obliczeniowy jest nieprawidłowy lub sprzeczny, transakcja zostaje odrzucona z
 błędami parsowania budżetu obliczeniowego, takimi jak
-_rs`DuplicateInstruction`_, `InstructionError(..., InvalidInstructionData)` lub
-_rs`InvalidLoadedAccountsDataSizeLimit`_.
+`DuplicateInstruction`, `InstructionError(..., InvalidInstructionData)` lub
+`InvalidLoadedAccountsDataSizeLimit`.
 
 W przypadku
 [transakcji v1](/docs/core/transactions/versioned-transactions#v1-message-format)
 nie ma instrukcji budżetu obliczeniowego do parsowania: limity i opłata priorytetowa
 pochodzą z konfiguracji wiadomości, a wszelkie instrukcje ComputeBudget zawarte w wiadomości
 są ignorowane podczas konfiguracji. Pola konfiguracji pozostawione bez wartości domyślnie przyjmują zero, co
-ujawnia się później podczas [ładowania kont](#6-load-accounts).
+ujawnia się później podczas [ładowania kont](#6-ładowanie-kont).
 
 **Wiek blockhasha**: `recent_blockhash` transakcji jest wyszukiwany w
 [`BlockhashQueue`](https://github.com/anza-xyz/agave/blob/v3.1.8/accounts-db/src/blockhash_queue.rs#L33).
-Jeśli hash zostanie znaleziony i jego wiek mieści się w _rs`MAX_PROCESSING_AGE`_
+Jeśli hash zostanie znaleziony i jego wiek mieści się w `MAX_PROCESSING_AGE`
 (150 slotów), transakcja jest kontynuowana. Jeśli nie zostanie znaleziony,
 validator sprawdza ważność
 [trwałego nonce](/docs/core/transactions/durable-nonces).
 
 **Cache statusu**: Hash wiadomości transakcji jest sprawdzany w cache statusu.
 Jeśli zostanie znaleziony, transakcja zostaje odrzucona z
-_rs`AlreadyProcessed`_.
+`AlreadyProcessed`.
 
 ### 5. Walidacja nonce i fee payera
 
@@ -112,7 +113,7 @@ w SVM obsługuje dwie walidacje:
 konto nonce i weryfikuje:
 
 - Konto jest własnością System Program
-- Parsuje się jako _rs`State::Initialized`_
+- Parsuje się jako `State::Initialized`
 - Przechowywany trwały nonce odpowiada `recent_blockhash` transakcji
 - Nonce może zostać zaktualizowany (jego obecny trwały nonce różni się od
   następnego trwałego nonce, tzn. nonce nie został już użyty w bieżącym bloku)
@@ -126,18 +127,18 @@ trwałego nonce. Zobacz
 sprawdzane przez
 [`validate_fee_payer`](https://github.com/anza-xyz/agave/blob/v3.1.8/svm/src/account_loader.rs#L369-L417):
 
-- Konto musi istnieć (lamports > 0), w przeciwnym razie _rs`AccountNotFound`_
+- Konto musi istnieć (lamports > 0), w przeciwnym razie `AccountNotFound`
 - Konto musi być kontem systemowym lub nonce, w przeciwnym razie
-  _rs`InvalidAccountForFee`_
+  `InvalidAccountForFee`
 - Lamports muszą pokrywać `min_balance + total_fee`, gdzie `min_balance` to 0
   dla kont systemowych lub `rent.minimum_balance(NonceState::size())` dla kont
-  nonce; w przeciwnym razie _rs`InsufficientFundsForFee`_
+  nonce; w przeciwnym razie `InsufficientFundsForFee`
 - Po odjęciu opłaty konto musi pozostać zwolnione z czynszu (nie może przejść ze
   stanu zwolnionego z czynszu do płacącego czynsz)
 
 Opłata jest pobierana od płatnika opłat na tym etapie. Tworzony jest migawkowy
 zapis płatnika opłat po odjęciu opłaty (oraz zaawansowanego nonce, jeśli
-dotyczy), który jest zapisywany jako _rs`RollbackAccounts`_. Są to konta, które
+dotyczy), który jest zapisywany jako `RollbackAccounts`. Są to konta, które
 zostają zatwierdzone nawet w przypadku niepowodzenia wykonania.
 
 ### 6. Ładowanie kont
@@ -161,16 +162,18 @@ Dla każdego konta niebędącego płatnikiem opłat, loader:
 
 Dla każdego programu wywoływanego przez instrukcje transakcji loader sprawdza,
 czy program account istnieje i jest własnością prawidłowego loadera
-(`NativeLoader` lub jednego z _rs`PROGRAM_OWNERS`_). Nieprawidłowe programy
-kończą się błędem _rs`ProgramAccountNotFound`_ lub
-_rs`InvalidProgramForExecution`_.
+(`NativeLoader` lub jednego z `PROGRAM_OWNERS`). Nieprawidłowe programy
+kończą się błędem `ProgramAccountNotFound` lub
+`InvalidProgramForExecution`.
 
 Programy LoaderV3 (upgradeable) domyślnie ładują powiązane konto programdata,
 które również wlicza się do limitu załadowanych danych.
 
-<Callout type="warn" title="Transakcje v1 domyślnie ustawiają ten limit na zero">
-  Domyślny limit 64 MiB dotyczy transakcji legacy i v0. W [formacie v1](/docs/core/transactions/versioned-transactions#v1-message-format) limit rozmiaru danych załadowanych kont jest odczytywany z konfiguracji wiadomości, a pole pozostawione bez wartości domyślnie przyjmuje **0 bajtów**, a nie hojną wartość domyślną. Transakcja v1 z pustą konfiguracją kończy się zatem niepowodzeniem na tym etapie z błędem _rs`MaxLoadedAccountsDataSizeExceeded`_ — żądany budżet jest zbyt mały dla pierwszego załadowanego konta, więc błąd pojawia się przed uruchomieniem jakiejkolwiek instrukcji i nie wskazuje ani na v1, ani na konfigurację. Zawsze jawnie ustawiaj limit jednostek obliczeniowych oraz limit rozmiaru danych załadowanych kont podczas budowania transakcji v1.
-</Callout>
+<Warning>
+  **Transakcje v1 domyślnie ustawiają ten limit na zero**
+
+  Domyślny limit 64 MiB dotyczy transakcji legacy i v0. W [formacie v1](/docs/core/transactions/versioned-transactions#v1-message-format) limit rozmiaru danych załadowanych kont jest odczytywany z konfiguracji wiadomości, a pole pozostawione bez wartości domyślnie przyjmuje **0 bajtów**, a nie hojną wartość domyślną. Transakcja v1 z pustą konfiguracją kończy się zatem niepowodzeniem na tym etapie z błędem `MaxLoadedAccountsDataSizeExceeded` — żądany budżet jest zbyt mały dla pierwszego załadowanego konta, więc błąd pojawia się przed uruchomieniem jakiejkolwiek instrukcji i nie wskazuje ani na v1, ani na konfigurację. Zawsze jawnie ustawiaj limit jednostek obliczeniowych oraz limit rozmiaru danych załadowanych kont podczas budowania transakcji v1.
+</Warning>
 
 Jeśli ładowanie konta się nie powiedzie, ale płatnik opłat został poprawnie
 zweryfikowany, transakcja staje się
@@ -180,10 +183,10 @@ opłata jest nadal pobierana, ale żadne instrukcje nie są wykonywane.
 ### 7. Wykonywanie instrukcji
 
 [`execute_loaded_transaction`](https://github.com/anza-xyz/agave/blob/v3.1.8/svm/src/transaction_processor.rs#L847)
-tworzy _rs`TransactionContext`_ ze wszystkimi załadowanymi kontami i wywołuje
+tworzy `TransactionContext` ze wszystkimi załadowanymi kontami i wywołuje
 [`process_message`](https://github.com/anza-xyz/agave/blob/v3.1.8/svm/src/message_processor.rs).
 Instrukcje są wykonywane sekwencyjnie w kolejności, w jakiej pojawiają się w
-wiadomości. Każde wywołanie instrukcji tworzy _rs`InvokeContext`_ i wywołuje
+wiadomości. Każde wywołanie instrukcji tworzy `InvokeContext` i wywołuje
 docelowy program.
 
 #### Szczegóły przetwarzania instrukcji
@@ -208,7 +211,7 @@ iteruje przez każdą instrukcję i wywołuje docelowy program:
 4. Po zakończeniu instrukcji środowisko uruchomieniowe
    [weryfikuje](https://github.com/anza-xyz/agave/blob/v3.1.8/transaction-context/src/lib.rs#L366-L398),
    że całkowity bilans lamportów na wszystkich kontach instrukcji nie uległ
-   zmianie (_rs`UnbalancedInstruction`_ check).
+   zmianie (`UnbalancedInstruction` check).
 5. Jeśli jakakolwiek instrukcja zakończy się niepowodzeniem, cała transakcja
    jest wycofywana. Żadne pośrednie zmiany stanu nie są zapisywane.
 
@@ -216,8 +219,8 @@ Każda instrukcja inkrementuje ślad instrukcji (instruction trace). Ślad obejm
 zarówno instrukcje najwyższego poziomu, jak i wszystkie wywołane przez nie
 [CPI](/docs/core/cpi). Całkowita długość śladu (instrukcje najwyższego poziomu
 plus wszystkie zagnieżdżone CPI) nie może przekroczyć 64
-(_rs`MAX_INSTRUCTION_TRACE_LENGTH`_). Przekroczenie tego limitu skutkuje
-zwróceniem _rs`InstructionError::MaxInstructionTraceLengthExceeded`_.
+(`MAX_INSTRUCTION_TRACE_LENGTH`). Przekroczenie tego limitu skutkuje
+zwróceniem `InstructionError::MaxInstructionTraceLengthExceeded`.
 
 Po wykonaniu środowisko uruchomieniowe weryfikuje, że:
 
@@ -229,8 +232,8 @@ Po wykonaniu środowisko uruchomieniowe weryfikuje, że:
 
 Jeśli wykonanie zakończy się sukcesem, zmodyfikowane stany kont z
 `TransactionContext` są zapisywane z powrotem do lokalnej pamięci podręcznej
-batch _rs`AccountLoader`_. Jeśli wykonanie zakończy się niepowodzeniem, tylko
-_rs`RollbackAccounts`_ (płatnik opłaty z potrąconą opłatą i zaawansowanym nonce)
+batch `AccountLoader`. Jeśli wykonanie zakończy się niepowodzeniem, tylko
+`RollbackAccounts` (płatnik opłaty z potrąconą opłatą i zaawansowanym nonce)
 są zapisywane z powrotem. Opłata jest nadal pobierana, ale wszystkie inne zmiany
 na kontach są odrzucane.
 

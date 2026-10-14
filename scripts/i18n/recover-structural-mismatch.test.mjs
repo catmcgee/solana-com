@@ -8,11 +8,12 @@ import {
   removeFailedTargets,
 } from "./recover-structural-mismatch.mjs";
 
-const source = "apps/docs/content/docs/en/example.mdx";
-const target = "apps/docs/content/docs/zh/example.mdx";
-const otherSource = "apps/docs/content/docs/en/other.mdx";
-const otherTarget = "apps/docs/content/docs/zh/other.mdx";
-const jsonTarget = "packages/i18n/messages/web/zh/common.json";
+// Paths are relative to the docs Lingo project root (apps/docs).
+const source = "docs/example.mdx";
+const target = "zh/docs/example.mdx";
+const otherSource = "developers/bootcamp/other.mdx";
+const otherTarget = "zh/developers/bootcamp/other.mdx";
+const jsonTarget = "navigation/labels/zh.json";
 const config = { targetLocales: ["zh"] };
 const structuralLine = (sourcePath, targetPath) =>
   `    ${targetPath}: Failed to plan ${sourcePath}: Cannot safely update ${sourcePath} (mdx) because the source and target document structures are not aligned (unit 14 is jsx-children:11 in the source but jsx-children:11.0 in the target). Force a full retranslation of this file to reset it.`;
@@ -82,6 +83,26 @@ test("recovers only a reported MDX structure failure", (t) => {
   assert.equal(target in lock.files, true);
   assert.equal(otherTarget in lock.files, true);
   assert.equal(jsonTarget in lock.files, true);
+});
+
+test("rejects a target that is not the source's locale copy", (t) => {
+  const rootDir = fixture(t);
+  assert.deepEqual(
+    failedStructuralTargets(
+      failureReport([structuralLine(source, otherTarget)]),
+      config,
+      rootDir,
+    ),
+    [],
+  );
+  assert.deepEqual(
+    failedStructuralTargets(
+      failureReport([structuralLine(source, "fr/docs/example.mdx")]),
+      config,
+      rootDir,
+    ),
+    [],
+  );
 });
 
 test("recovers multiple structural failures but rejects a mixed report", (t) => {

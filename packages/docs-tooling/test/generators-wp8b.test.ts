@@ -1,0 +1,583 @@
+/**
+ * WP8b generators: concepts, paths, addresses (spec §3.4, §4.3).
+ * Every test runs against a throwaway Mintlify root in the OS temp dir.
+ */
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+  existsSync,
+} from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { docsRoot as realDocsRoot } from "../src/lib/paths.ts";
+import {
+  initConcepts,
+  parseConcepts,
+  runConcepts,
+} from "../src/generators/concepts.ts";
+import {
+  examplesRoot,
+  initPaths,
+  parsePaths,
+  runPaths,
+} from "../src/generators/paths.ts";
+import { parseAddresses, runAddresses } from "../src/generators/addresses.ts";
+import {
+  attr,
+  mdText,
+  plainText,
+  readJson,
+  type Problem,
+} from "../src/generators/_lib.ts";
+
+let root: string;
+let outputs: string;
+
+const write = (rel: string, text: string, base = root) => {
+  const abs = path.join(base, rel);
+  mkdirSync(path.dirname(abs), { recursive: true });
+  writeFileSync(abs, text);
+};
+const read = (rel: string) => readFileSync(path.join(root, rel), "utf8");
+const page = (title: string, body: string) =>
+  `---\ntitle: ${title}\n---\n\n${body}\n`;
+
+const TRY_IT = page(
+  "Pay as a customer",
+  `import Stepper from "/snippets/paths/en/checkout/stepper-1.mdx";
+import Wallet from "/snippets/concepts/en/wallet.mdx";
+
+<Stepper />
+
+You used <span className="sol-chip" data-concept="clusters">devnet</span>. Also <Tooltip data-concept="account">accounts</Tooltip>.
+
+Mint: <span className="sol-address" data-address="EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v">\`EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v\`</span> and \`TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA\`.
+
+\`\`\`ts
+const usdc = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"; // <span data-concept="rpc">x</span>
+\`\`\`
+
+<Wallet />`,
+);
+
+beforeEach(() => {
+  root = mkdtempSync(path.join(os.tmpdir(), "wp8b-docs-"));
+  outputs = mkdtempSync(path.join(os.tmpdir(), "wp8b-out-"));
+  initConcepts(root);
+  initPaths(root);
+  writeFileSync(
+    path.join(root, "addresses.json"),
+    readFileSync(path.join(realDocsRoot, "addresses.json")),
+  );
+  for (const k of ["checkout", "paywall", "asset"])
+    write(`snippets/demos/${k}-demo.jsx`, "export const X = () => null;\n");
+  write("docs/payments/checkout/try-it.mdx", TRY_IT);
+  write("docs/core/accounts/index.mdx", page("Accounts", "Accounts."));
+  write("ja/docs/core/accounts/index.mdx", page("Accounts", "Konten."));
+  write(
+    "ja/docs/payments/checkout/try-it.mdx",
+    page(
+      "Try",
+      `import W from "/snippets/concepts/en/wallet.mdx";\n\n<W />\n\nSiehe <span className="sol-chip" data-concept="account">Konten</span>.`,
+    ),
+  );
+  write(
+    "paths/payments/checkout/pay.output.txt",
+    "Signature: 5h3f {x} <y> ```\nok\n",
+    outputs,
+  );
+  write(
+    "paths/payments/checkout/verify-payment.output.txt",
+    "confirmed\n",
+    outputs,
+  );
+});
+afterEach(() => {
+  rmSync(root, { recursive: true, force: true });
+  rmSync(outputs, { recursive: true, force: true });
+});
+
+const all = (check = false) => ({
+  paths: runPaths({ docsRoot: root, check, sync: true, outputsRoot: outputs }),
+  concepts: runConcepts({ docsRoot: root, check, sync: true }),
+  addresses: runAddresses({ docsRoot: root, check, sync: true }),
+});
+const errors = (ps: Problem[]) => ps.filter((p) => p.level === "error");
+
+describe("seeds and registries", () => {
+  it("the seed sources and apps/docs/addresses.json validate", () => {
+    const problems: Problem[] = [];
+    const seedDir = path.join(
+      import.meta.dirname,
+      "..",
+      "src",
+      "generators",
+      "seed",
+    );
+    const c = parseConcepts(
+      readJson(path.join(seedDir, "concepts.en.json")),
+      "c",
+      problems,
+    );
+    const p = parsePaths(
+      readJson(path.join(seedDir, "paths.en.json")),
+      "p",
+      problems,
+    );
+    const a = parseAddresses(
+      readJson(path.join(realDocsRoot, "addresses.json")),
+      problems,
+    );
+    expect(problems).toEqual([]);
+    expect(c.concepts).toHaveLength(16);
+    expect(p.paths.map((x) => x.key)).toEqual([
+      "checkout",
+      "paywall-api",
+      "issue-asset",
+    ]);
+    expect(a.length).toBeGreaterThan(20);
+  });
+
+  it("seed demo steps point at real WP5 recordings that match their labels", () => {
+    const problems: Problem[] = [];
+    const seedDir = path.join(
+      import.meta.dirname,
+      "..",
+      "src",
+      "generators",
+      "seed",
+    );
+    const p = parsePaths(
+      readJson(path.join(seedDir, "paths.en.json")),
+      "p",
+      problems,
+    );
+    const rec = (key: string, i: number) => {
+      const d = p.paths.find((x) => x.key === key)!.demo!;
+      const f = path.join(examplesRoot, d.steps[i]!.output);
+      expect(existsSync(f), f).toBe(true);
+      return readFileSync(f, "utf8");
+    };
+    expect(rec("checkout", 0)).toContain("Paid order-1001: 1 USDC");
+    expect(rec("paywall-api", 0)).toMatch(/-> 402/);
+    expect(rec("paywall-api", 1)).toMatch(/\(paid\) -> 200/);
+    expect(rec("issue-asset", 0)).toContain("balance: 1000 LSF");
+    expect(rec("issue-asset", 1)).toContain('"Custom":17');
+  });
+
+  it("concepts.css carries the .nojs-only rules the chip/address output needs", () => {
+    const css = readFileSync(
+      path.join(realDocsRoot, "styles", "concepts.css"),
+      "utf8",
+    );
+    expect(css).toMatch(/^\.nojs-only \{\n {2}display: none;/m);
+    expect(css).toContain("html:not([data-theme-preference]) span.nojs-only");
+  });
+
+  it("rejects bad sources", () => {
+    const problems: Problem[] = [];
+    parseConcepts(
+      {
+        Bad: { name: "x" },
+        ok: {
+          name: "a",
+          cat: "b",
+          short: "<b>x</b>",
+          like: "l",
+          href: "/x",
+          extra: 1,
+        },
+      },
+      "c",
+      problems,
+    );
+    parsePaths(
+      {
+        p: {
+          tab: "t",
+          job: "j",
+          name: "n",
+          time: "1",
+          intro: "x",
+          steps: [["/a"]],
+          first: 3,
+        },
+      },
+      "p",
+      problems,
+    );
+    parseAddresses(
+      {
+        "not-base58!": { label: "x" },
+        "11111111111111111111111111111111": { label: "S", cluster: "moon" },
+      },
+      problems,
+    );
+    const msgs = problems.map((p) => p.message).join("\n");
+    for (const m of [
+      "kebab-case",
+      "raw HTML",
+      'unknown field "extra"',
+      "root-relative",
+      "[href, title]",
+      "base58",
+      "cluster must be",
+    ])
+      expect(msgs).toContain(m);
+  });
+});
+
+describe("generated snippets", () => {
+  it("never use JSX expression children (Mintlify SSR drops them)", () => {
+    const r = all();
+    expect(errors(r.paths.problems)).toEqual([]);
+    expect(errors(r.concepts.problems)).toEqual([]);
+    for (const f of [...r.paths.written, ...r.concepts.written]) {
+      const full = read(f);
+      expect(
+        full.startsWith(
+          "{/* GENERATED by packages/docs-tooling/src/generators/",
+        ),
+      ).toBe(true);
+      const body = full.replace(/^\{\/\*.*\*\/\}\n/, "");
+      // Only the client-only demo component may take expression props.
+      const withoutDemo = body.replace(
+        /^<(Checkout|Paywall|Asset)Demo .*\/>$/m,
+        "",
+      );
+      expect(withoutDemo, f).not.toMatch(/\{["[{]/);
+    }
+  });
+
+  it("concept card, short text, backlinks and coverage", () => {
+    all();
+    const card = read("snippets/concepts/en/account.mdx");
+    expect(card).toContain(
+      '<Callout icon="gem" color="#9945FF" className="sol-concept">',
+    );
+    expect(card).toContain(
+      '**Accounts** <span className="sol-concept-label">New concept</span>',
+    );
+    expect(card).toContain("[Learn more →](/docs/core/accounts)");
+    expect(read("snippets/concepts/en/mint.short.mdx")).toMatch(
+      /\(\*mint authority\*\)/,
+    );
+    // wallet: card imported on step 1 (intro); clusters: chip (ref); rpc only in code.
+    expect(read("snippets/concepts/en/wallet.used-in.mdx")).toContain(
+      '[Payments <span className="sol-usedin-step">Step 1</span>](/docs/payments/checkout/try-it)',
+    );
+    expect(read("snippets/concepts/en/clusters.used-in.mdx")).toContain(
+      "/docs/payments/checkout/try-it",
+    );
+    expect(read("snippets/concepts/en/rpc.used-in.mdx")).toContain(
+      "Not used in a path yet.",
+    );
+    const cov = read("snippets/concepts/en/coverage.mdx");
+    expect(cov).toMatch(
+      /Wallets & signatures\]\(\/docs\/core\/wallets\)<\/th><td data-cov="intro">\[Step 1\]/,
+    );
+    expect(cov).toMatch(
+      /Devnet & mainnet\]\(\/docs\/references\/clusters\)<\/th><td data-cov="ref">mentioned/,
+    );
+    expect(cov).toMatch(
+      /\[RPC\]\(\/docs\/rpc\) <span className="sol-cov-gap">not taught in a path<\/span>/,
+    );
+  });
+
+  it("stepper, next cards, path card", () => {
+    all();
+    const s2 = read("snippets/paths/en/checkout/stepper-2.mdx");
+    expect(s2).toContain(
+      'role="navigation" aria-label="Build a checkout · ~30 min"',
+    );
+    expect(s2).not.toContain("<nav");
+    expect(s2).toMatch(
+      /<li data-state="done"><a href="\/docs\/payments\/checkout\/try-it">/,
+    );
+    expect(s2).toMatch(
+      /<li data-state="current"><a href="\/docs\/payments\/checkout\/browser" aria-current="step">/,
+    );
+    expect(s2.match(/aria-current/g)).toHaveLength(1);
+    // Accessible name reads "Step 1, Done: Title", not "Step 1DoneTitle".
+    expect(s2).toContain(
+      'Step 1<span className="sol-vh">, </span><span className="sol-stepper-done">Done</span><span className="sol-vh">: </span></span>',
+    );
+    expect(read("snippets/paths/en/checkout/stepper-0.mdx")).not.toContain(
+      "aria-current",
+    );
+    expect(read("snippets/paths/en/checkout/next-0.mdx")).toContain(
+      '<Card title="Next: Pay as a customer" href="/docs/payments/checkout/try-it" icon="arrow-right" horizontal>',
+    );
+    expect(read("snippets/paths/en/checkout/next-4.mdx")).toContain(
+      'href="/docs/payments"',
+    );
+    expect(read("snippets/paths/en/checkout/card.mdx")).toContain(
+      "[Start the path →](/docs/payments/checkout)",
+    );
+  });
+
+  it("demo: recorded output inlined for the replay and printed statically", () => {
+    const r = all();
+    const demo = read("snippets/paths/en/checkout/demo.mdx");
+    expect(demo).toContain(
+      'import { CheckoutDemo } from "/snippets/demos/checkout-demo.jsx";',
+    );
+    expect(demo).toContain('"output":"Signature: 5h3f {x} <y> ```\\nok"');
+    // Static fence must outlive the backticks in the output.
+    expect(demo).toContain("````text\nSignature: 5h3f {x} <y> ```\nok\n````");
+    expect(demo).toContain("<Check>Paid.");
+    expect(demo).not.toContain("<details");
+    // No recordings for the other paths: static steps only, no replay, warned.
+    const paywall = read("snippets/paths/en/paywall-api/demo.mdx");
+    expect(paywall).not.toContain("PaywallDemo");
+    expect(paywall).toContain(
+      '<Step title="Call the API without paying (402)">',
+    );
+    expect(
+      r.paths.problems.some(
+        (p) => p.level === "warn" && p.message.includes("client.output.txt"),
+      ),
+    ).toBe(true);
+  });
+});
+
+describe("--sync", () => {
+  it("expands chips and addresses, leaves code alone, and is idempotent", () => {
+    all();
+    const out = read("docs/payments/checkout/try-it.mdx");
+    expect(out).toContain(
+      '<span className="sol-chip" data-concept="clusters"><Tooltip headline="Devnet & mainnet" tip="Devnet is a free public test network that behaves like the real one (mainnet), with play money. Same code, different URL." cta="Learn more" href="/docs/references/clusters">devnet</Tooltip><span className="nojs-only"> ([Devnet & mainnet](/docs/references/clusters): Devnet is a free public',
+    );
+    // Spec form <Tooltip data-concept> is wrapped; the trigger text is kept.
+    expect(out).toContain(
+      '<span className="sol-chip" data-concept="account"><Tooltip headline="Accounts"',
+    );
+    expect(out).toContain(">accounts</Tooltip>");
+    expect(out).toContain(
+      'cta="View on Solana Explorer" href="https://explorer.solana.com/address/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v">`EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v`</Tooltip><span className="nojs-only"> ([USDC mint (mainnet)]',
+    );
+    expect(out).toContain(
+      'const usdc = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"; // <span data-concept="rpc">x</span>',
+    );
+    expect(
+      out.startsWith(
+        '---\ntitle: Pay as a customer\n---\n\nimport Stepper from "/snippets/paths/en/checkout/stepper-1.mdx";',
+      ),
+    ).toBe(true);
+    const second = all();
+    expect(second.concepts.synced).toEqual([]);
+    expect(second.addresses.synced).toEqual([]);
+    expect(second.concepts.written).toEqual([]);
+    expect(read("docs/payments/checkout/try-it.mdx")).toBe(out);
+    const check = all(true);
+    expect([check.paths.ok, check.concepts.ok, check.addresses.ok]).toEqual([
+      true,
+      true,
+      true,
+    ]);
+  });
+
+  it("updates chip text when the source changes, and only marked elements", () => {
+    all();
+    const src = JSON.parse(read("concepts/concepts.en.json"));
+    src.clusters.short = "Changed *text*.";
+    write("concepts/concepts.en.json", JSON.stringify(src));
+    const check = runConcepts({ docsRoot: root, check: true, sync: true });
+    expect(check.ok).toBe(false);
+    expect(check.synced).toContain("docs/payments/checkout/try-it.mdx");
+    expect(check.written).toContain("snippets/concepts/en/clusters.mdx");
+    runConcepts({ docsRoot: root, sync: true });
+    const out = read("docs/payments/checkout/try-it.mdx");
+    expect(out).toContain('tip="Changed text."');
+    expect(out).toContain(": Changed text.)</span>");
+  });
+
+  it("locale pages: locale source + localized links when they exist, else English", () => {
+    all();
+    // No concepts.ja.json yet: English text, English snippet imports, but
+    // links still go to the translated page when it exists.
+    const before = read("ja/docs/payments/checkout/try-it.mdx");
+    expect(before).toContain('"/snippets/concepts/en/wallet.mdx"');
+    expect(before).toContain('cta="Learn more" href="/ja/docs/core/accounts"');
+    expect(before).toContain("([Accounts](/ja/docs/core/accounts): ");
+    write(
+      "concepts/concepts.ja.json",
+      JSON.stringify({
+        account: { name: "アカウント" },
+        _ui: { learnMore: "詳細" },
+      }),
+    );
+    all();
+    const ja = read("ja/docs/payments/checkout/try-it.mdx");
+    expect(ja).toContain('"/snippets/concepts/ja/wallet.mdx"');
+    expect(ja).toContain('headline="アカウント"');
+    expect(ja).toContain('cta="詳細" href="/ja/docs/core/accounts"');
+    // Untranslated fields fall back to English; missing locale pages link to English.
+    const card = read("snippets/concepts/ja/wallet.mdx");
+    expect(card).toContain("A wallet is a keypair");
+    expect(card).toContain("](/docs/core/wallets)");
+    expect(read("snippets/concepts/ja/account.mdx")).toContain(
+      "](/ja/docs/core/accounts)",
+    );
+  });
+
+  it("--check without --sync fails on stale chips and leaves pages alone", () => {
+    all();
+    const src = JSON.parse(read("concepts/concepts.en.json"));
+    src.rent.short = "Changed.";
+    src.clusters.short = "Changed too.";
+    write("concepts/concepts.en.json", JSON.stringify(src));
+    runConcepts({ docsRoot: root }); // regenerates snippets only
+    const before = read("docs/payments/checkout/try-it.mdx");
+    const check = runConcepts({ docsRoot: root, check: true });
+    expect(check.written).toEqual([]);
+    expect(check.synced).toEqual(["docs/payments/checkout/try-it.mdx"]);
+    expect(check.ok).toBe(false);
+    expect(read("docs/payments/checkout/try-it.mdx")).toBe(before);
+    runConcepts({ docsRoot: root, sync: true });
+    expect(runConcepts({ docsRoot: root, check: true }).ok).toBe(true);
+  });
+
+  it("paths --check fails when a locale page import needs re-pointing", () => {
+    write("paths/paths.ja.json", JSON.stringify({ _ui: { step: "ステップ" } }));
+    all();
+    write(
+      "ja/docs/payments/checkout/browser.mdx",
+      page(
+        "B",
+        'import S from "/snippets/paths/en/checkout/stepper-2.mdx";\n\n<S />',
+      ),
+    );
+    const check = runPaths({
+      docsRoot: root,
+      check: true,
+      outputsRoot: outputs,
+    });
+    expect(check.synced).toEqual(["ja/docs/payments/checkout/browser.mdx"]);
+    expect(check.ok).toBe(false);
+  });
+
+  it("address mentions use the locale layer on locale pages", () => {
+    write(
+      "addresses.ja.json",
+      JSON.stringify({
+        _ui: { cta: "エクスプローラーで見る" },
+        EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v: { label: "USDC ミント" },
+      }),
+    );
+    write(
+      "ja/docs/x.mdx",
+      page(
+        "X",
+        'Mint <span className="sol-address" data-address="EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v">`EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v`</span>.',
+      ),
+    );
+    const r = runAddresses({ docsRoot: root, sync: true });
+    expect(errors(r.problems)).toEqual([]);
+    const ja = read("ja/docs/x.mdx");
+    expect(ja).toContain('headline="USDC ミント"');
+    expect(ja).toContain('cta="エクスプローラーで見る"');
+    expect(ja).toContain("([USDC ミント](https://explorer.solana.com/address/");
+    // English pages keep the English strings.
+    expect(read("docs/payments/checkout/try-it.mdx")).toContain(
+      'cta="View on Solana Explorer"',
+    );
+    write(
+      "addresses.ja.json",
+      JSON.stringify({
+        So11111111111111111111111111111111111111113: { label: "x" },
+      }),
+    );
+    expect(
+      runAddresses({ docsRoot: root, check: true }).problems.some((p) =>
+        p.message.includes("not in addresses.json"),
+      ),
+    ).toBe(true);
+  });
+
+  it("warns when a chip sits in a table cell (codec re-pads tables)", () => {
+    write(
+      "docs/t.mdx",
+      page(
+        "T",
+        '| a | b |\n| - | - |\n| <span className="sol-chip" data-concept="rent">rent</span> | x |',
+      ),
+    );
+    const r = runConcepts({ docsRoot: root, sync: true });
+    expect(
+      r.problems.some(
+        (p) =>
+          p.level === "warn" &&
+          p.file === "docs/t.mdx" &&
+          p.message.includes("table cell"),
+      ),
+    ).toBe(true);
+  });
+
+  it("reports unknown concepts and addresses", () => {
+    write(
+      "docs/x.mdx",
+      page(
+        "X",
+        'A <span className="sol-chip" data-concept="nope">x</span> <span className="sol-address" data-address="So11111111111111111111111111111111111111113">y</span>',
+      ),
+    );
+    const r = all();
+    expect(
+      r.concepts.problems.some((p) =>
+        p.message.includes('unknown data-concept="nope"'),
+      ),
+    ).toBe(true);
+    expect(
+      r.addresses.problems.some((p) =>
+        p.message.includes("is not in addresses.json"),
+      ),
+    ).toBe(true);
+    expect(r.concepts.ok).toBe(false);
+  });
+
+  it("--report lists unmarked prose mentions only", () => {
+    const r = runAddresses({ docsRoot: root, report: true });
+    expect(r.candidates).toEqual([
+      {
+        file: "docs/payments/checkout/try-it.mdx",
+        address: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      },
+    ]);
+    expect(read("docs/payments/checkout/try-it.mdx")).toBe(TRY_IT);
+  });
+});
+
+describe("generated folders", () => {
+  it("removes orphans, refuses to delete hand-written files, --check reports drift", () => {
+    all();
+    write(
+      "snippets/concepts/en/old.mdx",
+      "{/* GENERATED by packages/docs-tooling/src/generators/concepts.ts */}\n",
+    );
+    write("snippets/concepts/en/mine.mdx", "hand written\n");
+    const check = runConcepts({ docsRoot: root, check: true });
+    expect(check.removed).toEqual(["snippets/concepts/en/old.mdx"]);
+    expect(check.ok).toBe(false);
+    expect(existsSync(path.join(root, "snippets/concepts/en/old.mdx"))).toBe(
+      true,
+    );
+    runConcepts({ docsRoot: root });
+    expect(existsSync(path.join(root, "snippets/concepts/en/old.mdx"))).toBe(
+      false,
+    );
+    expect(read("snippets/concepts/en/mine.mdx")).toBe("hand written\n");
+  });
+});
+
+describe("text helpers", () => {
+  it("escape for MDX without expressions", () => {
+    expect(mdText("a *b* {c} <d>")).toBe("a \\*b\\* \\{c\\} \\<d\\>");
+    expect(attr("title", 'say "hi"')).toBe("title='say \"hi\"'");
+    expect(plainText("A *b* **c** [d](/e) `f`")).toBe("A b c d f");
+  });
+});

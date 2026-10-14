@@ -3,13 +3,13 @@ title: نظرة عامة
 description: معمارية بروتوكول القنوات الخاصة وتدفق البيانات فيه
 ---
 
-<Callout type="warning">
+<Warning>
   لم يخضع بروتوكول القنوات الخاصة لأي تدقيق أمني، ولا يُنصح باستخدامه في بيئة الإنتاج مع أموال حقيقية دون إجراء مراجعة أمنية شاملة.
-</Callout>
+</Warning>
 
-<Callout type="info">
+<Info>
   **هل تريد نشر نسخة؟** توجّه إلى [دليل المشغّلين](/docs/tools/private-channels/operators). **هل تريد التكامل مع نسخة قائمة؟** توجّه إلى [البدء السريع](/docs/tools/private-channels/quickstart/installation). هذه الصفحة هي مرجع المعمارية لكلا الجمهورين.
-</Callout>
+</Info>
 
 ## المعمارية
 
@@ -64,9 +64,9 @@ Streamer هو خادم WebSocket يدفع تحديثات حالة القناة �
 - الاتصال: `ws://localhost:8902`
 - نقطة نهاية الحالة الصحية: `GET /health` - تُعيد `503` إذا توقفت أي حلقة استطلاع داخلية لأكثر من 30 ثانية
 
-<Callout type="warning">
+<Warning>
   لم يُوثَّق مخطط أحداث WebSocket بعد بشكل رسمي. راجع [`core/src/bin/streamer.rs`](https://github.com/solana-foundation/solana-private-channels/blob/main/core/src/bin/streamer.rs) للاطلاع على تفاصيل التنفيذ ريثما تتوفر الوثائق الرسمية.
-</Callout>
+</Warning>
 
 ```mermaid
 flowchart TB
@@ -108,6 +108,48 @@ flowchart TB
     PG_P --> ST
 ```
 
+<div className="nojs-only" data-fallback="mermaid">
+  ```text Mermaid
+  flowchart TB
+      Wallet([User Wallet])
+      Escrow[Escrow Program<br/><i>Solana Mainnet</i>]
+      IS[Solana Mainnet Indexer]
+      IC[Private Channel Indexer]
+      PG_I[(Indexer DB)]
+      OS[Operator - Solana Side]
+      OC[Operator - Channel Side]
+      GW[Gateway :8899]
+      WN[Write Node :8900]
+      WP[Withdraw Program]
+      PG_P[(Postgres Primary)]
+      PG_R[(Postgres Replica)]
+      RN[Read Node :8901]
+      ST[Streamer :8902]
+
+      Wallet -- deposit --> Escrow
+      Wallet -- transact / withdraw --> GW
+      ST -. WebSocket .-> Wallet
+
+      Escrow -- watch --> IS
+      IS -- deposit events --> PG_I
+      PG_I -- pending deposits --> OS
+      OS -- mint --> GW
+
+      GW -- sendTransaction --> WN
+      WN --> WP
+      GW -- watch --> IC
+      IC -- withdrawal events --> PG_I
+      PG_I -- pending withdrawals --> OC
+      OC -- release --> Escrow
+
+      WN -- settle --> PG_P
+      PG_P -- replication --> PG_R
+      PG_R --> RN
+      RN --> GW
+      PG_P --> ST
+  ```
+</div>
+
 ## مسار المعاملات
 
 ```text
@@ -148,9 +190,9 @@ Transaction -> [1:Dedup] -> [2:SigVerify] -> [3:Sequencer] -> [4:Executor] -> [5
 
 ## الأمان التشغيلي للمفاتيح
 
-<Callout type="warning">
+<Warning>
   تستخدم الخدمات الخارجية مفردات موقّع خاصة بها، لا علاقة لها بصلاحيات admin/operator على السلسلة الموضّحة في نموذج الأمان أعلاه. `ADMIN_PRIVATE_KEY` مطلوب لكل خدمة مشغّل ويدفع رسوم المعاملات؛ أما `OPERATOR_PRIVATE_KEY` الاختياري المنفصل فيوفر توقيع Operator على السلسلة لـ `ReleaseFunds` و`ResetSmtRoot`، ويرجع إلى قيمة `ADMIN_PRIVATE_KEY` عند عدم تعيينه. لا تضع مفتاح admin النسخة على مستوى البروتوكول (المستخدم لـ `CreateInstance` / `AddOperator` / `SetNewAdmin`) في أي من المتغيّرين ولا تعرّضه في وقت التشغيل؛ احتفظ بذلك المفتاح بلا اتصال وفي وضع بارد.
-</Callout>
+</Warning>
 
 يتطلب `ReleaseFunds` و`ResetSmtRoot` توقيعَين على السلسلة: دافع الرسوم (من `ADMIN_PRIVATE_KEY`) وصلاحية Operator PDA (من `OPERATOR_PRIVATE_KEY`، أو `ADMIN_PRIVATE_KEY` إن لم يُعيَّن). يضع الدليل التجريبي لـ devnet في هذا الدليل keypair المشغّل المولَّد في `ADMIN_PRIVATE_KEY` ويترك `OPERATOR_PRIVATE_KEY` غير مُعيَّن، فيملأ keypair ذاته كلا دوري الموقّع. تعامل مع أي مفتاح ينتهي به المطاف في `ADMIN_PRIVATE_KEY` بنفس ضوابط المفتاح الخاص لمحفظة ساخنة:
 
@@ -162,7 +204,7 @@ Transaction -> [1:Dedup] -> [2:SigVerify] -> [3:Sequencer] -> [4:Executor] -> [5
 
 ## الخطوات التالية
 
-<Cards>
+<Columns cols={2}>
   <Card
     title="البدء السريع"
     href="/docs/tools/private-channels/quickstart/installation"
@@ -184,4 +226,4 @@ Transaction -> [1:Dedup] -> [2:SigVerify] -> [3:Sequencer] -> [4:Executor] -> [5
   >
     مرجع التعليمات الكامل لجميع البرامج.
   </Card>
-</Cards>
+</Columns>

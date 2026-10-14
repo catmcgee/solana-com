@@ -2,7 +2,6 @@
 title: Quy trình xử lý giao dịch
 description:
   Cách các giao dịch Solana được xử lý từ khi gửi đến khi commit, bao gồm quy trình xác thực 8 giai đoạn đầy đủ, đọc chi tiết giao dịch từ mạng lưới và các lỗi xác thực phổ biến.
-url: /docs/core/transactions/transaction-pipeline
 type: reference
 prerequisites:
   - /docs/core/transactions
@@ -14,11 +13,13 @@ related:
   - /docs/core/programs/program-execution
 ---
 
-<Callout type="info" title="Tóm tắt">
+<Info>
+  **Tóm tắt**
+
   Các giao dịch trải qua 8 giai đoạn: nhận, xác minh chữ ký, kiểm tra tính hợp
   lệ, kiểm tra ngân sách/thời gian, xác thực người trả phí, tải tài khoản, thực
   thi lệnh và commit.
-</Callout>
+</Info>
 
 ## Quy trình xử lý giao dịch
 
@@ -30,9 +31,9 @@ validator client.
 ### 1. Nhận và giải mã
 
 Validator nhận các byte giao dịch qua UDP/QUIC. Các byte thô phải vừa trong một
-gói tin duy nhất (_rs`PACKET_DATA_SIZE`_ = 1.232 byte). Các byte được giải mã
-thành một _rs`VersionedTransaction`_, chứa mảng chữ ký và một
-_rs`VersionedMessage`_ (legacy hoặc v0).
+gói tin duy nhất (`PACKET_DATA_SIZE` = 1.232 byte). Các byte được giải mã
+thành một `VersionedTransaction`, chứa mảng chữ ký và một
+`VersionedMessage` (legacy hoặc v0).
 
 Định dạng
 [v1](/docs/core/transactions/versioned-transactions#v1-message-format)
@@ -55,7 +56,7 @@ chunk
 
 ### 3. Kiểm tra tính hợp lệ
 
-Giao dịch đã giải mã được kiểm tra để tạo ra một _rs`SanitizedTransaction`_
+Giao dịch đã giải mã được kiểm tra để tạo ra một `SanitizedTransaction`
 (hoặc
 [`RuntimeTransaction`](https://github.com/anza-xyz/agave/blob/v3.1.8/runtime-transaction/src/runtime_transaction.rs#L31)).
 Việc kiểm tra xác thực các bất biến cấu trúc:
@@ -64,7 +65,7 @@ Việc kiểm tra xác thực các bất biến cấu trúc:
 - Tất cả `program_id_index` và `account_indices` của lệnh đều nằm trong giới hạn
 - Người trả phí (chỉ số tài khoản 0) là một signer có thể ghi
 
-Wrapper _rs`RuntimeTransaction`_ lưu trữ metadata được tính toán trước từ
+Wrapper `RuntimeTransaction` lưu trữ metadata được tính toán trước từ
 [`TransactionMeta`](https://github.com/anza-xyz/agave/blob/v3.1.8/runtime-transaction/src/transaction_meta.rs#L38-L44):
 message hash, cờ giao dịch vote, số lượng chữ ký precompile
 (Ed25519/secp256k1/secp256r1), chi tiết lệnh compute budget và tổng độ dài dữ
@@ -79,26 +80,26 @@ thực hiện một số kiểm tra cho mỗi giao dịch:
 **Ngân sách tính toán**: Các chỉ thị ngân sách tính toán của giao dịch được phân
 tích và xác thực trước. Chi tiết phí được tính toán từ giới hạn ngân sách và phí
 ưu tiên. Nếu ngân sách tính toán không hợp lệ hoặc xung đột, giao dịch sẽ thất
-bại với các lỗi phân tích ngân sách tính toán như _rs`DuplicateInstruction`_,
+bại với các lỗi phân tích ngân sách tính toán như `DuplicateInstruction`,
 `InstructionError(..., InvalidInstructionData)`, hoặc
-_rs`InvalidLoadedAccountsDataSizeLimit`_.
+`InvalidLoadedAccountsDataSizeLimit`.
 
 Đối với
 [giao dịch v1](/docs/core/transactions/versioned-transactions#v1-message-format),
 không có lệnh compute budget nào cần phân tích cú pháp: giới hạn và phí ưu tiên
 đến từ cấu hình thông điệp, và mọi lệnh ComputeBudget trong thông điệp
 đều bị bỏ qua khi cấu hình. Các trường cấu hình không được đặt sẽ mặc định là không, điều này
-sẽ xuất hiện sau tại [bước tải tài khoản](#6-load-accounts).
+sẽ xuất hiện sau tại [bước tải tài khoản](#6-tải-tài-khoản).
 
 **Tuổi blockhash**: `recent_blockhash` của giao dịch được tra cứu trong
 [`BlockhashQueue`](https://github.com/anza-xyz/agave/blob/v3.1.8/accounts-db/src/blockhash_queue.rs#L33).
-Nếu tìm thấy hash và tuổi của nó nằm trong _rs`MAX_PROCESSING_AGE`_ (150 slot),
+Nếu tìm thấy hash và tuổi của nó nằm trong `MAX_PROCESSING_AGE` (150 slot),
 giao dịch sẽ tiếp tục. Nếu không tìm thấy, validator sẽ kiểm tra
 [durable nonce](/docs/core/transactions/durable-nonces) hợp lệ.
 
 **Bộ nhớ đệm trạng thái**: Hash thông điệp của giao dịch được kiểm tra với bộ
 nhớ đệm trạng thái. Nếu tìm thấy, giao dịch sẽ bị từ chối với
-_rs`AlreadyProcessed`_.
+`AlreadyProcessed`.
 
 ### 5. Xác thực nonce và người trả phí
 
@@ -110,7 +111,7 @@ trong SVM xử lý hai xác thực:
 khoản nonce và xác minh:
 
 - Tài khoản thuộc sở hữu của System Program
-- Nó được phân tích là _rs`State::Initialized`_
+- Nó được phân tích là `State::Initialized`
 - Durable nonce được lưu trữ khớp với `recent_blockhash` của giao dịch
 - Nonce có thể được nâng cấp (durable nonce hiện tại khác với durable nonce tiếp
   theo, tức là nonce chưa được sử dụng trong block hiện tại)
@@ -123,19 +124,19 @@ Nếu hợp lệ, nonce được nâng cấp lên giá trị durable nonce tiế
 và kiểm tra bởi
 [`validate_fee_payer`](https://github.com/anza-xyz/agave/blob/v3.1.8/svm/src/account_loader.rs#L369-L417):
 
-- Tài khoản phải tồn tại (lamports > 0), nếu không sẽ báo _rs`AccountNotFound`_
+- Tài khoản phải tồn tại (lamports > 0), nếu không sẽ báo `AccountNotFound`
 - Tài khoản phải là tài khoản hệ thống hoặc tài khoản nonce, nếu không sẽ báo
-  _rs`InvalidAccountForFee`_
+  `InvalidAccountForFee`
 - Lamports phải đủ để chi trả `min_balance + total_fee`, trong đó `min_balance`
   là 0 đối với tài khoản hệ thống hoặc
   `rent.minimum_balance(NonceState::size())` đối với tài khoản nonce; nếu không
-  sẽ báo _rs`InsufficientFundsForFee`_
+  sẽ báo `InsufficientFundsForFee`
 - Sau khi khấu trừ phí, tài khoản phải vẫn được miễn phí thuê (không thể chuyển
   từ miễn phí thuê sang phải trả phí thuê)
 
 Phí được khấu trừ từ người trả phí ở giai đoạn này. Một bản chụp nhanh của người
 trả phí đã trừ phí (và nonce nâng cao, nếu có) được lưu dưới dạng
-_rs`RollbackAccounts`_, đây là các tài khoản được cam kết ngay cả khi việc thực
+`RollbackAccounts`, đây là các tài khoản được cam kết ngay cả khi việc thực
 thi thất bại.
 
 ### 6. Tải tài khoản
@@ -159,23 +160,25 @@ hiển thị cho các giao dịch sau đó.
 
 Đối với mỗi chương trình được gọi bởi các lệnh của giao dịch, trình tải xác minh
 rằng tài khoản chương trình tồn tại và thuộc sở hữu của một trình tải hợp lệ
-(`NativeLoader` hoặc một trong các _rs`PROGRAM_OWNERS`_). Các chương trình không
-hợp lệ sẽ thất bại với _rs`ProgramAccountNotFound`_ hoặc
-_rs`InvalidProgramForExecution`_.
+(`NativeLoader` hoặc một trong các `PROGRAM_OWNERS`). Các chương trình không
+hợp lệ sẽ thất bại với `ProgramAccountNotFound` hoặc
+`InvalidProgramForExecution`.
 
 Các chương trình LoaderV3 (có thể nâng cấp) ngầm định tải tài khoản programdata
 liên quan của chúng, cũng được tính vào giới hạn kích thước dữ liệu đã tải.
 
-<Callout type="warn" title="Giao dịch v1 mặc định giới hạn này là không">
+<Warning>
+  **Giao dịch v1 mặc định giới hạn này là không**
+
   Giá trị mặc định 64 MiB áp dụng cho các giao dịch legacy và v0. Trong [định dạng
   v1](/docs/core/transactions/versioned-transactions#v1-message-format), giới hạn kích thước dữ liệu tài khoản đã tải được đọc từ cấu hình thông điệp, và một trường
   không được đặt sẽ mặc định là **0 byte** thay vì một giá trị mặc định lớn hơn. Do đó, một giao dịch v1
   với cấu hình trống sẽ thất bại ở giai đoạn này với lỗi
-  _rs`MaxLoadedAccountsDataSizeExceeded`_ — ngân sách yêu cầu quá nhỏ
+`MaxLoadedAccountsDataSizeExceeded` — ngân sách yêu cầu quá nhỏ
   cho tài khoản đầu tiên được tải, nên lỗi xảy ra trước khi bất kỳ lệnh nào
   chạy, với thông báo lỗi không đề cập đến v1 hay cấu hình. Luôn đặt giới hạn đơn vị tính toán và giới hạn kích thước dữ liệu tài khoản đã tải một cách tường minh khi
   xây dựng giao dịch v1.
-</Callout>
+</Warning>
 
 Nếu việc tải tài khoản thất bại nhưng người trả phí đã được xác thực thành công,
 giao dịch sẽ trở thành kết quả
@@ -185,10 +188,10 @@ phí vẫn được thu nhưng không có lệnh nào được thực thi.
 ### 7. Thực thi lệnh
 
 [`execute_loaded_transaction`](https://github.com/anza-xyz/agave/blob/v3.1.8/svm/src/transaction_processor.rs#L847)
-tạo một _rs`TransactionContext`_ với tất cả các tài khoản đã tải và gọi
+tạo một `TransactionContext` với tất cả các tài khoản đã tải và gọi
 [`process_message`](https://github.com/anza-xyz/agave/blob/v3.1.8/svm/src/message_processor.rs).
 Các lệnh được thực thi tuần tự theo thứ tự chúng xuất hiện trong thông điệp. Mỗi
-lần gọi lệnh tạo một _rs`InvokeContext`_ và gọi chương trình mục tiêu.
+lần gọi lệnh tạo một `InvokeContext` và gọi chương trình mục tiêu.
 
 #### Chi tiết xử lý lệnh
 
@@ -212,15 +215,15 @@ của runtime lặp qua từng lệnh và gọi chương trình mục tiêu:
 4. Sau khi instruction hoàn thành, runtime
    [xác minh](https://github.com/anza-xyz/agave/blob/v3.1.8/transaction-context/src/lib.rs#L366-L398)
    rằng tổng số dư lamport trên tất cả các instruction account không thay đổi
-   (kiểm tra _rs`UnbalancedInstruction`_).
+   (kiểm tra `UnbalancedInstruction`).
 5. Nếu bất kỳ instruction nào thất bại, toàn bộ transaction sẽ được rollback.
    Không có thay đổi trạng thái trung gian nào được commit.
 
 Mỗi instruction tăng instruction trace. Trace bao gồm cả các instruction cấp cao
 nhất và bất kỳ [CPI](/docs/core/cpi) nào mà chúng gọi. Tổng độ dài trace (các
 instruction cấp cao nhất cộng với tất cả các CPI lồng nhau) không được vượt quá
-64 (_rs`MAX_INSTRUCTION_TRACE_LENGTH`_). Vượt quá giới hạn này sẽ trả về
-_rs`InstructionError::MaxInstructionTraceLengthExceeded`_.
+64 (`MAX_INSTRUCTION_TRACE_LENGTH`). Vượt quá giới hạn này sẽ trả về
+`InstructionError::MaxInstructionTraceLengthExceeded`.
 
 Sau khi thực thi, runtime xác minh rằng:
 
@@ -232,7 +235,7 @@ Sau khi thực thi, runtime xác minh rằng:
 
 Nếu thực thi thành công, các trạng thái account đã sửa đổi từ
 `TransactionContext` được ghi lại vào cache cục bộ theo batch của
-_rs`AccountLoader`_. Nếu thực thi thất bại, chỉ có _rs`RollbackAccounts`_ (fee
+`AccountLoader`. Nếu thực thi thất bại, chỉ có `RollbackAccounts` (fee
 payer với phí đã khấu trừ và nonce đã tăng) được ghi lại. Phí vẫn được thu,
 nhưng tất cả các thay đổi account khác đều bị loại bỏ.
 

@@ -28,89 +28,75 @@ Tanto el remitente como el patrocinador deben firmar la transacción:
 - El **remitente** firma para autorizar la transferencia de sus tokens
 - El **patrocinador** firma para autorizar el pago de la tarifa de red
 
-<Callout>
+<Note>
   Consulta [Cómo funcionan los pagos en
   Solana](/docs/payments/how-payments-work) para conocer los conceptos básicos
   de pagos.
-</Callout>
+</Note>
 
 Los pasos a continuación muestran el flujo principal. Consulta la [Demo](#demo)
 para ver el código completo ejecutable.
 
-<ScrollyCoding>
+<Steps>
+  <Step title="Crear una cuenta de patrocinador">
+    Genera un keypair separado para el patrocinador que pagará las tarifas de
+    transacción. El patrocinador necesita SOL para las tarifas pero no necesita
+    mantener los tokens que se están transfiriendo.
 
-## !!steps Crear una cuenta de patrocinador
+    ```ts title="Patrocinar tarifa de transacción"
+    const sponsor = await generateKeyPairSigner();
+    ```
+  </Step>
 
-Genera un keypair separado para el patrocinador que pagará las tarifas de
-transacción. El patrocinador necesita SOL para las tarifas pero no necesita
-mantener los tokens que se están transfiriendo.
+  <Step title="Crear instrucción de transferencia">
+    Crea la instrucción de transferencia de tokens con el remitente como autoridad.
+    El remitente posee los tokens y debe firmar la transferencia.
 
-<CodePlaceholder title="Patrocinar tarifa de transacción" />
+    ```ts title="Tarifa de transacción del patrocinador" focus={3-10}
+    const sponsor = await generateKeyPairSigner();
 
-```ts !! title="Sponsor Transaction Fee"
-const sponsor = await generateKeyPairSigner();
-```
+    const transferInstruction = getTransferCheckedInstruction({
+      source: senderAta,
+      mint: mint.address,
+      destination: recipientAta,
+      authority: sender, // Sender signs for the transfer
+      amount: 250_000n, // adjusted for the mint's decimals
+      decimals: 6
+    });
+    ```
+  </Step>
 
-## !!steps Crear instrucción de transferencia
+  <Step title="Enviar con patrocinador como pagador de tarifas">
+    Crea el cliente con el patrocinador configurado como pagador de comisiones
+    mediante `payer(sponsor)`, luego llama a `client.sendTransaction`. El
+    patrocinador firma para pagar la comisión de red mientras que el remitente firma
+    para autorizar la transferencia—`sendTransaction` recopila automáticamente cada
+    firmante referenciado.
 
-Crea la instrucción de transferencia de tokens con el remitente como autoridad.
-El remitente posee los tokens y debe firmar la transferencia.
+    ```ts title="Tarifa de transacción del patrocinador" highlight={13} focus={12-16}
+    const sponsor = await generateKeyPairSigner();
 
-<CodePlaceholder title="Tarifa de transacción del patrocinador" />
+    const transferInstruction = getTransferCheckedInstruction({
+      source: senderAta,
+      mint: mint.address,
+      destination: recipientAta,
+      authority: sender,
+      amount: 250_000n,
+      decimals: 6
+    });
 
-```ts !! title="Sponsor Transaction Fee"
-const sponsor = await generateKeyPairSigner();
+    const client = createClient()
+      .use(payer(sponsor)) // Sponsor pays the transaction fees
+      .use(solanaLocalRpc());
 
-// !focus(1:8)
-const transferInstruction = getTransferCheckedInstruction({
-  source: senderAta,
-  mint: mint.address,
-  destination: recipientAta,
-  authority: sender, // Sender signs for the transfer
-  amount: 250_000n, // adjusted for the mint's decimals
-  decimals: 6
-});
-```
-
-## !!steps Enviar con patrocinador como pagador de tarifas
-
-Crea el cliente con el patrocinador configurado como pagador de comisiones
-mediante `payer(sponsor)`, luego llama a `client.sendTransaction`. El
-patrocinador firma para pagar la comisión de red mientras que el remitente firma
-para autorizar la transferencia—`sendTransaction` recopila automáticamente cada
-firmante referenciado.
-
-<CodePlaceholder title="Tarifa de transacción del patrocinador" />
-
-```ts !! title="Sponsor Transaction Fee"
-const sponsor = await generateKeyPairSigner();
-
-const transferInstruction = getTransferCheckedInstruction({
-  source: senderAta,
-  mint: mint.address,
-  destination: recipientAta,
-  authority: sender,
-  amount: 250_000n,
-  decimals: 6
-});
-
-// !focus(1:5)
-const client = createClient()
-  // !mark
-  .use(payer(sponsor)) // Sponsor pays the transaction fees
-  .use(solanaLocalRpc());
-
-const { context } = await client.sendTransaction([transferInstruction]);
-```
-
-</ScrollyCoding>
+    const { context } = await client.sendTransaction([transferInstruction]);
+    ```
+  </Step>
+</Steps>
 
 ### Demo
 
-<CodeTabs flags="r">
-
-```ts !! title="Demo"
-// !collapse(1:15) collapsed
+```ts Demo highlight={20,64} expandable
 // Click ">" icon on left to expand demo imports
 import { createClient, generateKeyPairSigner, lamports } from "@solana/kit";
 import type { KeyPairSigner } from "@solana/kit";
@@ -130,7 +116,6 @@ import {
 // Generate keypairs for sender, recipient, and sponsor (fee payer)
 const sender = await generateKeyPairSigner();
 const recipient = await generateKeyPairSigner();
-// !mark
 const sponsor = await generateKeyPairSigner();
 
 console.log("Sender Address:", sender.address);
@@ -175,7 +160,6 @@ const transferInstruction = getTransferCheckedInstruction({
 
 // Send transaction with sponsor as fee payer using @solana/kit
 // The sponsor (client.payer) pays fees; the sender signs for the transfer
-// !mark
 const { context } = await client.sendTransaction([transferInstruction]);
 const signature = context.signature;
 
@@ -209,7 +193,6 @@ console.log("Fee Payer Address:", feePayer);
 // =============================================================================
 // Demo Setup Helper Function
 // =============================================================================
-// !collapse(1:1000) collapsed
 
 /**
  * Sets up for a sponsored token transfer demo:
@@ -315,14 +298,12 @@ async function demoSetup(
 }
 ```
 
-</CodeTabs>
-
-<Callout type="caution">
+<Danger>
   Cuando creas una token account para un usuario final, este puede cerrarla y
   recuperar el SOL utilizado para rent. Considera cobrar a los usuarios por la
   creación de cuentas en stablecoins, o incluye este costo en la economía de tu
   producto.
-</Callout>
+</Danger>
 
 ## Abstracción de tarifas a escala con Kora
 
@@ -370,7 +351,7 @@ console.log("Signature:", context.signature);
 
 ### Recursos de Kora
 
-<Cards>
+<Columns cols={2}>
   <Card
     title="Inicio Rápido de Kora"
     href="/docs/tools/kora/getting-started/quick-start"
@@ -386,4 +367,4 @@ console.log("Signature:", context.signature);
   <Card title="Guía para Operadores de Nodos" href="/docs/tools/kora/operators">
     Despliega y configura tu propia instancia de Kora.
   </Card>
-</Cards>
+</Columns>

@@ -13,11 +13,11 @@ description: 使用 Mollusk 测试 Solana 程序的综合指南
 
 在 `Cargo.toml` 中添加 `mollusk-svm` 作为依赖项：
 
-```terminal
-$ cargo add mollusk-svm --dev
+```bash Terminal
+cargo add mollusk-svm --dev
 ```
 
-```toml title="Cargo.toml"
+```toml Cargo.toml
 [dev-dependencies]
 mollusk-svm = "0.7"
 ```
@@ -25,11 +25,11 @@ mollusk-svm = "0.7"
 如需基准测试计算单元的使用情况，请在 `Cargo.toml` 中添加 `mollusk-svm-bencher`
 作为依赖项：
 
-```terminal
-$ cargo add mollusk-svm-bencher --dev
+```bash Terminal
+cargo add mollusk-svm-bencher --dev
 ```
 
-```toml title="Cargo.toml"
+```toml Cargo.toml
 [dev-dependencies]
 mollusk-svm-bencher = "0.7"
 ```
@@ -38,11 +38,11 @@ mollusk-svm-bencher = "0.7"
 extensions）和 associated token program，请在 `Cargo.toml` 中添加
 `mollusk-svm-programs-token` 作为依赖项：
 
-```terminal
-$ cargo add mollusk-svm-programs-token --dev
+```bash Terminal
+cargo add mollusk-svm-programs-token --dev
 ```
 
-```toml title="Cargo.toml"
+```toml Cargo.toml
 [dev-dependencies]
 mollusk-svm-programs-token = "0.7"
 ```
@@ -51,137 +51,125 @@ mollusk-svm-programs-token = "0.7"
 
 以下示例展示了如何使用 Mollusk 测试一个基础的 Solana 程序的最小化设置。
 
-<ScrollyCoding>
+<Steps>
+  <Step title="Hello World 程序">
+    本示例演示了如何使用 Mollusk 测试一个基础的 Solana 程序。该程序在被调用时会在程序日志中打印 "Hello,
+    world!"。
 
-## !!steps Hello World 程序
+    运行 `cargo build-sbf` 会在 `/target/deploy/<program_name>.so`
+    生成已编译的程序。
 
-本示例演示了如何使用 Mollusk 测试一个基础的 Solana 程序。该程序在被调用时会在程序日志中打印 "Hello,
-world!"。
+    ```rs src/lib.rs focus={16-30}
+    use solana_program::{
+        account_info::AccountInfo, entrypoint, entrypoint::ProgramResult, msg, pubkey::Pubkey,
+    };
 
-运行 `cargo build-sbf` 会在 `/target/deploy/<program_name>.so`
-生成已编译的程序。
+    entrypoint!(process_instruction);
 
-<CodePlaceholder title="src/lib.rs" />
-
-<WithMentions>
-
-要使用 Mollusk 测试 Solana 程序：
-
-1. [创建 `Mollusk` 实例](mention:mollusk) - 使用程序 ID 和已编译程序的路径（`.so`
-   文件）初始化 Mollusk
-2. [构建指令](mention:instruction) - 创建调用程序的指令
-3. [处理与验证](mention:process) - 使用 Mollusk 处理指令并验证结果
-
-```rs title="src/lib.rs"
-#[cfg(test)]
-mod tests {
-    use mollusk_svm::{result::Check, Mollusk};
-    use solana_sdk::{instruction::Instruction, pubkey::Pubkey};
-
-    #[test]
-    fn test_hello_world() {
-        let program_id = Pubkey::new_unique();
-        // !mention mollusk
-        let mollusk = Mollusk::new(&program_id, "target/deploy/hello_world");
-
-        // !mention instruction
-        let instruction = Instruction::new_with_bytes(program_id, &[], vec![]);
-
-        // !mention process
-        mollusk.process_and_validate_instruction(&instruction, &[], &[Check::success()]);
+    pub fn process_instruction(
+        _program_id: &Pubkey,
+        _accounts: &[AccountInfo],
+        _instruction_data: &[u8],
+    ) -> ProgramResult {
+        msg!("Hello, world!");
+        Ok(())
     }
-}
-```
 
-</WithMentions>
+    #[cfg(test)]
+    mod tests {
+        use mollusk_svm::{result::Check, Mollusk};
+        use solana_sdk::{instruction::Instruction, pubkey::Pubkey};
 
-要执行测试，请运行 `cargo test`。
+        #[test]
+        fn test_hello_world() {
+            let program_id = Pubkey::new_unique();
+            let mollusk = Mollusk::new(&program_id, "target/deploy/hello_world");
 
-当测试成功运行时，你会看到类似如下的输出：
+            let instruction = Instruction::new_with_bytes(program_id, &[], vec![]);
 
-```txt title="Terminal"
-running 1 test
-[2025-09-22T19:25:50.427685000Z DEBUG solana_runtime::message_processor::stable_log] Program 11157t3sqMV725NVRLrVQbAu98Jjfk1uCKehJnXXQs invoke [1]
-[2025-09-22T19:25:50.429669000Z DEBUG solana_runtime::message_processor::stable_log] Program log: Hello, world!
-[2025-09-22T19:25:50.429690000Z DEBUG solana_runtime::message_processor::stable_log] Program 11157t3sqMV725NVRLrVQbAu98Jjfk1uCKehJnXXQs consumed 211 of 1400000 compute units
-[2025-09-22T19:25:50.429726000Z DEBUG solana_runtime::message_processor::stable_log] Program 11157t3sqMV725NVRLrVQbAu98Jjfk1uCKehJnXXQs success
-test tests::test_hello_world ... ok
-
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
-
-   Doc-tests hello_world
-```
-
-```rs !! title="src/lib.rs"
-use solana_program::{
-    account_info::AccountInfo, entrypoint, entrypoint::ProgramResult, msg, pubkey::Pubkey,
-};
-
-entrypoint!(process_instruction);
-
-pub fn process_instruction(
-    _program_id: &Pubkey,
-    _accounts: &[AccountInfo],
-    _instruction_data: &[u8],
-) -> ProgramResult {
-    msg!("Hello, world!");
-    Ok(())
-}
-
-// !focus(1:15)
-#[cfg(test)]
-mod tests {
-    use mollusk_svm::{result::Check, Mollusk};
-    use solana_sdk::{instruction::Instruction, pubkey::Pubkey};
-
-    #[test]
-    fn test_hello_world() {
-        let program_id = Pubkey::new_unique();
-        let mollusk = Mollusk::new(&program_id, "target/deploy/hello_world");
-
-        let instruction = Instruction::new_with_bytes(program_id, &[], vec![]);
-
-        mollusk.process_and_validate_instruction(&instruction, &[], &[Check::success()]);
+            mollusk.process_and_validate_instruction(&instruction, &[], &[Check::success()]);
+        }
     }
-}
-```
+    ```
 
-```toml !! title="Cargo.toml"
-[package]
-name = "hello_world"
-version = "0.1.0"
-edition = "2021"
+    要使用 Mollusk 测试 Solana 程序：
 
-[lib]
-crate-type = ["cdylib", "lib"]
+    1. 创建 `Mollusk` 实例 - 使用程序 ID 和已编译程序的路径（`.so`
+       文件）初始化 Mollusk
+    2. 构建指令 - 创建调用程序的指令
+    3. 处理与验证 - 使用 Mollusk 处理指令并验证结果
 
-[dependencies]
-solana-program = "2.2.0"
+    ```rs src/lib.rs
+    #[cfg(test)]
+    mod tests {
+        use mollusk_svm::{result::Check, Mollusk};
+        use solana_sdk::{instruction::Instruction, pubkey::Pubkey};
 
-[dev-dependencies]
-mollusk-svm = "0.5.0"
-solana-sdk = "2.2.0"
-```
+        #[test]
+        fn test_hello_world() {
+            let program_id = Pubkey::new_unique();
+            let mollusk = Mollusk::new(&program_id, "target/deploy/hello_world");
 
-```txt !! title="target/deploy/hello_world.so"
-[binary]
-```
+            let instruction = Instruction::new_with_bytes(program_id, &[], vec![]);
 
-</ScrollyCoding>
+            mollusk.process_and_validate_instruction(&instruction, &[], &[Check::success()]);
+        }
+    }
+    ```
+
+    要执行测试，请运行 `cargo test`。
+
+    当测试成功运行时，你会看到类似如下的输出：
+
+    ```txt Terminal
+    running 1 test
+    [2025-09-22T19:25:50.427685000Z DEBUG solana_runtime::message_processor::stable_log] Program 11157t3sqMV725NVRLrVQbAu98Jjfk1uCKehJnXXQs invoke [1]
+    [2025-09-22T19:25:50.429669000Z DEBUG solana_runtime::message_processor::stable_log] Program log: Hello, world!
+    [2025-09-22T19:25:50.429690000Z DEBUG solana_runtime::message_processor::stable_log] Program 11157t3sqMV725NVRLrVQbAu98Jjfk1uCKehJnXXQs consumed 211 of 1400000 compute units
+    [2025-09-22T19:25:50.429726000Z DEBUG solana_runtime::message_processor::stable_log] Program 11157t3sqMV725NVRLrVQbAu98Jjfk1uCKehJnXXQs success
+    test tests::test_hello_world ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+       Doc-tests hello_world
+    ```
+
+    ```toml Cargo.toml
+    [package]
+    name = "hello_world"
+    version = "0.1.0"
+    edition = "2021"
+
+    [lib]
+    crate-type = ["cdylib", "lib"]
+
+    [dependencies]
+    solana-program = "2.2.0"
+
+    [dev-dependencies]
+    mollusk-svm = "0.5.0"
+    solana-sdk = "2.2.0"
+    ```
+
+    ```txt target/deploy/hello_world.so
+    [binary]
+    ```
+  </Step>
+</Steps>
 
 [`Mollusk`](https://docs.rs/mollusk-svm/0.5.0/mollusk_svm/struct.Mollusk.html)
 结构体为测试 Solana 程序提供了一个简单的接口。所有字段都可以通过少量辅助方法进行操作，但如果用户需要更多控制，也可以直接访问和修改这些字段。
 
 要用默认实例初始化 Mollusk，请使用 `Mollusk::default` 方法。
 
-```rust title="Example"
+```rust Example
 // Default instance with no custom programs
 let mollusk = Mollusk::default();
 ```
 
 要用特定程序初始化 Mollusk，请使用 `Mollusk::new` 方法。
 
-```rust title="Example"
+```rust Example
 // Initialize Mollusk with a specific program from a file path
 let program_id = Pubkey::new_unique();
 let mollusk = Mollusk::new(&program_id, "target/deploy/my_program");
@@ -189,7 +177,7 @@ let mollusk = Mollusk::new(&program_id, "target/deploy/my_program");
 
 要向 Mollusk 添加程序，请使用 `Mollusk::add_program` 方法。
 
-```rust title="Example"
+```rust Example
 let mollusk = Mollusk::default();
 let program_id = Pubkey::new_unique();
 
@@ -201,21 +189,21 @@ mollusk.add_program(
 );
 ```
 
-<Callout type="info">
+<Info>
   提供文件路径时，不要包含 `.so` 扩展名。例如，`"path/to/my_program"`
   是正确的，但 `"path/to/my_program.so"` 则不正确。
-</Callout>
+</Info>
 
 ### 处理指令
 
 Mollusk 提供了四个主要的指令处理方法：
 
-| 方法                                                                           | 描述                                                               |
-| ------------------------------------------------------------------------------ | ------------------------------------------------------------------ |
-| [`process_instruction`](#single-instruction)                                   | 处理一条指令并返回结果。                                           |
-| [`process_and_validate_instruction`](#single-instruction-with-checks)          | 处理一条指令并对结果进行一系列检查，如有检查未通过则抛出异常。     |
-| [`process_instruction_chain`](#multiple-instructions)                          | 处理多条指令并返回结果。                                           |
-| [`process_and_validate_instruction_chain`](#multiple-instructions-with-checks) | 处理多条指令并对每个结果进行一系列检查，如有检查未通过则抛出异常。 |
+| 方法                                                     | 描述                                |
+| ------------------------------------------------------ | --------------------------------- |
+| [`process_instruction`](#单条指令)                         | 处理一条指令并返回结果。                      |
+| [`process_and_validate_instruction`](#单条指令并带有检查)       | 处理一条指令并对结果进行一系列检查，如有检查未通过则抛出异常。   |
+| [`process_instruction_chain`](#多条指令)                   | 处理多条指令并返回结果。                      |
+| [`process_and_validate_instruction_chain`](#多条指令并带有检查) | 处理多条指令并对每个结果进行一系列检查，如有检查未通过则抛出异常。 |
 
 [`InstructionResult`](https://docs.rs/mollusk-svm-result/0.5.0/mollusk_svm_result/types/struct.InstructionResult.html)
 包含已处理指令的详细信息。
@@ -235,16 +223,14 @@ pub fn process_instruction(
 
 以下示例处理一条不带验证检查的 SOL 转账指令。
 
-<Callout type="info">
+<Info>
 
 下面的示例在 `main` 函数中运行 Mollusk 以便演示。实际使用中，你通常会在带有
 `#[test]` 注解的测试模块中使用 Mollusk。
 
-</Callout>
+</Info>
 
-<CodeTabs flags="r">
-
-```rs !! title="Single Instruction"
+```rs title="Single Instruction"
 use mollusk_svm::Mollusk;
 use solana_sdk::{account::Account, pubkey::Pubkey};
 use solana_system_interface::{instruction::transfer, program::ID as SYSTEM_PROGRAM_ID};
@@ -298,8 +284,6 @@ fn main() {
 }
 ```
 
-</CodeTabs>
-
 #### 单条指令并带有检查
 
 使用 `process_and_validate_instruction`
@@ -316,9 +300,7 @@ pub fn process_and_validate_instruction(
 
 以下示例处理一条带有验证检查的 SOL 转账指令。
 
-<CodeTabs flags="r">
-
-```rs !! title="With Validation"
+```rs title="With Validation"
 use {
     mollusk_svm::{result::Check, Mollusk},
     solana_sdk::{account::Account, pubkey::Pubkey},
@@ -372,8 +354,6 @@ fn main() {
 }
 ```
 
-</CodeTabs>
-
 #### 多条指令
 
 使用 `process_instruction_chain` 方法顺序处理多条指令，不进行验证检查。
@@ -388,9 +368,7 @@ pub fn process_instruction_chain(
 
 以下示例处理两条不带验证检查的 SOL 转账指令。
 
-<CodeTabs flags="r">
-
-```rs !! title="Multiple Instructions"
+```rs title="Multiple Instructions"
 use {
     mollusk_svm::Mollusk,
     solana_sdk::{account::Account, pubkey::Pubkey},
@@ -457,8 +435,6 @@ fn main() {
 }
 ```
 
-</CodeTabs>
-
 #### 多条指令并带有检查
 
 使用 `process_and_validate_instruction_chain`
@@ -474,9 +450,7 @@ pub fn process_and_validate_instruction_chain(
 
 以下示例处理了一组带有每步验证检查的两条 SOL 转账指令。
 
-<CodeTabs flags="r">
-
-```rs !! title="With Validation"
+```rs title="With Validation"
 use {
     mollusk_svm::{result::Check, Mollusk},
     solana_sdk::{account::Account, pubkey::Pubkey},
@@ -571,19 +545,17 @@ fn main() {
 }
 ```
 
-</CodeTabs>
-
 ### 验证检查
 
 Mollusk 提供了一组[辅助方法](https://docs.rs/mollusk-svm-result/0.5.0/mollusk_svm_result/check/struct.Check.html)，用于检查已处理指令的结果。
 
-```rust title="Example"
+```rust Example
 use mollusk_svm::result::Check;
 ```
 
 请使用以下方法验证指令结果：
 
-```rust title="Example"
+```rust Example
 // Program execution succeeded
 Check::success()
 
@@ -608,7 +580,7 @@ Check::return_data(&[1, 2, 3, 4])
 
 请使用以下方法验证账户状态：
 
-```rust title="Example"
+```rust Example
 // Single account validation
 Check::account(&pubkey)
     .lamports(1_000_000)           // Exact lamports
@@ -637,7 +609,7 @@ Check::all_rent_exempt()
 
 可使用 `with_context` 方法创建一个 `account_store`：
 
-```rust title="Example"
+```rust Example highlight={21} focus={9-19,21}
 use std::collections::HashMap;
 use solana_sdk::{account::Account, pubkey::Pubkey};
 use solana_system_interface::program::ID as SYSTEM_PROGRAM_ID;
@@ -646,7 +618,6 @@ use mollusk_svm::Mollusk;
 let mollusk = Mollusk::default();
 let account_address = Pubkey::new_unique();
 
-// !focus(1:11)
 let mut account_store = HashMap::new();
 account_store.insert(
     account_address,
@@ -659,16 +630,12 @@ account_store.insert(
     },
 );
 
-// !focus
-// !mark
 let context = mollusk.with_context(account_store);
 ```
 
 以下示例通过 `account_store` 在两次 SOL 转账指令间保持持久化账户状态。
 
-<CodeTabs flags="r">
-
-```rs !! title="Stateful Testing"
+```rs title="Stateful Testing"
 use {
     mollusk_svm::Mollusk,
     solana_sdk::{account::Account, pubkey::Pubkey},
@@ -727,8 +694,6 @@ fn main() {
 }
 ```
 
-</CodeTabs>
-
 ### Mollusk 系统变量
 
 Mollusk 提供了自定义的
@@ -737,9 +702,7 @@ Mollusk 提供了自定义的
 
 使用 `warp_to_slot` 方法更新系统变量时钟，以模拟前进或后退到指定 slot 的时间。
 
-<CodeTabs flags="r">
-
-```rust !! title="Warp to Slot"
+```rust title="Warp to Slot"
 use mollusk_svm::Mollusk;
 
 fn main() {
@@ -759,14 +722,10 @@ fn main() {
 }
 ```
 
-</CodeTabs>
-
 以下示例展示了如何通过访问 `sysvars` 字段直接修改 Mollusk
 sysvar，以更改 rent 参数。你也可以用同样的方法修改其他 sysvar 的值。
 
-<CodeTabs flags="r">
-
-```rust !! title="Modify Sysvars"
+```rust title="Modify Sysvars"
 use {mollusk_svm::Mollusk, solana_sdk::rent::Rent};
 
 fn main() {
@@ -793,8 +752,6 @@ fn main() {
 }
 ```
 
-</CodeTabs>
-
 ## 计算单元基准测试
 
 [`MolluskComputeUnitBencher`](https://docs.rs/mollusk-svm-bencher/0.5.0/mollusk_svm_bencher/struct.MolluskComputeUnitBencher.html)
@@ -806,9 +763,7 @@ fn main() {
 
 以下示例对 SOL 转账指令的计算单元使用情况进行基准测试。
 
-<CodeTabs>
-
-```rs !! title="Benchmark Compute Units"
+```rs title="Benchmark Compute Units" highlight={42-46} focus={42-46}
 use {
     mollusk_svm::Mollusk,
     mollusk_svm_bencher::MolluskComputeUnitBencher,
@@ -850,8 +805,6 @@ fn main() {
     ];
 
     // Run benchmark
-    // !focus(1:5)
-    // !mark(1:5)
     MolluskComputeUnitBencher::new(mollusk)
         .bench(("transfer", &transfer, &accounts))
         .must_pass(true)
@@ -860,12 +813,10 @@ fn main() {
 }
 ```
 
-</CodeTabs>
-
 基准测试结果会写入指定的 `out_dir`，以名为 `compute_units.md`
 的 markdown 文件保存。
 
-```md title="comput_units.md"
+```md comput_units.md
 #### 2025-09-19 22:28:53.691839 UTC
 
 Solana CLI Version: solana-cli 2.2.20 (src:dabc99a5; feat:3073396398,
@@ -883,16 +834,14 @@ client:Agave)
 crate，将 token program、token2022 program（token extensions）和 associated
 token program 添加到 Mollusk 进行测试。
 
-```rust title="Example"
+```rust Example focus={3,8-13}
 use {
     mollusk_svm::Mollusk,
-    // !focus
     mollusk_svm_programs_token::{associated_token, token, token2022},
 };
 
 let mut mollusk = Mollusk::default();
 
-// !focus(1:6)
 // Add SPL Token Program
 token::add_program(&mut mollusk);
 // Add SPL Token-2022 Program
@@ -903,14 +852,12 @@ associated_token::add_program(&mut mollusk);
 
 以下示例演示了如何使用 Mollusk 测试一次 token 转账。
 
-<Callout type="info">
+<Info>
   下面的示例为演示目的手动定义了测试账户。`mollusk-svm-programs-token`
   还包含用于创建 mint 和 token 账户的辅助函数。
-</Callout>
+</Info>
 
-<CodeTabs flags="r">
-
-```rs !! title="Token Transfer Example"
+```rs title="Token Transfer Example"
 use {
     mollusk_svm::{result::Check, Mollusk},
     mollusk_svm_programs_token::token,
@@ -1075,5 +1022,3 @@ fn main() {
     println!("Destination Token Account: {:#?}", dest_token);
 }
 ```
-
-</CodeTabs>

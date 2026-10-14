@@ -4,7 +4,6 @@ description:
   Створюйте онлайн-акаунти за адресами Solana PDA, використовуючи invoke_signed
   та обмеження init від Anchor. Процес перевірки invoke_signed та шаблони
   створення PDA в Anchor з прикладами коду.
-url: /docs/core/pda/pda-accounts
 type: tutorial
 prerequisites:
   - /docs/core/pda
@@ -18,16 +17,18 @@ related:
 
 {/* TOC: PDA Signing via invoke_signed, Create a PDA Account */}
 
-<Callout type="info" title="Підсумок">
-  Створюйте облікові записи PDA через _rs`invoke_signed`_ з seeds PDA. Тільки
-  програма-власник може підписувати від імені PDA. Обмеження _rs`init`_ в Anchor
+<Info>
+  **Підсумок**
+
+  Створюйте облікові записи PDA через `invoke_signed` з seeds PDA. Тільки
+  програма-власник може підписувати від імені PDA. Обмеження `init` в Anchor
   автоматизує створення облікових записів PDA.
-</Callout>
+</Info>
 
 ## Підписання PDA через `invoke_signed`
 
 Коли програмі потрібно підписати від імені PDA під час CPI, вона використовує
-_rs`invoke_signed`_ з seeds PDA. Runtime верифікує, що seeds виводять очікуваний
+`invoke_signed` з seeds PDA. Runtime верифікує, що seeds виводять очікуваний
 PDA, використовуючи **ID програми, що викликає**, гарантуючи, що тільки
 програма-власник може підписувати. Для повного процесу верифікації дивіться
 [Підписання PDA](/docs/core/cpi/cpi-cost-model#pda-signing).
@@ -38,19 +39,17 @@ PDA, використовуючи **ID програми, що викликає**
 повинні явно створити обліковий запис після виведення адреси.
 
 Щоб створити обліковий запис за PDA, програма, що виводить, викликає інструкцію
-_rs`create_account`_ System Program через [`invoke_signed`](/docs/core/cpi),
+`create_account` System Program через [`invoke_signed`](/docs/core/cpi),
 передаючи seeds PDA, щоб runtime міг верифікувати повноваження програми над цією
 адресою.
 
-<WithMentions>
-
 Приклад нижче використовує [фреймворк Anchor](https://www.anchor-lang.com/docs)
 для створення нового облікового запису з адресою, виведеною програмою. Програма
-включає одну інструкцію [`initialize`](mention:initialize) для створення нового
-облікового запису, який зберігатиме [адресу користувача](mention:user-address)
-та [bump seed](mention:bump), використані для виведення PDA.
+включає одну інструкцію `initialize` для створення нового
+облікового запису, який зберігатиме адресу користувача
+та bump seed, використані для виведення PDA.
 
-```rs title="Program"
+```rs Program highlight={12,14,27,29,40-41}
 use anchor_lang::prelude::*;
 
 declare_id!("75GJVCJNhaukaa2vCCqhreY31gaphv7XTScBChmr1ueR");
@@ -59,16 +58,11 @@ declare_id!("75GJVCJNhaukaa2vCCqhreY31gaphv7XTScBChmr1ueR");
 pub mod pda_account {
     use super::*;
 
-    // !mention initialize
     pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
         let account_data = &mut ctx.accounts.pda_account;
         // store the address of the `user`
-        // !mark
-        // !mention user-address
         account_data.user = *ctx.accounts.user.key;
         // store the canonical bump
-        // !mark
-        // !mention bump
         account_data.bump = ctx.bumps.pda_account;
         Ok(())
     }
@@ -77,18 +71,13 @@ pub mod pda_account {
 #[derive(Accounts)]
 pub struct Initialize<'info> {
     #[account(mut)]
-    // !mention user-address
     pub user: Signer<'info>,
 
     #[account(
         init,
         // define the seeds to derive the PDA
-        // !mark
-        // !mention user-address
         seeds = [b"data", user.key().as_ref()],
         // use the canonical bump
-        // !mark
-        // !mention bump
         bump,
         payer = user,
         space = 8 + DataAccount::INIT_SPACE // 8 bytes for Anchor account discriminator
@@ -100,38 +89,27 @@ pub struct Initialize<'info> {
 #[account]
 #[derive(InitSpace)]
 pub struct DataAccount {
-    // !mark
-    // !mention user-address
     pub user: Pubkey,
-    // !mark
-    // !mention bump
     pub bump: u8,
 }
 ```
 
-</WithMentions>
-
-<WithMentions>
-
-Обмеження [`init`](mention:init) вказує Anchor
+Обмеження `init` вказує Anchor
 [викликати System Program](/docs/core/programs/builtin-programs#the-system-program)
 для створення нового облікового запису, використовуючи PDA як адресу.
-[Seeds](mention:seeds), використані для створення PDA:
+Seeds, використані для створення PDA:
 
 - Фіксований рядок: "data"
 - Адреса облікового запису користувача, надана в інструкції
-- Канонічний [bump seed](mention:bump)
+- Канонічний bump seed
 
 У цьому прикладі обмеженню bump не присвоєно значення, тому Anchor використає
-_rs`find_program_address`_ для виведення PDA та знаходження bump.
+`find_program_address` для виведення PDA та знаходження bump.
 
-```rust title="pda_account"
+```rust pda_account
 #[account(
-    // !mention init
     init,
-    // !mention seeds
     seeds = [b"data", user.key().as_ref()],
-    // !mention bump
     bump,
     payer = user,
     space = 8 + DataAccount::INIT_SPACE // 8 bytes for Anchor account discriminator
@@ -139,19 +117,15 @@ _rs`find_program_address`_ для виведення PDA та знаходжен
 pub pda_account: Account<'info, DataAccount>,
 ```
 
-</WithMentions>
-
-<WithMentions>
-
 Тестовий файл нижче містить транзакцію, яка викликає інструкцію
-[`initialize`](mention:initialize) для створення нового облікового запису з
+`initialize` для створення нового облікового запису з
 адресою, похідною від програми. Файл містить код для
-[виведення PDA](mention:pda).
+виведення PDA.
 
-Приклад також показує, як [отримати](mention:fetch) новий обліковий запис, який
+Приклад також показує, як отримати новий обліковий запис, який
 буде створено.
 
-```ts title="Test"
+```ts Test
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { PdaAccount } from "../target/types/pda_account";
@@ -164,7 +138,6 @@ describe("pda-account", () => {
   const program = anchor.workspace.PdaAccount as Program<PdaAccount>;
   const user = provider.wallet as anchor.Wallet;
 
-  // !mention(1:5) pda
   // Derive the PDA address using the seeds specified on the program
   const [PDA] = PublicKey.findProgramAddressSync(
     [Buffer.from("data"), user.publicKey.toBuffer()],
@@ -173,7 +146,6 @@ describe("pda-account", () => {
 
   it("Is initialized!", async () => {
     const transactionSignature = await program.methods
-      // !mention initialize
       .initialize()
       .accounts({
         user: user.publicKey
@@ -184,17 +156,14 @@ describe("pda-account", () => {
   });
 
   it("Fetch Account", async () => {
-    // !mention fetch
     const pdaAccount = await program.account.dataAccount.fetch(PDA);
     console.log(JSON.stringify(pdaAccount, null, 2));
   });
 });
 ```
 
-</WithMentions>
-
-<Callout type="warn">
+<Warning>
   Якщо ви викличете інструкцію `initialize` знову з тим самим seed адреси
   `user`, транзакція не виконається. Це відбувається тому, що обліковий запис
   вже існує за похідною адресою.
-</Callout>
+</Warning>

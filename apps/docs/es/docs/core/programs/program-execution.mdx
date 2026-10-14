@@ -2,7 +2,6 @@
 title: Ejecución de programas
 description:
   Cómo Solana compila y ejecuta programas, incluyendo la VM sBPF, el modelo de unidades de cómputo, la caché de programas y las syscalls.
-url: /docs/core/programs/program-execution
 type: conceptual
 prerequisites:
   - /docs/core/programs
@@ -16,9 +15,11 @@ related:
 
 {/* TOC: Compilation, Write programs, Program execution model, Program cache, Syscalls */}
 
-<Callout type="info" title="Resumen">
+<Info>
+  **Resumen**
+
   Los programas se compilan a sBPF mediante LLVM y se ejecutan en una VM en sandbox con un presupuesto de 1,4 M de UC por transacción. El runtime almacena en caché hasta 512 programas compilados, proporciona syscalls para registro, CPI, criptografía y memoria, y retrasa los nuevos despliegues en 1 slot.
-</Callout>
+</Info>
 
 ## Compilación
 
@@ -26,11 +27,11 @@ Solana utiliza [LLVM](https://llvm.org/) para compilar programas en binarios
 [ELF](https://en.wikipedia.org/wiki/Executable_and_Linkable_Format)
 que contienen el Formato de Bytecode de Solana (sBPF). El binario ELF se almacena en la cadena en una cuenta ejecutable.
 
-<Callout>
+<Note>
   sBPF es la variante personalizada de Solana del bytecode [eBPF](https://en.wikipedia.org/wiki/EBPF),
   adaptada para el runtime de Solana. No es eBPF estándar y cuenta con
   modificaciones específicas de Solana.
-</Callout>
+</Note>
 
 ## Escribir programas
 
@@ -38,7 +39,7 @@ Los programas de Solana se escriben principalmente en
 [Rust](https://rust-book.cs.brown.edu/title-page.html) mediante uno de tres
 enfoques:
 
-<Cards>
+<Columns cols={2}>
   <Card title="Anchor" href="https://www.anchor-lang.com/docs">
     Un framework que utiliza macros de Rust para reducir el código repetitivo. Recomendado para
     la mayoría de los desarrolladores.
@@ -51,7 +52,7 @@ enfoques:
     Rust directo sin frameworks. Ofrece control total, pero requiere una implementación
     más manual.
   </Card>
-</Cards>
+</Columns>
 
 Consulta [Cross-Program Invocations](/docs/core/cpi) para conocer los conceptos y ejemplos de CPI
 que aplican a estos enfoques.
@@ -72,7 +73,7 @@ Para cada instrucción, el runtime:
 2. **Comprueba las precompilaciones.** Si el programa es una
    [precompile](/docs/core/programs/precompiles), el runtime llama a
    [`process_precompile()`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/invoke_context.rs#L491),
-   que igualmente introduce y extrae un frame de pila (mediante _rs`push()`_ y _rs`pop()`_)
+   que igualmente introduce y extrae un frame de pila (mediante `push()` y `pop()`)
    pero omite la VM sBPF y la búsqueda en la caché de programas, ejecutando el código nativo
    directamente.
 
@@ -80,7 +81,7 @@ Para cada instrucción, el runtime:
    [`InvokeContext::process_instruction()`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/invoke_context.rs#L481)
    y
    [`process_executable_chain()`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/invoke_context.rs#L507),
-   llamados desde _rs`process_message()`_.) Llama a
+   llamados desde `process_message()`.) Llama a
    [`push()`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/invoke_context.rs#L233)
    sobre
    [`InvokeContext`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/invoke_context.rs#L184),
@@ -89,7 +90,7 @@ Para cada instrucción, el runtime:
    programa en la cima actual de la pila de instrucciones) es el mismo programa.
    La auto-recursión profunda (A -> A -> A) está permitida, sujeta a los límites de profundidad de pila.
    Otros patrones de reentrada (p. ej., A llama a B que llama a A) devuelven
-   _rs`InstructionError::ReentrancyNotAllowed`_.
+   `InstructionError::ReentrancyNotAllowed`.
 
 4. **Resuelve el programa.** El runtime llama a
    [`process_executable_chain()`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/invoke_context.rs#L507),
@@ -110,7 +111,7 @@ Para cada instrucción, el runtime:
    - Serializa los datos de cuenta en un búfer de parámetros plano
    - Crea la VM sBPF con regiones de pila, heap y memoria
    - Ejecuta el código compilado, consumiendo unidades de cómputo durante la ejecución. Devuelve
-     _rs`ComputationalBudgetExceeded`_ si se supera el presupuesto.
+     `ComputationalBudgetExceeded` si se supera el presupuesto.
    - Deserializa los datos de cuenta del búfer de vuelta al estado de la cuenta
 
 6. **Extrae el frame de pila.** Llama a
@@ -151,14 +152,14 @@ Los programas recién desplegados o actualizados no son efectivos de inmediato. 
 [`DELAY_VISIBILITY_SLOT_OFFSET`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/loaded_programs.rs#L32)
 es `1`, lo que significa que un programa desplegado en el slot N se vuelve efectivo en el slot
 N+1. Durante el slot de despliegue, cualquier intento de invocar la nueva versión devuelve
-_rs`DelayVisibility`_, lo que hace que el runtime informe "El programa no está desplegado."
+`DelayVisibility`, lo que hace que el runtime informe "El programa no está desplegado."
 
 ### Política de expulsión
 
 La caché almacena hasta
 [`MAX_LOADED_ENTRY_COUNT`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/loaded_programs.rs#L31)
 (512) entradas de programas compilados. Cuando se alcanza el límite, los programas menos utilizados
-son expulsados al estado _rs`Unloaded`_. El uso se rastrea mediante
+son expulsados al estado `Unloaded`. El uso se rastrea mediante
 [`tx_usage_counter`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/loaded_programs.rs#L197)
 (incrementado cada vez que una transacción referencia el programa) y
 [`latest_access_slot`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/loaded_programs.rs#L199).
@@ -178,4 +179,4 @@ almacenan en una estructura
 [`TransactionReturnData`](https://github.com/anza-xyz/agave/blob/v3.1.8/transaction-context/src/lib.rs#L499)
 a nivel de transacción que contiene los bytes de datos y el `program_id` del programa cuya
 instrucción llamó a la syscall. El tamaño máximo es de 1024 bytes
-(_rs`MAX_RETURN_DATA`_).
+(`MAX_RETURN_DATA`).

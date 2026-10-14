@@ -17,11 +17,11 @@ token account du destinataire. Si le destinataire reçoit ce token pour la
 première fois, son token account peut être créé dans le cadre de la même
 transaction.
 
-<Callout>
+<Note>
   Consultez [Comment fonctionnent les paiements sur
   Solana](/docs/payments/how-payments-work) pour les concepts de paiement
   fondamentaux.
-</Callout>
+</Note>
 
 Le plugin `token2022Program()` de `@solana-program/token-2022` étend votre
 client [`@solana/kit`](/docs/frontend/client) avec un helper `client.token2022`.
@@ -29,118 +29,104 @@ Sa méthode `transferToATA` gère automatiquement la dérivation des ATA et la
 construction des transactions, ce qui est idéal pour les transferts de paiement
 uniques.
 
-Les étapes ci-dessous montrent le flux principal. Consultez la [Démo](#demo)
+Les étapes ci-dessous montrent le flux principal. Consultez la [Démo](#démo)
 pour le code complet exécutable.
 
-<ScrollyCoding>
+<Steps>
+  <Step title="Créer l'assistant de token">
+    Ajoutez le plugin `token2022Program()` à votre client avec
+    `.use(token2022Program())`. Cela expose `client.token2022`, dont les
+    `instructions` fournissent des méthodes pour les opérations courantes sur les
+    tokens.
 
-## !!steps Créer l'assistant de token
+    Utilisez `token2022Program()` pour les mints appartenant au programme
+    Token-2022, ou `tokenProgram()` de `@solana-program/token` pour les mints
+    appartenant au Token Program d'origine.
 
-Ajoutez le plugin `token2022Program()` à votre client avec
-`.use(token2022Program())`. Cela expose `client.token2022`, dont les
-`instructions` fournissent des méthodes pour les opérations courantes sur les
-tokens.
+    ```ts title="Paiement de base" focus={1-4}
+    const client = createClient()
+      .use(signer(sender))
+      .use(solanaLocalRpc())
+      .use(token2022Program());
+    ```
+  </Step>
 
-Utilisez `token2022Program()` pour les mints appartenant au programme
-Token-2022, ou `tokenProgram()` de `@solana-program/token` pour les mints
-appartenant au Token Program d'origine.
+  <Step title="Envoyer le paiement">
+    Utilisez `transferToATA()` pour transférer des tokens entre portefeuilles. La
+    méthode gère :
 
-<CodePlaceholder title="Paiement de base" />
+    - **Résolution des ATA** : Dérive automatiquement les Associated Token Accounts
+      (ATAs) pour l'expéditeur et le destinataire. Si l'ATA du destinataire n'existe
+      pas, l'instruction de création du compte est automatiquement ajoutée à la même
+      transaction.
+    - **Montants vérifiés** : Passez `amount` en unités de base ainsi que les
+      `decimals` du mint. Le transfert est vérifié par rapport aux décimales du mint
+      on-chain (ex. : 250 000 unités de base -> 0,25 tokens, si le mint a 6
+      décimales)
+    - **Construction des transactions** : `sendTransaction()` construit, signe et
+      envoie la transaction, qui se résout en un résultat dont `context.signature`
+      contient la signature de la transaction
 
-```ts !! title="Basic Payment"
-// !focus(1:4)
-const client = createClient()
-  .use(signer(sender))
-  .use(solanaLocalRpc())
-  .use(token2022Program());
-```
+    ```ts title="Basic Payment" focus={6-14}
+    const client = createClient()
+      .use(signer(sender))
+      .use(solanaLocalRpc())
+      .use(token2022Program());
 
-## !!steps Envoyer le paiement
+    const result = await client.token2022.instructions
+      .transferToATA({
+        mint: mint.address,
+        authority: sender,
+        recipient: recipient.address,
+        amount: 250_000n,
+        decimals: 6
+      })
+      .sendTransaction();
+    ```
+  </Step>
 
-Utilisez `transferToATA()` pour transférer des tokens entre portefeuilles. La
-méthode gère :
+  <Step title="Vérifier les soldes">
+    Une fois le transfert terminé, lisez les soldes de tokens depuis le RPC. Dérivez
+    l'ATA de chaque portefeuille avec `findAssociatedTokenPda()`, puis appelez
+    `getTokenAccountBalance()` pour récupérer le solde de ce compte.
 
-- **Résolution des ATA** : Dérive automatiquement les Associated Token Accounts
-  (ATAs) pour l'expéditeur et le destinataire. Si l'ATA du destinataire n'existe
-  pas, l'instruction de création du compte est automatiquement ajoutée à la même
-  transaction.
-- **Montants vérifiés** : Passez `amount` en unités de base ainsi que les
-  `decimals` du mint. Le transfert est vérifié par rapport aux décimales du mint
-  on-chain (ex. : 250 000 unités de base -> 0,25 tokens, si le mint a 6
-  décimales)
-- **Construction des transactions** : `sendTransaction()` construit, signe et
-  envoie la transaction, qui se résout en un résultat dont `context.signature`
-  contient la signature de la transaction
+    ```ts title="Basic Payment" focus={16-29}
+    const client = createClient()
+      .use(signer(sender))
+      .use(solanaLocalRpc())
+      .use(token2022Program());
 
-<CodePlaceholder title="Basic Payment" />
+    const result = await client.token2022.instructions
+      .transferToATA({
+        mint: mint.address,
+        authority: sender,
+        recipient: recipient.address,
+        amount: 250_000n,
+        decimals: 6
+      })
+      .sendTransaction();
 
-```ts !! title="Basic Payment"
-const client = createClient()
-  .use(signer(sender))
-  .use(solanaLocalRpc())
-  .use(token2022Program());
-
-// !focus(1:9)
-const result = await client.token2022.instructions
-  .transferToATA({
-    mint: mint.address,
-    authority: sender,
-    recipient: recipient.address,
-    amount: 250_000n,
-    decimals: 6
-  })
-  .sendTransaction();
-```
-
-## !!steps Vérifier les soldes
-
-Une fois le transfert terminé, lisez les soldes de tokens depuis le RPC. Dérivez
-l'ATA de chaque portefeuille avec `findAssociatedTokenPda()`, puis appelez
-`getTokenAccountBalance()` pour récupérer le solde de ce compte.
-
-<CodePlaceholder title="Basic Payment" />
-
-```ts !! title="Basic Payment"
-const client = createClient()
-  .use(signer(sender))
-  .use(solanaLocalRpc())
-  .use(token2022Program());
-
-const result = await client.token2022.instructions
-  .transferToATA({
-    mint: mint.address,
-    authority: sender,
-    recipient: recipient.address,
-    amount: 250_000n,
-    decimals: 6
-  })
-  .sendTransaction();
-
-// !focus(1:14)
-const [senderAta] = await findAssociatedTokenPda({
-  mint: mint.address,
-  owner: sender.address,
-  tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
-});
-const [recipientAta] = await findAssociatedTokenPda({
-  mint: mint.address,
-  owner: recipient.address,
-  tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
-});
-const senderBalance = await client.rpc.getTokenAccountBalance(senderAta).send();
-const recipientBalance = await client.rpc
-  .getTokenAccountBalance(recipientAta)
-  .send();
-```
-
-</ScrollyCoding>
+    const [senderAta] = await findAssociatedTokenPda({
+      mint: mint.address,
+      owner: sender.address,
+      tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
+    });
+    const [recipientAta] = await findAssociatedTokenPda({
+      mint: mint.address,
+      owner: recipient.address,
+      tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
+    });
+    const senderBalance = await client.rpc.getTokenAccountBalance(senderAta).send();
+    const recipientBalance = await client.rpc
+      .getTokenAccountBalance(recipientAta)
+      .send();
+    ```
+  </Step>
+</Steps>
 
 ### Démo
 
-<CodeTabs flags="r">
-
-```ts !! title="Demo"
-// !collapse(1:14) collapsed
+```ts Demo highlight={34-42} expandable
 // Click ">" icon on left to expand demo imports
 import {
   createClient,
@@ -174,7 +160,6 @@ console.log("\nMint Address:", mint.address);
 
 // Transfer tokens from sender to recipient. The source and destination ATAs are
 // derived automatically, and the recipient's ATA is created if it does not exist.
-// !mark(1:9)
 const result = await client.token2022.instructions
   .transferToATA({
     mint: mint.address,
@@ -217,7 +202,6 @@ console.log(
 // =============================================================================
 // Demo Setup Helper Function
 // =============================================================================
-// !collapse(1:1000) collapsed
 
 /**
  * Sets up for a token transfer demo:
@@ -271,5 +255,3 @@ async function demoSetup(sender: TransactionSigner) {
   };
 }
 ```
-
-</CodeTabs>

@@ -3,7 +3,6 @@ title: Eksekusi dan hak akses CPI
 description:
   Alur eksekusi CPI 11 langkah melalui runtime Solana, aturan ekstensi hak
   akses, pembatasan reentrancy, dan pemeriksaan program yang diotorisasi.
-url: /docs/core/cpi/cpi-execution
 type: reference
 prerequisites:
   - /docs/core/cpi
@@ -17,12 +16,14 @@ related:
 
 {/* TOC: CPI execution flow, Privilege rules */}
 
-<Callout type="info" title="Ringkasan">
+<Info>
+  **Ringkasan**
+
   CPI melewati 11 langkah runtime termasuk pemeriksaan hak akses, translasi
   akun, dan sinkronisasi data. Kedalaman panggilan maksimal: 5 (9 dengan
   SIMD-0268). Aturan hak akses mencegah callee meningkatkan hak akses melebihi
   yang diberikan caller.
-</Callout>
+</Info>
 
 ## Aturan hak akses
 
@@ -51,7 +52,7 @@ Aturan privilege dapat dirangkum sebagai:
 2. **Privilege signer memerlukan otorisasi.** Sebuah akun dapat menjadi signer
    dalam yang dipanggil hanya jika (a) akun tersebut sudah menjadi signer dalam
    pemanggil, ATAU (b) akun tersebut adalah PDA yang diturunkan dari seed
-   program pemanggil melalui _rs`invoke_signed`_.
+   program pemanggil melalui `invoke_signed`.
 3. **Pengurangan privilege selalu diizinkan.** Yang dipanggil dapat menggunakan
    privilege lebih sedikit daripada yang diberikan oleh pemanggil.
 
@@ -61,7 +62,7 @@ CPI melewati beberapa lapisan runtime. Bagian ini mendokumentasikan pipeline
 lengkap dari panggilan SDK program melalui batas syscall ke dalam runtime dan
 kembali. Setiap langkah merujuk pada file sumber yang mengimplementasikannya.
 
-<Callout>
+<Note>
   Tinggi maksimum dari pemanggilan instruksi program disebut
   [`max_instruction_stack_depth`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/execution_budget.rs#L66)
   dan diatur ke konstanta
@@ -72,7 +73,7 @@ Stack height 1 adalah instruksi transaksi awal. Setiap CPI menambah height
 sebesar 1. Maksimum 5 berarti program dapat melakukan CPI hingga kedalaman 4
 level (8 level dengan SIMD-0268).
 
-</Callout>
+</Note>
 
 ### Langkah 1: Program memanggil `invoke` atau `invoke_signed`
 
@@ -80,9 +81,9 @@ Program memanggil
 [`invoke`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/program/src/program.rs#L26)
 atau
 [`invoke_signed`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/program/src/program.rs#L51).
-_rs`invoke`_ adalah wrapper tipis yang memanggil _rs`invoke_signed`_ dengan
-array signer seeds kosong. Fungsi SDK menserialisasi _rs`Instruction`_, slice
-_rs`AccountInfo`_, dan signer seeds ke dalam memori VM, kemudian memicu syscall.
+`invoke` adalah wrapper tipis yang memanggil `invoke_signed` dengan
+array signer seeds kosong. Fungsi SDK menserialisasi `Instruction`, slice
+`AccountInfo`, dan signer seeds ke dalam memori VM, kemudian memicu syscall.
 
 ### Langkah 2: Entry syscall
 
@@ -93,7 +94,7 @@ yang memanggil entry point bersama:
 
 ### Langkah 3: Konsumsi biaya invokasi
 
-Tindakan pertama di dalam _rs`cpi_common`_ adalah
+Tindakan pertama di dalam `cpi_common` adalah
 [menagih biaya invokasi tetap](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/cpi.rs#L815-L818)
 dari compute meter bersama:
 [`invoke_units`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/execution_budget.rs#L108)
@@ -104,7 +105,7 @@ dari compute meter bersama:
 Syscall handler menerjemahkan instruksi dari ruang alamat VM program ke tipe
 Rust sisi host melalui
 [`translate_instruction_rust`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/cpi.rs#L529-L590),
-yang membaca struct _rs`StableInstruction`_, memvalidasi panjang data terhadap
+yang membaca struct `StableInstruction`, memvalidasi panjang data terhadap
 [`MAX_INSTRUCTION_DATA_LEN`](https://github.com/anza-xyz/agave/blob/v3.1.8/transaction-context/src/lib.rs#L33)
 (10.240 byte), kemudian menagih
 [biaya serialisasi data](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/cpi.rs#L551-L569).
@@ -152,8 +153,8 @@ Pelanggaran mengembalikan
 
 Runtime memanggil
 [`prepare_next_instruction`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/invoke_context.rs#L293-L432)
-yang membangun daftar _rs`InstructionAccount`_ callee dan menerapkan aturan
-privilege. Lihat [Aturan privilege](#privilege-rules) di bawah untuk tabel
+yang membangun daftar `InstructionAccount` callee dan menerapkan aturan
+privilege. Lihat [Aturan privilege](#aturan-hak-akses) di bawah untuk tabel
 keputusan lengkap.
 
 ### Langkah 8: Terjemahkan info akun
@@ -161,7 +162,7 @@ keputusan lengkap.
 Handler memanggil `translate_accounts` yang:
 
 1. [Memvalidasi jumlah info akun](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/cpi.rs#L164-L190)
-   terhadap _rs`MAX_CPI_ACCOUNT_INFOS`_ (128, atau 255 dengan SIMD-0339).
+   terhadap `MAX_CPI_ACCOUNT_INFOS` (128, atau 255 dengan SIMD-0339).
 2. [Mengenakan biaya terjemahan info akun](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/cpi.rs#L969-L981)
    (hanya SIMD-0339): `(num_account_infos * 80) / 250` CU.
 3. Untuk setiap akun yang tidak dapat dieksekusi dan tidak duplikat, membangun
@@ -188,11 +189,11 @@ yang:
 
 1. Memanggil
    [`push()`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/invoke_context.rs#L233-L265)
-   untuk menambahkan frame baru ke stack instruksi. _rs`push()`_ memberlakukan
+   untuk menambahkan frame baru ke stack instruksi. `push()` memberlakukan
    [aturan reentrancy](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/invoke_context.rs#L243-L259):
    sebuah program hanya dapat memanggil dirinya sendiri jika ia adalah pemanggil
    langsung (yaitu, program A dapat memanggil A, tetapi A tidak dapat memanggil
-   B yang memanggil A). Pelanggaran mengembalikan _rs`ReentrancyNotAllowed`_.
+   B yang memanggil A). Pelanggaran mengembalikan `ReentrancyNotAllowed`.
 2. Memanggil
    [`process_executable_chain`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/invoke_context.rs#L507-L602)
    yang menyelesaikan entry point program yang dipanggil dan memanggilnya. Yang
@@ -201,7 +202,7 @@ yang:
 3. Memanggil
    [`pop()`](https://github.com/anza-xyz/agave/blob/v3.1.8/transaction-context/src/lib.rs#L366-L398)
    untuk menghapus frame yang dipanggil dan memverifikasi bahwa saldo lamport
-   tidak berubah (_rs`UnbalancedInstruction`_ jika tidak).
+   tidak berubah (`UnbalancedInstruction` jika tidak).
 
 ### Langkah 11: Sinkronisasi akun pasca-CPI (yang dipanggil ke pemanggil)
 

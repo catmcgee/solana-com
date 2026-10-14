@@ -9,152 +9,130 @@ Solana的备忘录程序允许您在任何支付中附加发票号、订单ID或
 
 Memo 程序会将文本写入交易日志。这些日志会被区块浏览器和 RPC 服务商索引，使备注内容可以被搜索，便于支付对账。
 
-<Callout>
+<Note>
   参见 [Solana 支付原理](/docs/payments/how-payments-work) 了解核心支付概念。
-</Callout>
+</Note>
 
 添加备注需要直接构建指令，这样你可以完全控制交易中包含的内容。
 
-以下步骤展示了核心流程。完整可运行代码请参见 [演示](#demo)。
+以下步骤展示了核心流程。完整可运行代码请参见 [演示](#演示)。
 
-<ScrollyCoding>
+<Steps>
+  <Step title="导入 Memo 程序">
+    从 `getAddMemoInstruction` 导入 `@solana-program/memo`，用于创建 memo 指令。
 
-## !!steps 导入 Memo 程序
+    ```ts 带备注的支付 focus={1}
+    import { getAddMemoInstruction } from "@solana-program/memo";
+    ```
+  </Step>
 
-从 `getAddMemoInstruction` 导入 `@solana-program/memo`，用于创建 memo 指令。
+  <Step title="创建转账指令">
+    创建代币转账指令，指定源 ATA、目标 ATA、授权人（签名者）以及以基础单位计的金额。
 
-<CodePlaceholder title="带备注的支付" />
+    ```ts 带备注的支付 focus={3-8}
+    import { getAddMemoInstruction } from "@solana-program/memo";
 
-```ts !! title="Payment with Memo"
-// !focus
-import { getAddMemoInstruction } from "@solana-program/memo";
-```
+    const transferInstruction = getTransferInstruction({
+      source: senderAta,
+      destination: recipientAta,
+      authority: sender.address,
+      amount: 250_000n // adjusted for the mint's decimals
+    });
+    ```
+  </Step>
 
-## !!steps 创建转账指令
+  <Step title="创建 Memo 指令">
+    创建带有消息的 memo 指令。该消息将在交易的程序日志中可见。
 
-创建代币转账指令，指定源 ATA、目标 ATA、授权人（签名者）以及以基础单位计的金额。
+    ```ts 带备注的支付 focus={10-12}
+    import { getAddMemoInstruction } from "@solana-program/memo";
 
-<CodePlaceholder title="带备注的支付" />
+    const transferInstruction = getTransferInstruction({
+      source: senderAta,
+      destination: recipientAta,
+      authority: sender.address,
+      amount: 250_000n
+    });
 
-```ts !! title="Payment with Memo"
-import { getAddMemoInstruction } from "@solana-program/memo";
+    const memoInstruction = getAddMemoInstruction({
+      memo: "Payment for services rendered - Invoice #12345"
+    });
+    ```
+  </Step>
 
-// !focus(1:6)
-const transferInstruction = getTransferInstruction({
-  source: senderAta,
-  destination: recipientAta,
-  authority: sender.address,
-  amount: 250_000n // adjusted for the mint's decimals
-});
-```
+  <Step title="发送带备注的交易">
+    将转账指令和 memo 指令合并到同一笔交易中。
 
-## !!steps 创建 Memo 指令
+    ```ts 带备注的支付 highlight={16} focus={14-16}
+    import { getAddMemoInstruction } from "@solana-program/memo";
 
-创建带有消息的 memo 指令。该消息将在交易的程序日志中可见。
+    const transferInstruction = getTransferInstruction({
+      source: senderAta,
+      destination: recipientAta,
+      authority: sender.address,
+      amount: 250_000n
+    });
 
-<CodePlaceholder title="带备注的支付" />
+    const memoInstruction = getAddMemoInstruction({
+      memo: "Payment for services rendered - Invoice #12345"
+    });
 
-```ts !! title="Payment with Memo"
-import { getAddMemoInstruction } from "@solana-program/memo";
+    const {
+      context: { signature }
+    } = await client.sendTransaction([transferInstruction, memoInstruction]);
+    ```
+  </Step>
 
-const transferInstruction = getTransferInstruction({
-  source: senderAta,
-  destination: recipientAta,
-  authority: sender.address,
-  amount: 250_000n
-});
+  <Step title="在交易日志中查看 Memo">
+    交易确认后，获取该交易即可在日志中查看 Memo。Memo 会作为 Memo 程序的日志消息显示。
 
-// !focus(1:3)
-const memoInstruction = getAddMemoInstruction({
-  memo: "Payment for services rendered - Invoice #12345"
-});
-```
+    ```ts title="带有 Memo 的支付" focus={18-26}
+    import { getAddMemoInstruction } from "@solana-program/memo";
 
-## !!steps 发送带备注的交易
+    const transferInstruction = getTransferInstruction({
+      source: senderAta,
+      destination: recipientAta,
+      authority: sender.address,
+      amount: 250_000n
+    });
 
-将转账指令和 memo 指令合并到同一笔交易中。
+    const memoInstruction = getAddMemoInstruction({
+      memo: "Payment for services rendered - Invoice #12345"
+    });
 
-<CodePlaceholder title="带备注的支付" />
+    const {
+      context: { signature }
+    } = await client.sendTransaction([transferInstruction, memoInstruction]);
 
-```ts !! title="Payment with Memo"
-import { getAddMemoInstruction } from "@solana-program/memo";
+    const transaction = await client.rpc
+      .getTransaction(signature, {
+        encoding: "jsonParsed",
+        maxSupportedTransactionVersion: 1
+      })
+      .send();
 
-const transferInstruction = getTransferInstruction({
-  source: senderAta,
-  destination: recipientAta,
-  authority: sender.address,
-  amount: 250_000n
-});
+    console.log("Transaction logs with Memo:");
+    console.log(transaction?.meta?.logMessages);
+    ```
 
-const memoInstruction = getAddMemoInstruction({
-  memo: "Payment for services rendered - Invoice #12345"
-});
-
-// !focus(1:3)
-const {
-  context: { signature }
-  // !mark
-} = await client.sendTransaction([transferInstruction, memoInstruction]);
-```
-
-## !!steps 在交易日志中查看 Memo
-
-交易确认后，获取该交易即可在日志中查看 Memo。Memo 会作为 Memo 程序的日志消息显示。
-
-<CodePlaceholder title="带有 Memo 的支付" />
-
-```sh title="Example Transaction Logs"
-"Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb invoke [1]",
-"Program log: Instruction: Transfer",
-"Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 1682 of 200000 compute units",
-"Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb success",
-"Program MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr invoke [1]",
-# !mark
-'Program log: Memo (len 46): "Payment for services rendered - Invoice #12345"',
-"Program MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr consumed 18097 of 198318 compute units",
-"Program MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr success",
-"Program ComputeBudget111111111111111111111111111111 invoke [1]",
-"Program ComputeBudget111111111111111111111111111111 success"
-```
-
-```ts !! title="Payment with Memo"
-import { getAddMemoInstruction } from "@solana-program/memo";
-
-const transferInstruction = getTransferInstruction({
-  source: senderAta,
-  destination: recipientAta,
-  authority: sender.address,
-  amount: 250_000n
-});
-
-const memoInstruction = getAddMemoInstruction({
-  memo: "Payment for services rendered - Invoice #12345"
-});
-
-const {
-  context: { signature }
-} = await client.sendTransaction([transferInstruction, memoInstruction]);
-
-// !focus(1:9)
-const transaction = await client.rpc
-  .getTransaction(signature, {
-    encoding: "jsonParsed",
-    maxSupportedTransactionVersion: 1
-  })
-  .send();
-
-console.log("Transaction logs with Memo:");
-console.log(transaction?.meta?.logMessages);
-```
-
-</ScrollyCoding>
+    ```sh title="Example Transaction Logs" highlight={6}
+    "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb invoke [1]",
+    "Program log: Instruction: Transfer",
+    "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 1682 of 200000 compute units",
+    "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb success",
+    "Program MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr invoke [1]",
+    'Program log: Memo (len 46): "Payment for services rendered - Invoice #12345"',
+    "Program MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr consumed 18097 of 198318 compute units",
+    "Program MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr success",
+    "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+    "Program ComputeBudget111111111111111111111111111111 success"
+    ```
+  </Step>
+</Steps>
 
 ### 演示
 
-<CodeTabs flags="r">
-
-```ts !! title="Demo"
-// !collapse(1:16) collapsed
+```ts Demo highlight={16,60-62,67} expandable
 // Click ">" icon on left to expand demo imports
 import { createClient, generateKeyPairSigner, lamports } from "@solana/kit";
 import type { KeyPairSigner } from "@solana/kit";
@@ -170,7 +148,6 @@ import {
   getMintToInstruction,
   getTransferInstruction
 } from "@solana-program/token-2022";
-// !mark
 import { getAddMemoInstruction } from "@solana-program/memo";
 
 // Generate keypairs for sender and recipient
@@ -215,7 +192,6 @@ const transferInstruction = getTransferInstruction({
 });
 
 // Create instruction to add a memo to the transaction
-// !mark(1:3)
 const memoInstruction = getAddMemoInstruction({
   memo: "Payment for services rendered - Invoice #12345"
 });
@@ -223,7 +199,6 @@ const memoInstruction = getAddMemoInstruction({
 // Send transaction with both transfer and memo
 const {
   context: { signature }
-  // !mark
 } = await client.sendTransaction([transferInstruction, memoInstruction]);
 
 console.log("\n=== Token Payment with Memo Complete ===");
@@ -255,7 +230,6 @@ console.log(transaction?.meta?.logMessages);
 // =============================================================================
 // Demo Setup Helper Function
 // =============================================================================
-// !collapse(1:1000) collapsed
 
 /**
  * Sets up for a token transfer with memo demo:
@@ -354,5 +328,3 @@ async function demoSetup(sender: KeyPairSigner, recipient: KeyPairSigner) {
   };
 }
 ```
-
-</CodeTabs>

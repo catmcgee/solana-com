@@ -4,7 +4,6 @@ description:
   Comment le runtime Solana charge et valide les comptes avant l'exécution, et
   le format de sérialisation utilisé pour transmettre les données de compte aux
   programmes.
-url: /docs/core/accounts/account-runtime
 type: reference
 prerequisites:
   - /docs/core/accounts
@@ -16,18 +15,20 @@ related:
   - /docs/core/constants-reference
 ---
 
-<Callout type="info" title="Résumé">
+<Info>
+  **Résumé**
+
   Avant l'exécution, le runtime charge les comptes, valide le payeur de frais,
   vérifie l'exemption de loyer et sérialise les données de compte dans une
   disposition mémoire accessible aux programmes.
-</Callout>
+</Info>
 
-<Callout>
+<Note>
   Cette page couvre les mécanismes internes du runtime. La plupart des
   développeurs n'ont pas besoin de ces informations pour créer des programmes.
   Consultez [Structure des comptes](/docs/core/accounts/account-structure) pour
   la vue destinée aux développeurs.
-</Callout>
+</Note>
 
 ## Chargement des comptes
 
@@ -45,7 +46,7 @@ Ce processus effectue plusieurs validations :
    minimum d'exemption de loyer. Les comptes nonce doivent toujours conserver
    suffisamment de lamports pour rester exemptés de loyer. Si le payeur n'est ni
    un compte système ni un compte nonce, la transaction échoue avec
-   _rs`TransactionError::InvalidAccountForFee`_.
+   `TransactionError::InvalidAccountForFee`.
 
 2. **Limite de taille des données chargées** : la taille totale de tous les
    comptes chargés (incluant un
@@ -53,16 +54,16 @@ Ce processus effectue plusieurs validations :
    de 64 octets par compte) ne doit pas dépasser
    [`MAX_LOADED_ACCOUNTS_DATA_SIZE_BYTES`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/execution_budget.rs#L53)
    (64 Mio). Le dépassement de cette limite produit
-   _rs`TransactionError::MaxLoadedAccountsDataSizeExceeded`_.
+   `TransactionError::MaxLoadedAccountsDataSizeExceeded`.
 
 3. **Validation du compte de programme** : chaque programme invoqué par une
    instruction doit exister et appartenir à un chargeur valide : l'un des
    [`PROGRAM_OWNERS`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/account/src/lib.rs#L802)
    (BPF Loader Upgradeable, BPF Loader, BPF Loader Deprecated, Loader V4) ou le
    chargeur natif. Si le compte de programme n'existe pas, la transaction échoue
-   avec _rs`TransactionError::ProgramAccountNotFound`_. S'il existe mais possède
+   avec `TransactionError::ProgramAccountNotFound`. S'il existe mais possède
    un propriétaire invalide, la transaction échoue avec
-   _rs`TransactionError::InvalidProgramForExecution`_.
+   `TransactionError::InvalidProgramForExecution`.
 
 4. **Comptes inexistants** : Les comptes qui n'existent pas onchain sont chargés
    en tant que comptes par défaut (0 lamport, données vides, détenus par System
@@ -128,15 +129,15 @@ en trouvant le premier index au niveau de l'instruction qui y correspond :
   première occurrence.
 
 Étant donné que toutes les références au même compte partagent le même
-_rs`AccountSharedData`_ sous-jacent, les modifications effectuées via n'importe
+`AccountSharedData` sous-jacent, les modifications effectuées via n'importe
 quelle référence sont immédiatement visibles via toutes les autres références.
 Cependant, un seul emprunt mutable peut être détenu à la fois. Tenter
 d'emprunter le même compte de manière mutable via deux index de compte
 d'instruction différents simultanément retourne
-_rs`InstructionError::AccountBorrowFailed`_. Les programmes doivent libérer un
+`InstructionError::AccountBorrowFailed`. Les programmes doivent libérer un
 emprunt avant d'en acquérir un autre sur le même compte sous-jacent.
 
 Après l'exécution du programme, le runtime désérialise le buffer
 ([`deserialize_parameters_aligned()`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/serialization.rs#L580-L667))
 et applique tous les changements à `lamports`, `data` (y compris les changements
-de longueur jusqu'à _rs`MAX_PERMITTED_DATA_INCREASE`_), et `owner`.
+de longueur jusqu'à `MAX_PERMITTED_DATA_INCREASE`), et `owner`.

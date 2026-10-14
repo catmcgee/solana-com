@@ -2,7 +2,6 @@
 title: Структура транзакции
 description:
   "Анатомия транзакции Solana: подписи, формат сообщения, заголовок, адреса аккаунтов, blockhash, скомпилированные инструкции, бинарное кодирование и лимит размера."
-url: /docs/core/transactions/transaction-structure
 type: conceptual
 prerequisites:
   - /docs/core/transactions
@@ -16,49 +15,51 @@ related:
 
 {/* TOC: Signatures, Message (Header, Account addresses, Recent blockhash, Instructions), Transaction binary format, SOL transfer example */}
 
-<Callout type="info" title="Кратко">
+<Info>
+  **Кратко**
+
   Транзакция содержит подписи и сообщение. Сообщение включает заголовок,
   адреса аккаунтов, недавний blockhash и скомпилированные инструкции. Максимальный
   размер после сериализации: 1 232 байта (4 096 байт для предстоящего формата v1).
-</Callout>
+</Info>
 
 [`Transaction`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/transaction/src/lib.rs#L193)
 имеет два основных поля:
 
-<WithMentions>
-
-- [`signatures`](mention:signatures): Массив подписей
-- [`message`](mention:message): Информация о транзакции, включая список
+- `signatures`: Массив подписей
+- `message`: Информация о транзакции, включая список
   инструкций для обработки
 
-```rust title="Transaction"
+```rust Transaction
 pub struct Transaction {
-    // !mention signatures
     pub signatures: Vec<Signature>,
-    // !mention message
     pub message: Message,
 }
 ```
 
-</WithMentions>
-
-![Схема, показывающая две части транзакции](/assets/docs/core/transactions/tx_format.png)
+<Frame caption="Схема, показывающая две части транзакции">
+  ![Схема, показывающая две части транзакции](/docs-assets/assets/docs/core/transactions/tx_format.png)
+</Frame>
 
 Общий сериализованный размер транзакции не должен превышать
 [`PACKET_DATA_SIZE`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/packet/src/lib.rs#L32)
 (1 232 байт). Этот лимит равен 1 280 байтам (минимальный MTU IPv6) минус 48 байт
 на сетевые заголовки (40 байт IPv6 + 8 байт заголовок фрагмента). В эти 1 232
-байта входят как массив [`signatures`](#signatures), так и структура
-[`message`](#message).
+байта входят как массив [`signatures`](#подписи), так и структура
+[`message`](#сообщение).
 
-<Callout type="info" title="Транзакции v1 увеличивают лимит до 4 096 байт">
+<Info>
+  **Транзакции v1 увеличивают лимит до 4 096 байт**
+
   На этой странице описан устаревший формат транзакций, которому также следует
   формат v0, за исключением префикса версии и таблиц поиска адресов. Предстоящий
   [формат v1](/docs/core/transactions/versioned-transactions#v1-message-format)
   увеличивает ограничение размера до 4 096 байт и использует другую структуру передачи данных.
-</Callout>
+</Info>
 
-![Схема, показывающая формат транзакции и ограничения по размеру](/assets/docs/core/transactions/issues_with_legacy_txs.png)
+<Frame caption="Схема, показывающая формат транзакции и ограничения по размеру">
+  ![Схема, показывающая формат транзакции и ограничения по размеру](/docs-assets/assets/docs/core/transactions/issues_with_legacy_txs.png)
+</Frame>
 
 ## Подписи
 
@@ -66,7 +67,7 @@ pub struct Transaction {
 [`Signature`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/signature/src/lib.rs#L34).
 Каждый `Signature` — это 64-байтовая подпись Ed25519 сериализованного `Message`,
 подписанная приватным ключом аккаунта-подписанта. Одна подпись требуется для
-каждого [аккаунта-подписанта](#account-addresses), на который ссылаются
+каждого [аккаунта-подписанта](#адреса-аккаунтов), на который ссылаются
 инструкции транзакции.
 
 Каждая подпись создаётся закрытым ключом. Где именно хранится этот ключ — в
@@ -89,7 +90,7 @@ pub struct Transaction {
   [`validate_fee_payer`](https://github.com/anza-xyz/agave/blob/v3.1.8/svm/src/account_loader.rs#L369-L417)).
 - Должен иметь достаточно lamport для покрытия
   `rent_exempt_minimum + total_fee`; в противном случае транзакция завершится
-  ошибкой _rs`InsufficientFundsForFee`_.
+  ошибкой `InsufficientFundsForFee`.
 
 ## Сообщение
 
@@ -97,88 +98,77 @@ pub struct Transaction {
 [`Message`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/message/src/legacy.rs#L161)
 структуру, содержащую полезную нагрузку транзакции:
 
-<WithMentions>
+- `header`: [Заголовок](#заголовок) сообщения
+- `account_keys`: Массив
+  [адресов аккаунтов](#адреса-аккаунтов), необходимых инструкциям транзакции
+- `recent_blockhash`:
+  [Хэш блока](#последний-blockhash), выступающий в роли временной метки транзакции
+- `instructions`: Массив [инструкций](#инструкции)
 
-- [`header`](mention:message-header): [Заголовок](#header) сообщения
-- [`account_keys`](mention:account-addresses): Массив
-  [адресов аккаунтов](#account-addresses), необходимых инструкциям транзакции
-- [`recent_blockhash`](mention:recent-blockhash):
-  [Хэш блока](#recent-blockhash), выступающий в роли временной метки транзакции
-- [`instructions`](mention:instructions): Массив [инструкций](#instructions)
-
-```rust title="Message"
+```rust Message
 pub struct Message {
     /// The message header, identifying signed and read-only `account_keys`.
-    // !mention message-header
     pub header: MessageHeader,
 
     /// All the account keys used by this transaction.
     #[serde(with = "short_vec")]
-    // !mention account-addresses
     pub account_keys: Vec<Pubkey>,
 
     /// The id of a recent ledger entry.
-    // !mention recent-blockhash
     pub recent_blockhash: Hash,
 
     /// Programs that will be executed in sequence and committed in
     /// one atomic transaction if all succeed.
     #[serde(with = "short_vec")]
-    // !mention instructions
     pub instructions: Vec<CompiledInstruction>,
 }
 ```
 
-</WithMentions>
-
 ### Заголовок
-
-<WithMentions>
 
 Поле `header` представляет собой
 [`MessageHeader`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/message/src/lib.rs#L109)
 структуру с тремя полями `u8`, которые разделяют массив `account_keys` на группы
 разрешений:
 
-- [`num_required_signatures`](mention:num_required_signatures): Общее количество
+- `num_required_signatures`: Общее количество
   подписей, необходимых для транзакции.
-- [`num_readonly_signed_accounts`](mention:num_readonly_signed_accounts):
+- `num_readonly_signed_accounts`:
   Количество подписанных аккаунтов, доступных только для чтения.
-- [`num_readonly_unsigned_accounts`](mention:num_readonly_unsigned_accounts):
+- `num_readonly_unsigned_accounts`:
   Количество неподписанных аккаунтов, доступных только для чтения.
 
-```rust title="MessageHeader"
+```rust MessageHeader
 pub struct MessageHeader {
     /// The number of signatures required for this message to be considered
     /// valid. The signers of those signatures must match the first
     /// `num_required_signatures` of [`Message::account_keys`].
-    // !mention num_required_signatures
     pub num_required_signatures: u8,
 
     /// The last `num_readonly_signed_accounts` of the signed keys are read-only
     /// accounts.
-    // !mention num_readonly_signed_accounts
     pub num_readonly_signed_accounts: u8,
 
     /// The last `num_readonly_unsigned_accounts` of the unsigned keys are
     /// read-only accounts.
-    // !mention num_readonly_unsigned_accounts
     pub num_readonly_unsigned_accounts: u8,
 }
 ```
 
-</WithMentions>
+<Info>
+  **Префиксы устаревших и версионированных сообщений**
 
-<Callout type="info" title="Префиксы устаревших и версионированных сообщений">
   В устаревшем сообщении транзакции первый байт сообщения — это
   `num_required_signatures`, за которым следуют два других байта `MessageHeader`. В
   сообщении версионной транзакции первый байт является префиксом версии;
   трёхбайтовый `MessageHeader` начинается сразу после этого префикса. См.
   [версионные транзакции](/docs/core/transactions/versioned-transactions) для
   полных структур сообщений v0 и v1.
-</Callout>
+</Info>
 
-![Диаграмма, показывающая три части заголовка сообщения](/assets/docs/core/transactions/message_header.png)
+<Frame caption="Диаграмма, показывающая три части заголовка сообщения">
+  ![Диаграмма, показывающая три части заголовка сообщения](/docs-assets/assets/docs/core/transactions/message_header.png)
+</Frame>
 
 ### Адреса аккаунтов
 
@@ -194,15 +184,17 @@ pub struct MessageHeader {
 3. Не подписант + Записываемый
 4. Не подписант + Только для чтения
 
-<Callout>
+<Note>
   Этот строгий порядок позволяет объединить массив `account_keys` с тремя
-  счётчиками в [`header`](#header) заголовка сообщения для определения прав
+  счётчиками в [`header`](#заголовок) заголовка сообщения для определения прав
   доступа к каждому аккаунту без хранения флагов метаданных для каждого
   аккаунта. Счётчики заголовка разбивают массив на четыре группы прав доступа,
   перечисленных выше.
-</Callout>
+</Note>
 
-![Диаграмма, показывающая порядок массива адресов аккаунтов](/assets/docs/core/transactions/compat_array_of_account_addresses.png)
+<Frame caption="Диаграмма, показывающая порядок массива адресов аккаунтов">
+  ![Диаграмма, показывающая порядок массива адресов аккаунтов](/docs-assets/assets/docs/core/transactions/compat_array_of_account_addresses.png)
+</Frame>
 
 ### Последний blockhash
 
@@ -214,15 +206,15 @@ pub struct MessageHeader {
    транзакции.
 
 Blockhash истекает через 150 slot. Если blockhash больше не действителен на
-момент прибытия транзакции, она отклоняется с ошибкой _rs`BlockhashNotFound`_,
+момент прибытия транзакции, она отклоняется с ошибкой `BlockhashNotFound`,
 если только это не действительная
 [транзакция с устойчивым nonce](/docs/core/transactions/durable-nonces).
 
-<Callout>
+<Note>
   Метод RPC [`getLatestBlockhash`](/docs/rpc/http/getlatestblockhash) позволяет
   получить текущий blockhash и последнюю высоту блока, до которой blockhash
   будет действителен.
-</Callout>
+</Note>
 
 ### Инструкции
 
@@ -230,37 +222,32 @@ Blockhash истекает через 150 slot. Если blockhash больше 
 [`instructions`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/message/src/legacy.rs#L176)
 представляет собой компактно закодированный массив структур
 [`CompiledInstruction`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/message/src/compiled_instruction.rs#L21).
-Каждая _rs`CompiledInstruction`_ ссылается на аккаунты по индексу в массиве
+Каждая `CompiledInstruction` ссылается на аккаунты по индексу в массиве
 `account_keys`, а не по полному публичному ключу. Она содержит:
 
-<WithMentions>
-
-1. [`program_id_index`](mention:program-id-index): Индекс в `account_keys`,
+1. `program_id_index`: Индекс в `account_keys`,
    идентифицирующий вызываемую программу.
-2. [`accounts`](mention:account-indexes): Массив индексов в `account_keys`,
+2. `accounts`: Массив индексов в `account_keys`,
    задающий аккаунты для передачи в программу.
-3. [`data`](mention:instruction-data): Байтовый массив, содержащий дискриминатор
+3. `data`: Байтовый массив, содержащий дискриминатор
    инструкции и сериализованные аргументы.
 
-```rust title="CompiledInstruction"
+```rust CompiledInstruction
 pub struct CompiledInstruction {
     /// Index into the transaction keys array indicating the program account that executes this instruction.
-    // !mention program-id-index
     pub program_id_index: u8,
     /// Ordered indices into the transaction keys array indicating which accounts to pass to the program.
     #[serde(with = "short_vec")]
-    // !mention account-indexes
     pub accounts: Vec<u8>,
     /// The program input data.
     #[serde(with = "short_vec")]
-    // !mention instruction-data
     pub data: Vec<u8>,
 }
 ```
 
-</WithMentions>
-
-![Компактный массив инструкций](/assets/docs/core/transactions/compact_array_of_ixs.png)
+<Frame caption="Компактный массив инструкций">
+  ![Компактный массив инструкций](/docs-assets/assets/docs/core/transactions/compact_array_of_ixs.png)
+</Frame>
 
 ## Бинарный формат транзакции
 
@@ -271,18 +258,18 @@ pub struct CompiledInstruction {
 
 **Структура устаревшей транзакции** (в сети):
 
-| Поле                     | Размер                          | Описание                                     |
-| ------------------------- | ----------------------------- | ----------------------------------------------- |
-| `num_signatures`          | 1–3 байта (compact-u16)       | Количество подписей                            |
-| `signatures`              | `num_signatures` x 64 байта   | Подписи Ed25519                              |
-| `num_required_signatures` | 1 байт                        | Поле 1 `MessageHeader`                         |
-| `num_readonly_signed`     | 1 байт                        | Поле 2 `MessageHeader`                         |
-| `num_readonly_unsigned`   | 1 байт                        | Поле 3 `MessageHeader`                         |
-| `num_account_keys`        | 1–3 байта (compact-u16)       | Количество статических ключей аккаунтов                   |
-| `account_keys`            | `num_account_keys` x 32 байта | Публичные ключи                                     |
-| `recent_blockhash`        | 32 байта                      | Blockhash                                       |
-| `num_instructions`        | 1–3 байта (compact-u16)       | Количество инструкций                          |
-| `instructions`            | переменный                      | Массив [скомпилированных инструкций](#instructions) |
+| Поле                      | Размер                        | Описание                                          |
+| ------------------------- | ----------------------------- | ------------------------------------------------- |
+| `num_signatures`          | 1–3 байта (compact-u16)       | Количество подписей                               |
+| `signatures`              | `num_signatures` x 64 байта   | Подписи Ed25519                                   |
+| `num_required_signatures` | 1 байт                        | Поле 1 `MessageHeader`                            |
+| `num_readonly_signed`     | 1 байт                        | Поле 2 `MessageHeader`                            |
+| `num_readonly_unsigned`   | 1 байт                        | Поле 3 `MessageHeader`                            |
+| `num_account_keys`        | 1–3 байта (compact-u16)       | Количество статических ключей аккаунтов           |
+| `account_keys`            | `num_account_keys` x 32 байта | Публичные ключи                                   |
+| `recent_blockhash`        | 32 байта                      | Blockhash                                         |
+| `num_instructions`        | 1–3 байта (compact-u16)       | Количество инструкций                             |
+| `instructions`            | переменный                    | Массив [скомпилированных инструкций](#инструкции) |
 
 Каждая скомпилированная инструкция сериализуется следующим образом:
 
@@ -296,7 +283,7 @@ pub struct CompiledInstruction {
 
 ### Расчёт размера
 
-При _rs`PACKET_DATA_SIZE`_ = 1 232 байта доступное пространство можно вычислить:
+При `PACKET_DATA_SIZE` = 1 232 байта доступное пространство можно вычислить:
 
 ```
 Total = 1232 bytes
@@ -323,14 +310,24 @@ Total = 1232 bytes
 измениться. Для выполнения этой инструкции кошелёк отправителя отправляет
 транзакцию, содержащую его подпись и сообщение с инструкцией перевода SOL.
 
-![Схема перевода SOL](/assets/docs/core/transactions/sol-transfer.svg)
+<Frame caption="Схема перевода SOL">
+  <img className="block dark:hidden" src="/docs-assets/assets/docs/core/transactions/sol-transfer-light.svg" alt="Схема перевода SOL" />
+
+  <img className="hidden dark:block" src="/docs-assets/assets/docs/core/transactions/sol-transfer.svg" alt="Схема перевода SOL" />
+</Frame>
 
 После отправки транзакции System Program обрабатывает инструкцию перевода и
 обновляет баланс в lamport обоих аккаунтов.
 
-![Схема процесса перевода SOL](/assets/docs/core/transactions/sol-transfer-process.svg)
+<Frame caption="Схема процесса перевода SOL">
+  <img className="block dark:hidden" src="/docs-assets/assets/docs/core/transactions/sol-transfer-process-light.svg" alt="Схема процесса перевода SOL" />
 
-<Callout type="warn" title="Проверьте получателя перед отправкой SOL">
+  <img className="hidden dark:block" src="/docs-assets/assets/docs/core/transactions/sol-transfer-process.svg" alt="Схема процесса перевода SOL" />
+</Frame>
+
+<Warning>
+
+**Проверьте получателя перед отправкой SOL**
 
 Перевод через System Program добавляет lamport на **любой** аккаунт. На уровне
 протокола не предусмотрено проверки того, сможет ли получатель вывести SOL
@@ -347,15 +344,15 @@ SOL, отправленный на [token account](/docs/tokens/basics/create-to
 получателя перед подписанием. Полную логику классификации см. в разделе
 [Проверка адреса](/docs/payments/send-payments/verify-address).
 
-</Callout>
+</Warning>
 
 В примере ниже показан код, соответствующий приведённым выше диаграммам. См.
 [функцию `transfer`](https://github.com/anza-xyz/agave/blob/v3.1.8/programs/system/src/system_processor.rs#L210)
 System Program.
 
-<CodeTabs storage="sol-transfer" flags="r">
+<CodeGroup>
 
-```ts !! title="Kit"
+```ts Kit highlight={32-37}
 import { createClient, generateKeyPairSigner, lamports } from "@solana/kit";
 import { solanaRpc, rpcAirdrop } from "@solana/kit-plugin-rpc";
 import { generatedPayer, airdropPayer } from "@solana/kit-plugin-signer";
@@ -387,7 +384,6 @@ const { value: preBalance2 } = await client.rpc
   .getBalance(recipient.address)
   .send();
 
-// !mark(1:6)
 // Create a transfer instruction for transferring SOL from sender to recipient
 const transferInstruction = client.system.instructions.transferSol({
   source: sender,
@@ -426,7 +422,7 @@ console.log(
 console.log("Transaction Signature:", transactionSignature.context.signature);
 ```
 
-```ts !! title="Legacy"
+```ts Legacy highlight={31-36}
 import {
   LAMPORTS_PER_SOL,
   SystemProgram,
@@ -457,7 +453,6 @@ const preBalance2 = await connection.getBalance(recipient.publicKey);
 // Define the amount to transfer
 const transferAmount = 0.01; // 0.01 SOL
 
-// !mark(1:6)
 // Create a transfer instruction for transferring SOL from sender to recipient
 const transferInstruction = SystemProgram.transfer({
   fromPubkey: sender.publicKey,
@@ -486,7 +481,7 @@ console.log("Recipient postbalance:", postBalance2 / LAMPORTS_PER_SOL);
 console.log("Transaction Signature:", transactionSignature);
 ```
 
-```rs !! title="Rust"
+```rs Rust
 use anyhow::Result;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_commitment_config::CommitmentConfig;
@@ -566,14 +561,14 @@ async fn main() -> Result<()> {
 }
 ```
 
-</CodeTabs>
+</CodeGroup>
 
 В следующем примере показана структура транзакции, содержащей одну инструкцию
 перевода SOL.
 
-<CodeTabs storage="sol-transfer" flags="r">
+<CodeGroup>
 
-```ts !! title="Kit"
+```ts Kit
 import {
   createClient,
   generateKeyPairSigner,
@@ -636,7 +631,7 @@ const compiledTransactionMessage =
 console.log(JSON.stringify(compiledTransactionMessage, null, 2));
 ```
 
-```ts !! title="Legacy"
+```ts Legacy
 import {
   LAMPORTS_PER_SOL,
   SystemProgram,
@@ -674,7 +669,7 @@ const compiledMessage = transaction.compileMessage();
 console.log(JSON.stringify(compiledMessage, null, 2));
 ```
 
-```rs !! title="Rust"
+```rs Rust
 use anyhow::Result;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_commitment_config::CommitmentConfig;
@@ -715,33 +710,28 @@ async fn main() -> Result<()> {
 }
 ```
 
-</CodeTabs>
+</CodeGroup>
 
-<WithMentions>
 Код ниже показывает вывод из предыдущих фрагментов кода.
 Формат различается в зависимости от SDK,
 однако обратите внимание, что каждая инструкция содержит одинаковый набор обязательных данных.
 
-<CodeTabs storage="sol-transfer">
+<CodeGroup>
 
-```json !! title="Kit"
+```json Kit
 {
   "version": 0,
-  // !mention header
   "header": {
     "numSignerAccounts": 1,
     "numReadonlySignerAccounts": 0,
     "numReadonlyNonSignerAccounts": 1
   },
-  // !mention account_keys
   "staticAccounts": [
     "HoCy8p5xxDDYTYWEbQZasEjVNM5rxvidx8AfyqA4ywBa",
     "5T388jBjovy7d8mQ3emHxMDTbUF8b7nWvAnSiP3EAdFL",
     "11111111111111111111111111111111"
   ],
-  // !mention recent_blockhash
   "lifetimeToken": "EGCWPUEXhqHJWYBfDirq3mHZb4qDpATmYqBZMBy9TBC1",
-  // !mention instructions
   "instructions": [
     {
       "programAddressIndex": 2,
@@ -765,22 +755,19 @@ async fn main() -> Result<()> {
 }
 ```
 
-```json !! title="Legacy"
+```json Legacy
 {
-  // !mention header
   "header": {
     "numRequiredSignatures": 1,
     "numReadonlySignedAccounts": 0,
     "numReadonlyUnsignedAccounts": 1
   },
-  // !mention account_keys
   "accountKeys": [
     "EPLUagqZZAuAtJ5LSbK7eeXjqeTdesd4q8WhoqVrfG3g",
     "9Txf5pi5jzm7FydFAsQafk7xn5wY9yN2UNm5LW15qvcK",
     "11111111111111111111111111111111"
   ],
   "recentBlockhash": "2qYPgehzMKXcMt4Ku1tKAk9DACKUbtYEY9EUEN42cseT",
-  // !mention instructions
   "instructions": [
     {
       "programIdIndex": 2,
@@ -792,13 +779,12 @@ async fn main() -> Result<()> {
 }
 ```
 
-```json !! title="Rust"
+```json Rust
 {
   "signatures": [
     "2fPXZtQGWWj6suxfc55FBQiexS8hEhNELqasSL5DRYa1RB1GChHz86Cyy8ukiVwA6qbq91P4cY1FuvTuYtmTHmJP"
   ],
   "message": {
-    // !mention header
     "header": {
       "num_required_signatures": 1,
       "num_readonly_signed_accounts": 0,
@@ -810,7 +796,6 @@ async fn main() -> Result<()> {
       "11111111111111111111111111111111"
     ],
     "recent_blockhash": "3P7CVQ9nwXx4B37MvBzghzbcM9K9p5xo7ivDE8W78dCi",
-    // !mention instructions
     "instructions": [
       {
         "program_id_index": 2,
@@ -822,8 +807,7 @@ async fn main() -> Result<()> {
 }
 ```
 
-</CodeTabs>
-</WithMentions>
+</CodeGroup>
 
 ### Проверьте получателя перед переводом
 
@@ -834,9 +818,7 @@ async fn main() -> Result<()> {
 без средств); отклоняйте минты, token account'ы, программы и PDA, которые вы не
 контролируете.
 
-<CodeTabs flags="r">
-
-```ts !! title="Kit"
+```ts Kit
 import {
   type Address,
   createSolanaRpc,
@@ -886,24 +868,22 @@ await assertSafeSolRecipient(
 );
 ```
 
-</CodeTabs>
-
-<Callout>
+<Note>
   Этот фрагмент проверяет получателей нативного SOL. Для полной классификации,
   которая также охватывает отправку токенов SPL (token account'ы, ATA,
   Token-2022), см. [Verify
   Address](/docs/payments/send-payments/verify-address).
-</Callout>
+</Note>
 
 ## Получение деталей транзакции
 
 После отправки извлеките детали транзакции с помощью подписи транзакции и
 RPC-метода [getTransaction](/docs/rpc/http/gettransaction).
 
-<Callout>
+<Note>
   Вы также можете найти транзакцию с помощью [Solana
   Explorer](https://explorer.solana.com).
-</Callout>
+</Note>
 
 ```json title="Transaction Data"
 {

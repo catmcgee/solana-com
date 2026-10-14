@@ -13,7 +13,7 @@ l'estensione richiesta abilitata.
 Il diagramma seguente mostra i passaggi necessari per creare un token account con
 i Saldi Riservati abilitati:
 
-```mermaid title="Create Token Account with Confidential Balances"
+```mermaid
 sequenceDiagram
     participant Payer as Wallet
     participant ATA as Associated Token Program
@@ -48,6 +48,46 @@ sequenceDiagram
     Token22-->>TokenAccount: Configure Confidential Balances
     deactivate Token22
 ```
+
+<div className="nojs-only" data-fallback="mermaid">
+  ```text Mermaid
+  sequenceDiagram
+      participant Payer as Wallet
+      participant ATA as Associated Token Program
+      participant Token22 as Token Extensions Program
+      participant ZK as ZK ElGamal Proof Program
+      participant TokenAccount as Token Account
+
+      Payer->>ATA: create_associated_token_account()
+      activate ATA
+      ATA->>Token22: Create token account at deterministic address
+      deactivate ATA
+      activate Token22
+      Token22-->>TokenAccount: Initialize Token Account
+      deactivate Token22
+
+      Payer->>Token22: reallocate() for ConfidentialTransferAccount extension
+      activate Token22
+      Token22-->>TokenAccount: Add space for extension data
+      deactivate Token22
+
+      Payer->>Payer: Derive ElGamal keypair and AES key
+      Payer->>Payer: Generate pubkey validity proof
+      Payer->>Payer: Encrypt initial balance (0) with AES key
+
+      Payer->>ZK: VerifyPubkeyValidity into context state account
+      activate ZK
+      ZK-->>ZK: Verify proof and store result in context state account
+      deactivate ZK
+
+      Payer->>Token22: configure_account() referencing the proof context account
+      activate Token22
+      Token22-->>TokenAccount: Configure Confidential Balances
+      deactivate Token22
+  ```
+</div>
+
+<p className="sol-caption">Create Token Account with Confidential Balances</p>
 
 ### Stato del Token Account per i Saldi Riservati
 
@@ -105,7 +145,7 @@ pub struct ConfidentialTransferAccount {
 }
 ```
 
-Il _rs`ConfidentialTransferAccount`_ contiene diversi campi che gestiscono
+Il `ConfidentialTransferAccount` contiene diversi campi che gestiscono
 i Saldi Riservati:
 
 - **approvato**: Lo stato di approvazione dell'account per i Saldi Riservati. Se la
@@ -137,18 +177,18 @@ i Saldi Riservati:
   in entrata dalle istruzioni di deposito e trasferimento.
 
 - **maximum_pending_balance_credit_counter**: Il limite di conteggio dei crediti
-  in sospeso prima di richiedere un'istruzione _rs`ApplyPendingBalance`_ per
+  in sospeso prima di richiedere un'istruzione `ApplyPendingBalance` per
   convertire il saldo in sospeso nel saldo disponibile.
 
 - **expected_pending_balance_credit_counter**: Il valore
   `pending_balance_credit_counter` fornito dal client tramite instruction data
-  l'ultima volta che l'istruzione _rs`ApplyPendingBalance`_ è stata elaborata.
+  l'ultima volta che l'istruzione `ApplyPendingBalance` è stata elaborata.
 
 - **actual_pending_balance_credit_counter**: Il valore
   `pending_balance_credit_counter` sul token account al momento in cui l'ultima
-  istruzione _rs`ApplyPendingBalance`_ è stata elaborata.
+  istruzione `ApplyPendingBalance` è stata elaborata.
 
-<Callout type="info">
+<Info>
   **Saldo in Sospeso vs Saldo Disponibile**
 
 I saldi riservati sono suddivisi in saldi in sospeso e saldi disponibili per
@@ -161,13 +201,13 @@ elaborata, causando il fallimento della transazione.
 
 Tutti i depositi e gli importi dei trasferimenti vengono inizialmente aggiunti
 al saldo in sospeso. I proprietari del token account devono utilizzare
-l'istruzione _rs`ApplyPendingBalance`_ per convertire il saldo in sospeso in
+l'istruzione `ApplyPendingBalance` per convertire il saldo in sospeso in
 saldo disponibile. I trasferimenti in entrata o i depositi non influiscono sul
 saldo disponibile di un token account.
 
-</Callout>
+</Info>
 
-<Callout type="info">
+<Info>
   **Suddivisione Alto/Basso del Saldo in Sospeso**
 
 Il saldo in sospeso riservato è suddiviso in `pending_balance_lo` e
@@ -175,15 +215,15 @@ Il saldo in sospeso riservato è suddiviso in `pending_balance_lo` e
 calcolo per numeri più grandi. L'implementazione dell'aritmetica sui testi
 cifrati è disponibile
 [qui](https://github.com/solana-program/token-2022/blob/efd0c957fefbd79882d77df5fb2dac88c001249c/confidential-transfer/ciphertext-arithmetic/src/lib.rs#L54),
-utilizzata nell'istruzione _rs`ApplyPendingBalance`_
+utilizzata nell'istruzione `ApplyPendingBalance`
 [qui](https://github.com/solana-program/token-2022/blob/efd0c957fefbd79882d77df5fb2dac88c001249c/program/src/extension/confidential_transfer/processor.rs#L1180-L1184).
 
-</Callout>
+</Info>
 
-<Callout type="info">
+<Info>
   **Contatori di Credito del Saldo in Sospeso**
 
-Quando si chiama l'istruzione _rs`ApplyPendingBalance`_ per convertire il saldo
+Quando si chiama l'istruzione `ApplyPendingBalance` per convertire il saldo
 in sospeso in saldo disponibile:
 
 1. Il client recupera i saldi in sospeso e disponibili correnti, ne crittografa
@@ -192,13 +232,13 @@ in sospeso in saldo disponibile:
 
 2. I contatori di credito in sospeso attesi e effettivi tracciano le modifiche
    al valore del contatore tra il momento in cui l'istruzione
-   _rs`ApplyPendingBalance`_ viene creata e quello in cui viene elaborata:
+   `ApplyPendingBalance` viene creata e quello in cui viene elaborata:
    - `expected_pending_balance_credit_counter`: Il valore
      `pending_balance_credit_counter` quando il client crea l'istruzione
-     _rs`ApplyPendingBalance`_
+     `ApplyPendingBalance`
    - `actual_pending_balance_credit_counter`: Il valore
      `pending_balance_credit_counter` sul token account al momento in cui
-     l'istruzione _rs`ApplyPendingBalance`_ viene elaborata
+     l'istruzione `ApplyPendingBalance` viene elaborata
 
 Contatori expected/actual corrispondenti indicano che
 `decryptable_available_balance` corrisponde a `available_balance`.
@@ -220,7 +260,7 @@ questi passaggi per riconciliare `decryptable_available_balance`:
    - Decifrare e aggiungere gli importi del ciphertext di destinazione dalle
      istruzioni di trasferimento
 
-</Callout>
+</Info>
 
 ### Istruzioni Richieste
 
@@ -228,44 +268,44 @@ La creazione e la configurazione di un token account per i Saldi Riservati utili
 seguenti istruzioni, che rientrano tutte in una singola transazione:
 
 1. **Creare il Token Account**: Invocare l'istruzione
-   _rs`AssociatedTokenAccountInstruction::Create`_ dell'Associated Token Program
+   `AssociatedTokenAccountInstruction::Create` dell'Associated Token Program
    per creare il token account al suo indirizzo deterministico.
 
 2. **Riallocare lo Spazio dell'Account**: Invocare l'istruzione
-   _rs`TokenInstruction::Reallocate`_ del Token Extension Program per aggiungere
-   spazio per lo stato _rs`ConfidentialTransferAccount`_.
+   `TokenInstruction::Reallocate` del Token Extension Program per aggiungere
+   spazio per lo stato `ConfidentialTransferAccount`.
 
 3. **Verificare la Prova di Validità del Pubkey**: Creare un account di
    proprietà del programma ZK ElGamal Proof, quindi invocare la sua istruzione
-   _rs`VerifyPubkeyValidity`_ per verificare la prova e memorizzare il risultato
+   `VerifyPubkeyValidity` per verificare la prova e memorizzare il risultato
    verificato in quell'account di stato di contesto.
 
 4. **Configura i Saldi Riservati**: Richiama l'istruzione
    [ConfidentialTransferInstruction::ConfigureAccount](https://github.com/solana-program/token-2022/blob/efd0c957fefbd79882d77df5fb2dac88c001249c/program/src/extension/confidential_transfer/processor.rs#L201)
    del Token Extensions Program,
    facendo riferimento all'account di stato del contesto della prova tramite
-   _rs`ProofLocation::ContextStateAccount`_, per inizializzare lo
-   stato _rs`ConfidentialTransferAccount`_.
+   `ProofLocation::ContextStateAccount`, per inizializzare lo
+   stato `ConfidentialTransferAccount`.
 
-<Callout type="info">
+<Info>
 
 **Solo il proprietario del token account può abilitare i Saldi Riservati su un token
 account**.
 
-L'istruzione _rs`ConfigureAccount`_ richiede la generazione lato client di
+L'istruzione `ConfigureAccount` richiede la generazione lato client di
 chiavi di cifratura e una prova che può essere generata solo dal proprietario del token account.
 
 La prova di validità del pubkey verifica che la chiave pubblica ElGamal dell'account sia
-valida. Viene generata con _rs`build_pubkey_validity_proof_data`_, verificata on
+valida. Viene generata con `build_pubkey_validity_proof_data`, verificata on
 chain dal programma ZK ElGamal Proof in un account di stato del contesto, e poi
-referenziata da _rs`ConfigureAccount`_ tramite
-_rs`ProofLocation::ContextStateAccount`_, in modo che nessun byte di prova transiti nell'istruzione
+referenziata da `ConfigureAccount` tramite
+`ProofLocation::ContextStateAccount`, in modo che nessun byte di prova transiti nell'istruzione
 del token stessa. Per i dettagli di implementazione, consulta:
 
 - [PubkeyValidityProofData](https://github.com/anza-xyz/agave/blob/b39a9764005ac8596b7e14e61d381305ce57ecaa/zk-sdk/src/zk_elgamal_proof_program/proof_data/pubkey_validity.rs#L58)
 - [PubkeyValidityProof](https://github.com/anza-xyz/agave/blob/b39a9764005ac8596b7e14e61d381305ce57ecaa/zk-sdk/src/sigma_proofs/pubkey_validity.rs#L65)
 
-</Callout>
+</Info>
 
 ## Codice di Esempio
 
@@ -281,10 +321,9 @@ e sostituisci il segnaposto del mint con un mint creato seguendo
 
 ### Rust
 
-<CodeTabs>
+<CodeGroup>
 
-```rust !! title="main.rs"
-// !collapse(1:36) collapsed
+```rust main.rs expandable
 // Imports: dependencies used by this example.
 use anyhow::{Context, Result};
 use solana_address::Address;
@@ -442,7 +481,6 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-// !collapse(1:1000) collapsed
 // Setup: helper function to create the confidential mint.
 fn create_confidential_mint(rpc_client: &RpcClient, payer: &Keypair, decimals: u8) -> Result<Pubkey> {
     let mint = Keypair::new();
@@ -510,7 +548,7 @@ fn load_keypair() -> Result<Keypair> {
 }
 ```
 
-```toml !! title="Cargo.toml"
+```toml Cargo.toml
 [package]
 name = "confidential-transfer"
 version = "0.1.0"
@@ -542,14 +580,13 @@ dirs = "6.0.0"
 serde_json = "1.0"
 ```
 
-</CodeTabs>
+</CodeGroup>
 
 ### Typescript
 
-<CodeTabs>
+<CodeGroup>
 
-```ts !! title="index.ts"
-// !collapse(1:21) collapsed
+```ts index.ts expandable
 // Imports: dependencies used by this example.
 import {
   deriveAeKeyForOwnerMint,
@@ -626,7 +663,6 @@ console.log(
   `Enabled Confidential Balances on token account ${tokenAccount}: ${result.context.signature}`
 );
 
-// !collapse(1:1000) collapsed
 // Setup: helper function to create the confidential mint.
 async function createConfidentialMint(
   kitClient: typeof client,
@@ -661,7 +697,7 @@ async function createConfidentialMint(
 }
 ```
 
-```json !! title="package.json"
+```json package.json
 {
   "name": "confidential-account",
   "version": "0.1.0",
@@ -681,13 +717,13 @@ async function createConfidentialMint(
 }
 ```
 
-</CodeTabs>
+</CodeGroup>
 
-<Callout type="info">
+<Info>
   Gli helper TypeScript si trovano nel sottopath
   `@solana-program/token-2022/confidential` e si basano su `@solana/zk-sdk` per
   le primitive di cifratura. `owner` e `client` provengono dalla tua
   configurazione `@solana/kit`; il piano di istruzioni restituito viene inviato
   tramite il supporto ai piani di istruzioni di `@solana/kit`, che suddivide il
   lavoro su più transazioni quando le prove sono troppo grandi per una sola.
-</Callout>
+</Info>

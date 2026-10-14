@@ -7,7 +7,13 @@ description:
 
 ## What are Confidential Balances?
 
-<Embed url="https://youtu.be/Bqs95tFcRIU" />
+<Frame>
+  <iframe src="https://www.youtube-nocookie.com/embed/Bqs95tFcRIU" title="YouTube video player" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerPolicy="strict-origin-when-cross-origin" allowFullScreen className="w-full aspect-video" />
+</Frame>
+
+<div className="nojs-only">
+  [https://www.youtube.com/watch?v=Bqs95tFcRIU](https://www.youtube.com/watch?v=Bqs95tFcRIU)
+</div>
 
 Confidential Balances is a Token-2022 extension that lets you transfer tokens
 between token accounts without revealing the transfer amount. This is useful for
@@ -28,7 +34,7 @@ The Confidential Balances extension adds
 to the Token Extension program that allows you to transfer tokens between
 accounts without revealing the transfer amount.
 
-```mermaid title="Confidential Balances Basic Overview"
+```mermaid
     sequenceDiagram
 
     participant A as Sender Wallet
@@ -45,6 +51,28 @@ accounts without revealing the transfer amount.
     B->>BB: Withdraw
 
 ```
+
+<div className="nojs-only" data-fallback="mermaid">
+  ```text Mermaid
+      sequenceDiagram
+
+      participant A as Sender Wallet
+      participant AA as Sender Token Account
+      participant BB as Recipient Token Account
+      participant B as Recipient Wallet
+
+      A->>AA: Deposit
+      A->>AA: Apply
+
+      AA->>BB: Transfer
+      B->>BB: Apply
+
+      B->>BB: Withdraw
+
+  ```
+</div>
+
+<p className="sol-caption">Confidential Balances Basic Overview</p>
 
 The basic flow of confidential token transfers is as follows:
 
@@ -70,7 +98,7 @@ the amount, but the holder of the auditor secret key can decrypt transfer
 amounts for that mint.
 
 The Confidential Balances authority sets the auditor key when initializing the
-extension or changes it later with _rs`UpdateMint`_. The authority can rotate or
+extension or changes it later with `UpdateMint`. The authority can rotate or
 clear the key. A rotation applies only to future transfers, so retain prior
 secret keys when historical audit access is required. Auditor keys provide read
 access; they do not authorize token transfers or reveal an account's full
@@ -84,7 +112,7 @@ Wallets, explorers, exchanges, and compliance providers should also review the
 For more details on the steps in the confidential transfer flow, see the
 corresponding pages:
 
-<Cards>
+<Columns cols={2}>
   <Card
     title="Create Mint Account"
     href="/docs/tokens/extensions/confidential-transfer/create-mint"
@@ -135,12 +163,12 @@ corresponding pages:
     How to issue and operate a Confidential Balances token (approve policy,
     auditors, fees, mint and burn)
   </Card>
-</Cards>
+</Columns>
 
 The diagram below shows a detailed sequence of the basic flow for confidential
 token transfers:
 
-```mermaid title="Confidential Balances Detailed Overview"
+```mermaid
 sequenceDiagram
     participant Sender as Sender Wallet
     participant SenderAccount as Sender Token Account
@@ -283,26 +311,173 @@ sequenceDiagram
     end
 ```
 
+<div className="nojs-only" data-fallback="mermaid">
+  ```text Mermaid
+  sequenceDiagram
+      participant Sender as Sender Wallet
+      participant SenderAccount as Sender Token Account
+      participant Mint as Token Mint
+      participant Token22 as Token Extensions Program
+      participant ATAProgram as Associated Token Program
+      participant ElGamal as ZK ElGamal Proof Program
+      participant RecipientAccount as Recipient Token Account
+      participant Recipient as Recipient Wallet
+
+      rect rgba(120, 160, 235, 0.3)
+      Note over Sender,Mint: 1. Initialize Mint
+
+      activate Sender
+      Sender->>Token22: create_mint (with Confidential Balances)
+      activate Token22
+      Token22-->>Mint: Initialize mint
+      deactivate Token22
+      deactivate Sender
+      end
+
+      rect rgba(130, 210, 170, 0.3)
+      Note over Sender,SenderAccount: 2. Set Up Sender Account
+
+      activate Sender
+      Note right of Sender: Generate encryption keys
+      Sender->>Sender: Generate ElGamal keypair
+      Sender->>Sender: Generate AES key
+
+      Sender->>ATAProgram: create_associated_token_account
+      activate ATAProgram
+      ATAProgram->>Token22: Create token account at deterministic address
+      activate Token22
+      Token22-->>SenderAccount: Initialize account
+      deactivate Token22
+      deactivate ATAProgram
+
+      Sender->>Token22: reallocate & configure_account
+      activate Token22
+      Token22-->>SenderAccount: Configure Confidential Balances
+      deactivate Token22
+      deactivate Sender
+      end
+
+      rect rgba(130, 210, 170, 0.3)
+      Note over Recipient,RecipientAccount: 3. Set Up Recipient Account
+
+      activate Recipient
+      Note right of Recipient: Generate encryption keys
+      Recipient->>Recipient: Generate ElGamal keypair
+      Recipient->>Recipient: Generate AES key
+
+      Recipient->>ATAProgram: create_associated_token_account
+      activate ATAProgram
+      ATAProgram->>Token22: Create token account at deterministic address
+      activate Token22
+      Token22-->>RecipientAccount: Initialize account
+      deactivate Token22
+      deactivate ATAProgram
+
+      Recipient->>Token22: reallocate & configure_account
+      activate Token22
+      Token22-->>RecipientAccount: Configure Confidential Balances
+      deactivate Token22
+      deactivate Recipient
+      end
+
+      rect rgba(235, 160, 80, 0.3)
+      Note over Sender,SenderAccount: 4. Mint & Convert to Confidential Balance
+
+      activate Sender
+      Sender->>Token22: mint_tokens
+      activate Token22
+      Token22-->>SenderAccount: Increase token account public balance
+      deactivate Token22
+
+      Sender->>Token22: deposit_tokens
+      activate Token22
+      Token22-->>SenderAccount: Convert to confidential pending balance
+      deactivate Token22
+
+      Sender->>Sender: Use ElGamal keypair & AES key to decrypt
+      Sender->>Token22: apply_pending_balance
+      activate Token22
+      Token22-->>SenderAccount: Convert pending balance to available balance
+      deactivate Token22
+      deactivate Sender
+      end
+
+      rect rgba(235, 120, 120, 0.3)
+      Note over Sender,RecipientAccount: 5. Confidential Transfer
+
+      activate Sender
+      Note right of Sender: Create proofs
+      Sender->>Sender: Generate proof data for transfer
+
+      Sender->>ElGamal: Create equality proof context account
+      activate ElGamal
+      Sender->>ElGamal: Create ciphertext validity proof context account
+      Sender->>ElGamal: Create range proof context account
+      ElGamal-->>ElGamal: Verify proofs
+
+      Sender->>Token22: transfer_tokens, providing proof context accounts
+      activate Token22
+      Token22-->>SenderAccount: Decrease encrypted available balance
+      Token22-->>RecipientAccount: Increase encrypted pending balance
+      deactivate Token22
+
+      Sender->>ElGamal: Close proof context accounts
+      deactivate ElGamal
+      deactivate Sender
+      end
+
+      rect rgba(180, 150, 235, 0.3)
+      Note over Recipient,RecipientAccount: 6. Apply & Withdraw
+
+      activate Recipient
+      Recipient->>Recipient: Use ElGamal keypair & AES key to decrypt
+      Recipient->>Token22: apply_pending_balance
+      activate Token22
+      Token22-->>RecipientAccount: Convert pending balance to available balance
+      deactivate Token22
+
+      Note right of Recipient: Optional withdrawal
+      Recipient->>Recipient: Generate proof data for withdraw
+
+      Recipient->>ElGamal: Create equality proof context account
+      activate ElGamal
+      Recipient->>ElGamal: Create range proof context account
+      ElGamal-->>ElGamal: Verify proofs
+
+      Recipient->>Token22: withdraw_tokens, providing proof context accounts
+      activate Token22
+      Token22-->>RecipientAccount: Convert from available confidential balance to public balance
+      deactivate Token22
+
+      Recipient->>ElGamal: Close proof context accounts
+      deactivate ElGamal
+      deactivate Recipient
+      end
+  ```
+</div>
+
+<p className="sol-caption">Confidential Balances Detailed Overview</p>
+
 ## Confidential Balances Instructions
 
 The full list of Confidential Balances extension
 [instructions](https://github.com/solana-program/token-2022/blob/efd0c957fefbd79882d77df5fb2dac88c001249c/program/src/extension/confidential_transfer/instruction.rs#L29)
 is as follows:
 
-| Instruction                         | Description                                                                                                                                                       |
-| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| _rs`InitializeMint`_                | Enables Confidential Balances on a mint account. This instruction must be included in the same transaction as _rs`TokenInstruction::InitializeMint`_ instruction. |
-| _rs`UpdateMint`_                    | Updates the mint's account approval policy and optional global auditor ElGamal public key.                                                                        |
-| _rs`ConfigureAccount`_              | Enables Confidential Balances on a token account.                                                                                                                 |
-| _rs`ApproveAccount`_                | Approves a token account for Confidential Balances if the mint requires approval for new token accounts.                                                          |
-| _rs`EmptyAccount`_                  | Empties the pending and available confidential balances to allow closing a token account.                                                                         |
-| _rs`Deposit`_                       | Converts public token balance into pending confidential balance.                                                                                                  |
-| _rs`Withdraw`_                      | Converts available confidential balance back to public balance.                                                                                                   |
-| _rs`Transfer`_                      | Transfers tokens between token accounts confidentially.                                                                                                           |
-| _rs`ApplyPendingBalance`_           | Converts pending balance into available balance after deposits or transfers.                                                                                      |
-| _rs`EnableConfidentialCredits`_     | Allows a token account to receive confidential token transfers.                                                                                                   |
-| _rs`DisableConfidentialCredits`_    | Blocks incoming confidential transfers while still allowing public transfers.                                                                                     |
-| _rs`EnableNonConfidentialCredits`_  | Allows a token account to receive public token transfers.                                                                                                         |
-| _rs`DisableNonConfidentialCredits`_ | Blocks regular transfers to make account receive only confidential transfers.                                                                                     |
-| _rs`TransferWithFee`_               | Transfers tokens between token accounts confidentially with a fee.                                                                                                |
-| _rs`ConfigureAccountWithRegistry`_  | Alternative way to configure token accounts for Confidential Balances using an _rs`ElGamalRegistry`_ account instead of _rs`VerifyPubkeyValidity`_ proof.         |
+| Instruction                     | Description                                                                                                                                                   |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `InitializeMint`                | Enables Confidential Balances on a mint account. This instruction must be included in the same transaction as `TokenInstruction::InitializeMint` instruction. |
+| `UpdateMint`                    | Updates the mint's account approval policy and optional global auditor ElGamal public key.                                                                    |
+| `ConfigureAccount`              | Enables Confidential Balances on a token account.                                                                                                             |
+| `ApproveAccount`                | Approves a token account for Confidential Balances if the mint requires approval for new token accounts.                                                      |
+| `EmptyAccount`                  | Empties the pending and available confidential balances to allow closing a token account.                                                                     |
+| `Deposit`                       | Converts public token balance into pending confidential balance.                                                                                              |
+| `Withdraw`                      | Converts available confidential balance back to public balance.                                                                                               |
+| `Transfer`                      | Transfers tokens between token accounts confidentially.                                                                                                       |
+| `ApplyPendingBalance`           | Converts pending balance into available balance after deposits or transfers.                                                                                  |
+| `EnableConfidentialCredits`     | Allows a token account to receive confidential token transfers.                                                                                               |
+| `DisableConfidentialCredits`    | Blocks incoming confidential transfers while still allowing public transfers.                                                                                 |
+| `EnableNonConfidentialCredits`  | Allows a token account to receive public token transfers.                                                                                                     |
+| `DisableNonConfidentialCredits` | Blocks regular transfers to make account receive only confidential transfers.                                                                                 |
+| `TransferWithFee`               | Transfers tokens between token accounts confidentially with a fee.                                                                                            |
+| `ConfigureAccountWithRegistry`  | Alternative way to configure token accounts for Confidential Balances using an `ElGamalRegistry` account instead of `VerifyPubkeyValidity` proof.             |

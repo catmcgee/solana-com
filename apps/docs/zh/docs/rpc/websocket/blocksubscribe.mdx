@@ -1,130 +1,114 @@
 ---
-title: blockSubscribe
-hideTableOfContents: true
-h1: blockSubscribe RPC 方法
+title: blockSubscribe RPC 方法
+sidebarTitle: blockSubscribe
 ---
 
 订阅以在每次有新区块 `confirmed` 或 `finalized` 时接收通知。
 
-<Callout type="warn" title={"不稳定的方法"}>
+<Warning>
+  **不稳定的方法**
+
   此订阅被认为是**不稳定的**，仅在 validator 启动时使用了
   `--rpc-pubsub-enable-block-subscription` 标志时可用。
   此订阅的格式可能会在未来发生变化。
-</Callout>
+</Warning>
 
-<APIMethod>
+<RequestExample>
+  ```json WebSocket
+  {
+    "jsonrpc": "2.0",
+    "id": "1",
+    "method": "blockSubscribe",
+    "params": [
+      {
+        "mentionsAccountOrProgram": "LieKvPRE8XeX3Y2xVNHjKlpAScD12lYySBVQ4HqoJ5op"
+      },
+      {
+        "commitment": "confirmed",
+        "encoding": "base64",
+        "transactionDetails": "full",
+        "maxSupportedTransactionVersion": 0,
+        "showRewards": true
+      }
+    ]
+  }
+  ```
+</RequestExample>
 
-```jsonc !!request
-{
-  "jsonrpc": "2.0",
-  "id": "1",
-  "method": "blockSubscribe",
-  "params": [
-    // !hover(1:3) 0
-    {
-      "mentionsAccountOrProgram": "LieKvPRE8XeX3Y2xVNHjKlpAScD12lYySBVQ4HqoJ5op"
-    },
-    // !hover(1:6) 1
-    {
-      // !hover commitment
-      "commitment": "confirmed",
-      // !hover encoding
-      "encoding": "base64",
-      // !hover transactionDetails
-      "transactionDetails": "full",
-      // !hover maxSupportedTransactionVersion
-      "maxSupportedTransactionVersion": 0,
-      // !hover showRewards
-      "showRewards": true
-    }
-  ]
-}
-```
+<ResponseExample>
+  ```json Response
+  {
+    "jsonrpc": "2.0",
+    "result": 0,
+    "id": 1
+  }
+  ```
+</ResponseExample>
 
-### !params
+### Parameters
 
-#### !! 0
+<ParamField body="0" type="string | object" required>
+  用于根据账户类型过滤日志以接收结果的条件；当前支持：
 
-!type string | object  
-!required
+  - `all` - 包括区块中的所有交易
+  - 一个包含以下字段的 JSON 对象：
+    - `mentionsAccountOrProgram: <string>` - 仅返回提到提供的公钥（以 base-58 编码字符串形式）的交易。如果在某个区块中没有提到，则不会发送通知。
+</ParamField>
 
-用于根据账户类型过滤日志以接收结果的条件；当前支持：
+<ParamField body="1" type="object">
+  包含以下字段的配置对象：
 
-- `all` - 包括区块中的所有交易
-- 一个包含以下字段的 JSON 对象：
-  - `mentionsAccountOrProgram: <string>` - 仅返回提到提供的公钥（以 base-58 编码字符串形式）的交易。如果在某个区块中没有提到，则不会发送通知。
+  <Expandable title="properties" defaultOpen>
+    <ParamField body="commitment" type="string" default="finalized">
+      Values: `confirmed`, `finalized`
 
-#### !! 1
+      承诺描述了区块在该时间点的最终确定程度。请参阅
+      [配置状态承诺](/docs/rpc#configuring-state-commitment)。
 
-!type object
+      - `processed` 不支持。
+    </ParamField>
 
-包含以下字段的配置对象：
+    <ParamField body="encoding" type="string" default="json">
+      Values: `json`, `jsonParsed`, `base58`, `base64`
 
-##### !! commitment
+      每个返回交易的编码格式
 
-!type string !values confirmed finalized !default finalized
+      - `jsonParsed` 尝试使用特定程序的指令解析器以返回更具可读性和更明确的数据到
+        `transaction.message.instructions` 列表中。
+      - 如果请求了 `jsonParsed`
+        但未找到解析器，则指令将回退到常规 JSON 编码（`accounts`、`data` 和
+        `programIdIndex` 字段）。
+    </ParamField>
 
-承诺描述了区块在该时间点的最终确定程度。请参阅
-[配置状态承诺](/docs/rpc#configuring-state-commitment)。
+    <ParamField body="transactionDetails" type="string" default="full">
+      Values: `full`, `accounts`, `signatures`, `none`
 
-- `processed` 不支持。
+      返回的交易详情级别
 
-##### !! encoding
+      - 如果请求了 `accounts`，交易详情仅包括签名和每笔交易中的账户注释列表。
+      - 交易元数据仅限于以下内容：fee、err、pre_balances、post_balances、pre_token_balances 和 post_token_balances。
+    </ParamField>
 
-!type string  
-!values json jsonParsed base58 base64  
-!default json
+    <ParamField body="maxSupportedTransactionVersion" type="number" default="0">
+      Values: `0`
 
-每个返回交易的编码格式
+      目前，此参数的唯一有效值是 `0`。将其设置为 `0`
+      允许您获取所有交易，包括版本化和传统交易。
 
-- `jsonParsed` 尝试使用特定程序的指令解析器以返回更具可读性和更明确的数据到
-  `transaction.message.instructions` 列表中。
-- 如果请求了 `jsonParsed`
-  但未找到解析器，则指令将回退到常规 JSON 编码（`accounts`、`data` 和
-  `programIdIndex` 字段）。
+      此参数决定响应中返回的最大交易版本。如果您请求的交易版本高于此值，将返回错误。如果省略此参数，则仅返回传统交易——任何版本化交易都将导致错误。
+    </ParamField>
 
-##### !! transactionDetails
+    <ParamField body="showRewards" type="bool">
+      是否填充 `rewards` 数组。如果未提供参数，默认包括奖励。
+    </ParamField>
+  </Expandable>
+</ParamField>
 
-!type string  
-!values full accounts signatures none  
-!default full
+### Result
 
-返回的交易详情级别
-
-- 如果请求了 `accounts`，交易详情仅包括签名和每笔交易中的账户注释列表。
-- 交易元数据仅限于以下内容：fee、err、pre_balances、post_balances、pre_token_balances 和 post_token_balances。
-
-##### !! maxSupportedTransactionVersion
-
-!type number !values 0 !default 0
-
-目前，此参数的唯一有效值是 `0`。将其设置为 `0`
-允许您获取所有交易，包括版本化和传统交易。
-
-此参数决定响应中返回的最大交易版本。如果您请求的交易版本高于此值，将返回错误。如果省略此参数，则仅返回传统交易——任何版本化交易都将导致错误。
-
-##### !! showRewards
-
-!type bool
-
-是否填充 `rewards` 数组。如果未提供参数，默认包括奖励。
-
-### !!result
-
-```jsonc !response
-{
-  "jsonrpc": "2.0",
-  // !hover result
-  "result": 0,
-  "id": 1
-}
-```
-
-!type integer
-
-订阅 ID（用于取消订阅）
-
-</APIMethod>
+<ResponseField name="result" type="integer">
+  订阅 ID（用于取消订阅）
+</ResponseField>
 
 #### 通知格式：
 

@@ -35,23 +35,43 @@ description:
 "продвигать" его первой инструкцией. Каждое значение nonce может быть
 использовано только для одной транзакции.
 
-```mermaid title="Durable Nonce"
+```mermaid
 flowchart LR
     D1[Sign] --> D2[Store] --> D3[Submit]
     D3 -. "✓ No time limit" .-> D4[Success]
 ```
 
-```mermaid title="Standard Blockhash"
+<div className="nojs-only" data-fallback="mermaid">
+  ```text Mermaid
+  flowchart LR
+      D1[Sign] --> D2[Store] --> D3[Submit]
+      D3 -. "✓ No time limit" .-> D4[Success]
+  ```
+</div>
+
+<p className="sol-caption">Durable Nonce</p>
+
+```mermaid
 flowchart LR
     S1[Sign] --> S2[Submit]
     S2 -. "⏱️ ~90 sec limit" .-> S3[Expires]
 ```
 
-<Callout type="info">
+<div className="nojs-only" data-fallback="mermaid">
+  ```text Mermaid
+  flowchart LR
+      S1[Sign] --> S2[Submit]
+      S2 -. "⏱️ ~90 sec limit" .-> S3[Expires]
+  ```
+</div>
+
+<p className="sol-caption">Standard Blockhash</p>
+
+<Info>
   Nonce-аккаунт требует ~0,0015 SOL для освобождения от rent. Один nonce-аккаунт
   = одна ожидающая транзакция одновременно. Для параллельных процессов создайте
   несколько nonce-аккаунтов.
-</Callout>
+</Info>
 
 ### Создание nonce-аккаунта
 
@@ -62,342 +82,299 @@ flowchart LR
 2. **Инициализируйте его как nonce** с помощью
    `getInitializeNonceAccountInstruction`
 
-<ScrollyCoding>
+<Steps>
+  <Step title="Генерация keypair">
+    Сгенерируйте новую keypair для использования в качестве адреса nonce-аккаунта и
+    рассчитайте необходимое пространство и rent.
 
-## !!steps Генерация keypair
+    ```ts title="Create Nonce Account"
+    const nonceKeypair = await generateKeyPairSigner();
+    const nonceSpace = BigInt(getNonceSize());
+    const nonceRent = await rpc
+      .getMinimumBalanceForRentExemption(nonceSpace)
+      .send();
+    ```
+  </Step>
 
-Сгенерируйте новую keypair для использования в качестве адреса nonce-аккаунта и
-рассчитайте необходимое пространство и rent.
+  <Step title="Инструкция создания аккаунта">
+    Создайте аккаунт, принадлежащий System Program, с достаточным количеством
+    lamports для освобождения от rent.
 
-<CodePlaceholder title="Create Nonce Account" />
+    ```ts title="Create Nonce Account" focus={7-13}
+    const nonceKeypair = await generateKeyPairSigner();
+    const nonceSpace = BigInt(getNonceSize());
+    const nonceRent = await rpc
+      .getMinimumBalanceForRentExemption(nonceSpace)
+      .send();
 
-```ts !! title="Create Nonce Account"
-const nonceKeypair = await generateKeyPairSigner();
-const nonceSpace = BigInt(getNonceSize());
-const nonceRent = await rpc
-  .getMinimumBalanceForRentExemption(nonceSpace)
-  .send();
-```
+    const createNonceAccountIx = getCreateAccountInstruction({
+      payer: sender,
+      newAccount: nonceKeypair,
+      lamports: nonceRent,
+      space: nonceSpace,
+      programAddress: SYSTEM_PROGRAM_ADDRESS
+    });
+    ```
+  </Step>
 
-## !!steps Инструкция создания аккаунта
+  <Step title="Инструкция инициализации nonce">
+    Инициализируйте аккаунт как nonce-аккаунт, указав authority, который сможет
+    продвигать nonce.
 
-Создайте аккаунт, принадлежащий System Program, с достаточным количеством
-lamports для освобождения от rent.
+    ```ts title="Create Nonce Account" focus={15-18}
+    const nonceKeypair = await generateKeyPairSigner();
+    const nonceSpace = BigInt(getNonceSize());
+    const nonceRent = await rpc
+      .getMinimumBalanceForRentExemption(nonceSpace)
+      .send();
 
-<CodePlaceholder title="Create Nonce Account" />
+    const createNonceAccountIx = getCreateAccountInstruction({
+      payer: sender,
+      newAccount: nonceKeypair,
+      lamports: nonceRent,
+      space: nonceSpace,
+      programAddress: SYSTEM_PROGRAM_ADDRESS
+    });
 
-```ts !! title="Create Nonce Account"
-const nonceKeypair = await generateKeyPairSigner();
-const nonceSpace = BigInt(getNonceSize());
-const nonceRent = await rpc
-  .getMinimumBalanceForRentExemption(nonceSpace)
-  .send();
+    const initNonceIx = getInitializeNonceAccountInstruction({
+      nonceAccount: nonceKeypair.address,
+      nonceAuthority: sender.address
+    });
+    ```
+  </Step>
 
-// !focus(1:7)
-const createNonceAccountIx = getCreateAccountInstruction({
-  payer: sender,
-  newAccount: nonceKeypair,
-  lamports: nonceRent,
-  space: nonceSpace,
-  programAddress: SYSTEM_PROGRAM_ADDRESS
-});
-```
+  <Step title="Сборка транзакции">
+    Соберите транзакцию с обеими инструкциями.
 
-## !!steps Инструкция инициализации nonce
+    ```ts title="Create Nonce Account" focus={20-26}
+    const nonceKeypair = await generateKeyPairSigner();
+    const nonceSpace = BigInt(getNonceSize());
+    const nonceRent = await rpc
+      .getMinimumBalanceForRentExemption(nonceSpace)
+      .send();
 
-Инициализируйте аккаунт как nonce-аккаунт, указав authority, который сможет
-продвигать nonce.
+    const createNonceAccountIx = getCreateAccountInstruction({
+      payer: sender,
+      newAccount: nonceKeypair,
+      lamports: nonceRent,
+      space: nonceSpace,
+      programAddress: SYSTEM_PROGRAM_ADDRESS
+    });
 
-<CodePlaceholder title="Create Nonce Account" />
+    const initNonceIx = getInitializeNonceAccountInstruction({
+      nonceAccount: nonceKeypair.address,
+      nonceAuthority: sender.address
+    });
 
-```ts !! title="Create Nonce Account"
-const nonceKeypair = await generateKeyPairSigner();
-const nonceSpace = BigInt(getNonceSize());
-const nonceRent = await rpc
-  .getMinimumBalanceForRentExemption(nonceSpace)
-  .send();
+    const { value: blockhash } = await rpc.getLatestBlockhash().send();
+    const createNonceTx = pipe(
+      createTransactionMessage({ version: 0 }),
+      (tx) => setTransactionMessageFeePayerSigner(sender, tx),
+      (tx) => setTransactionMessageLifetimeUsingBlockhash(blockhash, tx),
+      (tx) =>
+        appendTransactionMessageInstructions(
+          [createNonceAccountIx, initNonceIx],
+          tx
+        )
+    );
+    ```
+  </Step>
 
-const createNonceAccountIx = getCreateAccountInstruction({
-  payer: sender,
-  newAccount: nonceKeypair,
-  lamports: nonceRent,
-  space: nonceSpace,
-  programAddress: SYSTEM_PROGRAM_ADDRESS
-});
+  <Step title="Подпись и отправка">
+    Подпишите и отправьте транзакцию для создания и инициализации nonce-аккаунта.
 
-// !focus(1:4)
-const initNonceIx = getInitializeNonceAccountInstruction({
-  nonceAccount: nonceKeypair.address,
-  nonceAuthority: sender.address
-});
-```
+    ```ts title="Создать nonce-аккаунт" focus={32-37}
+    const nonceKeypair = await generateKeyPairSigner();
+    const nonceSpace = BigInt(getNonceSize());
+    const nonceRent = await rpc
+      .getMinimumBalanceForRentExemption(nonceSpace)
+      .send();
 
-## !!steps Сборка транзакции
+    const createNonceAccountIx = getCreateAccountInstruction({
+      payer: sender,
+      newAccount: nonceKeypair,
+      lamports: nonceRent,
+      space: nonceSpace,
+      programAddress: SYSTEM_PROGRAM_ADDRESS
+    });
 
-Соберите транзакцию с обеими инструкциями.
+    const initNonceIx = getInitializeNonceAccountInstruction({
+      nonceAccount: nonceKeypair.address,
+      nonceAuthority: sender.address
+    });
 
-<CodePlaceholder title="Create Nonce Account" />
+    const { value: blockhash } = await rpc.getLatestBlockhash().send();
+    const createNonceTx = pipe(
+      createTransactionMessage({ version: 0 }),
+      (tx) => setTransactionMessageFeePayerSigner(sender, tx),
+      (tx) => setTransactionMessageLifetimeUsingBlockhash(blockhash, tx),
+      (tx) =>
+        appendTransactionMessageInstructions(
+          [createNonceAccountIx, initNonceIx],
+          tx
+        )
+    );
 
-```ts !! title="Create Nonce Account"
-const nonceKeypair = await generateKeyPairSigner();
-const nonceSpace = BigInt(getNonceSize());
-const nonceRent = await rpc
-  .getMinimumBalanceForRentExemption(nonceSpace)
-  .send();
+    const signedCreateNonceTx =
+      await signTransactionMessageWithSigners(createNonceTx);
 
-const createNonceAccountIx = getCreateAccountInstruction({
-  payer: sender,
-  newAccount: nonceKeypair,
-  lamports: nonceRent,
-  space: nonceSpace,
-  programAddress: SYSTEM_PROGRAM_ADDRESS
-});
-
-const initNonceIx = getInitializeNonceAccountInstruction({
-  nonceAccount: nonceKeypair.address,
-  nonceAuthority: sender.address
-});
-
-// !focus(1:7)
-const { value: blockhash } = await rpc.getLatestBlockhash().send();
-const createNonceTx = pipe(
-  createTransactionMessage({ version: 0 }),
-  (tx) => setTransactionMessageFeePayerSigner(sender, tx),
-  (tx) => setTransactionMessageLifetimeUsingBlockhash(blockhash, tx),
-  (tx) =>
-    appendTransactionMessageInstructions(
-      [createNonceAccountIx, initNonceIx],
-      tx
-    )
-);
-```
-
-## !!steps Подпись и отправка
-
-Подпишите и отправьте транзакцию для создания и инициализации nonce-аккаунта.
-
-<CodePlaceholder title="Создать nonce-аккаунт" />
-
-```ts !! title="Create Nonce Account"
-const nonceKeypair = await generateKeyPairSigner();
-const nonceSpace = BigInt(getNonceSize());
-const nonceRent = await rpc
-  .getMinimumBalanceForRentExemption(nonceSpace)
-  .send();
-
-const createNonceAccountIx = getCreateAccountInstruction({
-  payer: sender,
-  newAccount: nonceKeypair,
-  lamports: nonceRent,
-  space: nonceSpace,
-  programAddress: SYSTEM_PROGRAM_ADDRESS
-});
-
-const initNonceIx = getInitializeNonceAccountInstruction({
-  nonceAccount: nonceKeypair.address,
-  nonceAuthority: sender.address
-});
-
-const { value: blockhash } = await rpc.getLatestBlockhash().send();
-const createNonceTx = pipe(
-  createTransactionMessage({ version: 0 }),
-  (tx) => setTransactionMessageFeePayerSigner(sender, tx),
-  (tx) => setTransactionMessageLifetimeUsingBlockhash(blockhash, tx),
-  (tx) =>
-    appendTransactionMessageInstructions(
-      [createNonceAccountIx, initNonceIx],
-      tx
-    )
-);
-
-// !focus(1:6)
-const signedCreateNonceTx =
-  await signTransactionMessageWithSigners(createNonceTx);
-
-await sendAndConfirmTransactionFactory({ rpc, rpcSubscriptions })(
-  signedCreateNonceTx,
-  { commitment: "confirmed" }
-);
-```
-
-</ScrollyCoding>
+    await sendAndConfirmTransactionFactory({ rpc, rpcSubscriptions })(
+      signedCreateNonceTx,
+      { commitment: "confirmed" }
+    );
+    ```
+  </Step>
+</Steps>
 
 ### Сборка отложенной транзакции
 
 Вместо недавнего blockhash используйте значение nonce из nonce-аккаунта как срок
 действия транзакции.
 
-<ScrollyCoding>
+<Steps>
+  <Step title="Получить nonce">
+    Получите данные из nonce-аккаунта. Используйте значение nonce из nonce-аккаунта
+    как срок действия транзакции.
 
-## !!steps Получить nonce
+    ```sh title="Example Nonce Account Data" highlight={5}
+    {
+      version: 1,
+      state: 1,
+      authority: 'HgjaL8artMtmntaQDVM2UBk3gppsYYERS4PkUhiaLZD1',
+      blockhash: '5U7seXqfgZx1uh5DFhdH1vyBhr7XGRrKxBAnJJTbbUa',
+      lamportsPerSignature: 5000n
+    }
+    ```
 
-Получите данные из nonce-аккаунта. Используйте значение nonce из nonce-аккаунта
-как срок действия транзакции.
+    ```ts title="Собрать отложенную транзакцию" focus={1}
+    const { data: nonceData } = await fetchNonce(rpc, nonceKeypair.address);
+    ```
+  </Step>
 
-```sh title="Example Nonce Account Data"
-{
-  version: 1,
-  state: 1,
-  authority: 'HgjaL8artMtmntaQDVM2UBk3gppsYYERS4PkUhiaLZD1',
-  # !mark
-  blockhash: '5U7seXqfgZx1uh5DFhdH1vyBhr7XGRrKxBAnJJTbbUa',
-  lamportsPerSignature: 5000n
-}
-```
+  <Step title="Создать инструкцию перевода">
+    Создайте инструкцию для вашего платежа. В этом примере показан перевод токенов.
 
-<CodePlaceholder title="Собрать отложенную транзакцию" />
+    ```ts title="Собрать отложенную транзакцию" focus={3-8}
+    const { data: nonceData } = await fetchNonce(rpc, nonceKeypair.address);
 
-```ts !! title="Build Deferred Transaction"
-// !focus(1:1)
-const { data: nonceData } = await fetchNonce(rpc, nonceKeypair.address);
-```
+    const transferInstruction = getTransferInstruction({
+      source: senderAta,
+      destination: recipientAta,
+      authority: sender.address,
+      amount: 250_000n
+    });
+    ```
+  </Step>
 
-## !!steps Создать инструкцию перевода
+  <Step title="Сборка транзакции с долговечным nonce">
+    Используйте `setTransactionMessageLifetimeUsingDurableNonce`, чтобы установить
+    nonce как blockhash и автоматически добавить инструкцию advance nonce в начало.
 
-Создайте инструкцию для вашего платежа. В этом примере показан перевод токенов.
+    ```ts title="Собрать отложенную транзакцию" highlight={14-21} focus={10-23}
+    const { data: nonceData } = await fetchNonce(rpc, nonceKeypair.address);
 
-<CodePlaceholder title="Собрать отложенную транзакцию" />
+    const transferInstruction = getTransferInstruction({
+      source: senderAta,
+      destination: recipientAta,
+      authority: sender.address,
+      amount: 250_000n
+    });
 
-```ts !! title="Build Deferred Transaction"
-const { data: nonceData } = await fetchNonce(rpc, nonceKeypair.address);
+    const transactionMessage = pipe(
+      createTransactionMessage({ version: 0 }),
+      (tx) => setTransactionMessageFeePayerSigner(sender, tx),
+      (tx) =>
+        setTransactionMessageLifetimeUsingDurableNonce(
+          {
+            nonce: nonceData.blockhash as Nonce,
+            nonceAccountAddress: nonceKeypair.address,
+            nonceAuthorityAddress: nonceData.authority
+          },
+          tx
+        ),
+      (tx) => appendTransactionMessageInstructions([transferInstruction], tx)
+    );
+    ```
+  </Step>
 
-// !focus(1:6)
-const transferInstruction = getTransferInstruction({
-  source: senderAta,
-  destination: recipientAta,
-  authority: sender.address,
-  amount: 250_000n
-});
-```
+  <Step title="Подписать транзакцию">
+    Подпишите транзакцию. Теперь она использует долговечный nonce вместо
+    стандартного blockhash.
 
-## !!steps Сборка транзакции с долговечным nonce
+    ```ts title="Собрать отложенную транзакцию" focus={25-26}
+    const { data: nonceData } = await fetchNonce(rpc, nonceKeypair.address);
 
-Используйте `setTransactionMessageLifetimeUsingDurableNonce`, чтобы установить
-nonce как blockhash и автоматически добавить инструкцию advance nonce в начало.
+    const transferInstruction = getTransferInstruction({
+      source: senderAta,
+      destination: recipientAta,
+      authority: sender.address,
+      amount: 250_000n
+    });
 
-<CodePlaceholder title="Собрать отложенную транзакцию" />
+    const transactionMessage = pipe(
+      createTransactionMessage({ version: 0 }),
+      (tx) => setTransactionMessageFeePayerSigner(sender, tx),
+      (tx) =>
+        setTransactionMessageLifetimeUsingDurableNonce(
+          {
+            nonce: nonceData.blockhash as Nonce,
+            nonceAccountAddress: nonceKeypair.address,
+            nonceAuthorityAddress: nonceData.authority
+          },
+          tx
+        ),
+      (tx) => appendTransactionMessageInstructions([transferInstruction], tx)
+    );
 
-```ts !! title="Build Deferred Transaction"
-const { data: nonceData } = await fetchNonce(rpc, nonceKeypair.address);
-
-const transferInstruction = getTransferInstruction({
-  source: senderAta,
-  destination: recipientAta,
-  authority: sender.address,
-  amount: 250_000n
-});
-
-// !focus(1:14)
-const transactionMessage = pipe(
-  createTransactionMessage({ version: 0 }),
-  (tx) => setTransactionMessageFeePayerSigner(sender, tx),
-  (tx) =>
-    // !mark(1:8)
-    setTransactionMessageLifetimeUsingDurableNonce(
-      {
-        nonce: nonceData.blockhash as Nonce,
-        nonceAccountAddress: nonceKeypair.address,
-        nonceAuthorityAddress: nonceData.authority
-      },
-      tx
-    ),
-  (tx) => appendTransactionMessageInstructions([transferInstruction], tx)
-);
-```
-
-## !!steps Подписать транзакцию
-
-Подпишите транзакцию. Теперь она использует долговечный nonce вместо
-стандартного blockhash.
-
-<CodePlaceholder title="Собрать отложенную транзакцию" />
-
-```ts !! title="Build Deferred Transaction"
-const { data: nonceData } = await fetchNonce(rpc, nonceKeypair.address);
-
-const transferInstruction = getTransferInstruction({
-  source: senderAta,
-  destination: recipientAta,
-  authority: sender.address,
-  amount: 250_000n
-});
-
-const transactionMessage = pipe(
-  createTransactionMessage({ version: 0 }),
-  (tx) => setTransactionMessageFeePayerSigner(sender, tx),
-  (tx) =>
-    setTransactionMessageLifetimeUsingDurableNonce(
-      {
-        nonce: nonceData.blockhash as Nonce,
-        nonceAccountAddress: nonceKeypair.address,
-        nonceAuthorityAddress: nonceData.authority
-      },
-      tx
-    ),
-  (tx) => appendTransactionMessageInstructions([transferInstruction], tx)
-);
-
-// !focus(1:2)
-const signedTransaction =
-  await signTransactionMessageWithSigners(transactionMessage);
-```
-
-</ScrollyCoding>
+    const signedTransaction =
+      await signTransactionMessageWithSigners(transactionMessage);
+    ```
+  </Step>
+</Steps>
 
 ### Сохранение или отправка транзакции
 
 После подписания закодируйте транзакцию для хранения. Когда будете готовы,
 отправьте её в сеть.
 
-<ScrollyCoding>
+<Steps>
+  <Step title="Кодирование для хранения">
+    Закодируйте подписанную транзакцию в base64. Сохраните это значение в вашей базе
+    данных.
 
-## !!steps Кодирование для хранения
+    ```ts title="Сохранить и выполнить" focus={4-5}
+    const signedTransaction =
+      await signTransactionMessageWithSigners(transactionMessage);
 
-Закодируйте подписанную транзакцию в base64. Сохраните это значение в вашей базе
-данных.
+    const base64EncodedTransaction =
+      getBase64EncodedWireTransaction(signedTransaction);
 
-<CodePlaceholder title="Сохранить и выполнить" />
+    // Store base64EncodedTransaction in your database
+    ```
+  </Step>
 
-```ts !! title="Store and Execute"
-const signedTransaction =
-  await signTransactionMessageWithSigners(transactionMessage);
+  <Step title="Отправка транзакции">
+    Отправьте подписанную транзакцию, когда будете готовы. Транзакция останется
+    действительной, пока nonce не будет обновлён.
 
-// !focus(1:2)
-const base64EncodedTransaction =
-  getBase64EncodedWireTransaction(signedTransaction);
+    ```ts title="Сохранить и выполнить" focus={8-10}
+    const signedTransaction =
+      await signTransactionMessageWithSigners(transactionMessage);
 
-// Store base64EncodedTransaction in your database
-```
+    const base64EncodedTransaction =
+      getBase64EncodedWireTransaction(signedTransaction);
 
-## !!steps Отправка транзакции
-
-Отправьте подписанную транзакцию, когда будете готовы. Транзакция останется
-действительной, пока nonce не будет обновлён.
-
-<CodePlaceholder title="Сохранить и выполнить" />
-
-```ts !! title="Store and Execute"
-const signedTransaction =
-  await signTransactionMessageWithSigners(transactionMessage);
-
-const base64EncodedTransaction =
-  getBase64EncodedWireTransaction(signedTransaction);
-
-// When ready to execute (could be days later):
-// !focus(1:3)
-await rpc
-  .sendTransaction(base64EncodedTransaction, { encoding: "base64" })
-  .send();
-```
-
-</ScrollyCoding>
+    // When ready to execute (could be days later):
+    await rpc
+      .sendTransaction(base64EncodedTransaction, { encoding: "base64" })
+      .send();
+    ```
+  </Step>
+</Steps>
 
 ### Демонстрация
 
-<CodeTabs flags="r">
-
-```ts !! title="Demo"
-// !collapse(1:39) collapsed
+```ts Demo highlight={54,57-60,63-69,72-75,106,139-146,156-157,161-166} expandable
 // Click ">" icon on left to expand demo imports
 import {
   airdropFactory,
@@ -451,18 +428,15 @@ const { rpc, rpcSubscriptions, mint } = await demoSetup(sender, recipient);
 // Step 1: Create a Nonce Account
 // =============================================================================
 
-// !mark
 const nonceKeypair = await generateKeyPairSigner();
 console.log("\nNonce Account Address:", nonceKeypair.address);
 
-// !mark(1:4)
 const nonceSpace = BigInt(getNonceSize());
 const nonceRent = await rpc
   .getMinimumBalanceForRentExemption(nonceSpace)
   .send();
 
 // Instruction to create new account for the nonce
-// !mark(1:7)
 const createNonceAccountIx = getCreateAccountInstruction({
   payer: sender,
   newAccount: nonceKeypair,
@@ -472,7 +446,6 @@ const createNonceAccountIx = getCreateAccountInstruction({
 });
 
 // Instruction to initialize the nonce account
-// !mark(1:4)
 const initNonceIx = getInitializeNonceAccountInstruction({
   nonceAccount: nonceKeypair.address,
   nonceAuthority: sender.address
@@ -507,7 +480,6 @@ console.log("Nonce Account created.");
 // =============================================================================
 
 // Fetch current nonce value from the nonce account
-// !mark
 const { data: nonceData } = await fetchNonce(rpc, nonceKeypair.address);
 console.log("Nonce Account data:", nonceData);
 
@@ -541,7 +513,6 @@ const transactionMessage = pipe(
   createTransactionMessage({ version: 0 }),
   (tx) => setTransactionMessageFeePayerSigner(sender, tx),
   (tx) =>
-    // !mark(1:8)
     setTransactionMessageLifetimeUsingDurableNonce(
       {
         nonce: nonceData.blockhash as string as Nonce,
@@ -559,13 +530,11 @@ assertIsTransactionWithDurableNonceLifetime(signedTransaction);
 const transactionSignature = getSignatureFromTransaction(signedTransaction);
 
 // Encode the transaction to base64, optionally save and send at a later time
-// !mark(1:2)
 const base64EncodedTransaction =
   getBase64EncodedWireTransaction(signedTransaction);
 console.log("\nBase64 Encoded Transaction:", base64EncodedTransaction);
 
 // Send the encoded transaction, blockhash does not expire
-// !mark(1:6)
 await rpc
   .sendTransaction(base64EncodedTransaction, {
     encoding: "base64",
@@ -579,7 +548,6 @@ console.log("Transaction Signature:", transactionSignature);
 // =============================================================================
 // Demo Setup Helper Function
 // =============================================================================
-// !collapse(1:1000) collapsed
 
 /**
  * Sets up for a token transfer demo:
@@ -681,8 +649,6 @@ async function demoSetup(sender: KeyPairSigner, recipient: KeyPairSigner) {
   return { rpc, rpcSubscriptions, mint };
 }
 ```
-
-</CodeTabs>
 
 ## Аннулирование ожидающей транзакции
 

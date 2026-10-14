@@ -3,18 +3,18 @@ title: Ikhtisar
 description: Arsitektur dan alur data protokol Private Channels
 ---
 
-<Callout type="warning">
+<Warning>
   Private Channels belum diaudit keamanannya dan tidak direkomendasikan untuk
   penggunaan produksi dengan dana nyata tanpa tinjauan keamanan yang menyeluruh.
-</Callout>
+</Warning>
 
-<Callout type="info">
+<Info>
   **Ingin men-deploy instans?** Kunjungi [panduan
   Operator](/docs/tools/private-channels/operators). **Ingin mengintegrasikan dengan
   instans yang sudah ada?** Kunjungi
   [Quickstart](/docs/tools/private-channels/quickstart/installation). Halaman ini
   adalah referensi arsitektur untuk kedua audiens.
-</Callout>
+</Info>
 
 ## Arsitektur
 
@@ -104,11 +104,11 @@ stack devnet yang di-deploy oleh panduan ini; lihat
 - Endpoint kesehatan: `GET /health` - mengembalikan `503` jika loop polling internal mana pun
   terhenti lebih dari 30 detik
 
-<Callout type="warning">
+<Warning>
   Skema event WebSocket belum terdokumentasi secara publik. Lihat
   [`core/src/bin/streamer.rs`](https://github.com/solana-foundation/solana-private-channels/blob/main/core/src/bin/streamer.rs)
   untuk detail implementasi hingga dokumentasi resmi tersedia.
-</Callout>
+</Warning>
 
 ```mermaid
 flowchart TB
@@ -149,6 +149,48 @@ flowchart TB
     RN --> GW
     PG_P --> ST
 ```
+
+<div className="nojs-only" data-fallback="mermaid">
+  ```text Mermaid
+  flowchart TB
+      Wallet([User Wallet])
+      Escrow[Escrow Program<br/><i>Solana Mainnet</i>]
+      IS[Solana Mainnet Indexer]
+      IC[Private Channel Indexer]
+      PG_I[(Indexer DB)]
+      OS[Operator - Solana Side]
+      OC[Operator - Channel Side]
+      GW[Gateway :8899]
+      WN[Write Node :8900]
+      WP[Withdraw Program]
+      PG_P[(Postgres Primary)]
+      PG_R[(Postgres Replica)]
+      RN[Read Node :8901]
+      ST[Streamer :8902]
+
+      Wallet -- deposit --> Escrow
+      Wallet -- transact / withdraw --> GW
+      ST -. WebSocket .-> Wallet
+
+      Escrow -- watch --> IS
+      IS -- deposit events --> PG_I
+      PG_I -- pending deposits --> OS
+      OS -- mint --> GW
+
+      GW -- sendTransaction --> WN
+      WN --> WP
+      GW -- watch --> IC
+      IC -- withdrawal events --> PG_I
+      PG_I -- pending withdrawals --> OC
+      OC -- release --> Escrow
+
+      WN -- settle --> PG_P
+      PG_P -- replication --> PG_R
+      PG_R --> RN
+      RN --> GW
+      PG_P --> ST
+  ```
+</div>
 
 ## Pipeline Transaksi
 
@@ -221,7 +263,7 @@ baru.
 
 ## Keamanan Kunci Operasional
 
-<Callout type="warning">
+<Warning>
   Layanan off-chain menggunakan kosakata penanda tangan mereka sendiri, yang tidak terkait dengan
   otoritas admin/operator on-chain yang dijelaskan dalam Model Keamanan di atas.
   `ADMIN_PRIVATE_KEY` diperlukan untuk setiap layanan operator dan membayar
@@ -230,7 +272,7 @@ baru.
   `ADMIN_PRIVATE_KEY` ketika tidak ditetapkan. Jangan pernah memasukkan kunci admin instans
   tingkat protokol (yang digunakan untuk `CreateInstance` / `AddOperator` / `SetNewAdmin`)
   ke dalam salah satu variabel atau mengeksposnya saat runtime; simpan kunci tersebut secara dingin dan offline.
-</Callout>
+</Warning>
 
 `ReleaseFunds` dan `ResetSmtRoot` memerlukan dua tanda tangan on-chain: pembayar biaya
 (dari `ADMIN_PRIVATE_KEY`) dan otoritas PDA Operator (dari
@@ -254,7 +296,7 @@ memanggil instruksi ini tanpa memverifikasi alamat target.
 
 ## Langkah Selanjutnya
 
-<Cards>
+<Columns cols={2}>
   <Card
     title="Quickstart"
     href="/docs/tools/private-channels/quickstart/installation"
@@ -276,4 +318,4 @@ memanggil instruksi ini tanpa memverifikasi alamat target.
   >
     Referensi instruksi lengkap untuk semua program.
   </Card>
-</Cards>
+</Columns>

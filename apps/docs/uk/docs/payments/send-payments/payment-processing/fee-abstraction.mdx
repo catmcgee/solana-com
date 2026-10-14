@@ -27,87 +27,73 @@ description:
 - **Відправник** підписує для авторизації переказу своїх токенів
 - **Спонсор** підписує для авторизації оплати мережевої комісії
 
-<Callout>
+<Note>
   Дивіться [Як працюють платежі в Solana](/docs/payments/how-payments-work) для
   основних концепцій платежів.
-</Callout>
+</Note>
 
-Кроки нижче показують основний потік. Дивіться [Демо](#demo) для повного
+Кроки нижче показують основний потік. Дивіться [Демо](#демонстрація) для повного
 робочого коду.
 
-<ScrollyCoding>
+<Steps>
+  <Step title="Створіть обліковий запис спонсора">
+    Згенеруйте окрему пару ключів для спонсора, який оплачуватиме комісії
+    транзакцій. Спонсору потрібен SOL для комісій, але йому не потрібно тримати
+    токени, які переказуються.
 
-## !!steps Створіть обліковий запис спонсора
+    ```ts title="Спонсорування комісії транзакції"
+    const sponsor = await generateKeyPairSigner();
+    ```
+  </Step>
 
-Згенеруйте окрему пару ключів для спонсора, який оплачуватиме комісії
-транзакцій. Спонсору потрібен SOL для комісій, але йому не потрібно тримати
-токени, які переказуються.
+  <Step title="Створіть інструкцію переказу">
+    Створіть інструкцію переказу токенів з відправником як авторитетом. Відправник
+    володіє токенами і повинен підписати переказ.
 
-<CodePlaceholder title="Спонсорування комісії транзакції" />
+    ```ts title="Оплата комісії спонсором" focus={3-10}
+    const sponsor = await generateKeyPairSigner();
 
-```ts !! title="Sponsor Transaction Fee"
-const sponsor = await generateKeyPairSigner();
-```
+    const transferInstruction = getTransferCheckedInstruction({
+      source: senderAta,
+      mint: mint.address,
+      destination: recipientAta,
+      authority: sender, // Sender signs for the transfer
+      amount: 250_000n, // adjusted for the mint's decimals
+      decimals: 6
+    });
+    ```
+  </Step>
 
-## !!steps Створіть інструкцію переказу
+  <Step title="Надсилання зі спонсором як платником комісії">
+    Створіть клієнта зі спонсором як платником комісії за допомогою
+    `payer(sponsor)`, потім викличте `client.sendTransaction`. Спонсор підписує
+    транзакцію для оплати мережевої комісії, а відправник підписує для авторизації
+    переказу — `sendTransaction` автоматично збирає кожного зазначеного підписанта.
 
-Створіть інструкцію переказу токенів з відправником як авторитетом. Відправник
-володіє токенами і повинен підписати переказ.
+    ```ts title="Оплата комісії спонсором" highlight={13} focus={12-16}
+    const sponsor = await generateKeyPairSigner();
 
-<CodePlaceholder title="Оплата комісії спонсором" />
+    const transferInstruction = getTransferCheckedInstruction({
+      source: senderAta,
+      mint: mint.address,
+      destination: recipientAta,
+      authority: sender,
+      amount: 250_000n,
+      decimals: 6
+    });
 
-```ts !! title="Sponsor Transaction Fee"
-const sponsor = await generateKeyPairSigner();
+    const client = createClient()
+      .use(payer(sponsor)) // Sponsor pays the transaction fees
+      .use(solanaLocalRpc());
 
-// !focus(1:8)
-const transferInstruction = getTransferCheckedInstruction({
-  source: senderAta,
-  mint: mint.address,
-  destination: recipientAta,
-  authority: sender, // Sender signs for the transfer
-  amount: 250_000n, // adjusted for the mint's decimals
-  decimals: 6
-});
-```
-
-## !!steps Надсилання зі спонсором як платником комісії
-
-Створіть клієнта зі спонсором як платником комісії за допомогою
-`payer(sponsor)`, потім викличте `client.sendTransaction`. Спонсор підписує
-транзакцію для оплати мережевої комісії, а відправник підписує для авторизації
-переказу — `sendTransaction` автоматично збирає кожного зазначеного підписанта.
-
-<CodePlaceholder title="Оплата комісії спонсором" />
-
-```ts !! title="Sponsor Transaction Fee"
-const sponsor = await generateKeyPairSigner();
-
-const transferInstruction = getTransferCheckedInstruction({
-  source: senderAta,
-  mint: mint.address,
-  destination: recipientAta,
-  authority: sender,
-  amount: 250_000n,
-  decimals: 6
-});
-
-// !focus(1:5)
-const client = createClient()
-  // !mark
-  .use(payer(sponsor)) // Sponsor pays the transaction fees
-  .use(solanaLocalRpc());
-
-const { context } = await client.sendTransaction([transferInstruction]);
-```
-
-</ScrollyCoding>
+    const { context } = await client.sendTransaction([transferInstruction]);
+    ```
+  </Step>
+</Steps>
 
 ### Демонстрація
 
-<CodeTabs flags="r">
-
-```ts !! title="Demo"
-// !collapse(1:15) collapsed
+```ts Demo highlight={20,64} expandable
 // Click ">" icon on left to expand demo imports
 import { createClient, generateKeyPairSigner, lamports } from "@solana/kit";
 import type { KeyPairSigner } from "@solana/kit";
@@ -127,7 +113,6 @@ import {
 // Generate keypairs for sender, recipient, and sponsor (fee payer)
 const sender = await generateKeyPairSigner();
 const recipient = await generateKeyPairSigner();
-// !mark
 const sponsor = await generateKeyPairSigner();
 
 console.log("Sender Address:", sender.address);
@@ -172,7 +157,6 @@ const transferInstruction = getTransferCheckedInstruction({
 
 // Send transaction with sponsor as fee payer using @solana/kit
 // The sponsor (client.payer) pays fees; the sender signs for the transfer
-// !mark
 const { context } = await client.sendTransaction([transferInstruction]);
 const signature = context.signature;
 
@@ -206,7 +190,6 @@ console.log("Fee Payer Address:", feePayer);
 // =============================================================================
 // Demo Setup Helper Function
 // =============================================================================
-// !collapse(1:1000) collapsed
 
 /**
  * Sets up for a sponsored token transfer demo:
@@ -312,14 +295,12 @@ async function demoSetup(
 }
 ```
 
-</CodeTabs>
-
-<Callout type="caution">
+<Danger>
   Коли ви створюєте токен-акаунт для кінцевого користувача, він може закрити
   його та повернути SOL, використаний для rent. Розгляньте можливість стягнення
   плати з користувачів за створення акаунта у стейблкоїнах або врахуйте цю
   вартість в економіці вашого продукту.
-</Callout>
+</Danger>
 
 ## Абстракція комісій у масштабі з Kora
 
@@ -366,7 +347,7 @@ console.log("Signature:", context.signature);
 
 ### Ресурси Kora
 
-<Cards>
+<Columns cols={2}>
   <Card
     title="Швидкий старт Kora"
     href="/docs/tools/kora/getting-started/quick-start"
@@ -382,4 +363,4 @@ console.log("Signature:", context.signature);
   <Card title="Посібник для операторів вузлів" href="/docs/tools/kora/operators">
     Розгорніть і налаштуйте власний екземпляр Kora.
   </Card>
-</Cards>
+</Columns>

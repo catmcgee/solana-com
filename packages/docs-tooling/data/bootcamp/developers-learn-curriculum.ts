@@ -881,7 +881,7 @@ export function getDevelopersLearnPrerequisiteCourseSlug(courseSlug: string) {
     return null;
   }
 
-  return developersLearnCourses[courseIndex - 1].slug;
+  return developersLearnCourses[courseIndex - 1]!.slug;
 }
 
 export function getDevelopersLearnCourseProgress(
@@ -952,7 +952,7 @@ export function isDevelopersLearnLessonUnlocked(
     return true;
   }
 
-  const previousLessonSlug = course.lessons[lessonIndex - 1].slug;
+  const previousLessonSlug = course.lessons[lessonIndex - 1]!.slug;
   return completedLessons.has(
     getDevelopersLearnLessonKey(courseSlug, previousLessonSlug),
   );
@@ -1022,7 +1022,7 @@ export function getDevelopersLearnDependentLessonKeys(
     courseCursor < developersLearnCourses.length;
     courseCursor++
   ) {
-    const cursorCourse = developersLearnCourses[courseCursor];
+    const cursorCourse = developersLearnCourses[courseCursor]!;
     const lessonStartIndex = courseCursor === courseIndex ? lessonIndex : 0;
 
     for (
@@ -1030,7 +1030,7 @@ export function getDevelopersLearnDependentLessonKeys(
       lessonCursor < cursorCourse.lessons.length;
       lessonCursor++
     ) {
-      const cursorLesson = cursorCourse.lessons[lessonCursor];
+      const cursorLesson = cursorCourse.lessons[lessonCursor]!;
       dependentLessonKeys.push(
         getDevelopersLearnLessonKey(cursorCourse.slug, cursorLesson.slug),
       );

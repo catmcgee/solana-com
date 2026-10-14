@@ -10,7 +10,7 @@ Confidential Balances는 token account에 추가 상태를 더함으로써 프�
 
 다음 다이어그램은 Confidential Balances가 활성화된 token account를 생성하는 데 관련된 단계를 보여줍니다:
 
-```mermaid title="Create Token Account with Confidential Balances"
+```mermaid
 sequenceDiagram
     participant Payer as Wallet
     participant ATA as Associated Token Program
@@ -45,6 +45,46 @@ sequenceDiagram
     Token22-->>TokenAccount: Configure Confidential Balances
     deactivate Token22
 ```
+
+<div className="nojs-only" data-fallback="mermaid">
+  ```text Mermaid
+  sequenceDiagram
+      participant Payer as Wallet
+      participant ATA as Associated Token Program
+      participant Token22 as Token Extensions Program
+      participant ZK as ZK ElGamal Proof Program
+      participant TokenAccount as Token Account
+
+      Payer->>ATA: create_associated_token_account()
+      activate ATA
+      ATA->>Token22: Create token account at deterministic address
+      deactivate ATA
+      activate Token22
+      Token22-->>TokenAccount: Initialize Token Account
+      deactivate Token22
+
+      Payer->>Token22: reallocate() for ConfidentialTransferAccount extension
+      activate Token22
+      Token22-->>TokenAccount: Add space for extension data
+      deactivate Token22
+
+      Payer->>Payer: Derive ElGamal keypair and AES key
+      Payer->>Payer: Generate pubkey validity proof
+      Payer->>Payer: Encrypt initial balance (0) with AES key
+
+      Payer->>ZK: VerifyPubkeyValidity into context state account
+      activate ZK
+      ZK-->>ZK: Verify proof and store result in context state account
+      deactivate ZK
+
+      Payer->>Token22: configure_account() referencing the proof context account
+      activate Token22
+      Token22-->>TokenAccount: Configure Confidential Balances
+      deactivate Token22
+  ```
+</div>
+
+<p className="sol-caption">Create Token Account with Confidential Balances</p>
 
 ### Confidential Balances Token Account 상태
 
@@ -102,7 +142,7 @@ pub struct ConfidentialTransferAccount {
 }
 ```
 
-_rs`ConfidentialTransferAccount`_에는 Confidential Balances를 관리하는 여러 필드가 포함되어 있습니다:
+`ConfidentialTransferAccount`에는 Confidential Balances를 관리하는 여러 필드가 포함되어 있습니다:
 
 - **approved**: Confidential Balances에 대한 계정의 승인 상태입니다. mint account의 `auto_approve_new_accounts` 설정이 `true`로 지정된 경우, 모든 token account는 Confidential Balances에 대해 자동으로 승인됩니다.
 
@@ -129,18 +169,18 @@ _rs`ConfidentialTransferAccount`_에는 Confidential Balances를 관리하는 �
   중인 잔액 크레딧을 계산합니다.
 
 - **maximum_pending_balance_credit_counter**: 대기 중인 잔액을 사용 가능한
-  잔액으로 전환하기 위해 _rs`ApplyPendingBalance`_ 명령어가 필요하기 전까지의
+  잔액으로 전환하기 위해 `ApplyPendingBalance` 명령어가 필요하기 전까지의
   대기 크레딧 수 한도입니다.
 
 - **expected_pending_balance_credit_counter**: 마지막으로
-  _rs`ApplyPendingBalance`_ 명령어가 처리되었을 때 클라이언트가 instruction
+  `ApplyPendingBalance` 명령어가 처리되었을 때 클라이언트가 instruction
   data를 통해 제공한 `pending_balance_credit_counter` 값입니다.
 
-- **actual_pending_balance_credit_counter**: 마지막 _rs`ApplyPendingBalance`_
+- **actual_pending_balance_credit_counter**: 마지막 `ApplyPendingBalance`
   명령어가 처리된 시점의 token account에 있는 `pending_balance_credit_counter`
   값입니다.
 
-<Callout type="info">
+<Info>
   **대기 잔액 vs 사용 가능 잔액**
 
 기밀 잔액은 DoS 공격을 방지하기 위해 대기 잔액과 사용 가능 잔액으로 구분됩니다.
@@ -150,40 +190,40 @@ account 소유자의 토큰 전송 기능을 차단할 수 있습니다. 트랜�
 account 소유자는 토큰을 전송할 수 없게 됩니다.
 
 모든 입금 및 전송 금액은 처음에 대기 잔액에 추가됩니다. Token account 소유자는
-_rs`ApplyPendingBalance`_ 명령어를 사용하여 대기 잔액을 사용 가능 잔액으로
+`ApplyPendingBalance` 명령어를 사용하여 대기 잔액을 사용 가능 잔액으로
 전환해야 합니다. 수신 전송이나 입금은 token account의 사용 가능 잔액에 영향을
 주지 않습니다.
 
-</Callout>
+</Info>
 
-<Callout type="info">
+<Info>
   **대기 잔액 상위/하위 분할**
 
 ElGamal 복호화는 큰 숫자일수록 더 많은 연산이 필요하기 때문에, 기밀 대기 잔액은
 `pending_balance_lo`와 `pending_balance_hi`로 분할됩니다. 암호문 산술 구현은
 [여기](https://github.com/solana-program/token-2022/blob/efd0c957fefbd79882d77df5fb2dac88c001249c/confidential-transfer/ciphertext-arithmetic/src/lib.rs#L54)에서
-확인할 수 있으며, 이는 _rs`ApplyPendingBalance`_ 명령어에서
+확인할 수 있으며, 이는 `ApplyPendingBalance` 명령어에서
 [여기](https://github.com/solana-program/token-2022/blob/efd0c957fefbd79882d77df5fb2dac88c001249c/program/src/extension/confidential_transfer/processor.rs#L1180-L1184)와
 같이 사용됩니다.
 
-</Callout>
+</Info>
 
-<Callout type="info">
+<Info>
   **대기 잔액 크레딧 카운터**
 
-대기 잔액을 사용 가능 잔액으로 전환하기 위해 _rs`ApplyPendingBalance`_ 명령어를
+대기 잔액을 사용 가능 잔액으로 전환하기 위해 `ApplyPendingBalance` 명령어를
 호출할 때:
 
 1. 클라이언트는 현재 대기 잔액 및 사용 가능 잔액을 조회하고, 그 합계를
    암호화하여 token account 소유자의 AES 키로 암호화된
    `decryptable_available_balance`를 제공합니다.
 
-2. 예상 및 실제 대기 크레딧 카운터는 _rs`ApplyPendingBalance`_ 명령어가 생성된
+2. 예상 및 실제 대기 크레딧 카운터는 `ApplyPendingBalance` 명령어가 생성된
    시점과 처리된 시점 사이의 카운터 값 변화를 추적합니다:
    - `expected_pending_balance_credit_counter`: 클라이언트가
-     _rs`ApplyPendingBalance`_ 명령어를 생성할 때의
+     `ApplyPendingBalance` 명령어를 생성할 때의
      `pending_balance_credit_counter` 값
-   - `actual_pending_balance_credit_counter`: _rs`ApplyPendingBalance`_ 명령어가
+   - `actual_pending_balance_credit_counter`: `ApplyPendingBalance` 명령어가
      처리된 시점의 token account에 있는 `pending_balance_credit_counter` 값
 
 예상/실제 카운터가 일치하면 `decryptable_available_balance`가
@@ -205,41 +245,41 @@ token account의 상태를 가져와 `decryptable_available_balance`를 읽을 �
    - 입금 명령어에서 공개 금액을 더합니다
    - 전송 명령어에서 대상 암호문 금액을 복호화하여 더합니다
 
-</Callout>
+</Info>
 
 ### 필수 명령어
 
 Confidential Balances를 위한 token account 생성 및 구성에는 다음 명령어들이 사용되며, 모두 단일 트랜잭션에 포함됩니다:
 
 1. **Token Account 생성**: Associated Token Program의
-   _rs`AssociatedTokenAccountInstruction::Create`_ 명령어를 호출하여 결정론적
+   `AssociatedTokenAccountInstruction::Create` 명령어를 호출하여 결정론적
    주소에 token account를 생성합니다.
 
 2. **계정 공간 재할당**: Token Extension Program의
-   _rs`TokenInstruction::Reallocate`_ 명령어를 호출하여
-   _rs`ConfidentialTransferAccount`_ 상태를 위한 공간을 추가합니다.
+   `TokenInstruction::Reallocate` 명령어를 호출하여
+   `ConfidentialTransferAccount` 상태를 위한 공간을 추가합니다.
 
 3. **Pubkey 유효성 증명 검증**: ZK ElGamal Proof 프로그램이 소유한 계정을 생성한
-   후, _rs`VerifyPubkeyValidity`_ 명령어를 호출하여 증명을 검증하고 해당
+   후, `VerifyPubkeyValidity` 명령어를 호출하여 증명을 검증하고 해당
    컨텍스트 상태 계정에 검증된 결과를 저장합니다.
 
 4. **Confidential Balances 구성**: Token Extension Program의
    [ConfidentialTransferInstruction::ConfigureAccount](https://github.com/solana-program/token-2022/blob/efd0c957fefbd79882d77df5fb2dac88c001249c/program/src/extension/confidential_transfer/processor.rs#L201)
-   명령어를 호출하고, _rs`ProofLocation::ContextStateAccount`_를 통해 proof context state account를 참조하여
-   _rs`ConfidentialTransferAccount`_ 상태를 초기화합니다.
+   명령어를 호출하고, `ProofLocation::ContextStateAccount`를 통해 proof context state account를 참조하여
+   `ConfidentialTransferAccount` 상태를 초기화합니다.
 
-<Callout type="info">
+<Info>
 
 **token account에서 Confidential Balances를 활성화할 수 있는 것은 token account 소유자뿐입니다**.
 
-_rs`ConfigureAccount`_ 명령어는 token account 소유자만 생성할 수 있는 암호화 키와 증명의 클라이언트 측 생성이 필요합니다.
+`ConfigureAccount` 명령어는 token account 소유자만 생성할 수 있는 암호화 키와 증명의 클라이언트 측 생성이 필요합니다.
 
-pubkey 유효성 증명은 계정의 ElGamal 공개 키가 유효한지 검증합니다. 이는 _rs`build_pubkey_validity_proof_data`_로 생성되고, ZK ElGamal Proof 프로그램에 의해 체인 상에서 context state account로 검증된 후, _rs`ProofLocation::ContextStateAccount`_를 통해 _rs`ConfigureAccount`_에서 참조됩니다. 따라서 토큰 명령어 자체에는 증명 바이트가 포함되지 않습니다. 구현 세부 사항은 다음을 참조하세요:
+pubkey 유효성 증명은 계정의 ElGamal 공개 키가 유효한지 검증합니다. 이는 `build_pubkey_validity_proof_data`로 생성되고, ZK ElGamal Proof 프로그램에 의해 체인 상에서 context state account로 검증된 후, `ProofLocation::ContextStateAccount`를 통해 `ConfigureAccount`에서 참조됩니다. 따라서 토큰 명령어 자체에는 증명 바이트가 포함되지 않습니다. 구현 세부 사항은 다음을 참조하세요:
 
 - [PubkeyValidityProofData](https://github.com/anza-xyz/agave/blob/b39a9764005ac8596b7e14e61d381305ce57ecaa/zk-sdk/src/zk_elgamal_proof_program/proof_data/pubkey_validity.rs#L58)
 - [PubkeyValidityProof](https://github.com/anza-xyz/agave/blob/b39a9764005ac8596b7e14e61d381305ce57ecaa/zk-sdk/src/sigma_proofs/pubkey_validity.rs#L65)
 
-</Callout>
+</Info>
 
 ## 예제 코드
 
@@ -250,10 +290,9 @@ Confidential Balances는 ZK ElGamal Proof 프로그램에 의존하며, 이는 �
 
 ### Rust
 
-<CodeTabs>
+<CodeGroup>
 
-```rust !! title="main.rs"
-// !collapse(1:36) collapsed
+```rust main.rs expandable
 // Imports: dependencies used by this example.
 use anyhow::{Context, Result};
 use solana_address::Address;
@@ -411,7 +450,6 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-// !collapse(1:1000) collapsed
 // Setup: helper function to create the confidential mint.
 fn create_confidential_mint(rpc_client: &RpcClient, payer: &Keypair, decimals: u8) -> Result<Pubkey> {
     let mint = Keypair::new();
@@ -479,7 +517,7 @@ fn load_keypair() -> Result<Keypair> {
 }
 ```
 
-```toml !! title="Cargo.toml"
+```toml Cargo.toml
 [package]
 name = "confidential-transfer"
 version = "0.1.0"
@@ -511,14 +549,13 @@ dirs = "6.0.0"
 serde_json = "1.0"
 ```
 
-</CodeTabs>
+</CodeGroup>
 
 ### Typescript
 
-<CodeTabs>
+<CodeGroup>
 
-```ts !! title="index.ts"
-// !collapse(1:21) collapsed
+```ts index.ts expandable
 // Imports: dependencies used by this example.
 import {
   deriveAeKeyForOwnerMint,
@@ -595,7 +632,6 @@ console.log(
   `Enabled Confidential Balances on token account ${tokenAccount}: ${result.context.signature}`
 );
 
-// !collapse(1:1000) collapsed
 // Setup: helper function to create the confidential mint.
 async function createConfidentialMint(
   kitClient: typeof client,
@@ -630,7 +666,7 @@ async function createConfidentialMint(
 }
 ```
 
-```json !! title="package.json"
+```json package.json
 {
   "name": "confidential-account",
   "version": "0.1.0",
@@ -650,12 +686,12 @@ async function createConfidentialMint(
 }
 ```
 
-</CodeTabs>
+</CodeGroup>
 
-<Callout type="info">
+<Info>
   TypeScript 헬퍼는 `@solana-program/token-2022/confidential` 서브패스에
   위치하며, 암호화 기본 요소를 위해 `@solana/zk-sdk`를 기반으로 합니다. `owner`
   및 `client`는 `@solana/kit` 설정에서 제공되며, 반환된 명령 플랜은
   `@solana/kit`의 명령 플랜 지원을 통해 전송됩니다. 이는 증명이 하나의
   트랜잭션에 담기에 너무 클 경우 여러 트랜잭션으로 작업을 분산합니다.
-</Callout>
+</Info>

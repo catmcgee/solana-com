@@ -2,7 +2,6 @@
 title: Transaktioputki
 description:
   Miten Solana-transaktiot käsitellään lähetyksestä vahvistukseen, mukaan lukien täydellinen 8-vaiheinen validointiputki, transaktiotietojen lukeminen verkosta ja yleiset validointivirheet.
-url: /docs/core/transactions/transaction-pipeline
 type: reference
 prerequisites:
   - /docs/core/transactions
@@ -14,11 +13,13 @@ related:
   - /docs/core/programs/program-execution
 ---
 
-<Callout type="info" title="Yhteenveto">
+<Info>
+  **Yhteenveto**
+
   Transaktiot kulkevat 8 vaiheen läpi: vastaanotto, allekirjoituksen varmennus,
   puhdistus, budjetin/iän tarkistukset, maksajan validointi, tilin lataus,
   käskyn suoritus ja vahvistus.
-</Callout>
+</Info>
 
 ## Transaktioiden käsittelyputki
 
@@ -30,9 +31,9 @@ vahvistukseen, sisältäen viittaukset lähdetiedostoihin
 ### 1. Vastaanotto ja deserialisointi
 
 Validator vastaanottaa transaktiotavut UDP/QUIC-yhteyden kautta. Raakadatan on
-mahduttava yksittäiseen pakettiin (_rs`PACKET_DATA_SIZE`_ = 1 232 tavua). Tavut
-deseralisoidaan _rs`VersionedTransaction`_-muotoon, joka sisältää
-allekirjoitustaulukon ja _rs`VersionedMessage`_-viestin (joko legacy tai v0).
+mahduttava yksittäiseen pakettiin (`PACKET_DATA_SIZE` = 1 232 tavua). Tavut
+deseralisoidaan `VersionedTransaction`-muotoon, joka sisältää
+allekirjoitustaulukon ja `VersionedMessage`-viestin (joko legacy tai v0).
 
 Tuleva
 [v1-formaatti](/docs/core/transactions/versioned-transactions#v1-message-format)
@@ -54,7 +55,7 @@ paloihin (128) ja käsittelee ne rinnakkain.
 
 ### 3. Puhdistus
 
-Deserialisoitu transaktio puhdistetaan tuottamaan _rs`SanitizedTransaction`_
+Deserialisoitu transaktio puhdistetaan tuottamaan `SanitizedTransaction`
 (tai
 [`RuntimeTransaction`](https://github.com/anza-xyz/agave/blob/v3.1.8/runtime-transaction/src/runtime_transaction.rs#L31)).
 Puhdistus validoi rakenteelliset invariantit:
@@ -64,7 +65,7 @@ Puhdistus validoi rakenteelliset invariantit:
   sisällä
 - Maksaja (tilin indeksi 0) on kirjoitettava allekirjoittaja
 
-_rs`RuntimeTransaction`_-kääre tallentaa välimuistiin esikäsitellyt metatiedot
+`RuntimeTransaction`-kääre tallentaa välimuistiin esikäsitellyt metatiedot
 [`TransactionMeta`](https://github.com/anza-xyz/agave/blob/v3.1.8/runtime-transaction/src/transaction_meta.rs#L38-L44)-rakenteesta:
 viestin hash, äänestystransaktiolippu, esikäännösten allekirjoitusmäärät
 (Ed25519/secp256k1/secp256r1), laskentabudjetin käskytiedot ja käskyjen
@@ -79,23 +80,23 @@ suorittaa useita tarkistuksia transaktiota kohden:
 validoidaan ensin. Maksutiedot lasketaan budjettirajoista ja
 priorisointimaksusta. Jos laskentabudjetti on virheellinen tai ristiriitainen,
 transaktio epäonnistuu laskentabudjetin jäsennysvirheillä, kuten
-_rs`DuplicateInstruction`_, `InstructionError(..., InvalidInstructionData)` tai
-_rs`InvalidLoadedAccountsDataSizeLimit`_.
+`DuplicateInstruction`, `InstructionError(..., InvalidInstructionData)` tai
+`InvalidLoadedAccountsDataSizeLimit`.
 
 [V1-transaktioille](/docs/core/transactions/versioned-transactions#v1-message-format)
 ei ole käsiteltäviä laskentabudjetti-ohjeita: rajat ja prioriteettimaksu
 tulevat viestin konfiguraatiosta, ja kaikki viestin ComputeBudget-ohjeet
 jätetään huomiotta konfiguraatiota varten. Asettamattomat konfiguraatiokentät
-saavat oletusarvoksi nollan, mikä ilmenee myöhemmin [tilien latauksessa](#6-load-accounts).
+saavat oletusarvoksi nollan, mikä ilmenee myöhemmin [tilien latauksessa](#6-lataa-tilit).
 
 **Blockhash-ikä**: Transaktion `recent_blockhash` haetaan
 [`BlockhashQueue`](https://github.com/anza-xyz/agave/blob/v3.1.8/accounts-db/src/blockhash_queue.rs#L33)-jonosta.
-Jos hash löytyy ja sen ikä on _rs`MAX_PROCESSING_AGE`_-arvon sisällä (150
+Jos hash löytyy ja sen ikä on `MAX_PROCESSING_AGE`-arvon sisällä (150
 slottia), transaktio jatkaa. Jos sitä ei löydy, validaattori tarkistaa
 kelvollisen [durable nonce](/docs/core/transactions/durable-nonces) -arvon.
 
 **Tilavälimuisti**: Transaktion viestihashin tarkistetaan tilavälimuistista. Jos
-se löytyy, transaktio hylätään virheellä _rs`AlreadyProcessed`_.
+se löytyy, transaktio hylätään virheellä `AlreadyProcessed`.
 
 ### 5. Validoi nonce ja maksaja
 
@@ -107,7 +108,7 @@ käsittelee kaksi validointia:
 lataa nonce-tilin ja varmistaa:
 
 - Tilin omistaa System Program
-- Se jäsentyy muotoon _rs`State::Initialized`_
+- Se jäsentyy muotoon `State::Initialized`
 - Tallennettu durable nonce vastaa transaktion `recent_blockhash`-arvoa
 - Noncea voidaan edistää (sen nykyinen durable nonce eroaa seuraavasta durable
   noncesta, eli noncea ei ole jo käytetty nykyisessä lohkossa)
@@ -119,18 +120,18 @@ Jos kelvollinen, nonce edistetään seuraavaan durable nonce -arvoon. Katso
 **Maksajan validointi**: Maksajatili (aina indeksi 0) ladataan ja tarkistetaan
 [`validate_fee_payer`](https://github.com/anza-xyz/agave/blob/v3.1.8/svm/src/account_loader.rs#L369-L417)-metodilla:
 
-- Tilin on oltava olemassa (lamports > 0), muuten _rs`AccountNotFound`_
+- Tilin on oltava olemassa (lamports > 0), muuten `AccountNotFound`
 - Tilin on oltava järjestelmätili tai nonce-tili, muuten
-  _rs`InvalidAccountForFee`_
+  `InvalidAccountForFee`
 - Lamportien on katettava `min_balance + total_fee`, jossa `min_balance` on 0
   järjestelmätileille tai `rent.minimum_balance(NonceState::size())`
-  nonce-tileille; muuten _rs`InsufficientFundsForFee`_
+  nonce-tileille; muuten `InsufficientFundsForFee`
 - Maksun vähentämisen jälkeen tilin on pysyttävä rent-exempt-tilassa (ei voi
   siirtyä rent-exempt-tilasta rent-paying-tilaan)
 
 Maksu vähennetään maksajalta tässä vaiheessa. Tilannekuva maksusta vähennetystä
 maksajasta (ja edistetystä noncesta, jos sovellettavissa) tallennetaan nimellä
-_rs`RollbackAccounts`_, jotka ovat tilejä, jotka vahvistetaan, vaikka suoritus
+`RollbackAccounts`, jotka ovat tilejä, jotka vahvistetaan, vaikka suoritus
 epäonnistuisi.
 
 ### 6. Lataa tilit
@@ -154,16 +155,18 @@ Jokaiselle ei-maksajatilille lataaja:
 
 Jokaiselle transaktion käskyjen kutsumalle ohjelmalle lataaja varmistaa, että
 ohjelmatili on olemassa ja sen omistaa kelvollinen lataaja (`NativeLoader` tai
-jokin _rs`PROGRAM_OWNERS`_). Virheelliset ohjelmat epäonnistuvat virheellä
-_rs`ProgramAccountNotFound`_ tai _rs`InvalidProgramForExecution`_.
+jokin `PROGRAM_OWNERS`). Virheelliset ohjelmat epäonnistuvat virheellä
+`ProgramAccountNotFound` tai `InvalidProgramForExecution`.
 
 LoaderV3 (päivitettävät) ohjelmat lataavat implisiittisesti niihin liittyvän
 programdata-tilin, joka myös lasketaan ladatun datan kokorajaan.
 
-<Callout type="warn" title="v1-transaktiot asettavat tämän rajan oletusarvoisesti nollaan">
+<Warning>
+  **v1-transaktiot asettavat tämän rajan oletusarvoisesti nollaan**
+
   64 MiB:n oletusarvo koskee perinteisiä ja v0-transaktioita. [V1-formaatissa](/docs/core/transactions/versioned-transactions#v1-message-format) ladattujen tilien datakoon raja luetaan viestin konfiguraatiosta, ja asettamaton kenttä saa oletusarvoksi **0 tavua** eikä mitään anteliasta oletusarvoa. Tyhjällä konfiguraatiolla varustettu v1-transaktio epäonnistuu siksi tässä vaiheessa virheellä
-  _rs`MaxLoadedAccountsDataSizeExceeded`_ — pyydetty budjetti on liian pieni ensimmäiselle ladattavalle tilille, joten virhe ilmenee ennen kuin yhtään ohjetta suoritetaan, ja virheilmoituksessa ei mainita v1:tä eikä konfiguraatiota. Aseta aina laskentayksikön raja ja ladattujen tilien datakoon raja eksplisiittisesti v1-transaktioita rakentaessasi.
-</Callout>
+`MaxLoadedAccountsDataSizeExceeded` — pyydetty budjetti on liian pieni ensimmäiselle ladattavalle tilille, joten virhe ilmenee ennen kuin yhtään ohjetta suoritetaan, ja virheilmoituksessa ei mainita v1:tä eikä konfiguraatiota. Aseta aina laskentayksikön raja ja ladattujen tilien datakoon raja eksplisiittisesti v1-transaktioita rakentaessasi.
+</Warning>
 
 Jos tilin lataus epäonnistuu, mutta maksaja validoitiin onnistuneesti,
 transaktiosta tulee
@@ -173,10 +176,10 @@ transaktiosta tulee
 ### 7. Suorita käskyt
 
 [`execute_loaded_transaction`](https://github.com/anza-xyz/agave/blob/v3.1.8/svm/src/transaction_processor.rs#L847)
-luo _rs`TransactionContext`_ -olion kaikilla ladatuilla tileillä ja kutsuu
+luo `TransactionContext` -olion kaikilla ladatuilla tileillä ja kutsuu
 [`process_message`](https://github.com/anza-xyz/agave/blob/v3.1.8/svm/src/message_processor.rs)
 -funktiota. Käskyt suoritetaan peräkkäin siinä järjestyksessä, jossa ne
-esiintyvät viestissä. Jokainen käskyn kutsu luo _rs`InvokeContext`_ -olion ja
+esiintyvät viestissä. Jokainen käskyn kutsu luo `InvokeContext` -olion ja
 kutsuu kohdeohjelmaa.
 
 #### Käskyn käsittelyn yksityiskohdat
@@ -200,15 +203,15 @@ Ajoympäristön
 4. Ohjeen suorittamisen jälkeen runtime
    [vahvistaa](https://github.com/anza-xyz/agave/blob/v3.1.8/transaction-context/src/lib.rs#L366-L398),
    että lamport-saldo kaikkien ohjeen tilien välillä ei ole muuttunut
-   (_rs`UnbalancedInstruction`_ -tarkistus).
+   (`UnbalancedInstruction` -tarkistus).
 5. Jos jokin ohje epäonnistuu, koko transaktio peruutetaan. Mitään välitilan
    muutoksia ei vahvisteta.
 
 Jokainen ohje kasvattaa instruction trace -jälkeä. Jälki sisältää sekä ylätason
 ohjeet että kaikki niiden kutsutut [CPI:t](/docs/core/cpi). Jäljen
 kokonaispituus (ylätason ohjeet plus kaikki sisäkkäiset CPI:t) ei voi ylittää
-64:ää (_rs`MAX_INSTRUCTION_TRACE_LENGTH`_). Tämän rajan ylittäminen palauttaa
-_rs`InstructionError::MaxInstructionTraceLengthExceeded`_.
+64:ää (`MAX_INSTRUCTION_TRACE_LENGTH`). Tämän rajan ylittäminen palauttaa
+`InstructionError::MaxInstructionTraceLengthExceeded`.
 
 Suorituksen jälkeen runtime vahvistaa, että:
 
@@ -218,8 +221,8 @@ Suorituksen jälkeen runtime vahvistaa, että:
 ### 8. Vahvistus tai peruutus
 
 Jos suoritus onnistuu, muokatut tilitilat `TransactionContext`:sta kirjoitetaan
-takaisin _rs`AccountLoader`_:n batch-paikalliseen välimuistiin. Jos suoritus
-epäonnistuu, vain _rs`RollbackAccounts`_ (maksaja, jolta maksu on vähennetty ja
+takaisin `AccountLoader`:n batch-paikalliseen välimuistiin. Jos suoritus
+epäonnistuu, vain `RollbackAccounts` (maksaja, jolta maksu on vähennetty ja
 nonce edistetty) kirjoitetaan takaisin. Maksu peritään silti, mutta kaikki muut
 tilimuutokset hylätään.
 

@@ -3,7 +3,6 @@ title: Tilin suoritusympäristö
 description:
   Miten Solanan suoritusympäristö lataa ja validoi tilit ennen suoritusta, sekä
   sarjallistamismuoto, jota käytetään tilin datan välittämiseen ohjelmille.
-url: /docs/core/accounts/account-runtime
 type: reference
 prerequisites:
   - /docs/core/accounts
@@ -15,18 +14,20 @@ related:
   - /docs/core/constants-reference
 ---
 
-<Callout type="info" title="Yhteenveto">
+<Info>
+  **Yhteenveto**
+
   Ennen suoritusta suoritusympäristö lataa tilit, validoi maksajan, tarkistaa
   vuokravapautuksen ja sarjallistaa tilin datan muistiasetteluun, johon ohjelmat
   voivat päästä käsiksi.
-</Callout>
+</Info>
 
-<Callout>
+<Note>
   Tämä sivu käsittelee suoritusympäristön sisäisiä toimintoja. Useimmat
   kehittäjät eivät tarvitse näitä tietoja ohjelmien rakentamiseen. Katso [tilin
   rakenne](/docs/core/accounts/account-structure) kehittäjille suunnatusta
   näkökulmasta.
-</Callout>
+</Note>
 
 ## Tilin lataaminen
 
@@ -43,7 +44,7 @@ kautta. Tämä prosessi suorittaa useita validointeja:
    vuokravapautusminimin väliin. Nonce-tilien on aina säilytettävä tarpeeksi
    lamportteja pysyäkseen vuokravapautettuina. Jos maksaja ei ole
    järjestelmätili eikä nonce-tili, transaktio epäonnistuu virheellä
-   _rs`TransactionError::InvalidAccountForFee`_.
+   `TransactionError::InvalidAccountForFee`.
 
 2. **Ladatun datan kokoraja**: Kaikkien ladattujen tilien yhteenlaskettu koko
    (sisältäen
@@ -51,16 +52,16 @@ kautta. Tämä prosessi suorittaa useita validointeja:
    64 tavua per tili) ei saa ylittää
    [`MAX_LOADED_ACCOUNTS_DATA_SIZE_BYTES`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/execution_budget.rs#L53)
    (64 MiB). Tämän rajan ylittäminen tuottaa virheen
-   _rs`TransactionError::MaxLoadedAccountsDataSizeExceeded`_.
+   `TransactionError::MaxLoadedAccountsDataSizeExceeded`.
 
 3. **Ohjelmatilien validointi**: Jokaisen instruktion kutsuman ohjelman on
    oltava olemassa ja sen on oltava kelvollisen lataajan omistuksessa: jonkin
    [`PROGRAM_OWNERS`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/account/src/lib.rs#L802)
    (BPF Loader Upgradeable, BPF Loader, BPF Loader Deprecated, Loader V4) tai
    natiivin lataajan. Jos ohjelmatiliä ei ole olemassa, transaktio epäonnistuu
-   virheellä _rs`TransactionError::ProgramAccountNotFound`_. Jos se on olemassa
+   virheellä `TransactionError::ProgramAccountNotFound`. Jos se on olemassa
    mutta sillä on virheellinen omistaja, transaktio epäonnistuu virheellä
-   _rs`TransactionError::InvalidProgramForExecution`_.
+   `TransactionError::InvalidProgramForExecution`.
 
 4. **Olemattomia tilejä**: Tilit, joita ei ole olemassa lohkoketjussa, ladataan
    oletustileinä (0 lamport, tyhjä data, System Program omistaa)
@@ -124,15 +125,15 @@ instruktiotason indeksin, joka kartoittuu siihen:
   ensimmäisen esiintymän indeksi.
 
 Koska kaikki viittaukset samaan tiliin jakavat saman taustalla olevan
-_rs`AccountSharedData`_:n, muutokset minkä tahansa viittauksen kautta ovat
+`AccountSharedData`:n, muutokset minkä tahansa viittauksen kautta ovat
 välittömästi näkyvissä kaikkien muiden viittausten kautta. Kuitenkin vain yksi
 muokattava laina voi olla voimassa kerrallaan. Yritys lainata samaa tiliä
 muokattavasti kahden eri instruktiotiliindeksin kautta samanaikaisesti palauttaa
-_rs`InstructionError::AccountBorrowFailed`_. Ohjelmien on vapautettava yksi
+`InstructionError::AccountBorrowFailed`. Ohjelmien on vapautettava yksi
 laina ennen toisen hankkimista samalle taustalla olevalle tilille.
 
 Ohjelman suorituksen jälkeen ajonaikainen ympäristö deserialisoi puskurin
 takaisin
 ([`deserialize_parameters_aligned()`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/serialization.rs#L580-L667))
 ja soveltaa kaikki muutokset `lamports`:iin, `data`:iin (mukaan lukien
-pituusmuutokset _rs`MAX_PERMITTED_DATA_INCREASE`_:iin asti) ja `owner`:iin.
+pituusmuutokset `MAX_PERMITTED_DATA_INCREASE`:iin asti) ja `owner`:iin.

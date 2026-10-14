@@ -1,0 +1,100 @@
+---
+title: "Add it to your server"
+description:
+  "Pay for your endpoint from a client with a spending cap, run the server and
+  client on a local test network, and move the handler into your own app."
+---
+
+import Stepper from "/snippets/paths/en/paywall-api/stepper-3.mdx";
+import NextStep from "/snippets/paths/en/paywall-api/next-3.mdx";
+import Config from "/snippets/examples/paths/payments/checkout/config.mdx";
+import PaywallClient from "/snippets/examples/paths/payments/paywall-api/client.mdx";
+import Rpc from "/snippets/concepts/en/rpc.mdx";
+import Commitment from "/snippets/concepts/en/commitment.mdx";
+
+<Stepper />
+
+You have read the server. This step adds the client that pays it, runs both on
+your machine, and shows what to copy into your own app.
+
+## 1. Pay from a client
+
+`fetchWithPayment` works like `fetch`, but pays when it gets a `402`. It picks
+the USDC option, refuses any price above `maxAmount`, signs a USDC transfer to
+`payTo` and retries with the signed transaction in the `X-PAYMENT` header.
+
+<PaywallClient />
+
+The recorded run shows three requests: a paid request that returns `200` and
+the settled signature, the same `X-PAYMENT` header sent again (refused with
+`402`), and a client whose `maxAmount` of 5,000 is below the price of 10,000
+(it refuses and signs nothing). Set `maxAmount` on every client you give a
+wallet to, including AI agents. It is the most a single request can cost.
+
+## 2. Point it at a network
+
+The server and client read their network settings from environment variables.
+The defaults are devnet:
+
+<Config />
+
+`x402.ts` reads `X402_NETWORK` the same way, with the devnet CAIP-2 identifier
+as the default.
+
+<Rpc />
+
+## 3. Run it on your machine
+
+The server, client and tests live in the docs repository under
+`packages/docs-examples/paths/payments/paywall-api`. The test starts a local
+Surfpool network from npm, funds a test client with SOL and 1 USDC, starts the
+server, and makes the calls you saw above:
+
+```sh Terminal
+git clone --branch mintlify-migration https://github.com/catmcgee/solana-com.git
+cd solana-com
+corepack enable
+pnpm install
+pnpm --filter @workspace/docs-examples exec vitest run paths/payments/paywall-api
+```
+
+The test passes when the unpaid call gets `402`, malformed `X-PAYMENT` headers
+get `402` without stopping the server, the paid call gets `200`, the replay and
+the over-cap client are refused, and the `payTo` wallet's USDC account is
+credited exactly the price.
+
+<Note>
+  These examples are on the `mintlify-migration` branch of the
+  [catmcgee/solana-com](https://github.com/catmcgee/solana-com/tree/mintlify-migration/packages/docs-examples/paths/payments/paywall-api)
+  fork until it is merged into `solana-foundation/solana-com`.
+</Note>
+
+<Note>
+  If you have no Solana CLI key file at `~/.config/solana/id.json`, the test
+  setup creates one there. To keep it out of your home folder, run the test
+  with `HOME` set to a temporary folder.
+</Note>
+
+## 4. Move it into your app
+
+Copy four files into your server project: `x402.ts`, `server.ts`, and from
+the checkout path `config.ts` and `verify-payment.ts`. Add `client.ts` to the
+project that pays (it also needs `x402.ts` and `config.ts`). Fix the import
+paths, and install `@solana/kit` and `@solana-program/token`. Then call
+`createPaywallServer({ payTo, price })` with your wallet address and a price in
+USDC base units (`10_000n` is 0.01 USDC), and call `listen` on the server it
+returns.
+
+The handler only uses the request method, URL and `X-PAYMENT` header, and it
+sets a status, headers and a JSON body. To use Express, Fastify or Hono, move
+the body of the `createServer` callback into a route handler for your paid
+route. The `usedSignatures` set must be shared by every request, as it is here.
+
+<Commitment />
+
+The server answers a paid request only after the payment reaches *confirmed*,
+so a paid request takes longer than an unpaid one. The recorded run doesn't
+measure this. On a public network, expect roughly the confirmation time added
+to your normal response time.
+
+<NextStep />

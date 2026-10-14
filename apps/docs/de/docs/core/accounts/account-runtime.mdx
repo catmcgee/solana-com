@@ -4,7 +4,6 @@ description:
   Wie die Solana-Laufzeitumgebung Konten vor der Ausführung lädt und validiert,
   und das Serialisierungsformat, das verwendet wird, um Kontodaten an Programme
   zu übergeben.
-url: /docs/core/accounts/account-runtime
 type: reference
 prerequisites:
   - /docs/core/accounts
@@ -16,18 +15,20 @@ related:
   - /docs/core/constants-reference
 ---
 
-<Callout type="info" title="Zusammenfassung">
+<Info>
+  **Zusammenfassung**
+
   Vor der Ausführung lädt die Laufzeitumgebung Konten, validiert den Fee-Zahler,
   prüft die Miete-Befreiung und serialisiert Kontodaten in ein Speicherlayout,
   auf das Programme zugreifen können.
-</Callout>
+</Info>
 
-<Callout>
+<Note>
   Diese Seite behandelt Laufzeitumgebungs-Interna. Die meisten Entwickler
   benötigen diese Informationen nicht für die Entwicklung von Programmen. Siehe
   [Kontostruktur](/docs/core/accounts/account-structure) für die
   entwicklerorientierte Ansicht.
-</Callout>
+</Note>
 
 ## Laden von Konten
 
@@ -45,7 +46,7 @@ Dieser Prozess führt mehrere Validierungen durch:
    Miete-Befreiungs-Minimum enden. Nonce-Konten müssen immer genügend Lamports
    behalten, um miete-befreit zu bleiben. Wenn der Zahler weder ein Systemkonto
    noch ein Nonce-Konto ist, schlägt die Transaktion mit
-   _rs`TransactionError::InvalidAccountForFee`_ fehl.
+   `TransactionError::InvalidAccountForFee` fehl.
 
 2. **Limit für geladene Datengröße**: Die Gesamtgröße aller geladenen Konten
    (einschließlich eines
@@ -53,7 +54,7 @@ Dieser Prozess führt mehrere Validierungen durch:
    von 64 Bytes pro Konto) darf
    [`MAX_LOADED_ACCOUNTS_DATA_SIZE_BYTES`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/execution_budget.rs#L53)
    (64 MiB) nicht überschreiten. Das Überschreiten dieses Limits erzeugt
-   _rs`TransactionError::MaxLoadedAccountsDataSizeExceeded`_.
+   `TransactionError::MaxLoadedAccountsDataSizeExceeded`.
 
 3. **Programmkonto-Validierung**: Jedes Programm, das von einer Instruktion
    aufgerufen wird, muss existieren und im Besitz eines gültigen Loaders sein:
@@ -61,9 +62,9 @@ Dieser Prozess führt mehrere Validierungen durch:
    [`PROGRAM_OWNERS`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/account/src/lib.rs#L802)
    (BPF Loader Upgradeable, BPF Loader, BPF Loader Deprecated, Loader V4) oder
    der native Loader. Wenn das Programmkonto nicht existiert, schlägt die
-   Transaktion mit _rs`TransactionError::ProgramAccountNotFound`_ fehl. Wenn es
+   Transaktion mit `TransactionError::ProgramAccountNotFound` fehl. Wenn es
    existiert, aber einen ungültigen Besitzer hat, schlägt die Transaktion mit
-   _rs`TransactionError::InvalidProgramForExecution`_ fehl.
+   `TransactionError::InvalidProgramForExecution` fehl.
 
 4. **Nicht existierende Konten**: Konten, die nicht onchain existieren, werden
    als Standard-Konten geladen (0 lamport, leere Daten, im Besitz des System
@@ -129,15 +130,15 @@ ersten Index auf Instruktionsebene findet, der darauf verweist:
   des ersten Vorkommens ist.
 
 Da alle Verweise auf dasselbe Konto dieselben zugrunde liegenden
-_rs`AccountSharedData`_ teilen, sind Änderungen über einen beliebigen Verweis
+`AccountSharedData` teilen, sind Änderungen über einen beliebigen Verweis
 sofort über alle anderen Verweise sichtbar. Es kann jedoch nur eine veränderbare
 Ausleihe gleichzeitig gehalten werden. Der Versuch, dasselbe Konto veränderbar
 über zwei verschiedene Instruktionskontenindizes gleichzeitig auszuleihen, gibt
-_rs`InstructionError::AccountBorrowFailed`_ zurück. Programme müssen eine
+`InstructionError::AccountBorrowFailed` zurück. Programme müssen eine
 Ausleihe freigeben, bevor sie eine weitere für dasselbe zugrunde liegende Konto
 erwerben.
 
 Nach der Programmausführung deserialisiert die Runtime den Puffer zurück
 ([`deserialize_parameters_aligned()`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/serialization.rs#L580-L667))
 und wendet alle Änderungen auf `lamports`, `data` (einschließlich
-Längenänderungen bis zu _rs`MAX_PERMITTED_DATA_INCREASE`_) und `owner` an.
+Längenänderungen bis zu `MAX_PERMITTED_DATA_INCREASE`) und `owner` an.

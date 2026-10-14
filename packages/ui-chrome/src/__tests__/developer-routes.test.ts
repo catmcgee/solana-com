@@ -35,4 +35,23 @@ describe("developer route matching", () => {
     expect(isThemeRoute("/data")).toBe(false);
     expect(isThemeRoute("/database")).toBe(false);
   });
+
+  it("adds light/dark support to the exact /developers and /learn landings", () => {
+    expect(isThemeRoute("/developers")).toBe(true);
+    expect(isThemeRoute("/developers/")).toBe(true);
+    expect(isThemeRoute("/ja/developers")).toBe(true);
+    expect(isThemeRoute("/ar/developers")).toBe(true);
+    expect(isThemeRoute("/learn")).toBe(true);
+    expect(isThemeRoute("/fr/learn")).toBe(true);
+    expect(isThemeRoute("/developers?ref=nav")).toBe(true);
+  });
+
+  it("keeps /developers subpages dark-only", () => {
+    expect(isThemeRoute("/developers/payments")).toBe(false);
+    expect(isThemeRoute("/de/developers/defi")).toBe(false);
+    expect(isThemeRoute("/developers/templates")).toBe(false);
+    expect(isThemeRoute("/developership")).toBe(false);
+    expect(isThemeRoute("/learning")).toBe(false);
+    expect(isThemeRoute(null)).toBe(false);
+  });
 });

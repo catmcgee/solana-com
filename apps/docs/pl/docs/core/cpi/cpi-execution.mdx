@@ -4,7 +4,6 @@ description:
   11-etapowy przebieg wykonywania CPI w środowisku uruchomieniowym Solana,
   zasady rozszerzania uprawnień, ograniczenia reentrancji oraz weryfikacja
   autoryzowanych programów.
-url: /docs/core/cpi/cpi-execution
 type: reference
 prerequisites:
   - /docs/core/cpi
@@ -18,12 +17,14 @@ related:
 
 {/* TOC: Przebieg wykonywania CPI, Zasady uprawnień */}
 
-<Callout type="info" title="Podsumowanie">
+<Info>
+  **Podsumowanie**
+
   CPI przechodzi przez 11 etapów środowiska uruchomieniowego, w tym sprawdzanie
   uprawnień, translację kont i synchronizację danych. Maksymalna głębokość
   wywołań: 5 (9 z SIMD-0268). Zasady uprawnień uniemożliwiają podwyższanie
   uprawnień przez wywoływany program ponad to, co przyznał wywołujący.
-</Callout>
+</Info>
 
 ## Zasady uprawnień
 
@@ -53,7 +54,7 @@ Zasady przyznawania uprawnień można podsumować następująco:
 2. **Uprawnienie do podpisu wymaga autoryzacji.** Konto może być podpisującym u
    wywoływanego tylko wtedy, gdy (a) już było podpisującym u wywołującego LUB
    (b) jest to PDA wyprowadzone z seedów programu wywołującego za pomocą
-   _rs`invoke_signed`_.
+   `invoke_signed`.
 3. **Redukcja uprawnień jest zawsze dozwolona.** Wywoływany może użyć mniejszych
    uprawnień niż te przyznane przez wywołującego.
 
@@ -64,7 +65,7 @@ dokumentuje cały pipeline od wywołania SDK programu, przez granicę syscall, d
 środowiska uruchomieniowego i z powrotem. Każdy krok odnosi się do pliku
 źródłowego, który go implementuje.
 
-<Callout>
+<Note>
   Maksymalna wysokość wywołania instrukcji programu nazywana jest
   [`max_instruction_stack_depth`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/execution_budget.rs#L66)
   i jest ustawiona na
@@ -75,7 +76,7 @@ Wysokość stosu 1 oznacza początkową instrukcję transakcji. Każdy CPI zwię
 wysokość o 1. Maksymalna wartość 5 oznacza, że program może wykonać CPI do 4
 poziomów w głąb (do 8 poziomów z SIMD-0268).
 
-</Callout>
+</Note>
 
 ### Krok 1: Program wywołuje `invoke` lub `invoke_signed`
 
@@ -83,9 +84,9 @@ Program wywołuje
 [`invoke`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/program/src/program.rs#L26)
 lub
 [`invoke_signed`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/program/src/program.rs#L51).
-_rs`invoke`_ to cienki wrapper, który wywołuje _rs`invoke_signed`_ z pustą
-tablicą seedów podpisujących. Funkcja SDK serializuje _rs`Instruction`_,
-_rs`AccountInfo`_ (slice) oraz seedy podpisujących do pamięci VM, a następnie
+`invoke` to cienki wrapper, który wywołuje `invoke_signed` z pustą
+tablicą seedów podpisujących. Funkcja SDK serializuje `Instruction`,
+`AccountInfo` (slice) oraz seedy podpisujących do pamięci VM, a następnie
 wywołuje syscall.
 
 ### Krok 2: Wejście do syscall
@@ -97,7 +98,7 @@ który wywołuje wspólny punkt wejścia:
 
 ### Krok 3: Pobranie kosztu wywołania
 
-Pierwszą akcją wewnątrz _rs`cpi_common`_ jest
+Pierwszą akcją wewnątrz `cpi_common` jest
 [pobranie stałego kosztu wywołania](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/cpi.rs#L815-L818)
 z współdzielonego licznika obliczeń:
 [`invoke_units`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/execution_budget.rs#L108)
@@ -108,7 +109,7 @@ z współdzielonego licznika obliczeń:
 Handler syscall tłumaczy instrukcję z przestrzeni adresowej VM programu na typy
 Rust po stronie hosta za pomocą
 [`translate_instruction_rust`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/cpi.rs#L529-L590),
-który odczytuje strukturę _rs`StableInstruction`_, sprawdza długość danych
+który odczytuje strukturę `StableInstruction`, sprawdza długość danych
 względem
 [`MAX_INSTRUCTION_DATA_LEN`](https://github.com/anza-xyz/agave/blob/v3.1.8/transaction-context/src/lib.rs#L33)
 (10 240 bajtów), a następnie pobiera
@@ -157,16 +158,16 @@ Naruszenie skutkuje zwróceniem
 
 Runtime wywołuje
 [`prepare_next_instruction`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/invoke_context.rs#L293-L432),
-który buduje listę _rs`InstructionAccount`_ wywoływanego programu i egzekwuje
+który buduje listę `InstructionAccount` wywoływanego programu i egzekwuje
 reguły uprawnień. Pełna tabela decyzyjna znajduje się w sekcji
-[Reguły uprawnień](#privilege-rules) poniżej.
+[Reguły uprawnień](#zasady-uprawnień) poniżej.
 
 ### Krok 8: Tłumaczenie informacji o kontach
 
 Handler wywołuje `translate_accounts`, który:
 
 1. [Weryfikuje liczbę informacji o kontach](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/cpi.rs#L164-L190)
-   względem _rs`MAX_CPI_ACCOUNT_INFOS`_ (128 lub 255 z SIMD-0339).
+   względem `MAX_CPI_ACCOUNT_INFOS` (128 lub 255 z SIMD-0339).
 2. [Pobiera opłatę za tłumaczenie informacji o koncie](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/cpi.rs#L969-L981)
    (tylko SIMD-0339): `(num_account_infos * 80) / 250` CU.
 3. Dla każdego nie-wykonywalnego, niepowtarzającego się konta buduje
@@ -192,11 +193,11 @@ który:
 
 1. Wywołuje
    [`push()`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/invoke_context.rs#L233-L265)
-   aby dodać nową ramkę do stosu instrukcji. _rs`push()`_ wymusza
+   aby dodać nową ramkę do stosu instrukcji. `push()` wymusza
    [regułę reentrancy](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/invoke_context.rs#L243-L259):
    program może wywołać sam siebie tylko jeśli jest bezpośrednim wywołującym
    (czyli program A może wywołać A, ale A nie może wywołać B, który wywołuje A).
-   Naruszenie skutkuje zwróceniem _rs`ReentrancyNotAllowed`_.
+   Naruszenie skutkuje zwróceniem `ReentrancyNotAllowed`.
 2. Wywołuje
    [`process_executable_chain`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/invoke_context.rs#L507-L602),
    który rozwiązuje punkt wejścia programu wywoływanego i uruchamia go.
@@ -205,7 +206,7 @@ który:
 3. Wywołuje
    [`pop()`](https://github.com/anza-xyz/agave/blob/v3.1.8/transaction-context/src/lib.rs#L366-L398)
    aby usunąć ramkę wywoływanego i zweryfikować, że salda lamportów się nie
-   zmieniły (_rs`UnbalancedInstruction`_ w przeciwnym razie).
+   zmieniły (`UnbalancedInstruction` w przeciwnym razie).
 
 ### Krok 11: Synchronizacja kont po CPI (od wywoływanego do wywołującego)
 

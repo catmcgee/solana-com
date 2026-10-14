@@ -13,7 +13,7 @@ extension cần thiết được bật.
 Sơ đồ sau đây mô tả các bước liên quan đến việc tạo token account với
 Confidential Balances được bật:
 
-```mermaid title="Create Token Account with Confidential Balances"
+```mermaid
 sequenceDiagram
     participant Payer as Wallet
     participant ATA as Associated Token Program
@@ -48,6 +48,46 @@ sequenceDiagram
     Token22-->>TokenAccount: Configure Confidential Balances
     deactivate Token22
 ```
+
+<div className="nojs-only" data-fallback="mermaid">
+  ```text Mermaid
+  sequenceDiagram
+      participant Payer as Wallet
+      participant ATA as Associated Token Program
+      participant Token22 as Token Extensions Program
+      participant ZK as ZK ElGamal Proof Program
+      participant TokenAccount as Token Account
+
+      Payer->>ATA: create_associated_token_account()
+      activate ATA
+      ATA->>Token22: Create token account at deterministic address
+      deactivate ATA
+      activate Token22
+      Token22-->>TokenAccount: Initialize Token Account
+      deactivate Token22
+
+      Payer->>Token22: reallocate() for ConfidentialTransferAccount extension
+      activate Token22
+      Token22-->>TokenAccount: Add space for extension data
+      deactivate Token22
+
+      Payer->>Payer: Derive ElGamal keypair and AES key
+      Payer->>Payer: Generate pubkey validity proof
+      Payer->>Payer: Encrypt initial balance (0) with AES key
+
+      Payer->>ZK: VerifyPubkeyValidity into context state account
+      activate ZK
+      ZK-->>ZK: Verify proof and store result in context state account
+      deactivate ZK
+
+      Payer->>Token22: configure_account() referencing the proof context account
+      activate Token22
+      Token22-->>TokenAccount: Configure Confidential Balances
+      deactivate Token22
+  ```
+</div>
+
+<p className="sol-caption">Create Token Account with Confidential Balances</p>
 
 ### Trạng thái Token Account của Confidential Balances
 
@@ -105,7 +145,7 @@ pub struct ConfidentialTransferAccount {
 }
 ```
 
-_rs`ConfidentialTransferAccount`_ chứa một số trường để quản lý
+`ConfidentialTransferAccount` chứa một số trường để quản lý
 Confidential Balances:
 
 - **approved**: Trạng thái phê duyệt của tài khoản đối với Confidential Balances. Nếu
@@ -136,18 +176,18 @@ Confidential Balances:
   từ các lệnh nạp tiền và chuyển tiền.
 
 - **maximum_pending_balance_credit_counter**: Giới hạn số lần ghi có đang chờ xử
-  lý trước khi yêu cầu lệnh _rs`ApplyPendingBalance`_ để chuyển đổi số dư đang
+  lý trước khi yêu cầu lệnh `ApplyPendingBalance` để chuyển đổi số dư đang
   chờ xử lý sang số dư khả dụng.
 
 - **expected_pending_balance_credit_counter**: Giá trị
   `pending_balance_credit_counter` được cung cấp bởi client thông qua
-  instruction data lần cuối cùng lệnh _rs`ApplyPendingBalance`_ được xử lý.
+  instruction data lần cuối cùng lệnh `ApplyPendingBalance` được xử lý.
 
 - **actual_pending_balance_credit_counter**: Giá trị
   `pending_balance_credit_counter` trên token account tại thời điểm lệnh
-  _rs`ApplyPendingBalance`_ cuối cùng được xử lý.
+  `ApplyPendingBalance` cuối cùng được xử lý.
 
-<Callout type="info">
+<Info>
   **Số dư chờ xử lý và số dư khả dụng**
 
 Số dư bảo mật được tách thành số dư chờ xử lý và số dư khả dụng để ngăn chặn các
@@ -158,28 +198,28 @@ sẽ thay đổi trong khoảng thời gian từ khi giao dịch được gửi 
 dẫn đến giao dịch thất bại.
 
 Tất cả các khoản tiền gửi và số tiền chuyển ban đầu đều được cộng vào số dư chờ
-xử lý. Chủ sở hữu token account phải sử dụng lệnh _rs`ApplyPendingBalance`_ để
+xử lý. Chủ sở hữu token account phải sử dụng lệnh `ApplyPendingBalance` để
 chuyển đổi số dư chờ xử lý thành số dư khả dụng. Các khoản chuyển tiền đến hoặc
 tiền gửi không ảnh hưởng đến số dư khả dụng của token account.
 
-</Callout>
+</Info>
 
-<Callout type="info">
+<Info>
   **Tách số dư chờ xử lý thành mức cao/thấp**
 
 Số dư chờ xử lý bảo mật được tách thành `pending_balance_lo` và
 `pending_balance_hi` vì giải mã ElGamal đòi hỏi nhiều tính toán hơn đối với các
 số lớn hơn. Bạn có thể tìm thấy cách triển khai phép tính số học trên bản mã
 [tại đây](https://github.com/solana-program/token-2022/blob/efd0c957fefbd79882d77df5fb2dac88c001249c/confidential-transfer/ciphertext-arithmetic/src/lib.rs#L54),
-được sử dụng trong lệnh _rs`ApplyPendingBalance`_
+được sử dụng trong lệnh `ApplyPendingBalance`
 [tại đây](https://github.com/solana-program/token-2022/blob/efd0c957fefbd79882d77df5fb2dac88c001249c/program/src/extension/confidential_transfer/processor.rs#L1180-L1184).
 
-</Callout>
+</Info>
 
-<Callout type="info">
+<Info>
   **Bộ đếm tín dụng số dư chờ xử lý**
 
-Khi gọi lệnh _rs`ApplyPendingBalance`_ để chuyển đổi số dư chờ xử lý thành số dư
+Khi gọi lệnh `ApplyPendingBalance` để chuyển đổi số dư chờ xử lý thành số dư
 khả dụng:
 
 1. Client tra cứu số dư chờ xử lý và số dư khả dụng hiện tại, mã hóa tổng số, và
@@ -187,14 +227,14 @@ khả dụng:
    chủ sở hữu token account.
 
 2. Bộ đếm tín dụng chờ xử lý dự kiến và thực tế theo dõi các thay đổi đối với
-   giá trị bộ đếm trong khoảng thời gian từ khi lệnh _rs`ApplyPendingBalance`_
+   giá trị bộ đếm trong khoảng thời gian từ khi lệnh `ApplyPendingBalance`
    được tạo đến khi được xử lý:
    - `expected_pending_balance_credit_counter`: Giá trị
      `pending_balance_credit_counter` khi client tạo lệnh
-     _rs`ApplyPendingBalance`_
+     `ApplyPendingBalance`
    - `actual_pending_balance_credit_counter`: Giá trị
      `pending_balance_credit_counter` trên token account tại thời điểm lệnh
-     _rs`ApplyPendingBalance`_ được xử lý
+     `ApplyPendingBalance` được xử lý
 
 Bộ đếm expected/actual khớp nhau cho thấy `decryptable_available_balance` khớp
 với `available_balance`.
@@ -215,7 +255,7 @@ sau để đối soát `decryptable_available_balance`:
    - Cộng thêm các số tiền công khai từ các lệnh deposit
    - Giải mã và cộng thêm các số tiền ciphertext đích từ các lệnh transfer
 
-</Callout>
+</Info>
 
 ### Các Lệnh Bắt Buộc
 
@@ -223,15 +263,15 @@ Việc tạo và cấu hình token account cho Confidential Balances sử dụng
 các lệnh sau, tất cả đều nằm gọn trong một giao dịch duy nhất:
 
 1. **Tạo Token Account**: Gọi lệnh
-   _rs`AssociatedTokenAccountInstruction::Create`_ của Associated Token Program
+   `AssociatedTokenAccountInstruction::Create` của Associated Token Program
    để tạo token account tại địa chỉ xác định của nó.
 
 2. **Cấp Phát Lại Không Gian Tài Khoản**: Gọi lệnh
-   _rs`TokenInstruction::Reallocate`_ của Token Extensions Program để thêm không
-   gian cho trạng thái _rs`ConfidentialTransferAccount`_.
+   `TokenInstruction::Reallocate` của Token Extensions Program để thêm không
+   gian cho trạng thái `ConfidentialTransferAccount`.
 
 3. **Xác Minh Bằng Chứng Hợp Lệ Pubkey**: Tạo một tài khoản thuộc sở hữu của
-   chương trình ZK ElGamal Proof, sau đó gọi lệnh _rs`VerifyPubkeyValidity`_ của
+   chương trình ZK ElGamal Proof, sau đó gọi lệnh `VerifyPubkeyValidity` của
    nó để xác minh bằng chứng và lưu kết quả đã xác minh vào tài khoản context
    state đó.
 
@@ -239,27 +279,27 @@ các lệnh sau, tất cả đều nằm gọn trong một giao dịch duy nhấ
    [ConfidentialTransferInstruction::ConfigureAccount](https://github.com/solana-program/token-2022/blob/efd0c957fefbd79882d77df5fb2dac88c001249c/program/src/extension/confidential_transfer/processor.rs#L201)
    của Token Extensions Program,
    tham chiếu đến tài khoản trạng thái context proof qua
-   _rs`ProofLocation::ContextStateAccount`_, để khởi tạo
-   trạng thái _rs`ConfidentialTransferAccount`_.
+   `ProofLocation::ContextStateAccount`, để khởi tạo
+   trạng thái `ConfidentialTransferAccount`.
 
-<Callout type="info">
+<Info>
 
 **Chỉ chủ sở hữu token account mới có thể bật Confidential Balances trên token
 account**.
 
-Lệnh _rs`ConfigureAccount`_ yêu cầu tạo khóa mã hóa và bằng chứng ở phía client, và chỉ có chủ sở hữu token account mới có thể tạo được.
+Lệnh `ConfigureAccount` yêu cầu tạo khóa mã hóa và bằng chứng ở phía client, và chỉ có chủ sở hữu token account mới có thể tạo được.
 
 Bằng chứng hợp lệ pubkey xác minh rằng khóa công khai ElGamal của tài khoản là
-hợp lệ. Nó được tạo bằng _rs`build_pubkey_validity_proof_data`_, được xác minh trên
+hợp lệ. Nó được tạo bằng `build_pubkey_validity_proof_data`, được xác minh trên
 chuỗi bởi chương trình ZK ElGamal Proof vào một tài khoản trạng thái context, và sau đó
-được tham chiếu từ _rs`ConfigureAccount`_ qua
-_rs`ProofLocation::ContextStateAccount`_, do đó không có byte bằng chứng nào được truyền trong
+được tham chiếu từ `ConfigureAccount` qua
+`ProofLocation::ContextStateAccount`, do đó không có byte bằng chứng nào được truyền trong
 bản thân lệnh token. Để biết chi tiết triển khai, xem:
 
 - [PubkeyValidityProofData](https://github.com/anza-xyz/agave/blob/b39a9764005ac8596b7e14e61d381305ce57ecaa/zk-sdk/src/zk_elgamal_proof_program/proof_data/pubkey_validity.rs#L58)
 - [PubkeyValidityProof](https://github.com/anza-xyz/agave/blob/b39a9764005ac8596b7e14e61d381305ce57ecaa/zk-sdk/src/sigma_proofs/pubkey_validity.rs#L65)
 
-</Callout>
+</Info>
 
 ## Mã Ví Dụ
 
@@ -275,10 +315,9 @@ và thay thế placeholder mint bằng một mint được tạo theo hướng d
 
 ### Rust
 
-<CodeTabs>
+<CodeGroup>
 
-```rust !! title="main.rs"
-// !collapse(1:36) collapsed
+```rust main.rs expandable
 // Imports: dependencies used by this example.
 use anyhow::{Context, Result};
 use solana_address::Address;
@@ -436,7 +475,6 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-// !collapse(1:1000) collapsed
 // Setup: helper function to create the confidential mint.
 fn create_confidential_mint(rpc_client: &RpcClient, payer: &Keypair, decimals: u8) -> Result<Pubkey> {
     let mint = Keypair::new();
@@ -504,7 +542,7 @@ fn load_keypair() -> Result<Keypair> {
 }
 ```
 
-```toml !! title="Cargo.toml"
+```toml Cargo.toml
 [package]
 name = "confidential-transfer"
 version = "0.1.0"
@@ -536,14 +574,13 @@ dirs = "6.0.0"
 serde_json = "1.0"
 ```
 
-</CodeTabs>
+</CodeGroup>
 
 ### Typescript
 
-<CodeTabs>
+<CodeGroup>
 
-```ts !! title="index.ts"
-// !collapse(1:21) collapsed
+```ts index.ts expandable
 // Imports: dependencies used by this example.
 import {
   deriveAeKeyForOwnerMint,
@@ -620,7 +657,6 @@ console.log(
   `Enabled Confidential Balances on token account ${tokenAccount}: ${result.context.signature}`
 );
 
-// !collapse(1:1000) collapsed
 // Setup: helper function to create the confidential mint.
 async function createConfidentialMint(
   kitClient: typeof client,
@@ -655,7 +691,7 @@ async function createConfidentialMint(
 }
 ```
 
-```json !! title="package.json"
+```json package.json
 {
   "name": "confidential-account",
   "version": "0.1.0",
@@ -675,13 +711,13 @@ async function createConfidentialMint(
 }
 ```
 
-</CodeTabs>
+</CodeGroup>
 
-<Callout type="info">
+<Info>
   Các tiện ích TypeScript nằm trong subpath
   `@solana-program/token-2022/confidential` và được xây dựng dựa trên
   `@solana/zk-sdk` cho các nguyên thủy mã hóa. `owner` và `client` đến từ thiết
   lập `@solana/kit` của bạn; kế hoạch lệnh được trả về được gửi với hỗ trợ kế
   hoạch lệnh của `@solana/kit`, phân chia công việc qua nhiều giao dịch khi các
   bằng chứng quá lớn cho một giao dịch.
-</Callout>
+</Info>

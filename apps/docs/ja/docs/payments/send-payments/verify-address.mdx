@@ -11,11 +11,11 @@ description:
 - **SPLトークン**は部分的に自己保護機能を備えています。Token
   Programは、アカウントが期待されるミントと一致しない転送を拒否するため、誤ったアドレスへのトークン転送は資金を失うことなく失敗します。このページの大部分はSPLトークンの送信について説明しています。
 - **ネイティブSOL**にはそのような保護機能はありません。System
-  Programの転送はあらゆるアカウントへ成功してしまうため、誤った受取人を指定するとSOLが永久にロックされます。[ネイティブSOLの送信](#sending-native-sol)を参照してください。
+  Programの転送はあらゆるアカウントへ成功してしまうため、誤った受取人を指定するとSOLが永久にロックされます。[ネイティブSOLの送信](#ネイティブsolの送金)を参照してください。
 
-<Callout>
+<Note>
   コアとなる支払いの概念については、[Solanaにおける支払いの仕組み](/docs/payments/how-payments-work)を参照してください。
-</Callout>
+</Note>
 
 ## Solanaアドレスについて
 
@@ -41,9 +41,9 @@ Solanaアカウントには、オンカーブとオフカーブの2種類のア�
 
 アドレスを使用してネットワークから[アカウント](/docs/core/accounts)を取得し、プログラムオーナーとアカウントタイプを確認して、そのアドレスの処理方法を判断してください。
 
-<Callout>
+<Note>
   アドレスがオンカーブかオフカーブかを知るだけでは、アカウントの種類、所有プログラム、またはそのアドレスにアカウントが存在するかどうかはわかりません。これらの詳細を確認するには、ネットワークからアカウントを取得する必要があります。
-</Callout>
+</Note>
 
 ### System Program アカウント（ウォレット）
 
@@ -59,12 +59,12 @@ account の rent の支払いが必要です。受信者が ATA を所有して�
 
 Systemアカウントはオフカーブに存在できます。ユーザーがオフカーブアドレスにトークンを送信しようとしている場合は、スマートウォレットへの送金であることを意図しているかどうか、ユーザーに確認を促すことをお勧めします。
 
-<Callout type="warn">
+<Warning>
   適切な保護措置がない場合、ATA
   作成のコスト負担は悪用される可能性があります。悪意のあるユーザーが転送をリクエストし、あなたの費用で
   ATA を作成させた後、ATA を閉じて rent の SOL
   を回収し、これを繰り返す可能性があります。
-</Callout>
+</Warning>
 
 ### Token Accounts
 
@@ -76,10 +76,10 @@ account であること（mint
 account ではないこと）を確認し、送信前に期待するトークンの mint
 account と一致しているかどうかを検証してください。
 
-<Callout type="info">
+<Info>
   Token Programs は、転送における両方の token accounts が同じ mint
   のトークンを保持していることを自動的に検証します。検証に失敗した場合、トランザクションは拒否され、資金は失われません。
-</Callout>
+</Info>
 
 ### Mint Accounts
 
@@ -106,15 +106,15 @@ SPLトークンの送金とは異なり、送金先が予期しないアドレ�
 の結果のみが許容されます。`IS_TOKEN_ACCOUNT` は**許容されません**。token
 accountはSPLトークンを保持しており、そこに送られたSOLは送信者の管理外となります。
 
-<Callout type="warn">
+<Warning>
   これはSOLが失われる一般的なケースです。ユーザーがトークンのミントアドレス（またはプログラムアドレス）をSOL出金先に貼り付けてしまうことがあります。送金は成功しますが、SOLは回収不能となります。SOL送金に署名する前に、必ず送金先を確認してください。
-</Callout>
+</Warning>
 
 ## 検証フロー
 
 以下の図は、アドレスを検証するための参考デシジョンツリーを示しています。
 
-```mermaid title="Address Verification Flow"
+```mermaid
 flowchart TD
     A["Input address"]
     B["Fetch account info"]
@@ -143,17 +143,46 @@ flowchart TD
     K -- "No" --> V2["VERIFY: Confirm the recipient intends to use a smart wallet"]
 ```
 
-<Steps>
-<Step>
+<div className="nojs-only" data-fallback="mermaid">
+  ```text Mermaid
+  flowchart TD
+      A["Input address"]
+      B["Fetch account info"]
 
-### アカウントの取得
+      A --> B
+      B --> C{"Account exists onchain?"}
+
+      %% --- Non-existent account path ---
+      C -- "No" --> D{"Is address off-curve (PDA)?"}
+      D -- "Yes" --> V1["VERIFY: Confirm the recipient intends to use a smart wallet"]
+      D -- "No" --> W1["IS_WALLET: Valid unfunded public key address"]
+
+      %% --- Existing account path ---
+      C -- "Yes" --> F{"Check program owner"}
+
+      F -- "Token Program / Token-2022" --> G{"Is token account for expected mint?"}
+      G -- "Yes" --> T1["IS_TOKEN_ACCOUNT: Send directly"]
+      G -- "No" --> R1["REJECT: Wrong account type or mint"]
+
+      F -- "System Program" --> H{"Is address off-curve?"}
+      H -- "No" --> W2["IS_WALLET: Derive ATA and send"]
+      H -- "Yes" --> V3["VERIFY: Confirm the recipient intends to use a smart wallet"]
+
+      F -- "Other Program" --> K{"Allowed by policy?"}
+      K -- "Yes" --> W3["IS_WALLET: Derive ATA and send"]
+      K -- "No" --> V2["VERIFY: Confirm the recipient intends to use a smart wallet"]
+  ```
+</div>
+
+<p className="sol-caption">Address Verification Flow</p>
+
+<Steps titleSize="h3">
+<Step title="アカウントの取得">
 
 アドレスを使用してネットワークからアカウントの詳細を取得します。
 
 </Step>
-<Step>
-
-### アカウントが存在しない場合
+<Step title="アカウントが存在しない場合">
 
 このアドレスにアカウントが存在しない場合、アドレスがオンカーブかオフカーブかを確認してください：
 
@@ -162,9 +191,7 @@ flowchart TD
 - **オンカーブ**: これはまだ資金が入金されていない有効なウォレットアドレス（公開鍵）です。ATAを導出し、存在するか確認してから、トークンを送信してください。ATAが存在しない場合、その作成に資金を提供するかどうかのポリシーを決定する必要があります。
 
 </Step>
-<Step>
-
-### アカウントが存在する場合
+<Step title="アカウントが存在する場合">
 
 アカウントが存在する場合、どのプログラムがそれを所有しているか確認してください：
 
@@ -188,12 +215,12 @@ flowchart TD
 
 以下の例はアドレス検証ロジックのみを示しています。これは説明目的の参考コードです。
 
-<Callout>
+<Note>
   このデモでは、ATAの導出方法やトークンを送信するトランザクションの構築方法については説明していません。サンプルコードについては、[token
   account](/docs/tokens/basics/create-token-account#how-to-create-an-associated-token-account)
   および [token transfer](/docs/tokens/basics/transfer-tokens)
   のドキュメントを参照してください。
-</Callout>
+</Note>
 
 以下のデモでは、3つの考えられる結果を使用しています：
 
@@ -206,10 +233,7 @@ flowchart TD
 
 次に、各結果を`canReceiveNativeSol`（ウォレットのみ）および`canReceiveSplToken`（ウォレットまたはtoken account）を使用して、アセットごとの受け入れ可否にマッピングします。`USER_VERIFICATION`の結果は自動的に承認されません。SPLトークンを送信する前に、アプリケーションはユーザーに意図を確認させる必要があります。token accountは`IS_TOKEN_ACCOUNT`を返すため、SPLトークンを受け取ることはできますが、ネイティブSOLは受け取れません。これがSOLのロックを防ぐための重要な区別です。
 
-<CodeTabs flags="r">
-
-```ts !! title="Demo"
-// !collapse(1:35) collapsed
+```ts Demo expandable
 
 import {
   type Address,
@@ -339,7 +363,6 @@ function canReceiveSplToken(result: ValidationResult): boolean {
 // =============================================================================
 // Examples
 // =============================================================================
-// !collapse(1:1000) collapsed
 
 // Wallets
 const EXISTING_WALLET =
@@ -414,5 +437,3 @@ console.log("\n" + "═".repeat(60));
 console.log("  Done!");
 console.log("═".repeat(60) + "\n");
 ```
-
-</CodeTabs>

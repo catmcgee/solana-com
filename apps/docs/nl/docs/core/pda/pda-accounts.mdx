@@ -4,7 +4,6 @@ description:
   Maak onchain-accounts aan op Solana PDA-adressen met behulp van invoke_signed
   en Anchor's init-beperking. Verificatiestroom van invoke_signed en Anchor
   PDA-creatiepatronen met codevoorbeelden.
-url: /docs/core/pda/pda-accounts
 type: tutorial
 prerequisites:
   - /docs/core/pda
@@ -18,16 +17,18 @@ related:
 
 {/* TOC: PDA Signing via invoke_signed, Create a PDA Account */}
 
-<Callout type="info" title="Samenvatting">
-  Maak PDA-accounts aan via _rs`invoke_signed`_ met de seeds van de PDA. Alleen
-  het eigenaarsprogramma kan namens een PDA ondertekenen. Anchor's _rs`init`_
+<Info>
+  **Samenvatting**
+
+  Maak PDA-accounts aan via `invoke_signed` met de seeds van de PDA. Alleen
+  het eigenaarsprogramma kan namens een PDA ondertekenen. Anchor's `init`
   constraint automatiseert het aanmaken van PDA-accounts.
-</Callout>
+</Info>
 
 ## PDA-ondertekening via `invoke_signed`
 
 Wanneer een programma namens een PDA moet ondertekenen tijdens een CPI, gebruikt
-het _rs`invoke_signed`_ met de seeds van de PDA. De runtime verifieert dat de
+het `invoke_signed` met de seeds van de PDA. De runtime verifieert dat de
 seeds de verwachte PDA afleiden met behulp van de **ID van het aanroepende
 programma**, waardoor alleen het eigenaarsprogramma kan ondertekenen. Voor het
 volledige verificatieproces, zie
@@ -40,21 +41,19 @@ afzonderlijke bewerkingen. Je moet het account expliciet aanmaken na het
 afleiden van het adres.
 
 Om een account aan te maken op een PDA, roept het afleidende programma de
-_rs`create_account`_ instructie van het System Program aan via
+`create_account` instructie van het System Program aan via
 [`invoke_signed`](/docs/core/cpi), waarbij de seeds van de PDA worden
 doorgegeven zodat de runtime de bevoegdheid van het programma over dat adres kan
 verifiëren.
 
-<WithMentions>
-
 Het onderstaande voorbeeld gebruikt het
 [Anchor framework](https://www.anchor-lang.com/docs) om een nieuw account aan te
 maken met een program-derived address. Het programma bevat een enkele
-[`initialize`](mention:initialize) instructie om het nieuwe account aan te
-maken, dat het [gebruikersadres](mention:user-address) en de
-[bump seed](mention:bump) opslaat die gebruikt zijn om de PDA af te leiden.
+`initialize` instructie om het nieuwe account aan te
+maken, dat het gebruikersadres en de
+bump seed opslaat die gebruikt zijn om de PDA af te leiden.
 
-```rs title="Program"
+```rs Program highlight={12,14,27,29,40-41}
 use anchor_lang::prelude::*;
 
 declare_id!("75GJVCJNhaukaa2vCCqhreY31gaphv7XTScBChmr1ueR");
@@ -63,16 +62,11 @@ declare_id!("75GJVCJNhaukaa2vCCqhreY31gaphv7XTScBChmr1ueR");
 pub mod pda_account {
     use super::*;
 
-    // !mention initialize
     pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
         let account_data = &mut ctx.accounts.pda_account;
         // store the address of the `user`
-        // !mark
-        // !mention user-address
         account_data.user = *ctx.accounts.user.key;
         // store the canonical bump
-        // !mark
-        // !mention bump
         account_data.bump = ctx.bumps.pda_account;
         Ok(())
     }
@@ -81,18 +75,13 @@ pub mod pda_account {
 #[derive(Accounts)]
 pub struct Initialize<'info> {
     #[account(mut)]
-    // !mention user-address
     pub user: Signer<'info>,
 
     #[account(
         init,
         // define the seeds to derive the PDA
-        // !mark
-        // !mention user-address
         seeds = [b"data", user.key().as_ref()],
         // use the canonical bump
-        // !mark
-        // !mention bump
         bump,
         payer = user,
         space = 8 + DataAccount::INIT_SPACE // 8 bytes for Anchor account discriminator
@@ -104,39 +93,28 @@ pub struct Initialize<'info> {
 #[account]
 #[derive(InitSpace)]
 pub struct DataAccount {
-    // !mark
-    // !mention user-address
     pub user: Pubkey,
-    // !mark
-    // !mention bump
     pub bump: u8,
 }
 ```
 
-</WithMentions>
-
-<WithMentions>
-
-De [`init`](mention:init) constraint instrueert Anchor om
+De `init` constraint instrueert Anchor om
 [het System Program aan te roepen](/docs/core/programs/builtin-programs#the-system-program)
 om een nieuw account aan te maken met de PDA als adres. De
-[seeds](mention:seeds) die gebruikt worden om de PDA aan te maken zijn:
+seeds die gebruikt worden om de PDA aan te maken zijn:
 
 - De vaste string: "data"
 - Het adres van het gebruikersaccount dat in de instructie is opgegeven
-- De canonieke [bump seed](mention:bump)
+- De canonieke bump seed
 
 In dit voorbeeld krijgt de bump constraint geen waarde toegewezen, dus Anchor
-zal _rs`find_program_address`_ gebruiken om de PDA af te leiden en de bump te
+zal `find_program_address` gebruiken om de PDA af te leiden en de bump te
 vinden.
 
-```rust title="pda_account"
+```rust pda_account
 #[account(
-    // !mention init
     init,
-    // !mention seeds
     seeds = [b"data", user.key().as_ref()],
-    // !mention bump
     bump,
     payer = user,
     space = 8 + DataAccount::INIT_SPACE // 8 bytes for Anchor account discriminator
@@ -144,19 +122,15 @@ vinden.
 pub pda_account: Account<'info, DataAccount>,
 ```
 
-</WithMentions>
-
-<WithMentions>
-
 Het testbestand hieronder bevat een transactie die de
-[`initialize`](mention:initialize) instructie aanroept om een nieuw account aan
+`initialize` instructie aanroept om een nieuw account aan
 te maken met een program-derived address. Het bestand bevat code om
-[de PDA af te leiden](mention:pda).
+de PDA af te leiden.
 
 Het voorbeeld laat ook zien hoe je het nieuwe account dat wordt aangemaakt kunt
-[ophalen](mention:fetch).
+ophalen.
 
-```ts title="Test"
+```ts Test
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { PdaAccount } from "../target/types/pda_account";
@@ -169,7 +143,6 @@ describe("pda-account", () => {
   const program = anchor.workspace.PdaAccount as Program<PdaAccount>;
   const user = provider.wallet as anchor.Wallet;
 
-  // !mention(1:5) pda
   // Derive the PDA address using the seeds specified on the program
   const [PDA] = PublicKey.findProgramAddressSync(
     [Buffer.from("data"), user.publicKey.toBuffer()],
@@ -178,7 +151,6 @@ describe("pda-account", () => {
 
   it("Is initialized!", async () => {
     const transactionSignature = await program.methods
-      // !mention initialize
       .initialize()
       .accounts({
         user: user.publicKey
@@ -189,17 +161,14 @@ describe("pda-account", () => {
   });
 
   it("Fetch Account", async () => {
-    // !mention fetch
     const pdaAccount = await program.account.dataAccount.fetch(PDA);
     console.log(JSON.stringify(pdaAccount, null, 2));
   });
 });
 ```
 
-</WithMentions>
-
-<Callout type="warn">
+<Warning>
   Als je de `initialize` instructie opnieuw aanroept met dezelfde `user` adres
   seed, zal de transactie mislukken. Dit gebeurt omdat er al een account bestaat
   op het afgeleide adres.
-</Callout>
+</Warning>

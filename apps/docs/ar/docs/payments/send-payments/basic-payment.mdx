@@ -13,124 +13,110 @@ description: تعلم كيفية إرسال تحويل رمز واحد بين ا
 بالمستلم. إذا كان المستلم يتلقى هذا الرمز لأول مرة، يمكن إنشاء حساب الرمز الخاص
 به كجزء من نفس المعاملة.
 
-<Callout>
+<Note>
   راجع [كيف تعمل المدفوعات على سولانا](/docs/payments/how-payments-work) لمفاهيم
   الدفع الأساسية.
-</Callout>
+</Note>
 
 المكوّن الإضافي `token2022Program()` من `@solana-program/token-2022` يوسّع عميل
 [`@solana/kit`](/docs/frontend/client) الخاص بك بمساعد `client.token2022`. تتولى
 طريقة `transferToATA` الخاصة به استنتاج ATA وبناء المعاملات تلقائيًا، وهو مثالي
 لعمليات نقل الدفع الفردي.
 
-توضح الخطوات أدناه التدفق الأساسي. راجع [العرض التوضيحي](#demo) للحصول على كود
+توضح الخطوات أدناه التدفق الأساسي. راجع [العرض التوضيحي](#عرض-توضيحي) للحصول على كود
 كامل قابل للتشغيل.
 
-<ScrollyCoding>
+<Steps>
+  <Step title="إنشاء مساعد الرمز">
+    أضف المكوّن الإضافي `token2022Program()` إلى عميلك باستخدام
+    `.use(token2022Program())`. يتيح هذا الوصول إلى `client.token2022`، التي توفر
+    `instructions` طرقًا لعمليات الرمز الشائعة.
 
-## !!steps إنشاء مساعد الرمز
+    استخدم `token2022Program()` للعناوين المملوكة لبرنامج Token-2022، أو
+    `tokenProgram()` من `@solana-program/token` للعناوين المملوكة لـ Token Program
+    الأصلي.
 
-أضف المكوّن الإضافي `token2022Program()` إلى عميلك باستخدام
-`.use(token2022Program())`. يتيح هذا الوصول إلى `client.token2022`، التي توفر
-`instructions` طرقًا لعمليات الرمز الشائعة.
+    ```ts title="الدفع الأساسي" focus={1-4}
+    const client = createClient()
+      .use(signer(sender))
+      .use(solanaLocalRpc())
+      .use(token2022Program());
+    ```
+  </Step>
 
-استخدم `token2022Program()` للعناوين المملوكة لبرنامج Token-2022، أو
-`tokenProgram()` من `@solana-program/token` للعناوين المملوكة لـ Token Program
-الأصلي.
+  <Step title="إرسال الدفع">
+    استخدم `transferToATA()` لنقل الرموز بين المحافظ. تتولى هذه الطريقة:
 
-<CodePlaceholder title="الدفع الأساسي" />
+    - **استنتاج ATA**: يستنتج تلقائيًا Associated Token Accounts (ATAs) للمرسل
+      والمستلم. في حال عدم وجود associated token account الخاص بالمستلم، تُضاف
+      تعليمة إنشاء الحساب تلقائيًا إلى نفس المعاملة.
+    - **المبالغ المتحقق منها**: مرّر `amount` بالوحدات الأساسية مع `decimals` الخاص
+      بالعنوان. يُتحقق من عملية النقل مقابل الكسور العشرية للعنوان على السلسلة
+      (مثلاً: 250000 وحدة أساسية -> 0.25 رمز، إذا كان العنوان يحتوي على 6 كسور
+      عشرية)
+    - **بناء المعاملة**: يقوم `sendTransaction()` ببناء المعاملة وتوقيعها وإرسالها،
+      محللًا إلى نتيجة يحتوي `context.signature` الخاص بها على توقيع المعاملة
 
-```ts !! title="Basic Payment"
-// !focus(1:4)
-const client = createClient()
-  .use(signer(sender))
-  .use(solanaLocalRpc())
-  .use(token2022Program());
-```
+    ```ts title="Basic Payment" focus={6-14}
+    const client = createClient()
+      .use(signer(sender))
+      .use(solanaLocalRpc())
+      .use(token2022Program());
 
-## !!steps إرسال الدفع
+    const result = await client.token2022.instructions
+      .transferToATA({
+        mint: mint.address,
+        authority: sender,
+        recipient: recipient.address,
+        amount: 250_000n,
+        decimals: 6
+      })
+      .sendTransaction();
+    ```
+  </Step>
 
-استخدم `transferToATA()` لنقل الرموز بين المحافظ. تتولى هذه الطريقة:
+  <Step title="التحقق من الأرصدة">
+    بعد اكتمال عملية النقل، اقرأ أرصدة الرموز من RPC. استنتج token account الخاص بكل
+    محفظة باستخدام `findAssociatedTokenPda()`، ثم استدعِ `getTokenAccountBalance()`
+    لجلب الرصيد لذلك الحساب.
 
-- **استنتاج ATA**: يستنتج تلقائيًا Associated Token Accounts (ATAs) للمرسل
-  والمستلم. في حال عدم وجود associated token account الخاص بالمستلم، تُضاف
-  تعليمة إنشاء الحساب تلقائيًا إلى نفس المعاملة.
-- **المبالغ المتحقق منها**: مرّر `amount` بالوحدات الأساسية مع `decimals` الخاص
-  بالعنوان. يُتحقق من عملية النقل مقابل الكسور العشرية للعنوان على السلسلة
-  (مثلاً: 250000 وحدة أساسية -> 0.25 رمز، إذا كان العنوان يحتوي على 6 كسور
-  عشرية)
-- **بناء المعاملة**: يقوم `sendTransaction()` ببناء المعاملة وتوقيعها وإرسالها،
-  محللًا إلى نتيجة يحتوي `context.signature` الخاص بها على توقيع المعاملة
+    ```ts title="Basic Payment" focus={16-29}
+    const client = createClient()
+      .use(signer(sender))
+      .use(solanaLocalRpc())
+      .use(token2022Program());
 
-<CodePlaceholder title="Basic Payment" />
+    const result = await client.token2022.instructions
+      .transferToATA({
+        mint: mint.address,
+        authority: sender,
+        recipient: recipient.address,
+        amount: 250_000n,
+        decimals: 6
+      })
+      .sendTransaction();
 
-```ts !! title="Basic Payment"
-const client = createClient()
-  .use(signer(sender))
-  .use(solanaLocalRpc())
-  .use(token2022Program());
-
-// !focus(1:9)
-const result = await client.token2022.instructions
-  .transferToATA({
-    mint: mint.address,
-    authority: sender,
-    recipient: recipient.address,
-    amount: 250_000n,
-    decimals: 6
-  })
-  .sendTransaction();
-```
-
-## !!steps التحقق من الأرصدة
-
-بعد اكتمال عملية النقل، اقرأ أرصدة الرموز من RPC. استنتج token account الخاص بكل
-محفظة باستخدام `findAssociatedTokenPda()`، ثم استدعِ `getTokenAccountBalance()`
-لجلب الرصيد لذلك الحساب.
-
-<CodePlaceholder title="Basic Payment" />
-
-```ts !! title="Basic Payment"
-const client = createClient()
-  .use(signer(sender))
-  .use(solanaLocalRpc())
-  .use(token2022Program());
-
-const result = await client.token2022.instructions
-  .transferToATA({
-    mint: mint.address,
-    authority: sender,
-    recipient: recipient.address,
-    amount: 250_000n,
-    decimals: 6
-  })
-  .sendTransaction();
-
-// !focus(1:14)
-const [senderAta] = await findAssociatedTokenPda({
-  mint: mint.address,
-  owner: sender.address,
-  tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
-});
-const [recipientAta] = await findAssociatedTokenPda({
-  mint: mint.address,
-  owner: recipient.address,
-  tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
-});
-const senderBalance = await client.rpc.getTokenAccountBalance(senderAta).send();
-const recipientBalance = await client.rpc
-  .getTokenAccountBalance(recipientAta)
-  .send();
-```
-
-</ScrollyCoding>
+    const [senderAta] = await findAssociatedTokenPda({
+      mint: mint.address,
+      owner: sender.address,
+      tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
+    });
+    const [recipientAta] = await findAssociatedTokenPda({
+      mint: mint.address,
+      owner: recipient.address,
+      tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
+    });
+    const senderBalance = await client.rpc.getTokenAccountBalance(senderAta).send();
+    const recipientBalance = await client.rpc
+      .getTokenAccountBalance(recipientAta)
+      .send();
+    ```
+  </Step>
+</Steps>
 
 ### عرض توضيحي
 
-<CodeTabs flags="r">
-
-```ts !! title="Demo"
-// !collapse(1:14) collapsed
+```ts Demo highlight={34-42} expandable
 // Click ">" icon on left to expand demo imports
 import {
   createClient,
@@ -164,7 +150,6 @@ console.log("\nMint Address:", mint.address);
 
 // Transfer tokens from sender to recipient. The source and destination ATAs are
 // derived automatically, and the recipient's ATA is created if it does not exist.
-// !mark(1:9)
 const result = await client.token2022.instructions
   .transferToATA({
     mint: mint.address,
@@ -207,7 +192,6 @@ console.log(
 // =============================================================================
 // Demo Setup Helper Function
 // =============================================================================
-// !collapse(1:1000) collapsed
 
 /**
  * Sets up for a token transfer demo:
@@ -261,5 +245,3 @@ async function demoSetup(sender: TransactionSigner) {
   };
 }
 ```
-
-</CodeTabs>

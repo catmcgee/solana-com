@@ -3,7 +3,6 @@ title: 不可变所有者
 description:
   使用不可变所有权初始化 Token Extensions Program
   代币账户，使其所有者永远无法被重新分配。
-url: /docs/tokens/extensions/immutable-owner
 type: tutorial
 prerequisites:
   - /docs/tokens/basics/create-token-account
@@ -14,346 +13,332 @@ related:
 
 ## 什么是不可变所有者？
 
-Token Extensions Program 的 _rs`ImmutableOwner`_ 账户扩展使 token
+Token Extensions Program 的 `ImmutableOwner` 账户扩展使 token
 account 的所有者永久固定。
 
-一旦 token account 使用 _rs`ImmutableOwner`_ 初始化，后续的 _rs`SetAuthority`_
-指令将无法更改其 _rs`AccountOwner`_ 权限。
+一旦 token account 使用 `ImmutableOwner` 初始化，后续的 `SetAuthority`
+指令将无法更改其 `AccountOwner` 权限。
 
-<Callout type="info" title="关联代币账户">
+<Info>
+  **关联代币账户**
+
   通过 Associated Token Program 为 Token Extensions Program 创建的 associated
-  token account 会自动在 token account 上初始化 _rs`ImmutableOwner`_。
-</Callout>
+  token account 会自动在 token account 上初始化 `ImmutableOwner`。
+</Info>
 
 ## 如何初始化不可变所有者账户
 
 初始化不可变所有者账户的步骤：
 
 1. 创建并初始化铸币账户。
-2. 创建具有足够空间容纳 _rs`ImmutableOwner`_ 的 token account。
-3. 在执行 _rs`InitializeAccount`_ 之前，在 token account 上初始化
-   _rs`ImmutableOwner`_。
-4. 稍后尝试使用 _rs`SetAuthority`_ 更改账户所有者将失败，并返回
-   _rs`TokenError::ImmutableOwner`_ 错误。
+2. 创建具有足够空间容纳 `ImmutableOwner` 的 token account。
+3. 在执行 `InitializeAccount` 之前，在 token account 上初始化
+   `ImmutableOwner`。
+4. 稍后尝试使用 `SetAuthority` 更改账户所有者将失败，并返回
+   `TokenError::ImmutableOwner` 错误。
 
-<ScrollyCoding>
+<Steps>
+  <Step title="计算代币账户大小">
+    计算基础 token account 加上 `ImmutableOwner` 扩展所需的 token
+    account 大小。这是在 `CreateAccount` 中使用的大小。
 
-## !!steps 计算代币账户大小
+    ```ts 示例 focus={36,38}
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
 
-计算基础 token account 加上 _rs`ImmutableOwner`_ 扩展所需的 token
-account 大小。这是在 _rs`CreateAccount`_ 中使用的大小。
+    const mint = await generateKeyPairSigner();
+    const tokenAccount = await generateKeyPairSigner();
 
-<CodePlaceholder title="示例" />
+    const mintSpace = BigInt(getMintSize());
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
 
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializeMintInstruction({
+        mint: mint.address,
+        decimals: 0,
+        mintAuthority: client.payer.address,
+        freezeAuthority: client.payer.address
+      })
+    ]);
 
-const mint = await generateKeyPairSigner();
-const tokenAccount = await generateKeyPairSigner();
+    const immutableOwnerExtension = extension("ImmutableOwner", {});
 
-const mintSpace = BigInt(getMintSize());
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
+    const tokenSpace = BigInt(getTokenSize([immutableOwnerExtension]));
+    ```
+  </Step>
 
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  }),
-  getInitializeMintInstruction({
-    mint: mint.address,
-    decimals: 0,
-    mintAuthority: client.payer.address,
-    freezeAuthority: client.payer.address
-  })
-]);
+  <Step title="计算租金">
+    使用 `ImmutableOwner` 扩展所需的 token account 大小计算 rent。
 
-// !focus(1:1)
-const immutableOwnerExtension = extension("ImmutableOwner", {});
+    ```ts 示例 focus={40-42} expandable
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
 
-// !focus(1:1)
-const tokenSpace = BigInt(getTokenSize([immutableOwnerExtension]));
-```
+    const mint = await generateKeyPairSigner();
+    const tokenAccount = await generateKeyPairSigner();
 
-## !!steps 计算租金
+    const mintSpace = BigInt(getMintSize());
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
 
-使用 _rs`ImmutableOwner`_ 扩展所需的 token account 大小计算 rent。
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializeMintInstruction({
+        mint: mint.address,
+        decimals: 0,
+        mintAuthority: client.payer.address,
+        freezeAuthority: client.payer.address
+      })
+    ]);
 
-<CodePlaceholder title="示例" />
+    const immutableOwnerExtension = extension("ImmutableOwner", {});
 
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
+    const tokenSpace = BigInt(getTokenSize([immutableOwnerExtension]));
 
-const mint = await generateKeyPairSigner();
-const tokenAccount = await generateKeyPairSigner();
+    const tokenRent = await client.rpc
+      .getMinimumBalanceForRentExemption(tokenSpace)
+      .send();
+    ```
+  </Step>
 
-const mintSpace = BigInt(getMintSize());
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
+  <Step title="创建代币账户">
+    使用计算出的空间和 lamport 创建 token account。
 
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  }),
-  getInitializeMintInstruction({
-    mint: mint.address,
-    decimals: 0,
-    mintAuthority: client.payer.address,
-    freezeAuthority: client.payer.address
-  })
-]);
+    ```ts 示例 focus={44-52} expandable
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
 
-const immutableOwnerExtension = extension("ImmutableOwner", {});
+    const mint = await generateKeyPairSigner();
+    const tokenAccount = await generateKeyPairSigner();
 
-const tokenSpace = BigInt(getTokenSize([immutableOwnerExtension]));
+    const mintSpace = BigInt(getMintSize());
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
 
-// !focus(1:3)
-const tokenRent = await client.rpc
-  .getMinimumBalanceForRentExemption(tokenSpace)
-  .send();
-```
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializeMintInstruction({
+        mint: mint.address,
+        decimals: 0,
+        mintAuthority: client.payer.address,
+        freezeAuthority: client.payer.address
+      })
+    ]);
 
-## !!steps 创建代币账户
+    const immutableOwnerExtension = extension("ImmutableOwner", {});
 
-使用计算出的空间和 lamport 创建 token account。
+    const tokenSpace = BigInt(getTokenSize([immutableOwnerExtension]));
 
-<CodePlaceholder title="示例" />
+    const tokenRent = await client.rpc
+      .getMinimumBalanceForRentExemption(tokenSpace)
+      .send();
 
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: tokenAccount,
+        lamports: tokenRent,
+        space: tokenSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      })
+    ]);
+    ```
+  </Step>
 
-const mint = await generateKeyPairSigner();
-const tokenAccount = await generateKeyPairSigner();
+  <Step title="初始化 ImmutableOwner">
+    在代币账户上初始化 `ImmutableOwner` 扩展。
 
-const mintSpace = BigInt(getMintSize());
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
+    ```ts 示例 focus={52-54} expandable
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
 
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  }),
-  getInitializeMintInstruction({
-    mint: mint.address,
-    decimals: 0,
-    mintAuthority: client.payer.address,
-    freezeAuthority: client.payer.address
-  })
-]);
+    const mint = await generateKeyPairSigner();
+    const tokenAccount = await generateKeyPairSigner();
 
-const immutableOwnerExtension = extension("ImmutableOwner", {});
+    const mintSpace = BigInt(getMintSize());
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
 
-const tokenSpace = BigInt(getTokenSize([immutableOwnerExtension]));
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializeMintInstruction({
+        mint: mint.address,
+        decimals: 0,
+        mintAuthority: client.payer.address,
+        freezeAuthority: client.payer.address
+      })
+    ]);
 
-const tokenRent = await client.rpc
-  .getMinimumBalanceForRentExemption(tokenSpace)
-  .send();
+    const immutableOwnerExtension = extension("ImmutableOwner", {});
 
-// !focus(1:9)
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: tokenAccount,
-    lamports: tokenRent,
-    space: tokenSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  })
-]);
-```
+    const tokenSpace = BigInt(getTokenSize([immutableOwnerExtension]));
 
-## !!steps 初始化 ImmutableOwner
+    const tokenRent = await client.rpc
+      .getMinimumBalanceForRentExemption(tokenSpace)
+      .send();
 
-在代币账户上初始化 _rs`ImmutableOwner`_ 扩展。
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: tokenAccount,
+        lamports: tokenRent,
+        space: tokenSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializeImmutableOwnerInstruction({
+        account: tokenAccount.address
+      })
+    ]);
+    ```
+  </Step>
 
-<CodePlaceholder title="示例" />
+  <Step title="初始化代币账户">
+    在同一笔交易中使用 `InitializeAccount` 初始化代币账户。
 
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
+    ```ts 示例 focus={55-59} expandable
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
 
-const mint = await generateKeyPairSigner();
-const tokenAccount = await generateKeyPairSigner();
+    const mint = await generateKeyPairSigner();
+    const tokenAccount = await generateKeyPairSigner();
 
-const mintSpace = BigInt(getMintSize());
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
+    const mintSpace = BigInt(getMintSize());
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
 
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  }),
-  getInitializeMintInstruction({
-    mint: mint.address,
-    decimals: 0,
-    mintAuthority: client.payer.address,
-    freezeAuthority: client.payer.address
-  })
-]);
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializeMintInstruction({
+        mint: mint.address,
+        decimals: 0,
+        mintAuthority: client.payer.address,
+        freezeAuthority: client.payer.address
+      })
+    ]);
 
-const immutableOwnerExtension = extension("ImmutableOwner", {});
+    const immutableOwnerExtension = extension("ImmutableOwner", {});
 
-const tokenSpace = BigInt(getTokenSize([immutableOwnerExtension]));
+    const tokenSpace = BigInt(getTokenSize([immutableOwnerExtension]));
 
-const tokenRent = await client.rpc
-  .getMinimumBalanceForRentExemption(tokenSpace)
-  .send();
+    const tokenRent = await client.rpc
+      .getMinimumBalanceForRentExemption(tokenSpace)
+      .send();
 
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: tokenAccount,
-    lamports: tokenRent,
-    space: tokenSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  }),
-  // !focus(1:3)
-  getInitializeImmutableOwnerInstruction({
-    account: tokenAccount.address
-  })
-]);
-```
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: tokenAccount,
+        lamports: tokenRent,
+        space: tokenSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializeImmutableOwnerInstruction({
+        account: tokenAccount.address
+      }),
+      getInitializeAccountInstruction({
+        account: tokenAccount.address,
+        mint: mint.address,
+        owner: client.payer.address
+      })
+    ]);
+    ```
+  </Step>
+</Steps>
 
-## !!steps 初始化代币账户
+<Info>
+  **指令顺序**
 
-在同一笔交易中使用 _rs`InitializeAccount`_ 初始化代币账户。
-
-<CodePlaceholder title="示例" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-const tokenAccount = await generateKeyPairSigner();
-
-const mintSpace = BigInt(getMintSize());
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
-
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  }),
-  getInitializeMintInstruction({
-    mint: mint.address,
-    decimals: 0,
-    mintAuthority: client.payer.address,
-    freezeAuthority: client.payer.address
-  })
-]);
-
-const immutableOwnerExtension = extension("ImmutableOwner", {});
-
-const tokenSpace = BigInt(getTokenSize([immutableOwnerExtension]));
-
-const tokenRent = await client.rpc
-  .getMinimumBalanceForRentExemption(tokenSpace)
-  .send();
-
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: tokenAccount,
-    lamports: tokenRent,
-    space: tokenSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  }),
-  getInitializeImmutableOwnerInstruction({
-    account: tokenAccount.address
-  }),
-  // !focus(1:5)
-  getInitializeAccountInstruction({
-    account: tokenAccount.address,
-    mint: mint.address,
-    owner: client.payer.address
-  })
-]);
-```
-
-</ScrollyCoding>
-
-<Callout type="info" title="指令顺序">
-  _rs`InitializeImmutableOwner`_ 必须在 _rs`InitializeAccount`_ 之前执行。
-  _rs`CreateAccount`_、_rs`InitializeImmutableOwner`_ 和 _rs`InitializeAccount`_
+  `InitializeImmutableOwner` 必须在 `InitializeAccount` 之前执行。
+`CreateAccount`、`InitializeImmutableOwner` 和 `InitializeAccount`
   必须包含在同一笔交易中。
-</Callout>
+</Info>
 
 ### 源代码参考
 
-| 项目                                     | 描述                                                               | 源代码                                                                                                                           |
-| ---------------------------------------- | ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
-| _rs`ImmutableOwner`_                     | 将代币账户所有者标记为不可变的账户扩展。                           | [源代码](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/immutable_owner.rs#L13-L16) |
-| _rs`InitializeImmutableOwner`_           | 在未初始化的代币账户上初始化不可变所有者扩展的指令。               | [源代码](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/instruction.rs#L1982-L1991)           |
-| _rs`process_initialize_immutable_owner`_ | 在账户上分配并初始化 _rs`ImmutableOwner`_ 的处理器逻辑。           | [源代码](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/processor.rs#L1532-L1543)               |
-| _rs`SetAuthority`_                       | 用于更改权限（包括代币账户所有者）的基础代币指令。                 | [源代码](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/instruction.rs#L1611-L1633)           |
-| _rs`process_set_authority`_              | 当代币账户启用 _rs`ImmutableOwner`_ 时拒绝所有者更改的处理器逻辑。 | [源代码](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/processor.rs#L703-L900)                 |
+| 项目                                   | 描述                                       | 源代码                                                                                                                           |
+| ------------------------------------ | ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `ImmutableOwner`                     | 将代币账户所有者标记为不可变的账户扩展。                     | [源代码](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/immutable_owner.rs#L13-L16) |
+| `InitializeImmutableOwner`           | 在未初始化的代币账户上初始化不可变所有者扩展的指令。               | [源代码](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/instruction.rs#L1982-L1991)           |
+| `process_initialize_immutable_owner` | 在账户上分配并初始化 `ImmutableOwner` 的处理器逻辑。      | [源代码](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/processor.rs#L1532-L1543)               |
+| `SetAuthority`                       | 用于更改权限（包括代币账户所有者）的基础代币指令。                | [源代码](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/instruction.rs#L1611-L1633)           |
+| `process_set_authority`              | 当代币账户启用 `ImmutableOwner` 时拒绝所有者更改的处理器逻辑。 | [源代码](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/processor.rs#L703-L900)                 |
 
 ### Typescript
 
@@ -362,9 +347,7 @@ await client.sendTransaction([
 
 #### Kit
 
-<CodeTabs storage="token-ts-kit" flags="r">
-
-```ts !! title="Instructions"
+```ts Instructions highlight={74-76,87-92}
 import {
   lamports,
   createClient,
@@ -438,7 +421,6 @@ await client.sendTransaction([
     space: tokenSpace, // Account size in bytes for the token account plus ImmutableOwner.
     programAddress: TOKEN_2022_PROGRAM_ADDRESS // Program that owns the token account.
   }),
-  // !mark(1:3)
   getInitializeImmutableOwnerInstruction({
     account: tokenAccount.address // Token account that stores the ImmutableOwner extension.
   }),
@@ -452,7 +434,6 @@ await client.sendTransaction([
 let failure: string | undefined;
 try {
   await client.sendTransaction([
-    // !mark(1:6)
     getSetAuthorityInstruction({
       owned: tokenAccount.address, // Token account whose authority is being updated.
       owner: client.payer, // Current token account owner signing the instruction.
@@ -478,13 +459,9 @@ console.log("ImmutableOwner Extension:", immutableOwnerExtensionState);
 console.log("SetAuthority Failure:", failure);
 ```
 
-</CodeTabs>
-
 #### Web3.js
 
-<CodeTabs storage="token-ts-legacy" flags="r">
-
-```ts !! title="Instructions"
+```ts Instructions highlight={74-78,111-118}
 import {
   Connection,
   Keypair,
@@ -558,7 +535,6 @@ const createTokenAccountInstruction = SystemProgram.createAccount({
   programId: TOKEN_2022_PROGRAM_ID // Program that owns the token account.
 });
 
-// !mark(1:5)
 const initializeImmutableOwnerInstruction =
   createInitializeImmutableOwnerInstruction(
     tokenAccount.publicKey, // Token account that stores the ImmutableOwner extension.
@@ -596,7 +572,6 @@ try {
   await sendAndConfirmTransaction(
     connection,
     new Transaction().add(
-      // !mark(1:8)
       createSetAuthorityInstruction(
         tokenAccount.publicKey, // Token account whose authority is being updated.
         feePayer.publicKey, // Current token account owner signing the instruction.
@@ -629,13 +604,9 @@ console.log("ImmutableOwner Extension:", immutableOwnerExtension);
 console.log("SetAuthority Failure:", failure);
 ```
 
-</CodeTabs>
-
 ### Rust
 
-<CodeTabs storage="token-rs" flags="r">
-
-```rust !! title="Rust"
+```rust Rust highlight={89-92,114-121}
 use anyhow::{anyhow, Result};
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_commitment_config::CommitmentConfig;
@@ -724,7 +695,6 @@ async fn main() -> Result<()> {
         &fee_payer.pubkey(),     // Owner of the token account.
     )?;
 
-    // !mark(1:4)
     let init_immutable_owner_instruction =
         initialize_immutable_owner(
             &TOKEN_2022_PROGRAM_ID, // Token program that owns the token account.
@@ -750,7 +720,6 @@ async fn main() -> Result<()> {
     let token_account_state = StateWithExtensions::<Account>::unpack(&token_account_data.data)?;
 
     let new_owner = Keypair::new();
-    // !mark(1:8)
     let set_authority_instruction = set_authority(
         &TOKEN_2022_PROGRAM_ID, // Token program that owns the token account.
         &token_account.pubkey(), // Token account whose authority is being updated.
@@ -785,5 +754,3 @@ async fn main() -> Result<()> {
     Ok(())
 }
 ```
-
-</CodeTabs>

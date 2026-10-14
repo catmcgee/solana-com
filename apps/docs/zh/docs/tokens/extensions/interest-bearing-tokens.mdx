@@ -2,7 +2,6 @@
 title: 计息代币
 description:
   使用链上利率创建 Token Extensions Program 铸币账户，更新利率，并将代币数量转换为包含利息的 UI 数量。
-url: /docs/tokens/extensions/interest-bearing-tokens
 type: tutorial
 prerequisites:
   - /docs/tokens/basics/create-mint
@@ -14,7 +13,7 @@ related:
 
 ## 什么是计息铸币账户？
 
-Token Extensions Program 的 _rs`InterestBearingConfig`_
+Token Extensions Program 的 `InterestBearingConfig`
 铸币扩展允许铸币账户直接在链上存储年化利率。
 
 计息代币**不会**随时间向代币账户增加更多代币。存储在每个代币账户中的代币数量保持不变，直到代币程序指令改变它，例如铸造、转账或销毁。
@@ -45,433 +44,413 @@ Token Extensions Program 的 _rs`InterestBearingConfig`_
 
 要创建和使用计息代币：
 
-1. 计算铸币账户大小以及铸币账户和 _rs`InterestBearingConfig`_ 扩展所需的租金。
-2. 使用 _rs`CreateAccount`_ 创建铸币账户，初始化
-   _rs`InterestBearingConfig`_，并使用 _rs`InitializeMint`_ 初始化铸币账户。
+1. 计算铸币账户大小以及铸币账户和 `InterestBearingConfig` 扩展所需的租金。
+2. 使用 `CreateAccount` 创建铸币账户，初始化
+   `InterestBearingConfig`，并使用 `InitializeMint` 初始化铸币账户。
 3. 像往常一样铸造代币。
-4. 使用 _rs`UpdateRate`_ 随时间改变铸币账户的当前利率。
-5. 使用 _rs`AmountToUiAmount`_
+4. 使用 `UpdateRate` 随时间改变铸币账户的当前利率。
+5. 使用 `AmountToUiAmount`
    或辅助方法将代币数量转换为包含利息的 UI 数量，这些辅助方法会获取铸币账户和时钟系统变量，然后计算 UI 数量而无需发送交易。
 
-<Callout type="info" title="链下和链上 UI 金额转换">
+<Info>
+  **链下和链上 UI 金额转换**
+
   链下辅助路径会获取铸币账户和时钟系统变量，然后在本地计算 UI
-  金额而无需发送交易。链上路径使用 _rs`AmountToUiAmount`_，它在 Token Program
-  中运行并在交易返回数据中返回 UI 金额。_rs`AmountToUiAmount`_
+  金额而无需发送交易。链上路径使用 `AmountToUiAmount`，它在 Token Program
+  中运行并在交易返回数据中返回 UI 金额。`AmountToUiAmount`
   可以在交易中发送或进行模拟。
-</Callout>
-
-<ScrollyCoding>
-
-## !!steps 计算账户大小
-
-计算基础铸币账户加上 _rs`InterestBearingConfig`_ 扩展所需的 mint
-account 大小。这是在 _rs`CreateAccount`_ 中使用的大小。
-
-<CodePlaceholder title="示例" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-
-// !focus(1:7)
-const interestBearingExtension = extension("InterestBearingConfig", {
-  rateAuthority: client.payer.address,
-  initializationTimestamp: BigInt(Math.floor(Date.now() / 1000)),
-  lastUpdateTimestamp: BigInt(Math.floor(Date.now() / 1000)),
-  preUpdateAverageRate: 30000,
-  currentRate: 30000
-});
-
-// !focus(1:1)
-const mintSpace = BigInt(getMintSize([interestBearingExtension]));
-```
-
-## !!steps 计算租金
-
-使用铸币账户加上 _rs`InterestBearingConfig`_ 扩展所需的大小来计算 rent。
-
-<CodePlaceholder title="示例" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-
-const interestBearingExtension = extension("InterestBearingConfig", {
-  rateAuthority: client.payer.address,
-  initializationTimestamp: BigInt(Math.floor(Date.now() / 1000)),
-  lastUpdateTimestamp: BigInt(Math.floor(Date.now() / 1000)),
-  preUpdateAverageRate: 30000,
-  currentRate: 30000
-});
-
-const mintSpace = BigInt(getMintSize([interestBearingExtension]));
-
-// !focus(1:3)
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
-```
-
-## !!steps 创建铸币账户
-
-使用计算出的空间和 lamport 创建 mint account。
-
-<CodePlaceholder title="示例" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-
-const interestBearingExtension = extension("InterestBearingConfig", {
-  rateAuthority: client.payer.address,
-  initializationTimestamp: BigInt(Math.floor(Date.now() / 1000)),
-  lastUpdateTimestamp: BigInt(Math.floor(Date.now() / 1000)),
-  preUpdateAverageRate: 30000,
-  currentRate: 30000
-});
-
-const mintSpace = BigInt(getMintSize([interestBearingExtension]));
-
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
-
-// !focus(1:9)
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  })
-]);
-```
-
-## !!steps 初始化 InterestBearingConfig
-
-在铸币账户上初始化 _rs`InterestBearingConfig`_ 扩展。
-
-<CodePlaceholder title="示例" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-
-const interestBearingExtension = extension("InterestBearingConfig", {
-  rateAuthority: client.payer.address,
-  initializationTimestamp: BigInt(Math.floor(Date.now() / 1000)),
-  lastUpdateTimestamp: BigInt(Math.floor(Date.now() / 1000)),
-  preUpdateAverageRate: 30000,
-  currentRate: 30000
-});
-
-const mintSpace = BigInt(getMintSize([interestBearingExtension]));
-
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
-
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  }),
-  // !focus(1:5)
-  getInitializeInterestBearingMintInstruction({
-    mint: mint.address,
-    rateAuthority: client.payer.address,
-    rate: 30000
-  })
-]);
-```
-
-## !!steps 初始化铸币账户
-
-在同一交易中使用 _rs`InitializeMint`_ 初始化铸币账户。
-
-<CodePlaceholder title="示例" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-
-const interestBearingExtension = extension("InterestBearingConfig", {
-  rateAuthority: client.payer.address,
-  initializationTimestamp: BigInt(Math.floor(Date.now() / 1000)),
-  lastUpdateTimestamp: BigInt(Math.floor(Date.now() / 1000)),
-  preUpdateAverageRate: 30000,
-  currentRate: 30000
-});
-
-const mintSpace = BigInt(getMintSize([interestBearingExtension]));
-
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
-
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  }),
-  getInitializeInterestBearingMintInstruction({
-    mint: mint.address,
-    rateAuthority: client.payer.address,
-    rate: 30000
-  }),
-  // !focus(1:6)
-  getInitializeMintInstruction({
-    mint: mint.address,
-    decimals: 0,
-    mintAuthority: client.payer.address,
-    freezeAuthority: client.payer.address
-  })
-]);
-```
-
-## !!steps 创建代币账户并铸造代币
-
-为铸币账户创建一个 token account，然后向该 token account 铸造代币。
-
-<CodePlaceholder title="示例" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-
-const interestBearingExtension = extension("InterestBearingConfig", {
-  rateAuthority: client.payer.address,
-  initializationTimestamp: BigInt(Math.floor(Date.now() / 1000)),
-  lastUpdateTimestamp: BigInt(Math.floor(Date.now() / 1000)),
-  preUpdateAverageRate: 30000,
-  currentRate: 30000
-});
-
-const mintSpace = BigInt(getMintSize([interestBearingExtension]));
-
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
-
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  }),
-  getInitializeInterestBearingMintInstruction({
-    mint: mint.address,
-    rateAuthority: client.payer.address,
-    rate: 30000
-  }),
-  getInitializeMintInstruction({
-    mint: mint.address,
-    decimals: 0,
-    mintAuthority: client.payer.address,
-    freezeAuthority: client.payer.address
-  })
-]);
-
-// !focus(1:21)
-const recipient = await generateKeyPairSigner();
-const tokenAmount = 1_000_000_000_000n;
-const [tokenAccount] = await findAssociatedTokenPda({
-  mint: mint.address,
-  owner: recipient.address,
-  tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
-});
-await client.sendTransaction([
-  await getCreateAssociatedTokenInstructionAsync({
-    payer: client.payer,
-    mint: mint.address,
-    owner: recipient.address
-  }),
-  getMintToCheckedInstruction({
-    mint: mint.address,
-    token: tokenAccount,
-    mintAuthority: client.payer,
-    amount: tokenAmount,
-    decimals: 0
-  })
-]);
-```
-
-## !!steps 使用链下辅助函数计算 UI 金额
-
-获取铸币账户和时钟系统变量，然后在不发送交易的情况下计算 UI 金额。
-
-<CodePlaceholder title="示例" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-
-const interestBearingExtension = extension("InterestBearingConfig", {
-  rateAuthority: client.payer.address,
-  initializationTimestamp: BigInt(Math.floor(Date.now() / 1000)),
-  lastUpdateTimestamp: BigInt(Math.floor(Date.now() / 1000)),
-  preUpdateAverageRate: 30000,
-  currentRate: 30000
-});
-
-const mintSpace = BigInt(getMintSize([interestBearingExtension]));
-
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
-
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  }),
-  getInitializeInterestBearingMintInstruction({
-    mint: mint.address,
-    rateAuthority: client.payer.address,
-    rate: 30000
-  }),
-  getInitializeMintInstruction({
-    mint: mint.address,
-    decimals: 0,
-    mintAuthority: client.payer.address,
-    freezeAuthority: client.payer.address
-  })
-]);
-
-const recipient = await generateKeyPairSigner();
-const tokenAmount = 1_000_000_000_000n;
-const [tokenAccount] = await findAssociatedTokenPda({
-  mint: mint.address,
-  owner: recipient.address,
-  tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
-});
-await client.sendTransaction([
-  await getCreateAssociatedTokenInstructionAsync({
-    payer: client.payer,
-    mint: mint.address,
-    owner: recipient.address
-  }),
-  getMintToCheckedInstruction({
-    mint: mint.address,
-    token: tokenAccount,
-    mintAuthority: client.payer,
-    amount: tokenAmount,
-    decimals: 0
-  })
-]);
-
-await new Promise((resolve) => setTimeout(resolve, 2_000));
-
-// !focus(1:5)
-const offchainUiAmount = await amountToUiAmountForMintWithoutSimulation(
-  client.rpc,
-  mint.address,
-  tokenAmount
-);
-```
-
-</ScrollyCoding>
-
-<Callout type="info" title="指令顺序">
-  _rs`InterestBearingMintInstruction::Initialize`_ 必须在 _rs`InitializeMint`_
-  之前执行。_rs`CreateAccount`_、_rs`InterestBearingMintInstruction::Initialize`_
-  和 _rs`InitializeMint`_ 必须包含在同一笔交易中。
-</Callout>
+</Info>
+
+<Steps>
+  <Step title="计算账户大小">
+    计算基础铸币账户加上 `InterestBearingConfig` 扩展所需的 mint
+    account 大小。这是在 `CreateAccount` 中使用的大小。
+
+    ```ts 示例 focus={14-20,22}
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+
+    const interestBearingExtension = extension("InterestBearingConfig", {
+      rateAuthority: client.payer.address,
+      initializationTimestamp: BigInt(Math.floor(Date.now() / 1000)),
+      lastUpdateTimestamp: BigInt(Math.floor(Date.now() / 1000)),
+      preUpdateAverageRate: 30000,
+      currentRate: 30000
+    });
+
+    const mintSpace = BigInt(getMintSize([interestBearingExtension]));
+    ```
+  </Step>
+
+  <Step title="计算租金">
+    使用铸币账户加上 `InterestBearingConfig` 扩展所需的大小来计算 rent。
+
+    ```ts 示例 focus={24-26}
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+
+    const interestBearingExtension = extension("InterestBearingConfig", {
+      rateAuthority: client.payer.address,
+      initializationTimestamp: BigInt(Math.floor(Date.now() / 1000)),
+      lastUpdateTimestamp: BigInt(Math.floor(Date.now() / 1000)),
+      preUpdateAverageRate: 30000,
+      currentRate: 30000
+    });
+
+    const mintSpace = BigInt(getMintSize([interestBearingExtension]));
+
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
+    ```
+  </Step>
+
+  <Step title="创建铸币账户">
+    使用计算出的空间和 lamport 创建 mint account。
+
+    ```ts 示例 focus={28-36}
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+
+    const interestBearingExtension = extension("InterestBearingConfig", {
+      rateAuthority: client.payer.address,
+      initializationTimestamp: BigInt(Math.floor(Date.now() / 1000)),
+      lastUpdateTimestamp: BigInt(Math.floor(Date.now() / 1000)),
+      preUpdateAverageRate: 30000,
+      currentRate: 30000
+    });
+
+    const mintSpace = BigInt(getMintSize([interestBearingExtension]));
+
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
+
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      })
+    ]);
+    ```
+  </Step>
+
+  <Step title="初始化 InterestBearingConfig">
+    在铸币账户上初始化 `InterestBearingConfig` 扩展。
+
+    ```ts 示例 focus={36-40} expandable
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+
+    const interestBearingExtension = extension("InterestBearingConfig", {
+      rateAuthority: client.payer.address,
+      initializationTimestamp: BigInt(Math.floor(Date.now() / 1000)),
+      lastUpdateTimestamp: BigInt(Math.floor(Date.now() / 1000)),
+      preUpdateAverageRate: 30000,
+      currentRate: 30000
+    });
+
+    const mintSpace = BigInt(getMintSize([interestBearingExtension]));
+
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
+
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializeInterestBearingMintInstruction({
+        mint: mint.address,
+        rateAuthority: client.payer.address,
+        rate: 30000
+      })
+    ]);
+    ```
+  </Step>
+
+  <Step title="初始化铸币账户">
+    在同一交易中使用 `InitializeMint` 初始化铸币账户。
+
+    ```ts 示例 focus={41-46} expandable
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+
+    const interestBearingExtension = extension("InterestBearingConfig", {
+      rateAuthority: client.payer.address,
+      initializationTimestamp: BigInt(Math.floor(Date.now() / 1000)),
+      lastUpdateTimestamp: BigInt(Math.floor(Date.now() / 1000)),
+      preUpdateAverageRate: 30000,
+      currentRate: 30000
+    });
+
+    const mintSpace = BigInt(getMintSize([interestBearingExtension]));
+
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
+
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializeInterestBearingMintInstruction({
+        mint: mint.address,
+        rateAuthority: client.payer.address,
+        rate: 30000
+      }),
+      getInitializeMintInstruction({
+        mint: mint.address,
+        decimals: 0,
+        mintAuthority: client.payer.address,
+        freezeAuthority: client.payer.address
+      })
+    ]);
+    ```
+  </Step>
+
+  <Step title="创建代币账户并铸造代币">
+    为铸币账户创建一个 token account，然后向该 token account 铸造代币。
+
+    ```ts 示例 focus={49-69} expandable
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+
+    const interestBearingExtension = extension("InterestBearingConfig", {
+      rateAuthority: client.payer.address,
+      initializationTimestamp: BigInt(Math.floor(Date.now() / 1000)),
+      lastUpdateTimestamp: BigInt(Math.floor(Date.now() / 1000)),
+      preUpdateAverageRate: 30000,
+      currentRate: 30000
+    });
+
+    const mintSpace = BigInt(getMintSize([interestBearingExtension]));
+
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
+
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializeInterestBearingMintInstruction({
+        mint: mint.address,
+        rateAuthority: client.payer.address,
+        rate: 30000
+      }),
+      getInitializeMintInstruction({
+        mint: mint.address,
+        decimals: 0,
+        mintAuthority: client.payer.address,
+        freezeAuthority: client.payer.address
+      })
+    ]);
+
+    const recipient = await generateKeyPairSigner();
+    const tokenAmount = 1_000_000_000_000n;
+    const [tokenAccount] = await findAssociatedTokenPda({
+      mint: mint.address,
+      owner: recipient.address,
+      tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
+    });
+    await client.sendTransaction([
+      await getCreateAssociatedTokenInstructionAsync({
+        payer: client.payer,
+        mint: mint.address,
+        owner: recipient.address
+      }),
+      getMintToCheckedInstruction({
+        mint: mint.address,
+        token: tokenAccount,
+        mintAuthority: client.payer,
+        amount: tokenAmount,
+        decimals: 0
+      })
+    ]);
+    ```
+  </Step>
+
+  <Step title="使用链下辅助函数计算 UI 金额">
+    获取铸币账户和时钟系统变量，然后在不发送交易的情况下计算 UI 金额。
+
+    ```ts 示例 focus={73-77} expandable
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+
+    const interestBearingExtension = extension("InterestBearingConfig", {
+      rateAuthority: client.payer.address,
+      initializationTimestamp: BigInt(Math.floor(Date.now() / 1000)),
+      lastUpdateTimestamp: BigInt(Math.floor(Date.now() / 1000)),
+      preUpdateAverageRate: 30000,
+      currentRate: 30000
+    });
+
+    const mintSpace = BigInt(getMintSize([interestBearingExtension]));
+
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
+
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializeInterestBearingMintInstruction({
+        mint: mint.address,
+        rateAuthority: client.payer.address,
+        rate: 30000
+      }),
+      getInitializeMintInstruction({
+        mint: mint.address,
+        decimals: 0,
+        mintAuthority: client.payer.address,
+        freezeAuthority: client.payer.address
+      })
+    ]);
+
+    const recipient = await generateKeyPairSigner();
+    const tokenAmount = 1_000_000_000_000n;
+    const [tokenAccount] = await findAssociatedTokenPda({
+      mint: mint.address,
+      owner: recipient.address,
+      tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
+    });
+    await client.sendTransaction([
+      await getCreateAssociatedTokenInstructionAsync({
+        payer: client.payer,
+        mint: mint.address,
+        owner: recipient.address
+      }),
+      getMintToCheckedInstruction({
+        mint: mint.address,
+        token: tokenAccount,
+        mintAuthority: client.payer,
+        amount: tokenAmount,
+        decimals: 0
+      })
+    ]);
+
+    await new Promise((resolve) => setTimeout(resolve, 2_000));
+
+    const offchainUiAmount = await amountToUiAmountForMintWithoutSimulation(
+      client.rpc,
+      mint.address,
+      tokenAmount
+    );
+    ```
+  </Step>
+</Steps>
+
+<Info>
+  **指令顺序**
+
+  `InterestBearingMintInstruction::Initialize` 必须在 `InitializeMint`
+  之前执行。`CreateAccount`、`InterestBearingMintInstruction::Initialize`
+  和 `InitializeMint` 必须包含在同一笔交易中。
+</Info>
 
 ### 源代码参考
 
-| 项目                                             | 描述                                                                                                                   | 源代码                                                                                                                                              |
-| ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| _rs`InterestBearingConfig`_                      | 存储利率授权、时间戳以及当前和历史利率的铸币扩展。                         | [源代码](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/interest_bearing_mint/mod.rs#L40-L153)         |
-| _rs`InterestBearingMintInstruction::Initialize`_ | 在 _rs`InitializeMint`_ 之前初始化计息配置的指令。                                         | [源代码](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/interest_bearing_mint/instruction.rs#L17-L90)  |
-| _rs`InterestBearingMintInstruction::UpdateRate`_ | 更改铸币当前利率的指令。                                                                    | [源代码](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/interest_bearing_mint/instruction.rs#L35-L113) |
-| _rs`AmountToUiAmount`_                           | 使用铸币的活动配置返回代币数量的当前 UI 金额字符串的指令。                      | [源代码](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/instruction.rs#L520-L538)                                |
-| _rs`InterestBearingConfig::amount_to_ui_amount`_ | 将代币数量转换为指定时间戳的含利息 UI 金额的辅助函数。                                           | [源代码](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/interest_bearing_mint/mod.rs#L85-L96)          |
-| _rs`process_initialize`_                         | 初始化 _rs`InterestBearingConfig`_ 并记录初始时间戳和利率的处理器逻辑。                     | [源代码](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/extension/interest_bearing_mint/processor.rs#L21-L43)      |
-| _rs`process_update_rate`_                        | 更新当前利率、重新计算时间加权平均利率并记录更新时间戳的处理器逻辑。 | [源代码](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/extension/interest_bearing_mint/processor.rs#L46-L77)      |
-| _rs`process_amount_to_ui_amount`_                | 使用铸币的活动计息配置返回 UI 金额字符串的处理器逻辑。                     | [源代码](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/processor.rs#L1548-L1569)                                  |
+| 项目                                           | 描述                                             | 源代码                                                                                                                                              |
+| -------------------------------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `InterestBearingConfig`                      | 存储利率授权、时间戳以及当前和历史利率的铸币扩展。                      | [源代码](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/interest_bearing_mint/mod.rs#L40-L153)         |
+| `InterestBearingMintInstruction::Initialize` | 在 `InitializeMint` 之前初始化计息配置的指令。               | [源代码](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/interest_bearing_mint/instruction.rs#L17-L90)  |
+| `InterestBearingMintInstruction::UpdateRate` | 更改铸币当前利率的指令。                                   | [源代码](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/interest_bearing_mint/instruction.rs#L35-L113) |
+| `AmountToUiAmount`                           | 使用铸币的活动配置返回代币数量的当前 UI 金额字符串的指令。                | [源代码](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/instruction.rs#L520-L538)                                |
+| `InterestBearingConfig::amount_to_ui_amount` | 将代币数量转换为指定时间戳的含利息 UI 金额的辅助函数。                  | [源代码](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/interest_bearing_mint/mod.rs#L85-L96)          |
+| `process_initialize`                         | 初始化 `InterestBearingConfig` 并记录初始时间戳和利率的处理器逻辑。 | [源代码](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/extension/interest_bearing_mint/processor.rs#L21-L43)      |
+| `process_update_rate`                        | 更新当前利率、重新计算时间加权平均利率并记录更新时间戳的处理器逻辑。             | [源代码](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/extension/interest_bearing_mint/processor.rs#L46-L77)      |
+| `process_amount_to_ui_amount`                | 使用铸币的活动计息配置返回 UI 金额字符串的处理器逻辑。                  | [源代码](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/processor.rs#L1548-L1569)                                  |
 
 ### Typescript
 
@@ -480,9 +459,7 @@ const offchainUiAmount = await amountToUiAmountForMintWithoutSimulation(
 
 #### Kit
 
-<CodeTabs storage="token-ts-kit" flags="r">
-
-```ts !! title="Instructions"
+```ts Instructions highlight={74-78,110-113,138-142}
 import {
   lamports,
   createClient,
@@ -556,7 +533,6 @@ await client.sendTransaction([
     space: mintSpace, // Account size in bytes for the mint plus InterestBearingConfig.
     programAddress: TOKEN_2022_PROGRAM_ADDRESS // Program that owns the mint account.
   }),
-  // !mark(1:5)
   getInitializeInterestBearingMintInstruction({
     mint: mint.address, // Mint account that stores the InterestBearingConfig extension.
     rateAuthority: client.payer.address, // Authority allowed to update the interest rate later.
@@ -593,7 +569,6 @@ const calculatedUiAmount = await amountToUiAmountForMintWithoutSimulation(
   tokenAmount
 );
 
-// !mark(1:4)
 const amountToUiInstruction = getAmountToUiAmountInstruction({
   mint: mint.address, // Mint whose UI amount conversion is being simulated.
   amount: tokenAmount // Token amount in base units.
@@ -622,7 +597,6 @@ const simulatedUiAmount = Buffer.from(
   "base64"
 ).toString("utf8");
 
-// !mark(1:5)
 const updateRateInstruction = getUpdateRateInterestBearingMintInstruction({
   mint: mint.address, // Mint account that stores the InterestBearingConfig extension.
   rateAuthority: client.payer, // Signer authorized to update the interest rate.
@@ -643,13 +617,9 @@ console.log("Simulated UI Amount:", simulatedUiAmount);
 console.log("InterestBearingConfig:", interestBearingConfig);
 ```
 
-</CodeTabs>
-
 #### Web3.js
 
-<CodeTabs storage="token-ts-legacy" flags="r">
-
-```ts !! title="Instructions"
+```ts Instructions highlight={67-73,133-138,149-156}
 import {
   Connection,
   Keypair,
@@ -716,7 +686,6 @@ const createMintAccountInstruction = SystemProgram.createAccount({
   programId: TOKEN_2022_PROGRAM_ID // Program that owns the mint account.
 });
 
-// !mark(1:7)
 const initializeInterestBearingInstruction =
   createInitializeInterestBearingMintInstruction(
     mint.publicKey, // Mint account that stores the InterestBearingConfig extension.
@@ -783,7 +752,6 @@ const calculatedUiAmount = await amountToUiAmountForMintWithoutSimulation(
   tokenAmount
 );
 
-// !mark(1:6)
 const amountToUiInstruction = createAmountToUiAmountInstruction(
   mint.publicKey, // Mint whose UI amount conversion is being simulated.
   tokenAmount, // Token amount in base units.
@@ -800,7 +768,6 @@ const simulatedUiAmount = Buffer.from(
   "base64"
 ).toString("utf8");
 
-// !mark(1:8)
 const updateRateInstruction = createUpdateRateInterestBearingMintInstruction(
   mint.publicKey, // Mint account that stores the InterestBearingConfig extension.
   feePayer.publicKey, // Signer authorized to update the interest rate.
@@ -830,13 +797,9 @@ console.log("Simulated UI Amount:", simulatedUiAmount);
 console.log("InterestBearingConfig:", interestBearingConfig);
 ```
 
-</CodeTabs>
-
 ### Rust
 
-<CodeTabs storage="token-rs" flags="r">
-
-```rust !! title="Rust"
+```rust Rust highlight={68-73,147-151,171-176}
 use anyhow::{anyhow, Result};
 use base64::prelude::{Engine as _, BASE64_STANDARD};
 use solana_client::nonblocking::rpc_client::RpcClient;
@@ -904,7 +867,6 @@ async fn main() -> Result<()> {
         &TOKEN_2022_PROGRAM_ID, // Program that owns the mint account.
     );
 
-    // !mark(1:6)
     let initialize_interest_bearing_instruction = initialize_interest_bearing_instruction(
         &TOKEN_2022_PROGRAM_ID, // Token program that owns the mint.
         &mint.pubkey(), // Mint account that stores the InterestBearingConfig extension.
@@ -984,7 +946,6 @@ async fn main() -> Result<()> {
         .amount_to_ui_amount(token_amount, mint_state.base.decimals, clock.unix_timestamp)
         .ok_or_else(|| anyhow!("Failed to calculate UI amount"))?;
 
-    // !mark(1:5)
     let amount_to_ui_instruction = amount_to_ui_amount(
         &TOKEN_2022_PROGRAM_ID, // Token program that owns the mint.
         &mint.pubkey(), // Mint whose UI amount conversion is being simulated.
@@ -1009,7 +970,6 @@ async fn main() -> Result<()> {
         )?,
     )?;
 
-    // !mark(1:6)
     let update_rate_instruction = update_rate(
         &TOKEN_2022_PROGRAM_ID, // Token program that owns the mint.
         &mint.pubkey(), // Mint account that stores the InterestBearingConfig extension.
@@ -1042,5 +1002,3 @@ async fn main() -> Result<()> {
     Ok(())
 }
 ```
-
-</CodeTabs>

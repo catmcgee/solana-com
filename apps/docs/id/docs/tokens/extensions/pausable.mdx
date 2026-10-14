@@ -3,7 +3,6 @@ title: Pausable mint
 description:
   Buat mint Token-2022 dengan pause authority, blokir transfer saat mint dijeda,
   dan lanjutkan aktivitas nanti.
-url: /docs/tokens/extensions/pausable
 type: tutorial
 prerequisites:
   - /docs/tokens/basics/create-mint
@@ -15,7 +14,7 @@ related:
 
 ## Apa Itu Mint yang Dapat Dijeda?
 
-Ekstensi mint _rs`PausableConfig`_ dari Token Extensions Program memberikan
+Ekstensi mint `PausableConfig` dari Token Extensions Program memberikan
 pause authority kemampuan untuk menjeda dan melanjutkan aktivitas token untuk
 seluruh mint.
 
@@ -33,377 +32,355 @@ kembali.
 Untuk membuat, menjeda, dan melanjutkan mint:
 
 1. Hitung ukuran mint account dan rent yang diperlukan untuk mint dan ekstensi
-   _rs`PausableConfig`_.
-2. Buat mint account dengan _rs`CreateAccount`_, inisialisasi
-   _rs`PausableConfig`_, dan inisialisasi mint dengan _rs`InitializeMint`_.
+   `PausableConfig`.
+2. Buat mint account dengan `CreateAccount`, inisialisasi
+   `PausableConfig`, dan inisialisasi mint dengan `InitializeMint`.
 3. Mint token dan buat token account untuk mint tersebut.
-4. Gunakan _rs`Pause`_ untuk memblokir aktivitas token untuk mint.
-5. Gunakan _rs`Resume`_ untuk mengizinkan aktivitas token kembali.
-
-<ScrollyCoding>
-
-## !!steps Hitung ukuran account
-
-Hitung ukuran mint account untuk base mint ditambah ekstensi
-_rs`PausableConfig`_. Ini adalah ukuran yang digunakan dalam
-_rs`CreateAccount`_.
-
-<CodePlaceholder title="Contoh" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-const recipient = await generateKeyPairSigner();
-
-// !focus(1:4)
-const pausableExtension = extension("PausableConfig", {
-  authority: client.payer.address,
-  paused: false
-});
-
-// !focus(1:1)
-const mintSpace = BigInt(getMintSize([pausableExtension]));
-```
-
-## !!steps Hitung rent
-
-Hitung rent menggunakan ukuran yang diperlukan untuk mint ditambah ekstensi
-_rs`PausableConfig`_.
-
-<CodePlaceholder title="Contoh" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-const recipient = await generateKeyPairSigner();
-
-const pausableExtension = extension("PausableConfig", {
-  authority: client.payer.address,
-  paused: false
-});
-
-const mintSpace = BigInt(getMintSize([pausableExtension]));
-
-// !focus(1:3)
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
-```
-
-## !!steps Buat mint account
-
-Buat mint account dengan ruang dan lamport yang telah dihitung.
-
-<CodePlaceholder title="Example" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-const recipient = await generateKeyPairSigner();
-
-const pausableExtension = extension("PausableConfig", {
-  authority: client.payer.address,
-  paused: false
-});
-
-const mintSpace = BigInt(getMintSize([pausableExtension]));
-
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
-
-// !focus(1:9)
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  })
-]);
-```
-
-## !!steps Inisialisasi PausableConfig
-
-Inisialisasi ekstensi _rs`PausableConfig`_ pada mint.
-
-<CodePlaceholder title="Example" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-const recipient = await generateKeyPairSigner();
-
-const pausableExtension = extension("PausableConfig", {
-  authority: client.payer.address,
-  paused: false
-});
-
-const mintSpace = BigInt(getMintSize([pausableExtension]));
-
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
-
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  }),
-  // !focus(1:4)
-  getInitializePausableConfigInstruction({
-    mint: mint.address,
-    authority: client.payer.address
-  })
-]);
-```
-
-## !!steps Inisialisasi mint
-
-Inisialisasi mint dengan _rs`InitializeMint`_ dalam transaksi yang sama.
-
-<CodePlaceholder title="Example" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-const recipient = await generateKeyPairSigner();
-
-const pausableExtension = extension("PausableConfig", {
-  authority: client.payer.address,
-  paused: false
-});
-
-const mintSpace = BigInt(getMintSize([pausableExtension]));
-
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
-
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  }),
-  getInitializePausableConfigInstruction({
-    mint: mint.address,
-    authority: client.payer.address
-  }),
-  // !focus(1:6)
-  getInitializeMintInstruction({
-    mint: mint.address,
-    decimals: 0,
-    mintAuthority: client.payer.address,
-    freezeAuthority: client.payer.address
-  })
-]);
-```
-
-## !!steps Jeda mint
-
-Jeda mint dengan _rs`Pause`_.
-
-<CodePlaceholder title="Example" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-const recipient = await generateKeyPairSigner();
-
-const pausableExtension = extension("PausableConfig", {
-  authority: client.payer.address,
-  paused: false
-});
-
-const mintSpace = BigInt(getMintSize([pausableExtension]));
-
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
-
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  }),
-  getInitializePausableConfigInstruction({
-    mint: mint.address,
-    authority: client.payer.address
-  }),
-  getInitializeMintInstruction({
-    mint: mint.address,
-    decimals: 0,
-    mintAuthority: client.payer.address,
-    freezeAuthority: client.payer.address
-  })
-]);
-
-await client.sendTransaction([
-  // !focus(1:4)
-  getPauseInstruction({
-    mint: mint.address,
-    authority: client.payer
-  })
-]);
-```
-
-## !!steps Lanjutkan mint
-
-Lanjutkan mint dengan _rs`Resume`_.
-
-<CodePlaceholder title="Example" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-const recipient = await generateKeyPairSigner();
-
-const pausableExtension = extension("PausableConfig", {
-  authority: client.payer.address,
-  paused: false
-});
-
-const mintSpace = BigInt(getMintSize([pausableExtension]));
-
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
-
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  }),
-  getInitializePausableConfigInstruction({
-    mint: mint.address,
-    authority: client.payer.address
-  }),
-  getInitializeMintInstruction({
-    mint: mint.address,
-    decimals: 0,
-    mintAuthority: client.payer.address,
-    freezeAuthority: client.payer.address
-  })
-]);
-
-await client.sendTransaction([
-  getPauseInstruction({
-    mint: mint.address,
-    authority: client.payer
-  })
-]);
-
-await client.sendTransaction([
-  // !focus(1:4)
-  getResumeInstruction({
-    mint: mint.address,
-    authority: client.payer
-  })
-]);
-```
-
-</ScrollyCoding>
-
-<Callout type="info" title="Urutan Instruksi">
-  _rs`PausableInstruction::Initialize`_ harus dijalankan sebelum
-  _rs`InitializeMint`_. _rs`CreateAccount`_,
-  _rs`PausableInstruction::Initialize`_, dan _rs`InitializeMint`_ harus
+4. Gunakan `Pause` untuk memblokir aktivitas token untuk mint.
+5. Gunakan `Resume` untuk mengizinkan aktivitas token kembali.
+
+<Steps>
+  <Step title="Hitung ukuran account">
+    Hitung ukuran mint account untuk base mint ditambah ekstensi
+    `PausableConfig`. Ini adalah ukuran yang digunakan dalam
+    `CreateAccount`.
+
+    ```ts Contoh focus={15-18,20}
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+    const recipient = await generateKeyPairSigner();
+
+    const pausableExtension = extension("PausableConfig", {
+      authority: client.payer.address,
+      paused: false
+    });
+
+    const mintSpace = BigInt(getMintSize([pausableExtension]));
+    ```
+  </Step>
+
+  <Step title="Hitung rent">
+    Hitung rent menggunakan ukuran yang diperlukan untuk mint ditambah ekstensi
+    `PausableConfig`.
+
+    ```ts Contoh focus={22-24}
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+    const recipient = await generateKeyPairSigner();
+
+    const pausableExtension = extension("PausableConfig", {
+      authority: client.payer.address,
+      paused: false
+    });
+
+    const mintSpace = BigInt(getMintSize([pausableExtension]));
+
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
+    ```
+  </Step>
+
+  <Step title="Buat mint account">
+    Buat mint account dengan ruang dan lamport yang telah dihitung.
+
+    ```ts Example focus={26-34}
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+    const recipient = await generateKeyPairSigner();
+
+    const pausableExtension = extension("PausableConfig", {
+      authority: client.payer.address,
+      paused: false
+    });
+
+    const mintSpace = BigInt(getMintSize([pausableExtension]));
+
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
+
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      })
+    ]);
+    ```
+  </Step>
+
+  <Step title="Inisialisasi PausableConfig">
+    Inisialisasi ekstensi `PausableConfig` pada mint.
+
+    ```ts Example focus={34-37}
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+    const recipient = await generateKeyPairSigner();
+
+    const pausableExtension = extension("PausableConfig", {
+      authority: client.payer.address,
+      paused: false
+    });
+
+    const mintSpace = BigInt(getMintSize([pausableExtension]));
+
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
+
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializePausableConfigInstruction({
+        mint: mint.address,
+        authority: client.payer.address
+      })
+    ]);
+    ```
+  </Step>
+
+  <Step title="Inisialisasi mint">
+    Inisialisasi mint dengan `InitializeMint` dalam transaksi yang sama.
+
+    ```ts Example focus={38-43} expandable
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+    const recipient = await generateKeyPairSigner();
+
+    const pausableExtension = extension("PausableConfig", {
+      authority: client.payer.address,
+      paused: false
+    });
+
+    const mintSpace = BigInt(getMintSize([pausableExtension]));
+
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
+
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializePausableConfigInstruction({
+        mint: mint.address,
+        authority: client.payer.address
+      }),
+      getInitializeMintInstruction({
+        mint: mint.address,
+        decimals: 0,
+        mintAuthority: client.payer.address,
+        freezeAuthority: client.payer.address
+      })
+    ]);
+    ```
+  </Step>
+
+  <Step title="Jeda mint">
+    Jeda mint dengan `Pause`.
+
+    ```ts Example focus={47-50} expandable
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+    const recipient = await generateKeyPairSigner();
+
+    const pausableExtension = extension("PausableConfig", {
+      authority: client.payer.address,
+      paused: false
+    });
+
+    const mintSpace = BigInt(getMintSize([pausableExtension]));
+
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
+
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializePausableConfigInstruction({
+        mint: mint.address,
+        authority: client.payer.address
+      }),
+      getInitializeMintInstruction({
+        mint: mint.address,
+        decimals: 0,
+        mintAuthority: client.payer.address,
+        freezeAuthority: client.payer.address
+      })
+    ]);
+
+    await client.sendTransaction([
+      getPauseInstruction({
+        mint: mint.address,
+        authority: client.payer
+      })
+    ]);
+    ```
+  </Step>
+
+  <Step title="Lanjutkan mint">
+    Lanjutkan mint dengan `Resume`.
+
+    ```ts Example focus={54-57} expandable
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+    const recipient = await generateKeyPairSigner();
+
+    const pausableExtension = extension("PausableConfig", {
+      authority: client.payer.address,
+      paused: false
+    });
+
+    const mintSpace = BigInt(getMintSize([pausableExtension]));
+
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
+
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializePausableConfigInstruction({
+        mint: mint.address,
+        authority: client.payer.address
+      }),
+      getInitializeMintInstruction({
+        mint: mint.address,
+        decimals: 0,
+        mintAuthority: client.payer.address,
+        freezeAuthority: client.payer.address
+      })
+    ]);
+
+    await client.sendTransaction([
+      getPauseInstruction({
+        mint: mint.address,
+        authority: client.payer
+      })
+    ]);
+
+    await client.sendTransaction([
+      getResumeInstruction({
+        mint: mint.address,
+        authority: client.payer
+      })
+    ]);
+    ```
+  </Step>
+</Steps>
+
+<Info>
+  **Urutan Instruksi**
+
+  `PausableInstruction::Initialize` harus dijalankan sebelum
+`InitializeMint`. `CreateAccount`,
+`PausableInstruction::Initialize`, dan `InitializeMint` harus
   disertakan dalam transaksi yang sama.
-</Callout>
+</Info>
 
 ### Referensi Sumber
 
-| Item                                  | Deskripsi                                                                                                                   | Sumber                                                                                                                                |
-| ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| _rs`PausableConfig`_                  | Ekstensi mint yang menyimpan otoritas jeda dan apakah mint saat ini dijeda.                                                 | [Sumber](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/pausable/mod.rs#L17-L22)         |
-| _rs`PausableInstruction::Initialize`_ | Instruksi yang menginisialisasi konfigurasi pausable sebelum _rs`InitializeMint`_.                                          | [Sumber](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/pausable/instruction.rs#L20-L32) |
-| _rs`PausableInstruction::Pause`_      | Instruksi yang menandai mint sebagai dijeda.                                                                                | [Sumber](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/pausable/instruction.rs#L33-L44) |
-| _rs`PausableInstruction::Resume`_     | Instruksi yang menandai mint sebagai tidak dijeda.                                                                          | [Sumber](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/pausable/instruction.rs#L45-L56) |
-| _rs`process_initialize`_              | Logika pemroses yang menginisialisasi _rs`PausableConfig`_ pada mint yang belum diinisialisasi dan menyimpan otoritas jeda. | [Sumber](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/extension/pausable/processor.rs#L22-L35)     |
-| _rs`process_toggle_pause`_            | Logika pemroses yang memverifikasi otoritas jeda sebelum mengubah status jeda mint.                                         | [Sumber](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/extension/pausable/processor.rs#L39-L64)     |
+| Item                              | Deskripsi                                                                                                               | Sumber                                                                                                                                |
+| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `PausableConfig`                  | Ekstensi mint yang menyimpan otoritas jeda dan apakah mint saat ini dijeda.                                             | [Sumber](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/pausable/mod.rs#L17-L22)         |
+| `PausableInstruction::Initialize` | Instruksi yang menginisialisasi konfigurasi pausable sebelum `InitializeMint`.                                          | [Sumber](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/pausable/instruction.rs#L20-L32) |
+| `PausableInstruction::Pause`      | Instruksi yang menandai mint sebagai dijeda.                                                                            | [Sumber](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/pausable/instruction.rs#L33-L44) |
+| `PausableInstruction::Resume`     | Instruksi yang menandai mint sebagai tidak dijeda.                                                                      | [Sumber](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/pausable/instruction.rs#L45-L56) |
+| `process_initialize`              | Logika pemroses yang menginisialisasi `PausableConfig` pada mint yang belum diinisialisasi dan menyimpan otoritas jeda. | [Sumber](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/extension/pausable/processor.rs#L22-L35)     |
+| `process_toggle_pause`            | Logika pemroses yang memverifikasi otoritas jeda sebelum mengubah status jeda mint.                                     | [Sumber](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/extension/pausable/processor.rs#L39-L64)     |
 
 ### Typescript
 
@@ -413,9 +390,7 @@ sebagai referensi.
 
 #### Kit
 
-<CodeTabs storage="token-ts-kit" flags="r">
-
-```ts !! title="Instructions"
+```ts Instructions highlight={57-60,101-104,133-136}
 import {
   lamports,
   createClient,
@@ -472,7 +447,6 @@ await client.sendTransaction([
     space: mintSpace, // Account size in bytes for the mint plus PausableConfig.
     programAddress: TOKEN_2022_PROGRAM_ADDRESS // Program that owns the mint account.
   }),
-  // !mark(1:4)
   getInitializePausableConfigInstruction({
     mint: mint.address, // Mint account that stores the PausableConfig extension.
     authority: client.payer.address // Authority allowed to pause and resume the mint.
@@ -517,7 +491,6 @@ await client.sendTransaction([
 ]);
 
 await client.sendTransaction([
-  // !mark(1:4)
   getPauseInstruction({
     mint: mint.address, // Mint account to pause.
     authority: client.payer // Signer authorized to pause the mint.
@@ -550,7 +523,6 @@ if (!pausedTransferFailure) {
 }
 
 await client.sendTransaction([
-  // !mark(1:4)
   getResumeInstruction({
     mint: mint.address, // Mint account to resume.
     authority: client.payer // Signer authorized to resume the mint.
@@ -579,13 +551,9 @@ console.log("\nError From Failed Transaction:", pausedTransferFailure);
 console.log("\nConfig After Resume:", configAfterResume);
 ```
 
-</CodeTabs>
-
 #### Web3.js
 
-<CodeTabs storage="token-ts-legacy" flags="r">
-
-```ts !! title="Instructions"
+```ts Instructions highlight={56-60,124-129,173-178}
 import {
   Connection,
   Keypair,
@@ -641,7 +609,6 @@ await sendAndConfirmTransaction(
       lamports: mintRent, // Lamports funding the mint account rent.
       programId: TOKEN_2022_PROGRAM_ID // Program that owns the mint account.
     }),
-    // !mark(1:5)
     createInitializePausableConfigInstruction(
       mint.publicKey, // Mint account that stores the PausableConfig extension.
       feePayer.publicKey, // Authority allowed to pause and resume the mint.
@@ -710,7 +677,6 @@ await sendAndConfirmTransaction(
 await sendAndConfirmTransaction(
   connection,
   new Transaction().add(
-    // !mark(1:6)
     createPauseInstruction(
       mint.publicKey, // Mint account to pause.
       feePayer.publicKey, // Authority allowed to pause the mint.
@@ -760,7 +726,6 @@ if (!pausedTransferFailure) {
 await sendAndConfirmTransaction(
   connection,
   new Transaction().add(
-    // !mark(1:6)
     createResumeInstruction(
       mint.publicKey, // Mint account to resume.
       feePayer.publicKey, // Authority allowed to resume the mint.
@@ -804,13 +769,9 @@ console.log("\nError From Failed Transaction:", pausedTransferFailure);
 console.log("\nConfig After Resume:", configAfterResume);
 ```
 
-</CodeTabs>
-
 ### Rust
 
-<CodeTabs storage="token-rs" flags="r">
-
-```rust !! title="Rust"
+```rust Rust highlight={59-63,123-128,168-173}
 use anyhow::{anyhow, Result};
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_commitment_config::CommitmentConfig;
@@ -869,7 +830,6 @@ async fn main() -> Result<()> {
                 mint_space as u64, // Account size in bytes for the mint plus PausableConfig.
                 &TOKEN_2022_PROGRAM_ID, // Program that owns the mint account.
             ),
-            // !mark(1:5)
             pausable_ix::initialize(
                 &TOKEN_2022_PROGRAM_ID, // Token program that owns the mint.
                 &mint.pubkey(), // Mint account that stores the PausableConfig extension.
@@ -934,7 +894,6 @@ async fn main() -> Result<()> {
         .send_and_confirm_transaction(&create_token_accounts_transaction)
         .await?;
 
-    // !mark(1:6)
     let pause_ix = pausable_ix::pause(
         &TOKEN_2022_PROGRAM_ID, // Token program that owns the mint.
         &mint.pubkey(), // Mint account to pause.
@@ -980,7 +939,6 @@ async fn main() -> Result<()> {
         .err
         .ok_or_else(|| anyhow!("Expected the paused transfer to fail"))?;
 
-    // !mark(1:6)
     let resume_ix = pausable_ix::resume(
         &TOKEN_2022_PROGRAM_ID, // Token program that owns the mint.
         &mint.pubkey(), // Mint account to resume.
@@ -1032,5 +990,3 @@ async fn main() -> Result<()> {
     Ok(())
 }
 ```
-
-</CodeTabs>

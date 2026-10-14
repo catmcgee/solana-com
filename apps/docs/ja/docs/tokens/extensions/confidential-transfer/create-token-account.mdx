@@ -10,7 +10,7 @@ Confidential Balancesは、token accountに追加のステートを付与する�
 
 以下の図は、Confidential Balancesを有効にしたtoken accountを作成する際の手順を示しています：
 
-```mermaid title="Create Token Account with Confidential Balances"
+```mermaid
 sequenceDiagram
     participant Payer as Wallet
     participant ATA as Associated Token Program
@@ -45,6 +45,46 @@ sequenceDiagram
     Token22-->>TokenAccount: Configure Confidential Balances
     deactivate Token22
 ```
+
+<div className="nojs-only" data-fallback="mermaid">
+  ```text Mermaid
+  sequenceDiagram
+      participant Payer as Wallet
+      participant ATA as Associated Token Program
+      participant Token22 as Token Extensions Program
+      participant ZK as ZK ElGamal Proof Program
+      participant TokenAccount as Token Account
+
+      Payer->>ATA: create_associated_token_account()
+      activate ATA
+      ATA->>Token22: Create token account at deterministic address
+      deactivate ATA
+      activate Token22
+      Token22-->>TokenAccount: Initialize Token Account
+      deactivate Token22
+
+      Payer->>Token22: reallocate() for ConfidentialTransferAccount extension
+      activate Token22
+      Token22-->>TokenAccount: Add space for extension data
+      deactivate Token22
+
+      Payer->>Payer: Derive ElGamal keypair and AES key
+      Payer->>Payer: Generate pubkey validity proof
+      Payer->>Payer: Encrypt initial balance (0) with AES key
+
+      Payer->>ZK: VerifyPubkeyValidity into context state account
+      activate ZK
+      ZK-->>ZK: Verify proof and store result in context state account
+      deactivate ZK
+
+      Payer->>Token22: configure_account() referencing the proof context account
+      activate Token22
+      Token22-->>TokenAccount: Configure Confidential Balances
+      deactivate Token22
+  ```
+</div>
+
+<p className="sol-caption">Create Token Account with Confidential Balances</p>
 
 ### Confidential Balances Token Accountのステート
 
@@ -102,7 +142,7 @@ pub struct ConfidentialTransferAccount {
 }
 ```
 
-_rs`ConfidentialTransferAccount`_には、Confidential Balancesを管理するいくつかのフィールドが含まれています：
+`ConfidentialTransferAccount`には、Confidential Balancesを管理するいくつかのフィールドが含まれています：
 
 - **approved**：Confidential Balancesに対するアカウントの承認ステータス。mint accountの`auto_approve_new_accounts`設定が`true`に設定されている場合、すべてのtoken accountはConfidential Balancesに対して自動的に承認されます。
 
@@ -124,18 +164,18 @@ _rs`ConfidentialTransferAccount`_には、Confidential Balancesを管理する�
 - **pending_balance_credit_counter**：デポジットおよび転送instructionsからの受信ペンディング残高クレジットをカウントします。
 
 - **maximum_pending_balance_credit_counter**：ペンディング残高を利用可能残高に変換するために
-  _rs`ApplyPendingBalance`_
+  `ApplyPendingBalance`
   instructionが必要になるまでの、ペンディングクレジットのカウント上限。
 
-- **expected_pending_balance_credit_counter**：_rs`ApplyPendingBalance`_
+- **expected_pending_balance_credit_counter**：`ApplyPendingBalance`
   instructionが最後に処理された際に、instruction
   dataを通じてクライアントから提供された `pending_balance_credit_counter` の値。
 
 - **actual_pending_balance_credit_counter**: token accountの
-  `pending_balance_credit_counter` 値は、最後に _rs`ApplyPendingBalance`_
+  `pending_balance_credit_counter` 値は、最後に `ApplyPendingBalance`
   instructions が処理された時点のものです。
 
-<Callout type="info">
+<Info>
   **保留中の残高と利用可能な残高**
 
 機密残高は、DoS攻撃を防ぐために保留中の残高と利用可能な残高に分離されています。この分離がなければ、攻撃者がtoken
@@ -144,38 +184,38 @@ accountオーナーのトークン送金機能を妨害することができま�
 accountオーナーはトークンを送金できなくなり、トランザクションが失敗します。
 
 すべての入金額および送金額は、最初に保留中の残高に追加されます。token
-accountオーナーは _rs`ApplyPendingBalance`_
+accountオーナーは `ApplyPendingBalance`
 instructions を使用して、保留中の残高を利用可能な残高に変換する必要があります。受信した送金や入金は、token
 accountの利用可能な残高に影響を与えません。
 
-</Callout>
+</Info>
 
-<Callout type="info">
+<Info>
   **保留中の残高の上位/下位分割**
 
 機密保留残高は、ElGamalの復号化が大きな数値に対してより多くの計算を必要とするため、`pending_balance_lo`
 と `pending_balance_hi`
-に分割されています。暗号文の演算実装は[こちら](https://github.com/solana-program/token-2022/blob/efd0c957fefbd79882d77df5fb2dac88c001249c/confidential-transfer/ciphertext-arithmetic/src/lib.rs#L54)で確認でき、_rs`ApplyPendingBalance`_
+に分割されています。暗号文の演算実装は[こちら](https://github.com/solana-program/token-2022/blob/efd0c957fefbd79882d77df5fb2dac88c001249c/confidential-transfer/ciphertext-arithmetic/src/lib.rs#L54)で確認でき、`ApplyPendingBalance`
 instructions での使用箇所は[こちら](https://github.com/solana-program/token-2022/blob/efd0c957fefbd79882d77df5fb2dac88c001249c/program/src/extension/confidential_transfer/processor.rs#L1180-L1184)です。
 
-</Callout>
+</Info>
 
-<Callout type="info">
+<Info>
   **保留中の残高クレジットカウンター**
 
-保留中の残高を利用可能な残高に変換するために _rs`ApplyPendingBalance`_
+保留中の残高を利用可能な残高に変換するために `ApplyPendingBalance`
 instructions を呼び出す際:
 
 1. クライアントは現在の保留中の残高と利用可能な残高を参照し、その合計を暗号化して、token
    accountオーナーのAESキーを使用して暗号化された
    `decryptable_available_balance` を提供します。
 
-2. 期待値と実際の保留クレジットカウンターは、_rs`ApplyPendingBalance`_
+2. 期待値と実際の保留クレジットカウンターは、`ApplyPendingBalance`
    instructions が作成されてから処理されるまでの間のカウンター値の変化を追跡します:
    - `expected_pending_balance_credit_counter`: クライアントが
-     _rs`ApplyPendingBalance`_ instructions を作成した時点での
+     `ApplyPendingBalance` instructions を作成した時点での
      `pending_balance_credit_counter` 値
-   - `actual_pending_balance_credit_counter`: _rs`ApplyPendingBalance`_
+   - `actual_pending_balance_credit_counter`: `ApplyPendingBalance`
      instructions が処理された時点でのtoken accountの
      `pending_balance_credit_counter` 値
 
@@ -193,41 +233,41 @@ accountの状態を取得して`decryptable_available_balance`を読み取る際
    - 入金instructionsから公開金額を加算する
    - 送金instructionsから宛先の暗号文金額を復号して加算する
 
-</Callout>
+</Info>
 
 ### 必要なinstructions
 
 Confidential Balances向けのtoken accountの作成と設定には、以下のinstructionsを使用します。これらはすべて1つのトランザクションに収まります：
 
 1. **token accountの作成**: Associated Token
-   Programの*rs`AssociatedTokenAccountInstruction::Create`*
+   Programの`AssociatedTokenAccountInstruction::Create`
    instructionを呼び出して、決定論的アドレスにtoken accountを作成します。
 
 2. **アカウントスペースの再割り当て**: Token Extensions
-   Programの*rs`TokenInstruction::Reallocate`*
-   instructionを呼び出して、*rs`ConfidentialTransferAccount`*状態のためのスペースを追加します。
+   Programの`TokenInstruction::Reallocate`
+   instructionを呼び出して、`ConfidentialTransferAccount`状態のためのスペースを追加します。
 
 3. **pubkeyの有効性証明の検証**: ZK ElGamal
-   Proofプログラムが所有するアカウントを作成し、その*rs`VerifyPubkeyValidity`*
+   Proofプログラムが所有するアカウントを作成し、その`VerifyPubkeyValidity`
    instructionを呼び出して証明を検証し、検証済みの結果をそのコンテキスト状態アカウントに保存します。
 
 4. **Confidential Balancesの設定**：Token Extensions Programの
    [ConfidentialTransferInstruction::ConfigureAccount](https://github.com/solana-program/token-2022/blob/efd0c957fefbd79882d77df5fb2dac88c001249c/program/src/extension/confidential_transfer/processor.rs#L201)
-   instructionを呼び出し、_rs`ProofLocation::ContextStateAccount`_を通じてプルーフコンテキストステートアカウントを参照して、
-   _rs`ConfidentialTransferAccount`_ステートを初期化します。
+   instructionを呼び出し、`ProofLocation::ContextStateAccount`を通じてプルーフコンテキストステートアカウントを参照して、
+   `ConfidentialTransferAccount`ステートを初期化します。
 
-<Callout type="info">
+<Info>
 
 **token accountのオーナーのみが、token accountのConfidential Balancesを有効にできます**。
 
-_rs`ConfigureAccount`_ instructionは、token accountのオーナーのみが生成できる暗号化キーとプルーフをクライアント側で生成する必要があります。
+`ConfigureAccount` instructionは、token accountのオーナーのみが生成できる暗号化キーとプルーフをクライアント側で生成する必要があります。
 
-pubkey有効性プルーフは、アカウントのElGamal公開鍵が有効であることを検証します。これは_rs`build_pubkey_validity_proof_data`_で生成され、ZK ElGamal Proofプログラムによってオンチェーンでコンテキストステートアカウントに検証され、_rs`ProofLocation::ContextStateAccount`_を通じて_rs`ConfigureAccount`_から参照されるため、プルーフのバイト列はtoken instructionそのものの中では転送されません。実装の詳細については、以下を参照してください：
+pubkey有効性プルーフは、アカウントのElGamal公開鍵が有効であることを検証します。これは`build_pubkey_validity_proof_data`で生成され、ZK ElGamal Proofプログラムによってオンチェーンでコンテキストステートアカウントに検証され、`ProofLocation::ContextStateAccount`を通じて`ConfigureAccount`から参照されるため、プルーフのバイト列はtoken instructionそのものの中では転送されません。実装の詳細については、以下を参照してください：
 
 - [PubkeyValidityProofData](https://github.com/anza-xyz/agave/blob/b39a9764005ac8596b7e14e61d381305ce57ecaa/zk-sdk/src/zk_elgamal_proof_program/proof_data/pubkey_validity.rs#L58)
 - [PubkeyValidityProof](https://github.com/anza-xyz/agave/blob/b39a9764005ac8596b7e14e61d381305ce57ecaa/zk-sdk/src/sigma_proofs/pubkey_validity.rs#L65)
 
-</Callout>
+</Info>
 
 ## コード例
 
@@ -238,10 +278,9 @@ Confidential Balancesは、mainnetおよびdevnetで有効になっているZK E
 
 ### Rust
 
-<CodeTabs>
+<CodeGroup>
 
-```rust !! title="main.rs"
-// !collapse(1:36) collapsed
+```rust main.rs expandable
 // Imports: dependencies used by this example.
 use anyhow::{Context, Result};
 use solana_address::Address;
@@ -399,7 +438,6 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-// !collapse(1:1000) collapsed
 // Setup: helper function to create the confidential mint.
 fn create_confidential_mint(rpc_client: &RpcClient, payer: &Keypair, decimals: u8) -> Result<Pubkey> {
     let mint = Keypair::new();
@@ -467,7 +505,7 @@ fn load_keypair() -> Result<Keypair> {
 }
 ```
 
-```toml !! title="Cargo.toml"
+```toml Cargo.toml
 [package]
 name = "confidential-transfer"
 version = "0.1.0"
@@ -499,14 +537,13 @@ dirs = "6.0.0"
 serde_json = "1.0"
 ```
 
-</CodeTabs>
+</CodeGroup>
 
 ### Typescript
 
-<CodeTabs>
+<CodeGroup>
 
-```ts !! title="index.ts"
-// !collapse(1:21) collapsed
+```ts index.ts expandable
 // Imports: dependencies used by this example.
 import {
   deriveAeKeyForOwnerMint,
@@ -583,7 +620,6 @@ console.log(
   `Enabled Confidential Balances on token account ${tokenAccount}: ${result.context.signature}`
 );
 
-// !collapse(1:1000) collapsed
 // Setup: helper function to create the confidential mint.
 async function createConfidentialMint(
   kitClient: typeof client,
@@ -618,7 +654,7 @@ async function createConfidentialMint(
 }
 ```
 
-```json !! title="package.json"
+```json package.json
 {
   "name": "confidential-account",
   "version": "0.1.0",
@@ -638,10 +674,10 @@ async function createConfidentialMint(
 }
 ```
 
-</CodeTabs>
+</CodeGroup>
 
-<Callout type="info">
+<Info>
   TypeScriptのヘルパーは`@solana-program/token-2022/confidential`サブパスに含まれており、暗号化プリミティブとして`@solana/zk-sdk`を基盤としています。`owner`
   と`client`
   は`@solana/kit`のセットアップから取得されます。返されたinstructionsプランは`@solana/kit`のinstructionsプランサポートを使って送信され、プルーフが1つのトランザクションに収まりきらない場合は複数のトランザクションに分割されます。
-</Callout>
+</Info>

@@ -2,7 +2,6 @@
 title: Transactiestructuur
 description:
   Anatomie van een Solana-transactie inclusief handtekeningen, berichtformaat, header, accountadressen, blockhash, gecompileerde instructies, binaire codering en groottebudget.
-url: /docs/core/transactions/transaction-structure
 type: conceptual
 prerequisites:
   - /docs/core/transactions
@@ -16,50 +15,52 @@ related:
 
 {/* TOC: Signatures, Message (Header, Account addresses, Recent blockhash, Instructions), Transaction binary format, SOL transfer example */}
 
-<Callout type="info" title="Samenvatting">
+<Info>
+  **Samenvatting**
+
   Een transactie heeft handtekeningen + een bericht. Het bericht bevat een header,
   accountadressen, een recente blockhash en gecompileerde instructies. Maximale
   geserialiseerde grootte: 1.232 bytes (4.096 bytes voor het aankomende v1-formaat).
-</Callout>
+</Info>
 
 Een
 [`Transaction`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/transaction/src/lib.rs#L193)
 heeft twee velden op het hoogste niveau:
 
-<WithMentions>
-
-- [`signatures`](mention:signatures): Een array van handtekeningen
-- [`message`](mention:message): Transactie-informatie, inclusief de lijst met
+- `signatures`: Een array van handtekeningen
+- `message`: Transactie-informatie, inclusief de lijst met
   instructies die verwerkt moeten worden
 
-```rust title="Transaction"
+```rust Transaction
 pub struct Transaction {
-    // !mention signatures
     pub signatures: Vec<Signature>,
-    // !mention message
     pub message: Message,
 }
 ```
 
-</WithMentions>
-
-![Diagram dat de twee delen van een transactie toont](/assets/docs/core/transactions/tx_format.png)
+<Frame caption="Diagram dat de twee delen van een transactie toont">
+  ![Diagram dat de twee delen van een transactie toont](/docs-assets/assets/docs/core/transactions/tx_format.png)
+</Frame>
 
 De totale geserialiseerde grootte van een transactie mag niet groter zijn dan
 [`PACKET_DATA_SIZE`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/packet/src/lib.rs#L32)
 (1.232 bytes). Deze limiet is gelijk aan 1.280 bytes (de IPv6 minimum MTU) minus
 48 bytes voor netwerkheaders (40 bytes IPv6 + 8 bytes fragmentheader). De 1.232
-bytes omvatten zowel de [`signatures`](#signatures) array als de
-[`message`](#message) struct.
+bytes omvatten zowel de [`signatures`](#handtekeningen) array als de
+[`message`](#bericht) struct.
 
-<Callout type="info" title="v1-transacties verhogen de limiet naar 4.096 bytes">
+<Info>
+  **v1-transacties verhogen de limiet naar 4.096 bytes**
+
   Deze pagina beschrijft het legacy-transactieformaat, dat ook het v0-formaat
   volgt, afgezien van het versieprefix en adresopzoektabellen. Het aankomende
   [v1-formaat](/docs/core/transactions/versioned-transactions#v1-message-format)
   verhoogt de groottelimiet naar 4.096 bytes en maakt gebruik van een andere wire-indeling.
-</Callout>
+</Info>
 
-![Diagram dat het transactieformaat en groottelimieten toont](/assets/docs/core/transactions/issues_with_legacy_txs.png)
+<Frame caption="Diagram dat het transactieformaat en groottelimieten toont">
+  ![Diagram dat het transactieformaat en groottelimieten toont](/docs-assets/assets/docs/core/transactions/issues_with_legacy_txs.png)
+</Frame>
 
 ## Handtekeningen
 
@@ -68,7 +69,7 @@ Het `signatures` veld is een compact-gecodeerde array van
 waarden. Elke `Signature` is een 64-byte Ed25519 handtekening van het
 geserialiseerde `Message`, ondertekend met de private key van het ondertekenende
 account. Eén handtekening is vereist voor elk
-[ondertekenend account](#account-addresses) waarnaar wordt verwezen door de
+[ondertekenend account](#accountadressen) waarnaar wordt verwezen door de
 instructies van de transactie.
 
 Elke handtekening wordt gegenereerd door een privésleutel. Waar die sleutel zich
@@ -91,7 +92,7 @@ Vereisten voor de fee payer:
   nonce-account (gevalideerd door
   [`validate_fee_payer`](https://github.com/anza-xyz/agave/blob/v3.1.8/svm/src/account_loader.rs#L369-L417)).
 - Moet voldoende lamports bevatten om `rent_exempt_minimum + total_fee` te
-  dekken; anders mislukt de transactie met _rs`InsufficientFundsForFee`_.
+  dekken; anders mislukt de transactie met `InsufficientFundsForFee`.
 
 ## Bericht
 
@@ -99,90 +100,79 @@ Het veld `message` is een
 [`Message`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/message/src/legacy.rs#L161)
 struct die de payload van de transactie bevat:
 
-<WithMentions>
-
-- [`header`](mention:message-header): De bericht-[header](#header)
-- [`account_keys`](mention:account-addresses): Een array van
-  [accountadressen](#account-addresses) die vereist zijn door de instructies van
+- `header`: De bericht-[header](#header)
+- `account_keys`: Een array van
+  [accountadressen](#accountadressen) die vereist zijn door de instructies van
   de transactie
-- [`recent_blockhash`](mention:recent-blockhash): Een
-  [blockhash](#recent-blockhash) die fungeert als tijdstempel voor de transactie
-- [`instructions`](mention:instructions): Een array van
-  [instructies](#instructions)
+- `recent_blockhash`: Een
+  [blockhash](#recente-blockhash) die fungeert als tijdstempel voor de transactie
+- `instructions`: Een array van
+  [instructies](#instructies)
 
-```rust title="Message"
+```rust Message
 pub struct Message {
     /// The message header, identifying signed and read-only `account_keys`.
-    // !mention message-header
     pub header: MessageHeader,
 
     /// All the account keys used by this transaction.
     #[serde(with = "short_vec")]
-    // !mention account-addresses
     pub account_keys: Vec<Pubkey>,
 
     /// The id of a recent ledger entry.
-    // !mention recent-blockhash
     pub recent_blockhash: Hash,
 
     /// Programs that will be executed in sequence and committed in
     /// one atomic transaction if all succeed.
     #[serde(with = "short_vec")]
-    // !mention instructions
     pub instructions: Vec<CompiledInstruction>,
 }
 ```
 
-</WithMentions>
-
 ### Header
-
-<WithMentions>
 
 Het veld `header` is een
 [`MessageHeader`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/message/src/lib.rs#L109)
 struct met drie `u8`-velden die de array `account_keys` verdelen in
 permissiegroepen:
 
-- [`num_required_signatures`](mention:num_required_signatures): Totaal aantal
+- `num_required_signatures`: Totaal aantal
   handtekeningen dat vereist is door de transactie.
-- [`num_readonly_signed_accounts`](mention:num_readonly_signed_accounts): Aantal
+- `num_readonly_signed_accounts`: Aantal
   ondertekende accounts dat alleen-lezen is.
-- [`num_readonly_unsigned_accounts`](mention:num_readonly_unsigned_accounts):
+- `num_readonly_unsigned_accounts`:
   Aantal niet-ondertekende accounts dat alleen-lezen is.
 
-```rust title="MessageHeader"
+```rust MessageHeader
 pub struct MessageHeader {
     /// The number of signatures required for this message to be considered
     /// valid. The signers of those signatures must match the first
     /// `num_required_signatures` of [`Message::account_keys`].
-    // !mention num_required_signatures
     pub num_required_signatures: u8,
 
     /// The last `num_readonly_signed_accounts` of the signed keys are read-only
     /// accounts.
-    // !mention num_readonly_signed_accounts
     pub num_readonly_signed_accounts: u8,
 
     /// The last `num_readonly_unsigned_accounts` of the unsigned keys are
     /// read-only accounts.
-    // !mention num_readonly_unsigned_accounts
     pub num_readonly_unsigned_accounts: u8,
 }
 ```
 
-</WithMentions>
+<Info>
+  **Legacy en versioned berichtprefixen**
 
-<Callout type="info" title="Legacy en versioned berichtprefixen">
   In een legacy-transactiebericht is de eerste berichtbyte
   `num_required_signatures`, gevolgd door de andere twee `MessageHeader`-bytes. In
   een versioned-transactiebericht is de eerste byte in plaats daarvan een versieprefix;
   de driebytige `MessageHeader` begint direct na dat prefix. Zie
   [versioned transactions](/docs/core/transactions/versioned-transactions) voor
   de volledige v0- en v1-berichtindelingen.
-</Callout>
+</Info>
 
-![Diagram van de drie delen van de berichtheader](/assets/docs/core/transactions/message_header.png)
+<Frame caption="Diagram van de drie delen van de berichtheader">
+  ![Diagram van de drie delen van de berichtheader](/docs-assets/assets/docs/core/transactions/message_header.png)
+</Frame>
 
 ### Accountadressen
 
@@ -198,15 +188,17 @@ strikte volgorde volgen:
 3. Niet-ondertekenaar + Schrijfbaar
 4. Niet-ondertekenaar + Alleen-lezen
 
-<Callout>
+<Note>
   Deze strikte volgorde maakt het mogelijk om de `account_keys` array te
   combineren met de drie tellingen in de [`header`](#header) van het bericht om
   de rechten voor elk account te bepalen zonder per-account metadatavlaggen op
   te slaan. De headertelling verdeelt de array in de vier hierboven vermelde
   rechtengroepen.
-</Callout>
+</Note>
 
-![Diagram van de volgorde van de array met accountadressen](/assets/docs/core/transactions/compat_array_of_account_addresses.png)
+<Frame caption="Diagram van de volgorde van de array met accountadressen">
+  ![Diagram van de volgorde van de array met accountadressen](/docs-assets/assets/docs/core/transactions/compat_array_of_account_addresses.png)
+</Frame>
 
 ### Recente blockhash
 
@@ -217,14 +209,14 @@ Het `recent_blockhash` veld is een 32-byte hash die twee doelen dient:
 
 Een blockhash verloopt na 150 slot. Als de blockhash niet langer geldig is
 wanneer de transactie binnenkomt, wordt deze afgewezen met
-_rs`BlockhashNotFound`_, tenzij het een geldige
+`BlockhashNotFound`, tenzij het een geldige
 [durable nonce transactie](/docs/core/transactions/durable-nonces) is.
 
-<Callout>
+<Note>
   Met de [`getLatestBlockhash`](/docs/rpc/http/getlatestblockhash) RPC-methode
   kunt u de huidige blockhash en de laatste blokhoogte ophalen waarbij de
   blockhash geldig zal zijn.
-</Callout>
+</Note>
 
 ### Instructies
 
@@ -232,38 +224,33 @@ Het
 [`instructions`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/message/src/legacy.rs#L176)
 veld is een compact-gecodeerde array van
 [`CompiledInstruction`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/message/src/compiled_instruction.rs#L21)
-structs. Elke _rs`CompiledInstruction`_ verwijst naar accounts via een index in
+structs. Elke `CompiledInstruction` verwijst naar accounts via een index in
 de `account_keys` array in plaats van via een volledige publieke sleutel. Het
 bevat:
 
-<WithMentions>
-
-1. [`program_id_index`](mention:program-id-index): Index in `account_keys` die
+1. `program_id_index`: Index in `account_keys` die
    het aan te roepen programma identificeert.
-2. [`accounts`](mention:account-indexes): Array van indices in `account_keys`
+2. `accounts`: Array van indices in `account_keys`
    die de accounts specificeren die aan het programma worden doorgegeven.
-3. [`data`](mention:instruction-data): Byte-array met de instructie
+3. `data`: Byte-array met de instructie
    discriminator en geserialiseerde argumenten.
 
-```rust title="CompiledInstruction"
+```rust CompiledInstruction
 pub struct CompiledInstruction {
     /// Index into the transaction keys array indicating the program account that executes this instruction.
-    // !mention program-id-index
     pub program_id_index: u8,
     /// Ordered indices into the transaction keys array indicating which accounts to pass to the program.
     #[serde(with = "short_vec")]
-    // !mention account-indexes
     pub accounts: Vec<u8>,
     /// The program input data.
     #[serde(with = "short_vec")]
-    // !mention instruction-data
     pub data: Vec<u8>,
 }
 ```
 
-</WithMentions>
-
-![Compacte array van instructies](/assets/docs/core/transactions/compact_array_of_ixs.png)
+<Frame caption="Compacte array van instructies">
+  ![Compacte array van instructies](/docs-assets/assets/docs/core/transactions/compact_array_of_ixs.png)
+</Frame>
 
 ## Binair transactieformaat
 
@@ -274,18 +261,18 @@ byte voor waarden 0-127 en 2-3 bytes voor grotere waarden.
 
 **Legacy transactie-indeling** (op het netwerk):
 
-| Veld                     | Grootte                          | Beschrijving                                     |
-| ------------------------- | ----------------------------- | ----------------------------------------------- |
-| `num_signatures`          | 1-3 bytes (compact-u16)       | Aantal handtekeningen                            |
+| Veld                      | Grootte                       | Beschrijving                                        |
+| ------------------------- | ----------------------------- | --------------------------------------------------- |
+| `num_signatures`          | 1-3 bytes (compact-u16)       | Aantal handtekeningen                               |
 | `signatures`              | `num_signatures` x 64 bytes   | Ed25519-handtekeningen                              |
-| `num_required_signatures` | 1 byte                        | `MessageHeader` veld 1                         |
-| `num_readonly_signed`     | 1 byte                        | `MessageHeader` veld 2                         |
-| `num_readonly_unsigned`   | 1 byte                        | `MessageHeader` veld 3                         |
-| `num_account_keys`        | 1-3 bytes (compact-u16)       | Aantal statische accountsleutels                   |
-| `account_keys`            | `num_account_keys` x 32 bytes | Publieke sleutels                                     |
-| `recent_blockhash`        | 32 bytes                      | Blockhash                                       |
-| `num_instructions`        | 1-3 bytes (compact-u16)       | Aantal instructies                          |
-| `instructions`            | variabel                      | Array van [gecompileerde instructies](#instructions) |
+| `num_required_signatures` | 1 byte                        | `MessageHeader` veld 1                              |
+| `num_readonly_signed`     | 1 byte                        | `MessageHeader` veld 2                              |
+| `num_readonly_unsigned`   | 1 byte                        | `MessageHeader` veld 3                              |
+| `num_account_keys`        | 1-3 bytes (compact-u16)       | Aantal statische accountsleutels                    |
+| `account_keys`            | `num_account_keys` x 32 bytes | Publieke sleutels                                   |
+| `recent_blockhash`        | 32 bytes                      | Blockhash                                           |
+| `num_instructions`        | 1-3 bytes (compact-u16)       | Aantal instructies                                  |
+| `instructions`            | variabel                      | Array van [gecompileerde instructies](#instructies) |
 
 Elke gecompileerde instructie wordt als volgt geserialiseerd:
 
@@ -299,7 +286,7 @@ Elke gecompileerde instructie wordt als volgt geserialiseerd:
 
 ### Grootteberekening
 
-Gegeven _rs`PACKET_DATA_SIZE`_ = 1.232 bytes, kan de beschikbare ruimte worden
+Gegeven `PACKET_DATA_SIZE` = 1.232 bytes, kan de beschikbare ruimte worden
 berekend:
 
 ```
@@ -328,14 +315,24 @@ gewijzigd. Om deze instructie uit te voeren, stuurt de portemonnee van de
 verzender de transactie met zijn handtekening en het bericht met de
 SOL-overboekingsinstructie.
 
-![SOL-overboekingsdiagram](/assets/docs/core/transactions/sol-transfer.svg)
+<Frame caption="SOL-overboekingsdiagram">
+  <img className="block dark:hidden" src="/docs-assets/assets/docs/core/transactions/sol-transfer-light.svg" alt="SOL-overboekingsdiagram" />
+
+  <img className="hidden dark:block" src="/docs-assets/assets/docs/core/transactions/sol-transfer.svg" alt="SOL-overboekingsdiagram" />
+</Frame>
 
 Nadat de transactie is verzonden, verwerkt het System Program de
 overboekingsinstructie en werkt het lamport-saldo van beide accounts bij.
 
-![Procesdiagram SOL-overboeking](/assets/docs/core/transactions/sol-transfer-process.svg)
+<Frame caption="Procesdiagram SOL-overboeking">
+  <img className="block dark:hidden" src="/docs-assets/assets/docs/core/transactions/sol-transfer-process-light.svg" alt="Procesdiagram SOL-overboeking" />
 
-<Callout type="warn" title="Controleer de ontvanger voordat u SOL verzendt">
+  <img className="hidden dark:block" src="/docs-assets/assets/docs/core/transactions/sol-transfer-process.svg" alt="Procesdiagram SOL-overboeking" />
+</Frame>
+
+<Warning>
+
+**Controleer de ontvanger voordat u SOL verzendt**
 
 Een System Program-overboeking voegt lamports toe aan **elk** account. Er is
 geen protocolniveaucontrole of de ontvanger de SOL er weer uit kan halen.
@@ -355,15 +352,15 @@ verzender moet de ontvanger verifiëren voordat hij ondertekent. Zie
 [Adres verifiëren](/docs/payments/send-payments/verify-address) voor de
 volledige classificatielogica.
 
-</Callout>
+</Warning>
 
 Het onderstaande voorbeeld toont de code die relevant is voor de bovenstaande
 diagrammen. Zie de System Program's
 [`transfer` functie](https://github.com/anza-xyz/agave/blob/v3.1.8/programs/system/src/system_processor.rs#L210).
 
-<CodeTabs storage="sol-transfer" flags="r">
+<CodeGroup>
 
-```ts !! title="Kit"
+```ts Kit highlight={32-37}
 import { createClient, generateKeyPairSigner, lamports } from "@solana/kit";
 import { solanaRpc, rpcAirdrop } from "@solana/kit-plugin-rpc";
 import { generatedPayer, airdropPayer } from "@solana/kit-plugin-signer";
@@ -395,7 +392,6 @@ const { value: preBalance2 } = await client.rpc
   .getBalance(recipient.address)
   .send();
 
-// !mark(1:6)
 // Create a transfer instruction for transferring SOL from sender to recipient
 const transferInstruction = client.system.instructions.transferSol({
   source: sender,
@@ -434,7 +430,7 @@ console.log(
 console.log("Transaction Signature:", transactionSignature.context.signature);
 ```
 
-```ts !! title="Legacy"
+```ts Legacy highlight={31-36}
 import {
   LAMPORTS_PER_SOL,
   SystemProgram,
@@ -465,7 +461,6 @@ const preBalance2 = await connection.getBalance(recipient.publicKey);
 // Define the amount to transfer
 const transferAmount = 0.01; // 0.01 SOL
 
-// !mark(1:6)
 // Create a transfer instruction for transferring SOL from sender to recipient
 const transferInstruction = SystemProgram.transfer({
   fromPubkey: sender.publicKey,
@@ -494,7 +489,7 @@ console.log("Recipient postbalance:", postBalance2 / LAMPORTS_PER_SOL);
 console.log("Transaction Signature:", transactionSignature);
 ```
 
-```rs !! title="Rust"
+```rs Rust
 use anyhow::Result;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_commitment_config::CommitmentConfig;
@@ -574,14 +569,14 @@ async fn main() -> Result<()> {
 }
 ```
 
-</CodeTabs>
+</CodeGroup>
 
 Het volgende voorbeeld toont de structuur van een transactie die een enkel
 SOL-overboekingsinstructie bevat.
 
-<CodeTabs storage="sol-transfer" flags="r">
+<CodeGroup>
 
-```ts !! title="Kit"
+```ts Kit
 import {
   createClient,
   generateKeyPairSigner,
@@ -644,7 +639,7 @@ const compiledTransactionMessage =
 console.log(JSON.stringify(compiledTransactionMessage, null, 2));
 ```
 
-```ts !! title="Legacy"
+```ts Legacy
 import {
   LAMPORTS_PER_SOL,
   SystemProgram,
@@ -682,7 +677,7 @@ const compiledMessage = transaction.compileMessage();
 console.log(JSON.stringify(compiledMessage, null, 2));
 ```
 
-```rs !! title="Rust"
+```rs Rust
 use anyhow::Result;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_commitment_config::CommitmentConfig;
@@ -723,33 +718,28 @@ async fn main() -> Result<()> {
 }
 ```
 
-</CodeTabs>
+</CodeGroup>
 
-<WithMentions>
 De onderstaande code toont de uitvoer van de vorige codefragmenten.
 Het formaat verschilt per SDK,
 maar merk op dat elke instructie dezelfde vereiste informatie bevat.
 
-<CodeTabs storage="sol-transfer">
+<CodeGroup>
 
-```json !! title="Kit"
+```json Kit
 {
   "version": 0,
-  // !mention header
   "header": {
     "numSignerAccounts": 1,
     "numReadonlySignerAccounts": 0,
     "numReadonlyNonSignerAccounts": 1
   },
-  // !mention account_keys
   "staticAccounts": [
     "HoCy8p5xxDDYTYWEbQZasEjVNM5rxvidx8AfyqA4ywBa",
     "5T388jBjovy7d8mQ3emHxMDTbUF8b7nWvAnSiP3EAdFL",
     "11111111111111111111111111111111"
   ],
-  // !mention recent_blockhash
   "lifetimeToken": "EGCWPUEXhqHJWYBfDirq3mHZb4qDpATmYqBZMBy9TBC1",
-  // !mention instructions
   "instructions": [
     {
       "programAddressIndex": 2,
@@ -773,22 +763,19 @@ maar merk op dat elke instructie dezelfde vereiste informatie bevat.
 }
 ```
 
-```json !! title="Legacy"
+```json Legacy
 {
-  // !mention header
   "header": {
     "numRequiredSignatures": 1,
     "numReadonlySignedAccounts": 0,
     "numReadonlyUnsignedAccounts": 1
   },
-  // !mention account_keys
   "accountKeys": [
     "EPLUagqZZAuAtJ5LSbK7eeXjqeTdesd4q8WhoqVrfG3g",
     "9Txf5pi5jzm7FydFAsQafk7xn5wY9yN2UNm5LW15qvcK",
     "11111111111111111111111111111111"
   ],
   "recentBlockhash": "2qYPgehzMKXcMt4Ku1tKAk9DACKUbtYEY9EUEN42cseT",
-  // !mention instructions
   "instructions": [
     {
       "programIdIndex": 2,
@@ -800,13 +787,12 @@ maar merk op dat elke instructie dezelfde vereiste informatie bevat.
 }
 ```
 
-```json !! title="Rust"
+```json Rust
 {
   "signatures": [
     "2fPXZtQGWWj6suxfc55FBQiexS8hEhNELqasSL5DRYa1RB1GChHz86Cyy8ukiVwA6qbq91P4cY1FuvTuYtmTHmJP"
   ],
   "message": {
-    // !mention header
     "header": {
       "num_required_signatures": 1,
       "num_readonly_signed_accounts": 0,
@@ -818,7 +804,6 @@ maar merk op dat elke instructie dezelfde vereiste informatie bevat.
       "11111111111111111111111111111111"
     ],
     "recent_blockhash": "3P7CVQ9nwXx4B37MvBzghzbcM9K9p5xo7ivDE8W78dCi",
-    // !mention instructions
     "instructions": [
       {
         "program_id_index": 2,
@@ -830,8 +815,7 @@ maar merk op dat elke instructie dezelfde vereiste informatie bevat.
 }
 ```
 
-</CodeTabs>
-</WithMentions>
+</CodeGroup>
 
 ### Controleer de ontvanger vóór de overboeking
 
@@ -841,9 +825,7 @@ Program-wallet (of een niet-gefinancierd
 [on-curve](/docs/payments/send-payments/verify-address#on-curve-addresses)
 adres); wijs mints, token accounts, programma's en PDA's die je niet beheert af.
 
-<CodeTabs flags="r">
-
-```ts !! title="Kit"
+```ts Kit
 import {
   type Address,
   createSolanaRpc,
@@ -893,24 +875,22 @@ await assertSafeSolRecipient(
 );
 ```
 
-</CodeTabs>
-
-<Callout>
+<Note>
   Dit fragment controleert native SOL-ontvangers. Voor de volledige
   classificatie die ook SPL token-verzendingen afhandelt (token accounts, ATA's,
   Token-2022), zie [Verify
   Address](/docs/payments/send-payments/verify-address).
-</Callout>
+</Note>
 
 ## Transactiedetails ophalen
 
 Na het indienen kun je transactiedetails ophalen met de transactiehandtekening
 en de [getTransaction](/docs/rpc/http/gettransaction) RPC-methode.
 
-<Callout>
+<Note>
   Je kunt de transactie ook vinden via [Solana
   Explorer](https://explorer.solana.com).
-</Callout>
+</Note>
 
 ```json title="Transaction Data"
 {

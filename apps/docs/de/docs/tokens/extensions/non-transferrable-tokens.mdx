@@ -3,7 +3,6 @@ title: Nicht-Übertragbare Token
 description:
   Erstellen Sie ein Mint, dessen Token geprägt, verbrannt und geschlossen werden
   können, aber nicht zwischen Token-Konten übertragen werden können.
-url: /docs/tokens/extensions/non-transferrable-tokens
 type: tutorial
 prerequisites:
   - /docs/tokens/basics/create-mint
@@ -18,10 +17,10 @@ related:
 
 ## Was sind nicht-übertragbare Token?
 
-Die _rs`NonTransferable`_-Mint-Erweiterung des Token Extensions Program macht
+Die `NonTransferable`-Mint-Erweiterung des Token Extensions Program macht
 jedes Token-Konto für dieses Mint nicht-übertragbar. Nachdem Token geprägt
-wurden, können Token-Inhaber diese nicht mit _rs`Transfer`_ oder
-_rs`TransferChecked`_ auf ein anderes Token-Konto verschieben.
+wurden, können Token-Inhaber diese nicht mit `Transfer` oder
+`TransferChecked` auf ein anderes Token-Konto verschieben.
 
 Dieses Muster ist nützlich für Assets, die an ein Wallet gebunden bleiben
 sollen.
@@ -32,249 +31,235 @@ Nicht-übertragbare Token können weiterhin:
 - Vom Token-Kontoinhaber oder einem autorisierten Delegierten verbrannt werden
 - Token-Konten können geschlossen werden, nachdem der Saldo Null erreicht hat
 
-<Callout type="info" title="Token-Konto-Erweiterungen">
-  Wenn ein Token-Konto für ein Mint mit _rs`NonTransferable`_ initialisiert
-  wird, wird das Token-Konto mit _rs`NonTransferableAccount`_ und
-  _rs`ImmutableOwner`_ initialisiert. Wenn das Token-Konto über das [Associated
+<Info>
+  **Token-Konto-Erweiterungen**
+
+  Wenn ein Token-Konto für ein Mint mit `NonTransferable` initialisiert
+  wird, wird das Token-Konto mit `NonTransferableAccount` und
+`ImmutableOwner` initialisiert. Wenn das Token-Konto über das [Associated
   Token
   Program](/docs/tokens/basics/create-token-account#how-to-create-an-associated-token-account)
   erstellt wird, wird die erforderliche Kontogröße berechnet und das Token-Konto
   mit der erforderlichen Größe und den rent-exempt Lamports erstellt.
-</Callout>
+</Info>
 
 ## So erstellen Sie ein nicht-übertragbares Mint
 
 Um ein nicht-übertragbares Mint zu erstellen:
 
 1. Berechnen Sie die Mint-Kontogröße und die benötigte Miete für das Mint und
-   die _rs`NonTransferable`_-Erweiterung.
-2. Erstellen Sie das Mint-Konto mit _rs`CreateAccount`_, initialisieren Sie
-   _rs`NonTransferable`_ und initialisieren Sie das Mint mit
-   _rs`InitializeMint`_.
-3. Erstellen Sie Token-Konten für das Mint. _rs`NonTransferableAccount`_ und
-   _rs`ImmutableOwner`_ werden automatisch für Token-Konten aktiviert.
-4. _rs`Transfer`_ und _rs`TransferChecked`_ schlagen mit
-   _rs`TokenError::NonTransferable`_ fehl.
+   die `NonTransferable`-Erweiterung.
+2. Erstellen Sie das Mint-Konto mit `CreateAccount`, initialisieren Sie
+   `NonTransferable` und initialisieren Sie das Mint mit
+   `InitializeMint`.
+3. Erstellen Sie Token-Konten für das Mint. `NonTransferableAccount` und
+   `ImmutableOwner` werden automatisch für Token-Konten aktiviert.
+4. `Transfer` und `TransferChecked` schlagen mit
+   `TokenError::NonTransferable` fehl.
 
-<ScrollyCoding>
+<Steps>
+  <Step title="Kontogröße berechnen">
+    Berechnen Sie die Mint-Kontogröße für das Basis-Mint plus die
+    `NonTransferable`-Erweiterung. Dies ist die Größe, die in
+    `CreateAccount` verwendet wird.
 
-## !!steps Kontogröße berechnen
+    ```ts Beispiel focus={15,17}
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
 
-Berechnen Sie die Mint-Kontogröße für das Basis-Mint plus die
-_rs`NonTransferable`_-Erweiterung. Dies ist die Größe, die in
-_rs`CreateAccount`_ verwendet wird.
+    const mint = await generateKeyPairSigner();
+    const recipient = await generateKeyPairSigner();
 
-<CodePlaceholder title="Beispiel" />
+    const nonTransferableExtension = extension("NonTransferable", {});
 
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
+    const mintSpace = BigInt(getMintSize([nonTransferableExtension]));
+    ```
+  </Step>
 
-const mint = await generateKeyPairSigner();
-const recipient = await generateKeyPairSigner();
+  <Step title="Miete berechnen">
+    Berechnen Sie die Miete anhand der für die Prägung benötigten Größe plus der
+    `NonTransferable`-Erweiterung.
 
-// !focus(1:1)
-const nonTransferableExtension = extension("NonTransferable", {});
+    ```ts Beispiel focus={19-21}
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
 
-// !focus(1:1)
-const mintSpace = BigInt(getMintSize([nonTransferableExtension]));
-```
+    const mint = await generateKeyPairSigner();
+    const recipient = await generateKeyPairSigner();
 
-## !!steps Miete berechnen
+    const nonTransferableExtension = extension("NonTransferable", {});
 
-Berechnen Sie die Miete anhand der für die Prägung benötigten Größe plus der
-_rs`NonTransferable`_-Erweiterung.
+    const mintSpace = BigInt(getMintSize([nonTransferableExtension]));
 
-<CodePlaceholder title="Beispiel" />
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
+    ```
+  </Step>
 
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
+  <Step title="Prägungskonto erstellen">
+    Erstellen Sie das Prägungskonto mit dem berechneten Speicherplatz und den
+    Lamports.
 
-const mint = await generateKeyPairSigner();
-const recipient = await generateKeyPairSigner();
+    ```ts Beispiel focus={23-31}
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
 
-const nonTransferableExtension = extension("NonTransferable", {});
+    const mint = await generateKeyPairSigner();
+    const recipient = await generateKeyPairSigner();
 
-const mintSpace = BigInt(getMintSize([nonTransferableExtension]));
+    const nonTransferableExtension = extension("NonTransferable", {});
 
-// !focus(1:3)
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
-```
+    const mintSpace = BigInt(getMintSize([nonTransferableExtension]));
 
-## !!steps Prägungskonto erstellen
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
 
-Erstellen Sie das Prägungskonto mit dem berechneten Speicherplatz und den
-Lamports.
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      })
+    ]);
+    ```
+  </Step>
 
-<CodePlaceholder title="Beispiel" />
+  <Step title="NonTransferable initialisieren">
+    Initialisieren Sie die `NonTransferable`-Erweiterung auf der Prägung.
 
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
+    ```ts Beispiel focus={31-33}
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
 
-const mint = await generateKeyPairSigner();
-const recipient = await generateKeyPairSigner();
+    const mint = await generateKeyPairSigner();
+    const recipient = await generateKeyPairSigner();
 
-const nonTransferableExtension = extension("NonTransferable", {});
+    const nonTransferableExtension = extension("NonTransferable", {});
 
-const mintSpace = BigInt(getMintSize([nonTransferableExtension]));
+    const mintSpace = BigInt(getMintSize([nonTransferableExtension]));
 
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
 
-// !focus(1:9)
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  })
-]);
-```
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializeNonTransferableMintInstruction({
+        mint: mint.address
+      })
+    ]);
+    ```
+  </Step>
 
-## !!steps NonTransferable initialisieren
+  <Step title="Prägung initialisieren">
+    Initialisieren Sie die Prägung mit `InitializeMint` in derselben
+    Transaktion.
 
-Initialisieren Sie die _rs`NonTransferable`_-Erweiterung auf der Prägung.
+    ```ts Beispiel focus={34-39}
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
 
-<CodePlaceholder title="Beispiel" />
+    const mint = await generateKeyPairSigner();
+    const recipient = await generateKeyPairSigner();
 
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
+    const nonTransferableExtension = extension("NonTransferable", {});
 
-const mint = await generateKeyPairSigner();
-const recipient = await generateKeyPairSigner();
+    const mintSpace = BigInt(getMintSize([nonTransferableExtension]));
 
-const nonTransferableExtension = extension("NonTransferable", {});
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
 
-const mintSpace = BigInt(getMintSize([nonTransferableExtension]));
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializeNonTransferableMintInstruction({
+        mint: mint.address
+      }),
+      getInitializeMintInstruction({
+        mint: mint.address,
+        decimals: 0,
+        mintAuthority: client.payer.address,
+        freezeAuthority: client.payer.address
+      })
+    ]);
+    ```
+  </Step>
+</Steps>
 
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
+<Info>
+  **Reihenfolge der  Anweisungen**
 
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  }),
-  // !focus(1:3)
-  getInitializeNonTransferableMintInstruction({
-    mint: mint.address
-  })
-]);
-```
-
-## !!steps Prägung initialisieren
-
-Initialisieren Sie die Prägung mit _rs`InitializeMint`_ in derselben
-Transaktion.
-
-<CodePlaceholder title="Beispiel" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-const recipient = await generateKeyPairSigner();
-
-const nonTransferableExtension = extension("NonTransferable", {});
-
-const mintSpace = BigInt(getMintSize([nonTransferableExtension]));
-
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
-
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  }),
-  getInitializeNonTransferableMintInstruction({
-    mint: mint.address
-  }),
-  // !focus(1:6)
-  getInitializeMintInstruction({
-    mint: mint.address,
-    decimals: 0,
-    mintAuthority: client.payer.address,
-    freezeAuthority: client.payer.address
-  })
-]);
-```
-
-</ScrollyCoding>
-
-<Callout type="info" title="Reihenfolge der  Anweisungen">
-  _rs`InitializeNonTransferableMint`_ muss vor _rs`InitializeMint`_ erfolgen.
-  _rs`CreateAccount`_, _rs`InitializeNonTransferableMint`_ und
-  _rs`InitializeMint`_ müssen in derselben Transaktion enthalten sein.
-</Callout>
+  `InitializeNonTransferableMint` muss vor `InitializeMint` erfolgen.
+`CreateAccount`, `InitializeNonTransferableMint` und
+`InitializeMint` müssen in derselben Transaktion enthalten sein.
+</Info>
 
 ### Quellenreferenz
 
-| Element                                        | Beschreibung                                                                                                                                                                                                                                                                              | Quelle                                                                                                                            |
-| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| _rs`NonTransferable`_                          | Prägungserweiterung, die Token aus der Prägung als nicht übertragbar markiert.                                                                                                                                                                                                            | [Quelle](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/non_transferable.rs#L8-L13)  |
-| _rs`NonTransferableAccount`_                   | Token-Konten-Erweiterung, die zu Token-Konten für nicht übertragbare Prägungen hinzugefügt wird.                                                                                                                                                                                          | [Quelle](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/non_transferable.rs#L15-L21) |
-| _rs`ImmutableOwner`_                           | Token-Konten-Erweiterung, die Eigentümerwechsel verhindert und für nicht übertragbare Token-Konten erforderlich ist.                                                                                                                                                                      | [Quelle](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/immutable_owner.rs#L8-L16)   |
-| _rs`InitializeNonTransferableMint`_            | Anweisung, die die Nicht-Übertragbar-Erweiterung auf Prägungsebene vor _rs`InitializeMint`_ initialisiert.                                                                                                                                                                                | [Quelle](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/instruction.rs#L642-L653)              |
-| _rs`process_initialize_non_transferable_mint`_ | Prozessorlogik, die die _rs`NonTransferable`_-Prägungserweiterung auf einer nicht initialisierten Prägung initialisiert.                                                                                                                                                                  | [Quelle](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/processor.rs#L1646-L1655)                |
-| _rs`get_required_init_account_extensions`_     | Wird verwendet, um automatisch Token-Konten-Erweiterungen hinzuzufügen, wenn Token-Konten basierend auf den bei der Prägung aktivierten Erweiterungen initialisiert werden. Für _rs`NonTransferable`_-Prägungen werden _rs`NonTransferableAccount`_ und _rs`ImmutableOwner`_ hinzugefügt. | [Quelle](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/mod.rs#L1304-L1307)          |
+| Element                                    | Beschreibung                                                                                                                                                                                                                                                                  | Quelle                                                                                                                            |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `NonTransferable`                          | Prägungserweiterung, die Token aus der Prägung als nicht übertragbar markiert.                                                                                                                                                                                                | [Quelle](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/non_transferable.rs#L8-L13)  |
+| `NonTransferableAccount`                   | Token-Konten-Erweiterung, die zu Token-Konten für nicht übertragbare Prägungen hinzugefügt wird.                                                                                                                                                                              | [Quelle](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/non_transferable.rs#L15-L21) |
+| `ImmutableOwner`                           | Token-Konten-Erweiterung, die Eigentümerwechsel verhindert und für nicht übertragbare Token-Konten erforderlich ist.                                                                                                                                                          | [Quelle](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/immutable_owner.rs#L8-L16)   |
+| `InitializeNonTransferableMint`            | Anweisung, die die Nicht-Übertragbar-Erweiterung auf Prägungsebene vor `InitializeMint` initialisiert.                                                                                                                                                                        | [Quelle](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/instruction.rs#L642-L653)              |
+| `process_initialize_non_transferable_mint` | Prozessorlogik, die die `NonTransferable`-Prägungserweiterung auf einer nicht initialisierten Prägung initialisiert.                                                                                                                                                          | [Quelle](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/processor.rs#L1646-L1655)                |
+| `get_required_init_account_extensions`     | Wird verwendet, um automatisch Token-Konten-Erweiterungen hinzuzufügen, wenn Token-Konten basierend auf den bei der Prägung aktivierten Erweiterungen initialisiert werden. Für `NonTransferable`-Prägungen werden `NonTransferableAccount` und `ImmutableOwner` hinzugefügt. | [Quelle](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/mod.rs#L1304-L1307)          |
 
 ### TypeScript
 
@@ -283,9 +268,7 @@ Legacy-Beispiele mit `@solana/web3.js` sind zur Referenz enthalten.
 
 #### Kit
 
-<CodeTabs storage="token-ts-kit" flags="r">
-
-```ts !! title="Instructions"
+```ts Instructions highlight={47-49,92-99}
 import { lamports, createClient, generateKeyPairSigner } from "@solana/kit";
 import { solanaRpc, rpcAirdrop } from "@solana/kit-plugin-rpc";
 import { generatedPayer, airdropPayer } from "@solana/kit-plugin-signer";
@@ -332,7 +315,6 @@ await client.sendTransaction([
     space: mintSpace,
     programAddress: TOKEN_2022_PROGRAM_ADDRESS
   }),
-  // !mark(1:3)
   getInitializeNonTransferableMintInstruction({
     mint: mint.address // Mint account that stores the NonTransferable extension.
   }),
@@ -378,7 +360,6 @@ await client.sendTransaction([
 
 try {
   await client.sendTransaction([
-    // !mark(1:8)
     getTransferCheckedInstruction({
       source: sourceToken, // Token account sending the transfer.
       mint: mint.address, // Mint with the non-transferable configuration.
@@ -402,13 +383,9 @@ console.log("Source Token Extensions:", sourceTokenAccount.data.extensions);
 console.log("Destination ATA:", destinationToken);
 ```
 
-</CodeTabs>
-
 #### Web3.js
 
-<CodeTabs storage="token-ts-legacy" flags="r">
-
-```ts !! title="Instructions"
+```ts Instructions highlight={75-78,128-137}
 import {
   Connection,
   Keypair,
@@ -483,7 +460,6 @@ await sendAndConfirmTransaction(
       space: mintSpace,
       programId: TOKEN_2022_PROGRAM_ID
     }),
-    // !mark(1:4)
     createInitializeNonTransferableMintInstruction(
       mint.publicKey, // Mint account that stores the NonTransferable extension.
       TOKEN_2022_PROGRAM_ID // Token program that owns the mint.
@@ -537,7 +513,6 @@ try {
   await sendAndConfirmTransaction(
     connection,
     new Transaction().add(
-      // !mark(1:10)
       createTransferCheckedInstruction(
         sourceToken, // Token account sending the transfer.
         mint.publicKey, // Mint with the non-transferable configuration.
@@ -576,13 +551,9 @@ console.log("Source Token Account:", sourceTokenAccount);
 console.log("Destination ATA:", destinationToken.toBase58());
 ```
 
-</CodeTabs>
-
 ### Rust
 
-<CodeTabs storage="token-rs" flags="r">
-
-```rust !! title="Rust"
+```rust Rust highlight={122-131}
 use anyhow::Result;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_commitment_config::CommitmentConfig;
@@ -704,7 +675,6 @@ async fn main() -> Result<()> {
     let transfer_blockhash = client.get_latest_blockhash().await?;
     let transfer_transaction = Transaction::new_signed_with_payer(
         &[
-            // !mark(1:10)
             transfer_checked(
                 &TOKEN_2022_PROGRAM_ID, // Token program to invoke.
                 &source_token_address, // Token account sending the tokens.
@@ -753,5 +723,3 @@ async fn main() -> Result<()> {
     Ok(())
 }
 ```
-
-</CodeTabs>

@@ -10,7 +10,7 @@ Esta guía inicia el facilitador de referencia de Kora en Solana Devnet. Es un e
 
 ## Arquitectura
 
-```mermaid title="x402 with Kora"
+```mermaid
 sequenceDiagram
     participant Client
     participant API as Resource server
@@ -34,6 +34,34 @@ sequenceDiagram
     API-->>Client: 200 + resource + PAYMENT-RESPONSE
 ```
 
+<div className="nojs-only" data-fallback="mermaid">
+  ```text Mermaid
+  sequenceDiagram
+      participant Client
+      participant API as Resource server
+      participant Facilitator
+      participant Kora
+      participant Solana
+      Client->>API: GET /protected
+      API-->>Client: 402 + PAYMENT-REQUIRED
+      Client->>API: GET /protected + PAYMENT-SIGNATURE
+      API->>Facilitator: POST /verify
+      Facilitator->>Kora: signTransaction
+      Kora->>Kora: Enforce transaction policy
+      Kora-->>Facilitator: Validated transaction
+      Facilitator-->>API: Payment is valid
+      API->>Facilitator: POST /settle
+      Facilitator->>Kora: signAndSendTransaction
+      Kora->>Solana: Sign as fee payer and submit
+      Solana-->>Kora: Transaction signature
+      Kora-->>Facilitator: Transaction signature
+      Facilitator-->>API: Settlement result
+      API-->>Client: 200 + resource + PAYMENT-RESPONSE
+  ```
+</div>
+
+<p className="sol-caption">x402 with Kora</p>
+
 Los cuatro roles de la aplicación se mantienen separados:
 
 - El **cliente** selecciona un requisito de pago y firma la autorización de pago.
@@ -55,9 +83,11 @@ cp .env.example .env
 
 Establece `KORA_PRIVATE_KEY` en `.env` con un keypair desechable de Devnet. La configuración del firmante del demo acepta un secreto en base58, un keypair en formato de array de bytes o la ruta a un archivo keypair JSON. Fondea su dirección pública con SOL de Devnet para que pueda patrocinar las comisiones de transacción.
 
-<Callout type="caution" title="Usa un firmante de Devnet desechable">
+<Danger>
+  **Usa un firmante de Devnet desechable**
+
   El demo de Docker carga el firmante de Kora desde una variable de entorno. No introduzcas una clave de firma de producción en este demo ni confirmes el archivo `.env`.
-</Callout>
+</Danger>
 
 Inicia Kora y el facilitador:
 

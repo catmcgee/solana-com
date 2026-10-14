@@ -16,7 +16,7 @@ deployment.
 
 ## Architecture
 
-```mermaid title="x402 with Kora"
+```mermaid
 sequenceDiagram
     participant Client
     participant API as Resource server
@@ -39,6 +39,34 @@ sequenceDiagram
     Facilitator-->>API: Settlement result
     API-->>Client: 200 + resource + PAYMENT-RESPONSE
 ```
+
+<div className="nojs-only" data-fallback="mermaid">
+  ```text Mermaid
+  sequenceDiagram
+      participant Client
+      participant API as Resource server
+      participant Facilitator
+      participant Kora
+      participant Solana
+      Client->>API: GET /protected
+      API-->>Client: 402 + PAYMENT-REQUIRED
+      Client->>API: GET /protected + PAYMENT-SIGNATURE
+      API->>Facilitator: POST /verify
+      Facilitator->>Kora: signTransaction
+      Kora->>Kora: Enforce transaction policy
+      Kora-->>Facilitator: Validated transaction
+      Facilitator-->>API: Payment is valid
+      API->>Facilitator: POST /settle
+      Facilitator->>Kora: signAndSendTransaction
+      Kora->>Solana: Sign as fee payer and submit
+      Solana-->>Kora: Transaction signature
+      Kora-->>Facilitator: Transaction signature
+      Facilitator-->>API: Settlement result
+      API-->>Client: 200 + resource + PAYMENT-RESPONSE
+  ```
+</div>
+
+<p className="sol-caption">x402 with Kora</p>
 
 The four application roles remain separate:
 
@@ -70,10 +98,12 @@ signer configuration accepts a base58 secret, a byte-array keypair, or the path
 to a JSON keypair file. Fund its public address with Devnet SOL so it can
 sponsor transaction fees.
 
-<Callout type="caution" title="Use a disposable Devnet signer">
+<Danger>
+  **Use a disposable Devnet signer**
+
   The Docker demo loads the Kora signer from an environment variable. Do not put
   a production signing key in this demo or commit the `.env` file.
-</Callout>
+</Danger>
 
 Start Kora and the facilitator:
 

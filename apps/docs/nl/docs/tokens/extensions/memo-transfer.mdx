@@ -4,7 +4,6 @@ description:
   Vereist dat inkomende overdrachten een memo bevatten door de
   MemoTransfer-accountextensie in te schakelen op een token account van het
   Token Extensions Program.
-url: /docs/tokens/extensions/memo-transfer
 type: tutorial
 prerequisites:
   - /docs/tokens/basics/create-token-account
@@ -15,338 +14,321 @@ related:
 
 ## Wat is memo-overdracht?
 
-De _rs`MemoTransfer`_-accountextensie van het Token Extensions Program vereist
+De `MemoTransfer`-accountextensie van het Token Extensions Program vereist
 een memo-instructie direct voorafgaand aan elke inkomende overdracht naar dat
 token account. Uitgaande overdrachten vanaf dat token account vereisen geen
 memo.
 
 De extensie wordt geconfigureerd op het bestemmings-token account, niet op de
 mint. Eenmaal ingeschakeld, mislukken overdrachten zonder memo met
-_rs`TokenError::NoMemo`_ totdat de eigenaar van het token account de vereiste
+`TokenError::NoMemo` totdat de eigenaar van het token account de vereiste
 uitschakelt.
 
 ## Hoe maak je een token account aan met MemoTransfer ingeschakeld
 
-Om een token account aan te maken met _rs`MemoTransfer`_ ingeschakeld:
+Om een token account aan te maken met `MemoTransfer` ingeschakeld:
 
 1. Maak een mint aan en initialiseer deze.
 2. Bereken de grootte van het token account en de benodigde rent voor een token
-   account met _rs`MemoTransfer`_.
-3. Maak het token account aan en schakel _rs`MemoTransfer`_ in op dat account.
-4. _rs`Transfer`_- en _rs`TransferChecked`_-instructies naar dat token account
+   account met `MemoTransfer`.
+3. Maak het token account aan en schakel `MemoTransfer` in op dat account.
+4. `Transfer`- en `TransferChecked`-instructies naar dat token account
    moeten een memo-instructie bevatten direct voorafgaand aan de
    overdracht-instructie.
 
-<ScrollyCoding>
+<Steps>
+  <Step title="Maak de mint aan en initialiseer deze">
+    Maak de mint aan en initialiseer deze die het token account zal gebruiken.
 
-## !!steps Maak de mint aan en initialiseer deze
+    ```ts Voorbeeld focus={21-35}
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
 
-Maak de mint aan en initialiseer deze die het token account zal gebruiken.
+    const mint = await generateKeyPairSigner();
+    const tokenOwner = await generateKeyPairSigner();
+    const tokenAccount = await generateKeyPairSigner();
 
-<CodePlaceholder title="Voorbeeld" />
+    const mintSpace = BigInt(getMintSize());
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
 
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializeMintInstruction({
+        mint: mint.address,
+        decimals: 0,
+        mintAuthority: client.payer.address,
+        freezeAuthority: client.payer.address
+      })
+    ]);
+    ```
+  </Step>
 
-const mint = await generateKeyPairSigner();
-const tokenOwner = await generateKeyPairSigner();
-const tokenAccount = await generateKeyPairSigner();
+  <Step title="Bereken de grootte van het token account">
+    Bereken de grootte van het token account voor het basis-token account plus de
+    `MemoTransfer`-extensie. Dit is de grootte die wordt gebruikt in
+    `CreateAccount`.
 
-const mintSpace = BigInt(getMintSize());
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
+    ```ts Voorbeeld focus={37-40}
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
 
-// !focus(1:15)
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  }),
-  getInitializeMintInstruction({
-    mint: mint.address,
-    decimals: 0,
-    mintAuthority: client.payer.address,
-    freezeAuthority: client.payer.address
-  })
-]);
-```
+    const mint = await generateKeyPairSigner();
+    const tokenOwner = await generateKeyPairSigner();
+    const tokenAccount = await generateKeyPairSigner();
 
-## !!steps Bereken de grootte van het token account
+    const mintSpace = BigInt(getMintSize());
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
 
-Bereken de grootte van het token account voor het basis-token account plus de
-_rs`MemoTransfer`_-extensie. Dit is de grootte die wordt gebruikt in
-_rs`CreateAccount`_.
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializeMintInstruction({
+        mint: mint.address,
+        decimals: 0,
+        mintAuthority: client.payer.address,
+        freezeAuthority: client.payer.address
+      })
+    ]);
 
-<CodePlaceholder title="Voorbeeld" />
+    const memoTransferAccountExtension = extension("MemoTransfer", {
+      requireIncomingTransferMemos: false
+    });
+    const tokenSpace = BigInt(getTokenSize([memoTransferAccountExtension]));
+    ```
+  </Step>
 
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
+  <Step title="Bereken rent">
+    Bereken rent met behulp van de benodigde grootte van het token account voor de
+    `MemoTransfer`- extensie.
 
-const mint = await generateKeyPairSigner();
-const tokenOwner = await generateKeyPairSigner();
-const tokenAccount = await generateKeyPairSigner();
+    ```ts Voorbeeld focus={42-44} expandable
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
 
-const mintSpace = BigInt(getMintSize());
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
+    const mint = await generateKeyPairSigner();
+    const tokenOwner = await generateKeyPairSigner();
+    const tokenAccount = await generateKeyPairSigner();
 
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  }),
-  getInitializeMintInstruction({
-    mint: mint.address,
-    decimals: 0,
-    mintAuthority: client.payer.address,
-    freezeAuthority: client.payer.address
-  })
-]);
+    const mintSpace = BigInt(getMintSize());
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
 
-// !focus(1:4)
-const memoTransferAccountExtension = extension("MemoTransfer", {
-  requireIncomingTransferMemos: false
-});
-const tokenSpace = BigInt(getTokenSize([memoTransferAccountExtension]));
-```
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializeMintInstruction({
+        mint: mint.address,
+        decimals: 0,
+        mintAuthority: client.payer.address,
+        freezeAuthority: client.payer.address
+      })
+    ]);
 
-## !!steps Bereken rent
+    const memoTransferAccountExtension = extension("MemoTransfer", {
+      requireIncomingTransferMemos: false
+    });
+    const tokenSpace = BigInt(getTokenSize([memoTransferAccountExtension]));
 
-Bereken rent met behulp van de benodigde grootte van het token account voor de
-_rs`MemoTransfer`_- extensie.
+    const tokenRent = await client.rpc
+      .getMinimumBalanceForRentExemption(tokenSpace)
+      .send();
+    ```
+  </Step>
 
-<CodePlaceholder title="Voorbeeld" />
+  <Step title="Creëer en initialiseer het token account">
+    Creëer het token account met de berekende ruimte en lamports, en initialiseer
+    het vervolgens voor de mint.
 
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
+    ```ts Voorbeeld focus={46-59} expandable
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
 
-const mint = await generateKeyPairSigner();
-const tokenOwner = await generateKeyPairSigner();
-const tokenAccount = await generateKeyPairSigner();
+    const mint = await generateKeyPairSigner();
+    const tokenOwner = await generateKeyPairSigner();
+    const tokenAccount = await generateKeyPairSigner();
 
-const mintSpace = BigInt(getMintSize());
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
+    const mintSpace = BigInt(getMintSize());
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
 
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  }),
-  getInitializeMintInstruction({
-    mint: mint.address,
-    decimals: 0,
-    mintAuthority: client.payer.address,
-    freezeAuthority: client.payer.address
-  })
-]);
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializeMintInstruction({
+        mint: mint.address,
+        decimals: 0,
+        mintAuthority: client.payer.address,
+        freezeAuthority: client.payer.address
+      })
+    ]);
 
-const memoTransferAccountExtension = extension("MemoTransfer", {
-  requireIncomingTransferMemos: false
-});
-const tokenSpace = BigInt(getTokenSize([memoTransferAccountExtension]));
+    const memoTransferExtension = extension("MemoTransfer", {
+      requireIncomingTransferMemos: false
+    });
+    const tokenSpace = BigInt(getTokenSize([memoTransferExtension]));
 
-// !focus(1:3)
-const tokenRent = await client.rpc
-  .getMinimumBalanceForRentExemption(tokenSpace)
-  .send();
-```
+    const tokenRent = await client.rpc
+      .getMinimumBalanceForRentExemption(tokenSpace)
+      .send();
 
-## !!steps Creëer en initialiseer het token account
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: tokenAccount,
+        lamports: tokenRent,
+        space: tokenSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializeAccountInstruction({
+        account: tokenAccount.address,
+        mint: mint.address,
+        owner: tokenOwner.address
+      })
+    ]);
+    ```
+  </Step>
 
-Creëer het token account met de berekende ruimte en lamports, en initialiseer
-het vervolgens voor de mint.
+  <Step title="Schakel MemoTransfer in">
+    Schakel `MemoTransfer` in op het token account.
 
-<CodePlaceholder title="Voorbeeld" />
+    ```ts Voorbeeld focus={61-66} expandable
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
 
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
+    const mint = await generateKeyPairSigner();
+    const tokenOwner = await generateKeyPairSigner();
+    const tokenAccount = await generateKeyPairSigner();
 
-const mint = await generateKeyPairSigner();
-const tokenOwner = await generateKeyPairSigner();
-const tokenAccount = await generateKeyPairSigner();
+    const mintSpace = BigInt(getMintSize());
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
 
-const mintSpace = BigInt(getMintSize());
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializeMintInstruction({
+        mint: mint.address,
+        decimals: 0,
+        mintAuthority: client.payer.address,
+        freezeAuthority: client.payer.address
+      })
+    ]);
 
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  }),
-  getInitializeMintInstruction({
-    mint: mint.address,
-    decimals: 0,
-    mintAuthority: client.payer.address,
-    freezeAuthority: client.payer.address
-  })
-]);
+    const memoTransferExtension = extension("MemoTransfer", {
+      requireIncomingTransferMemos: false
+    });
+    const tokenSpace = BigInt(getTokenSize([memoTransferExtension]));
 
-const memoTransferExtension = extension("MemoTransfer", {
-  requireIncomingTransferMemos: false
-});
-const tokenSpace = BigInt(getTokenSize([memoTransferExtension]));
+    const tokenRent = await client.rpc
+      .getMinimumBalanceForRentExemption(tokenSpace)
+      .send();
 
-const tokenRent = await client.rpc
-  .getMinimumBalanceForRentExemption(tokenSpace)
-  .send();
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: tokenAccount,
+        lamports: tokenRent,
+        space: tokenSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializeAccountInstruction({
+        account: tokenAccount.address,
+        mint: mint.address,
+        owner: tokenOwner.address
+      })
+    ]);
 
-// !focus(1:14)
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: tokenAccount,
-    lamports: tokenRent,
-    space: tokenSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  }),
-  getInitializeAccountInstruction({
-    account: tokenAccount.address,
-    mint: mint.address,
-    owner: tokenOwner.address
-  })
-]);
-```
-
-## !!steps Schakel MemoTransfer in
-
-Schakel _rs`MemoTransfer`_ in op het token account.
-
-<CodePlaceholder title="Voorbeeld" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-const tokenOwner = await generateKeyPairSigner();
-const tokenAccount = await generateKeyPairSigner();
-
-const mintSpace = BigInt(getMintSize());
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
-
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  }),
-  getInitializeMintInstruction({
-    mint: mint.address,
-    decimals: 0,
-    mintAuthority: client.payer.address,
-    freezeAuthority: client.payer.address
-  })
-]);
-
-const memoTransferExtension = extension("MemoTransfer", {
-  requireIncomingTransferMemos: false
-});
-const tokenSpace = BigInt(getTokenSize([memoTransferExtension]));
-
-const tokenRent = await client.rpc
-  .getMinimumBalanceForRentExemption(tokenSpace)
-  .send();
-
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: tokenAccount,
-    lamports: tokenRent,
-    space: tokenSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  }),
-  getInitializeAccountInstruction({
-    account: tokenAccount.address,
-    mint: mint.address,
-    owner: tokenOwner.address
-  })
-]);
-
-// !focus(1:6)
-await client.sendTransaction([
-  getEnableMemoTransfersInstruction({
-    token: tokenAccount.address,
-    owner: tokenOwner
-  })
-]);
-```
-
-</ScrollyCoding>
+    await client.sendTransaction([
+      getEnableMemoTransfersInstruction({
+        token: tokenAccount.address,
+        owner: tokenOwner
+      })
+    ]);
+    ```
+  </Step>
+</Steps>
 
 ### Bronreferentie
 
-| Item                                            | Beschrijving                                                                                                      | Bron                                                                                                                                     |
-| ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| _rs`MemoTransfer`_                              | Accountextensie die opslaat of inkomende transfers een memo vereisen.                                             | [Bron](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/memo_transfer/mod.rs#L17-L22)         |
-| _rs`RequiredMemoTransfersInstruction::Enable`_  | Instructie die memo-vereiste transfers inschakelt op een token account.                                           | [Bron](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/memo_transfer/instruction.rs#L50-L71) |
-| _rs`RequiredMemoTransfersInstruction::Disable`_ | Instructie die memo-vereiste transfers uitschakelt op een token account.                                          | [Bron](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/memo_transfer/instruction.rs#L74-L95) |
-| _rs`process_toggle_required_memo_transfers`_    | Processorlogica die de _rs`MemoTransfer`_ extensie initialiseert of herschrijft na verificatie van eigenaarschap. | [Bron](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/extension/memo_transfer/processor.rs#L20-L48)     |
+| Item                                        | Beschrijving                                                                                                  | Bron                                                                                                                                     |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `MemoTransfer`                              | Accountextensie die opslaat of inkomende transfers een memo vereisen.                                         | [Bron](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/memo_transfer/mod.rs#L17-L22)         |
+| `RequiredMemoTransfersInstruction::Enable`  | Instructie die memo-vereiste transfers inschakelt op een token account.                                       | [Bron](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/memo_transfer/instruction.rs#L50-L71) |
+| `RequiredMemoTransfersInstruction::Disable` | Instructie die memo-vereiste transfers uitschakelt op een token account.                                      | [Bron](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/memo_transfer/instruction.rs#L74-L95) |
+| `process_toggle_required_memo_transfers`    | Processorlogica die de `MemoTransfer` extensie initialiseert of herschrijft na verificatie van eigenaarschap. | [Bron](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/extension/memo_transfer/processor.rs#L20-L48)     |
 
 ### Typescript
 
@@ -356,9 +338,7 @@ en `@solana/spl-memo` zijn ter referentie opgenomen.
 
 #### Kit
 
-<CodeTabs storage="token-ts-kit" flags="r">
-
-```ts !! title="Instructions"
+```ts Instructions highlight={107-110,128-131}
 import {
   lamports,
   createClient,
@@ -465,7 +445,6 @@ await client.sendTransaction([
 ]);
 
 await client.sendTransaction([
-  // !mark(1:4)
   getEnableMemoTransfersInstruction({
     token: tokenAccount.address, // Token account that stores the MemoTransfer extension.
     owner: tokenOwner // Token account owner authorized to toggle memo requirements.
@@ -487,7 +466,6 @@ await client.sendTransaction([
 ]);
 
 await client.sendTransaction([
-  // !mark(1:4)
   getDisableMemoTransfersInstruction({
     token: tokenAccount.address, // Token account that stores the MemoTransfer extension.
     owner: tokenOwner // Token account owner authorized to toggle memo requirements.
@@ -505,13 +483,9 @@ console.log("Destination Amount:", tokenAccountData.data.amount);
 console.log("MemoTransfer Extension:", memoTransferExtension);
 ```
 
-</CodeTabs>
-
 #### Web3.js
 
-<CodeTabs storage="token-ts-legacy" flags="r">
-
-```ts !! title="Instructions"
+```ts Instructions highlight={129-135,165-171}
 import {
   Connection,
   Keypair,
@@ -640,7 +614,6 @@ await sendAndConfirmTransaction(
   [feePayer, tokenAccount]
 );
 
-// !mark(1:7)
 const enableMemoTransferExtensionInstruction =
   createEnableRequiredMemoTransfersInstruction(
     tokenAccount.publicKey, // Token account that stores the MemoTransfer extension.
@@ -677,7 +650,6 @@ await sendAndConfirmTransaction(
   [feePayer]
 );
 
-// !mark(1:7)
 const disableMemoTransferExtensionInstruction =
   createDisableRequiredMemoTransfersInstruction(
     tokenAccount.publicKey, // Token account that stores the MemoTransfer extension.
@@ -706,13 +678,9 @@ console.log("Destination Amount:", tokenAccountData.amount.toString());
 console.log("MemoTransfer Extension:", memoTransferExtension);
 ```
 
-</CodeTabs>
-
 ### Rust
 
-<CodeTabs storage="token-rs" flags="r">
-
-```rust !! title="Rust"
+```rust Rust highlight={144-149,192-197}
 use anyhow::Result;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_commitment_config::CommitmentConfig;
@@ -856,7 +824,6 @@ async fn main() -> Result<()> {
 
     client.send_and_confirm_transaction(&setup_transaction).await?;
 
-    // !mark(1:6)
     let enable_memo_transfer_instruction = enable_required_transfer_memos(
         &TOKEN_2022_PROGRAM_ID,  // Token program that owns the token account.
         &token_account.pubkey(), // Token account that stores the MemoTransfer extension.
@@ -905,7 +872,6 @@ async fn main() -> Result<()> {
         .send_and_confirm_transaction(&transfer_transaction)
         .await?;
 
-    // !mark(1:6)
     let disable_memo_transfer_instruction = disable_required_transfer_memos(
         &TOKEN_2022_PROGRAM_ID,  // Token program that owns the token account.
         &token_account.pubkey(), // Token account that stores the MemoTransfer extension.
@@ -937,5 +903,3 @@ async fn main() -> Result<()> {
     Ok(())
 }
 ```
-
-</CodeTabs>

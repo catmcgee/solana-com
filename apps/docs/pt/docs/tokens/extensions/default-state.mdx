@@ -3,7 +3,6 @@ title: Estado padrão
 description:
   Configure um mint do Token Extensions Program para que as contas de token
   recém-criadas comecem em um estado padrão escolhido, como congelado.
-url: /docs/tokens/extensions/default-state
 type: tutorial
 prerequisites:
   - /docs/tokens/basics/create-mint
@@ -16,8 +15,8 @@ related:
 
 ## O Que É o Estado Padrão de Conta?
 
-A extensão de mint _rs`DefaultAccountState`_ do Token Extensions Program define
-o _rs`AccountState`_ inicial para cada nova token account criada para esse mint.
+A extensão de mint `DefaultAccountState` do Token Extensions Program define
+o `AccountState` inicial para cada nova token account criada para esse mint.
 
 Isso é usado mais comumente para fazer com que novas contas de token iniciem
 congeladas. Contas de token que iniciam congeladas não podem ser usadas até que
@@ -28,386 +27,364 @@ a autoridade de congelamento do mint as descongele.
 Para criar um mint com um estado padrão de conta:
 
 1. Calcule o tamanho da mint account e o rent necessário para o mint e a
-   extensão _rs`DefaultAccountState`_.
-2. Crie a mint account com _rs`CreateAccount`_, inicialize
-   _rs`DefaultAccountState`_, e inicialize o mint com _rs`InitializeMint`_.
+   extensão `DefaultAccountState`.
+2. Crie a mint account com `CreateAccount`, inicialize
+   `DefaultAccountState`, e inicialize o mint com `InitializeMint`.
 3. Crie token accounts para o mint e observe que cada nova token account inicia
    no estado padrão atual.
-4. Use _rs`UpdateDefaultAccountState`_ para alterar o estado em que as futuras
+4. Use `UpdateDefaultAccountState` para alterar o estado em que as futuras
    token accounts devem iniciar.
 
-<ScrollyCoding>
-
-## !!steps Calcular tamanho da conta
-
-Calcule o tamanho da mint account para o mint base mais a extensão
-_rs`DefaultAccountState`_. Este é o tamanho usado em _rs`CreateAccount`_.
-
-<CodePlaceholder title="Exemplo" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-const recipient = await generateKeyPairSigner();
-
-// !focus(1:3)
-const defaultAccountStateExtension = extension("DefaultAccountState", {
-  state: AccountState.Frozen
-});
-
-// !focus(1:1)
-const mintSpace = BigInt(getMintSize([defaultAccountStateExtension]));
-```
-
-## !!steps Calcular rent
-
-Calcule o rent usando o tamanho necessário para o mint mais a extensão
-_rs`DefaultAccountState`_.
-
-<CodePlaceholder title="Exemplo" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-const recipient = await generateKeyPairSigner();
-
-const defaultAccountStateExtension = extension("DefaultAccountState", {
-  state: AccountState.Frozen
-});
-
-const mintSpace = BigInt(getMintSize([defaultAccountStateExtension]));
-
-// !focus(1:3)
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
-```
-
-## !!steps Criar a mint account
-
-Crie a mint account com o espaço e os lamports calculados.
-
-<CodePlaceholder title="Example" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-const recipient = await generateKeyPairSigner();
-
-const defaultAccountStateExtension = extension("DefaultAccountState", {
-  state: AccountState.Frozen
-});
-
-const mintSpace = BigInt(getMintSize([defaultAccountStateExtension]));
-
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
-
-// !focus(1:9)
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  })
-]);
-```
-
-## !!steps Inicializar DefaultAccountState
-
-Inicialize a extensão _rs`DefaultAccountState`_ no mint.
-
-<CodePlaceholder title="Example" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-const recipient = await generateKeyPairSigner();
-
-const defaultAccountStateExtension = extension("DefaultAccountState", {
-  state: AccountState.Frozen
-});
-
-const mintSpace = BigInt(getMintSize([defaultAccountStateExtension]));
-
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
-
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  }),
-  // !focus(1:4)
-  getInitializeDefaultAccountStateInstruction({
-    mint: mint.address,
-    state: AccountState.Frozen
-  })
-]);
-```
-
-## !!steps Inicializar o mint
-
-Inicialize o mint com _rs`InitializeMint`_ na mesma transação.
-
-<CodePlaceholder title="Example" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-const recipient = await generateKeyPairSigner();
-
-const defaultAccountStateExtension = extension("DefaultAccountState", {
-  state: AccountState.Frozen
-});
-
-const mintSpace = BigInt(getMintSize([defaultAccountStateExtension]));
-
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
-
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  }),
-  getInitializeDefaultAccountStateInstruction({
-    mint: mint.address,
-    state: AccountState.Frozen
-  }),
-  // !focus(1:6)
-  getInitializeMintInstruction({
-    mint: mint.address,
-    decimals: 0,
-    mintAuthority: client.payer.address,
-    freezeAuthority: client.payer.address
-  })
-]);
-```
-
-## !!steps Criar uma token account
-
-Crie uma token account para o mint. Como o estado padrão atual é _rs`Frozen`_, a
-nova token account inicia congelada.
-
-<CodePlaceholder title="Example" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-const recipient = await generateKeyPairSigner();
-
-const defaultAccountStateExtension = extension("DefaultAccountState", {
-  state: AccountState.Frozen
-});
-
-const mintSpace = BigInt(getMintSize([defaultAccountStateExtension]));
-
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
-
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  }),
-  getInitializeDefaultAccountStateInstruction({
-    mint: mint.address,
-    state: AccountState.Frozen
-  }),
-  getInitializeMintInstruction({
-    mint: mint.address,
-    decimals: 0,
-    mintAuthority: client.payer.address,
-    freezeAuthority: client.payer.address
-  })
-]);
-
-// !focus(1:12)
-const [tokenAccount] = await findAssociatedTokenPda({
-  mint: mint.address,
-  owner: recipient.address,
-  tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
-});
-
-await client.sendTransaction([
-  await getCreateAssociatedTokenInstructionAsync({
-    payer: client.payer,
-    mint: mint.address,
-    owner: recipient.address
-  })
-]);
-```
-
-## !!steps Atualizar o estado padrão da conta
-
-Use _rs`UpdateDefaultAccountState`_ para alterar o estado padrão de modo que as
-futuras token accounts não iniciem mais congeladas.
-
-<CodePlaceholder title="Example" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-const recipient = await generateKeyPairSigner();
-
-const defaultAccountStateExtension = extension("DefaultAccountState", {
-  state: AccountState.Frozen
-});
-
-const mintSpace = BigInt(getMintSize([defaultAccountStateExtension]));
-
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
-
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  }),
-  getInitializeDefaultAccountStateInstruction({
-    mint: mint.address,
-    state: AccountState.Frozen
-  }),
-  getInitializeMintInstruction({
-    mint: mint.address,
-    decimals: 0,
-    mintAuthority: client.payer.address,
-    freezeAuthority: client.payer.address
-  })
-]);
-
-const [tokenAccount] = await findAssociatedTokenPda({
-  mint: mint.address,
-  owner: recipient.address,
-  tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
-});
-
-await client.sendTransaction([
-  await getCreateAssociatedTokenInstructionAsync({
-    payer: client.payer,
-    mint: mint.address,
-    owner: recipient.address
-  })
-]);
-
-await client.sendTransaction([
-  // !focus(1:6)
-  getUpdateDefaultAccountStateInstruction({
-    mint: mint.address,
-    freezeAuthority: client.payer,
-    state: AccountState.Initialized
-  })
-]);
-```
-
-</ScrollyCoding>
-
-<Callout type="info" title="Ordem das Instruções">
-  _rs`DefaultAccountStateInstruction::Initialize`_ deve vir antes de
-  _rs`InitializeMint`_. _rs`CreateAccount`_,
-  _rs`DefaultAccountStateInstruction::Initialize`_ e _rs`InitializeMint`_ devem
+<Steps>
+  <Step title="Calcular tamanho da conta">
+    Calcule o tamanho da mint account para o mint base mais a extensão
+    `DefaultAccountState`. Este é o tamanho usado em `CreateAccount`.
+
+    ```ts Exemplo focus={15-17,19}
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+    const recipient = await generateKeyPairSigner();
+
+    const defaultAccountStateExtension = extension("DefaultAccountState", {
+      state: AccountState.Frozen
+    });
+
+    const mintSpace = BigInt(getMintSize([defaultAccountStateExtension]));
+    ```
+  </Step>
+
+  <Step title="Calcular rent">
+    Calcule o rent usando o tamanho necessário para o mint mais a extensão
+    `DefaultAccountState`.
+
+    ```ts Exemplo focus={21-23}
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+    const recipient = await generateKeyPairSigner();
+
+    const defaultAccountStateExtension = extension("DefaultAccountState", {
+      state: AccountState.Frozen
+    });
+
+    const mintSpace = BigInt(getMintSize([defaultAccountStateExtension]));
+
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
+    ```
+  </Step>
+
+  <Step title="Criar a mint account">
+    Crie a mint account com o espaço e os lamports calculados.
+
+    ```ts Example focus={25-33}
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+    const recipient = await generateKeyPairSigner();
+
+    const defaultAccountStateExtension = extension("DefaultAccountState", {
+      state: AccountState.Frozen
+    });
+
+    const mintSpace = BigInt(getMintSize([defaultAccountStateExtension]));
+
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
+
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      })
+    ]);
+    ```
+  </Step>
+
+  <Step title="Inicializar DefaultAccountState">
+    Inicialize a extensão `DefaultAccountState` no mint.
+
+    ```ts Example focus={33-36}
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+    const recipient = await generateKeyPairSigner();
+
+    const defaultAccountStateExtension = extension("DefaultAccountState", {
+      state: AccountState.Frozen
+    });
+
+    const mintSpace = BigInt(getMintSize([defaultAccountStateExtension]));
+
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
+
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializeDefaultAccountStateInstruction({
+        mint: mint.address,
+        state: AccountState.Frozen
+      })
+    ]);
+    ```
+  </Step>
+
+  <Step title="Inicializar o mint">
+    Inicialize o mint com `InitializeMint` na mesma transação.
+
+    ```ts Example focus={37-42} expandable
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+    const recipient = await generateKeyPairSigner();
+
+    const defaultAccountStateExtension = extension("DefaultAccountState", {
+      state: AccountState.Frozen
+    });
+
+    const mintSpace = BigInt(getMintSize([defaultAccountStateExtension]));
+
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
+
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializeDefaultAccountStateInstruction({
+        mint: mint.address,
+        state: AccountState.Frozen
+      }),
+      getInitializeMintInstruction({
+        mint: mint.address,
+        decimals: 0,
+        mintAuthority: client.payer.address,
+        freezeAuthority: client.payer.address
+      })
+    ]);
+    ```
+  </Step>
+
+  <Step title="Criar uma token account">
+    Crie uma token account para o mint. Como o estado padrão atual é `Frozen`, a
+    nova token account inicia congelada.
+
+    ```ts Example focus={45-56} expandable
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+    const recipient = await generateKeyPairSigner();
+
+    const defaultAccountStateExtension = extension("DefaultAccountState", {
+      state: AccountState.Frozen
+    });
+
+    const mintSpace = BigInt(getMintSize([defaultAccountStateExtension]));
+
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
+
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializeDefaultAccountStateInstruction({
+        mint: mint.address,
+        state: AccountState.Frozen
+      }),
+      getInitializeMintInstruction({
+        mint: mint.address,
+        decimals: 0,
+        mintAuthority: client.payer.address,
+        freezeAuthority: client.payer.address
+      })
+    ]);
+
+    const [tokenAccount] = await findAssociatedTokenPda({
+      mint: mint.address,
+      owner: recipient.address,
+      tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
+    });
+
+    await client.sendTransaction([
+      await getCreateAssociatedTokenInstructionAsync({
+        payer: client.payer,
+        mint: mint.address,
+        owner: recipient.address
+      })
+    ]);
+    ```
+  </Step>
+
+  <Step title="Atualizar o estado padrão da conta">
+    Use `UpdateDefaultAccountState` para alterar o estado padrão de modo que as
+    futuras token accounts não iniciem mais congeladas.
+
+    ```ts Example focus={60-65} expandable
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+    const recipient = await generateKeyPairSigner();
+
+    const defaultAccountStateExtension = extension("DefaultAccountState", {
+      state: AccountState.Frozen
+    });
+
+    const mintSpace = BigInt(getMintSize([defaultAccountStateExtension]));
+
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
+
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializeDefaultAccountStateInstruction({
+        mint: mint.address,
+        state: AccountState.Frozen
+      }),
+      getInitializeMintInstruction({
+        mint: mint.address,
+        decimals: 0,
+        mintAuthority: client.payer.address,
+        freezeAuthority: client.payer.address
+      })
+    ]);
+
+    const [tokenAccount] = await findAssociatedTokenPda({
+      mint: mint.address,
+      owner: recipient.address,
+      tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
+    });
+
+    await client.sendTransaction([
+      await getCreateAssociatedTokenInstructionAsync({
+        payer: client.payer,
+        mint: mint.address,
+        owner: recipient.address
+      })
+    ]);
+
+    await client.sendTransaction([
+      getUpdateDefaultAccountStateInstruction({
+        mint: mint.address,
+        freezeAuthority: client.payer,
+        state: AccountState.Initialized
+      })
+    ]);
+    ```
+  </Step>
+</Steps>
+
+<Info>
+  **Ordem das Instruções**
+
+  `DefaultAccountStateInstruction::Initialize` deve vir antes de
+`InitializeMint`. `CreateAccount`,
+`DefaultAccountStateInstruction::Initialize` e `InitializeMint` devem
   ser incluídos na mesma transação.
-</Callout>
+</Info>
 
 ### Referência da Fonte
 
-| Item                                             | Descrição                                                                                                            | Fonte                                                                                                                                             |
-| ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| _rs`DefaultAccountState`_                        | Extensão de mint que armazena o estado que as novas token accounts devem herdar.                                     | [Fonte](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/default_account_state/mod.rs#L16-L21)         |
-| _rs`DefaultAccountStateInstruction::Initialize`_ | Instrução que inicializa o estado padrão da token account do mint antes de _rs`InitializeMint`_.                     | [Fonte](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/default_account_state/instruction.rs#L20-L36) |
-| _rs`DefaultAccountStateInstruction::Update`_     | Instrução que permite à autoridade de congelamento alterar o estado padrão para futuras token accounts.              | [Fonte](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/default_account_state/instruction.rs#L37-L53) |
-| _rs`process_initialize_default_account_state`_   | Lógica do processador que grava o estado padrão inicial em um mint não inicializado.                                 | [Fonte](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/extension/default_account_state/processor.rs#L29-L40)     |
-| _rs`process_update_default_account_state`_       | Lógica do processador que verifica a autoridade de congelamento antes de alterar o estado padrão armazenado do mint. | [Fonte](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/extension/default_account_state/processor.rs#L43-L74)     |
+| Item                                         | Descrição                                                                                                            | Fonte                                                                                                                                             |
+| -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DefaultAccountState`                        | Extensão de mint que armazena o estado que as novas token accounts devem herdar.                                     | [Fonte](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/default_account_state/mod.rs#L16-L21)         |
+| `DefaultAccountStateInstruction::Initialize` | Instrução que inicializa o estado padrão da token account do mint antes de `InitializeMint`.                         | [Fonte](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/default_account_state/instruction.rs#L20-L36) |
+| `DefaultAccountStateInstruction::Update`     | Instrução que permite à autoridade de congelamento alterar o estado padrão para futuras token accounts.              | [Fonte](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/default_account_state/instruction.rs#L37-L53) |
+| `process_initialize_default_account_state`   | Lógica do processador que grava o estado padrão inicial em um mint não inicializado.                                 | [Fonte](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/extension/default_account_state/processor.rs#L29-L40)     |
+| `process_update_default_account_state`       | Lógica do processador que verifica a autoridade de congelamento antes de alterar o estado padrão armazenado do mint. | [Fonte](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/extension/default_account_state/processor.rs#L43-L74)     |
 
 ### Typescript
 
@@ -416,9 +393,7 @@ usando `@solana/web3.js` e `@solana/spl-token` estão incluídos para referênci
 
 #### Kit
 
-<CodeTabs storage="token-ts-kit" flags="r">
-
-```ts !! title="Instructions"
+```ts Instructions highlight={64-67,97-100}
 import {
   lamports,
   createClient,
@@ -482,7 +457,6 @@ await client.sendTransaction([
     space: mintSpace, // Account size in bytes for the mint plus DefaultAccountState.
     programAddress: TOKEN_2022_PROGRAM_ADDRESS // Program that owns the mint account.
   }),
-  // !mark(1:4)
   getInitializeDefaultAccountStateInstruction({
     mint: mint.address, // Mint account that stores the DefaultAccountState extension.
     state: AccountState.Frozen // Default state assigned to new token accounts.
@@ -516,7 +490,6 @@ const defaultAccountStateBeforeUpdate = (
 ).find((item) => isExtension("DefaultAccountState", item));
 
 await client.sendTransaction([
-  // !mark(1:4)
   getUpdateDefaultAccountStateInstruction({
     mint: mint.address, // Mint account that stores the DefaultAccountState extension.
     freezeAuthority: client.payer, // Freeze authority authorized to update the default state.
@@ -549,13 +522,9 @@ console.log(
 );
 ```
 
-</CodeTabs>
-
 #### Web3.js
 
-<CodeTabs storage="token-ts-legacy" flags="r">
-
-```ts !! title="Instructions"
+```ts Instructions highlight={63-68,134-141}
 import {
   Connection,
   Keypair,
@@ -618,7 +587,6 @@ const createMintAccountInstruction = SystemProgram.createAccount({
   programId: TOKEN_2022_PROGRAM_ID // Program that owns the mint account.
 });
 
-// !mark(1:6)
 const initializeDefaultStateInstruction =
   createInitializeDefaultAccountStateInstruction(
     mint.publicKey, // Mint account that stores the DefaultAccountState extension.
@@ -690,7 +658,6 @@ const defaultAccountStateBeforeUpdate = getDefaultAccountState(
   mintAccountBeforeUpdate
 );
 
-// !mark(1:8)
 const updateDefaultStateInstruction =
   createUpdateDefaultAccountStateInstruction(
     mint.publicKey, // Mint account that stores the DefaultAccountState extension.
@@ -744,13 +711,9 @@ console.log(
 );
 ```
 
-</CodeTabs>
-
 ### Rust
 
-<CodeTabs storage="token-rs" flags="r">
-
-```rust !! title="Rust"
+```rust Rust highlight={70-74,130-135}
 use anyhow::Result;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_commitment_config::CommitmentConfig;
@@ -820,7 +783,6 @@ async fn main() -> Result<()> {
         &TOKEN_2022_PROGRAM_ID, // Program that owns the mint account.
     );
 
-    // !mark(1:5)
     let initialize_default_account_state_instruction = initialize_default_account_state(
         &TOKEN_2022_PROGRAM_ID, // Token program that owns the mint.
         &mint.pubkey(), // Mint account that stores the DefaultAccountState extension.
@@ -881,7 +843,6 @@ async fn main() -> Result<()> {
     let default_account_state_before_update = mint_state_before_update
         .get_extension::<DefaultAccountState>()?;
 
-    // !mark(1:6)
     let update_default_account_state_instruction = update_default_account_state(
         &TOKEN_2022_PROGRAM_ID, // Token program that owns the mint.
         &mint.pubkey(), // Mint account that stores the DefaultAccountState extension.
@@ -931,5 +892,3 @@ async fn main() -> Result<()> {
     Ok(())
 }
 ```
-
-</CodeTabs>

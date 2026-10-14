@@ -3,13 +3,13 @@ title: 概览
 description: 私有通道协议的架构与数据流
 ---
 
-<Callout type="warning">
+<Warning>
   Private Channels 尚未经过安全审计，在未经全面安全审查的情况下，不建议将其用于涉及真实资金的生产环境。
-</Callout>
+</Warning>
 
-<Callout type="info">
+<Info>
   **正在部署实例？** 请前往 [运营商指南](/docs/tools/private-channels/operators)。**正在对接现有实例？** 请前往 [快速入门](/docs/tools/private-channels/quickstart/installation)。本页面是面向两类读者的架构参考文档。
-</Callout>
+</Info>
 
 ## 架构
 
@@ -63,9 +63,9 @@ Streamer 是一个 WebSocket 服务器，可实时向已连接的客户端推送
 - 连接地址：`ws://localhost:8902`
 - 健康检查端点：`GET /health` - 若任意内部轮询循环停滞超过 30 秒，则返回 `503`
 
-<Callout type="warning">
+<Warning>
   WebSocket 事件模式尚未公开记录。在正式文档发布前，请参阅 [`core/src/bin/streamer.rs`](https://github.com/solana-foundation/solana-private-channels/blob/main/core/src/bin/streamer.rs) 了解实现细节。
-</Callout>
+</Warning>
 
 ```mermaid
 flowchart TB
@@ -107,6 +107,48 @@ flowchart TB
     PG_P --> ST
 ```
 
+<div className="nojs-only" data-fallback="mermaid">
+  ```text Mermaid
+  flowchart TB
+      Wallet([User Wallet])
+      Escrow[Escrow Program<br/><i>Solana Mainnet</i>]
+      IS[Solana Mainnet Indexer]
+      IC[Private Channel Indexer]
+      PG_I[(Indexer DB)]
+      OS[Operator - Solana Side]
+      OC[Operator - Channel Side]
+      GW[Gateway :8899]
+      WN[Write Node :8900]
+      WP[Withdraw Program]
+      PG_P[(Postgres Primary)]
+      PG_R[(Postgres Replica)]
+      RN[Read Node :8901]
+      ST[Streamer :8902]
+
+      Wallet -- deposit --> Escrow
+      Wallet -- transact / withdraw --> GW
+      ST -. WebSocket .-> Wallet
+
+      Escrow -- watch --> IS
+      IS -- deposit events --> PG_I
+      PG_I -- pending deposits --> OS
+      OS -- mint --> GW
+
+      GW -- sendTransaction --> WN
+      WN --> WP
+      GW -- watch --> IC
+      IC -- withdrawal events --> PG_I
+      PG_I -- pending withdrawals --> OC
+      OC -- release --> Escrow
+
+      WN -- settle --> PG_P
+      PG_P -- replication --> PG_R
+      PG_R --> RN
+      RN --> GW
+      PG_P --> ST
+  ```
+</div>
+
 ## 交易流水线
 
 ```text
@@ -147,9 +189,9 @@ Transaction -> [1:Dedup] -> [2:SigVerify] -> [3:Sequencer] -> [4:Executor] -> [5
 
 ## 运营密钥安全
 
-<Callout type="warning">
+<Warning>
   链下服务使用其自有的签名者体系，与上述安全模型中描述的链上管理员/运营商权限无关。`ADMIN_PRIVATE_KEY` 是所有运营商服务的必填项，用于支付交易费用；独立的可选项 `OPERATOR_PRIVATE_KEY` 为 `ReleaseFunds` 和 `ResetSmtRoot` 提供链上 Operator 签名，未设置时回退使用 `ADMIN_PRIVATE_KEY` 的值。切勿将协议级实例管理员密钥（用于 `CreateInstance` / `AddOperator` / `SetNewAdmin`）填入上述任一变量或在运行时暴露；请将该密钥保持冷存储并离线保管。
-</Callout>
+</Warning>
 
 `ReleaseFunds` 和 `ResetSmtRoot` 需要两个链上签名：费用支付者（来自 `ADMIN_PRIVATE_KEY`）和 Operator PDA 的授权方（来自 `OPERATOR_PRIVATE_KEY`，若未设置则使用 `ADMIN_PRIVATE_KEY`）。本部署指南的 devnet 演练将生成的运营商 keypair 填入 `ADMIN_PRIVATE_KEY`，并保持 `OPERATOR_PRIVATE_KEY` 未设置，因此同一 keypair 同时承担两个签名角色。请对 `ADMIN_PRIVATE_KEY` 中的密钥施以与热钱包私钥相同的安全管控：
 
@@ -161,7 +203,7 @@ Transaction -> [1:Dedup] -> [2:SigVerify] -> [3:Sequencer] -> [4:Executor] -> [5
 
 ## 下一步
 
-<Cards>
+<Columns cols={2}>
   <Card
     title="快速入门"
     href="/docs/tools/private-channels/quickstart/installation"
@@ -183,4 +225,4 @@ Transaction -> [1:Dedup] -> [2:SigVerify] -> [3:Sequencer] -> [4:Executor] -> [5
   >
     所有程序的完整指令参考。
   </Card>
-</Cards>
+</Columns>

@@ -2,7 +2,6 @@
 title: トランザクション構造
 description:
   Solanaトランザクションの構造：署名、メッセージ形式、ヘッダー、アカウントアドレス、ブロックハッシュ、コンパイル済みインストラクション、バイナリエンコーディング、サイズ制限。
-url: /docs/core/transactions/transaction-structure
 type: conceptual
 prerequisites:
   - /docs/core/transactions
@@ -16,43 +15,45 @@ related:
 
 {/* TOC: Signatures, Message (Header, Account addresses, Recent blockhash, Instructions), Transaction binary format, SOL transfer example */}
 
-<Callout type="info" title="概要">
+<Info>
+  **概要**
+
   トランザクションには署名とメッセージが含まれます。メッセージにはヘッダー、アカウントアドレス、最近のブロックハッシュ、およびコンパイル済みのinstructionsが含まれます。シリアル化後の最大サイズ：1,232バイト（今後のv1フォーマットでは4,096バイト）。
-</Callout>
+</Info>
 
 [`Transaction`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/transaction/src/lib.rs#L193)には、2つのトップレベルフィールドがあります:
 
-<WithMentions>
+- `signatures`: 署名の配列
+- `message`: 処理されるinstructionsのリストを含むトランザクション情報
 
-- [`signatures`](mention:signatures): 署名の配列
-- [`message`](mention:message): 処理されるinstructionsのリストを含むトランザクション情報
-
-```rust title="Transaction"
+```rust Transaction
 pub struct Transaction {
-    // !mention signatures
     pub signatures: Vec<Signature>,
-    // !mention message
     pub message: Message,
 }
 ```
 
-</WithMentions>
+<Frame caption="トランザクションの2つの部分を示す図">
+  ![トランザクションの2つの部分を示す図](/docs-assets/assets/docs/core/transactions/tx_format.png)
+</Frame>
 
-![トランザクションの2つの部分を示す図](/assets/docs/core/transactions/tx_format.png)
+トランザクションのシリアライズ後の合計サイズは、[`PACKET_DATA_SIZE`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/packet/src/lib.rs#L32)(1,232バイト)を超えてはなりません。この制限は、1,280バイト(IPv6の最小MTU)からネットワークヘッダー用の48バイト(IPv6用40バイト + フラグメントヘッダー用8バイト)を引いた値です。1,232バイトには、[`signatures`](#署名)配列と[`message`](#メッセージ)構造体の両方が含まれます。
 
-トランザクションのシリアライズ後の合計サイズは、[`PACKET_DATA_SIZE`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/packet/src/lib.rs#L32)(1,232バイト)を超えてはなりません。この制限は、1,280バイト(IPv6の最小MTU)からネットワークヘッダー用の48バイト(IPv6用40バイト + フラグメントヘッダー用8バイト)を引いた値です。1,232バイトには、[`signatures`](#signatures)配列と[`message`](#message)構造体の両方が含まれます。
+<Info>
+  **v1トランザクションでは上限が4,096バイトに引き上げられます**
 
-<Callout type="info" title="v1トランザクションでは上限が4,096バイトに引き上げられます">
   このページではレガシートランザクションフォーマットについて説明します。v0フォーマットも、バージョンプレフィックスとアドレスルックアップテーブルを除いて同じ仕様に従っています。今後リリース予定の
   [v1フォーマット](/docs/core/transactions/versioned-transactions#v1-message-format)
   ではサイズ制限が4,096バイトに引き上げられ、異なるワイヤーレイアウトが使用されます。
-</Callout>
+</Info>
 
-![トランザクション形式とサイズ制限を示す図](/assets/docs/core/transactions/issues_with_legacy_txs.png)
+<Frame caption="トランザクション形式とサイズ制限を示す図">
+  ![トランザクション形式とサイズ制限を示す図](/docs-assets/assets/docs/core/transactions/issues_with_legacy_txs.png)
+</Frame>
 
 ## 署名
 
-`signatures`フィールドは、[`Signature`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/signature/src/lib.rs#L34)値のコンパクトエンコード配列です。各`Signature`は、署名者アカウントの秘密鍵で署名された、シリアライズされた`Message`の64バイトEd25519署名です。トランザクションのinstructionsによって参照される[署名者アカウント](#account-addresses)ごとに1つの署名が必要です。
+`signatures`フィールドは、[`Signature`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/signature/src/lib.rs#L34)値のコンパクトエンコード配列です。各`Signature`は、署名者アカウントの秘密鍵で署名された、シリアライズされた`Message`の64バイトEd25519署名です。トランザクションのinstructionsによって参照される[署名者アカウント](#アカウントアドレス)ごとに1つの署名が必要です。
 
 各署名は秘密鍵によって生成されます。その鍵がローカルのkeypair、クラウドHSMまたはKMS、マネージドウォレットサービスのいずれに保管されるかは、本番環境における設計上の決定事項です。詳細は
 [本番環境での署名](/docs/core/transactions/signing-in-production)を参照してください。
@@ -67,7 +68,7 @@ pub struct Transaction {
 - System
   Programが所有するアカウント、またはnonceアカウントである必要があります（[`validate_fee_payer`](https://github.com/anza-xyz/agave/blob/v3.1.8/svm/src/account_loader.rs#L369-L417)によって検証）。
 - `rent_exempt_minimum + total_fee`をカバーするのに十分なlamportsを保有している必要があります。そうでない場合、トランザクションは
-  _rs`InsufficientFundsForFee`_ で失敗します。
+  `InsufficientFundsForFee` で失敗します。
 
 ## メッセージ
 
@@ -75,77 +76,66 @@ pub struct Transaction {
 [`Message`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/message/src/legacy.rs#L161)
 構造体です：
 
-<WithMentions>
+- `header`: メッセージの[ヘッダー](#ヘッダー)
+- `account_keys`: トランザクションのinstructionsが必要とする[アカウントアドレス](#アカウントアドレス)の配列
+- `recent_blockhash`: トランザクションのタイムスタンプとして機能する[ブロックハッシュ](#最近のブロックハッシュ)
+- `instructions`: [instructions](#instructions)の配列
 
-- [`header`](mention:message-header): メッセージの[ヘッダー](#header)
-- [`account_keys`](mention:account-addresses): トランザクションのinstructionsが必要とする[アカウントアドレス](#account-addresses)の配列
-- [`recent_blockhash`](mention:recent-blockhash): トランザクションのタイムスタンプとして機能する[ブロックハッシュ](#recent-blockhash)
-- [`instructions`](mention:instructions): [instructions](#instructions)の配列
-
-```rust title="Message"
+```rust Message
 pub struct Message {
     /// The message header, identifying signed and read-only `account_keys`.
-    // !mention message-header
     pub header: MessageHeader,
 
     /// All the account keys used by this transaction.
     #[serde(with = "short_vec")]
-    // !mention account-addresses
     pub account_keys: Vec<Pubkey>,
 
     /// The id of a recent ledger entry.
-    // !mention recent-blockhash
     pub recent_blockhash: Hash,
 
     /// Programs that will be executed in sequence and committed in
     /// one atomic transaction if all succeed.
     #[serde(with = "short_vec")]
-    // !mention instructions
     pub instructions: Vec<CompiledInstruction>,
 }
 ```
 
-</WithMentions>
-
 ### ヘッダー
-
-<WithMentions>
 
 `header`フィールドは、`account_keys`配列をパーミッショングループに分割する3つの`u8`フィールドを持つ
 [`MessageHeader`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/message/src/lib.rs#L109)
 構造体です：
 
-- [`num_required_signatures`](mention:num_required_signatures): トランザクションに必要な署名の総数。
-- [`num_readonly_signed_accounts`](mention:num_readonly_signed_accounts): 読み取り専用の署名済みアカウント数。
-- [`num_readonly_unsigned_accounts`](mention:num_readonly_unsigned_accounts): 読み取り専用の未署名アカウント数。
+- `num_required_signatures`: トランザクションに必要な署名の総数。
+- `num_readonly_signed_accounts`: 読み取り専用の署名済みアカウント数。
+- `num_readonly_unsigned_accounts`: 読み取り専用の未署名アカウント数。
 
-```rust title="MessageHeader"
+```rust MessageHeader
 pub struct MessageHeader {
     /// The number of signatures required for this message to be considered
     /// valid. The signers of those signatures must match the first
     /// `num_required_signatures` of [`Message::account_keys`].
-    // !mention num_required_signatures
     pub num_required_signatures: u8,
 
     /// The last `num_readonly_signed_accounts` of the signed keys are read-only
     /// accounts.
-    // !mention num_readonly_signed_accounts
     pub num_readonly_signed_accounts: u8,
 
     /// The last `num_readonly_unsigned_accounts` of the unsigned keys are
     /// read-only accounts.
-    // !mention num_readonly_unsigned_accounts
     pub num_readonly_unsigned_accounts: u8,
 }
 ```
 
-</WithMentions>
+<Info>
+  **レガシーおよびバージョン付きメッセージプレフィックス**
 
-<Callout type="info" title="レガシーおよびバージョン付きメッセージプレフィックス">
   レガシートランザクションメッセージでは、メッセージの最初のバイトは`num_required_signatures`であり、その後に残り2つの`MessageHeader`バイトが続きます。バージョン付きトランザクションメッセージでは、最初のバイトの代わりにバージョンプレフィックスが使用されます。3バイトの`MessageHeader`はそのプレフィックスの直後から始まります。v0およびv1メッセージの完全なレイアウトについては、[バージョン付きトランザクション](/docs/core/transactions/versioned-transactions)を参照してください。
-</Callout>
+</Info>
 
-![メッセージヘッダーの3つの部分を示す図](/assets/docs/core/transactions/message_header.png)
+<Frame caption="メッセージヘッダーの3つの部分を示す図">
+  ![メッセージヘッダーの3つの部分を示す図](/docs-assets/assets/docs/core/transactions/message_header.png)
+</Frame>
 
 ### アカウントアドレス
 
@@ -157,15 +147,17 @@ pub struct MessageHeader {
 3. 非署名者 + 書き込み可能
 4. 非署名者 + 読み取り専用
 
-<Callout>
-  この厳密な順序により、`account_keys` 配列をメッセージの [`header`](#header)
+<Note>
+  この厳密な順序により、`account_keys` 配列をメッセージの [`header`](#ヘッダー)
   にある
   3つのカウントと組み合わせることで、アカウントごとのメタデータフラグを保存することなく、
   各アカウントのパーミッションを判別できます。ヘッダーのカウントにより、
   配列は上記の4つのパーミッショングループに分割されます。
-</Callout>
+</Note>
 
-![アカウントアドレス配列の順序を示す図](/assets/docs/core/transactions/compat_array_of_account_addresses.png)
+<Frame caption="アカウントアドレス配列の順序を示す図">
+  ![アカウントアドレス配列の順序を示す図](/docs-assets/assets/docs/core/transactions/compat_array_of_account_addresses.png)
+</Frame>
 
 ### 最近のブロックハッシュ
 
@@ -175,51 +167,46 @@ pub struct MessageHeader {
 2. **重複排除**：同じトランザクションが2回処理されるのを防ぎます。
 
 ブロックハッシュは150
-slot後に期限切れになります。トランザクションが到着した時点でブロックハッシュが有効でなくなっている場合、[耐久性ノンストランザクション](/docs/core/transactions/durable-nonces)でない限り、_rs`BlockhashNotFound`_
+slot後に期限切れになります。トランザクションが到着した時点でブロックハッシュが有効でなくなっている場合、[耐久性ノンストランザクション](/docs/core/transactions/durable-nonces)でない限り、`BlockhashNotFound`
 で拒否されます。
 
-<Callout>
+<Note>
   [`getLatestBlockhash`](/docs/rpc/http/getlatestblockhash) RPC
   メソッドを使用すると、
   現在のブロックハッシュとブロックハッシュが有効な最後のブロック高を取得できます。
-</Callout>
+</Note>
 
 ### instructions
 
 [`instructions`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/message/src/legacy.rs#L176)
 フィールドは、[`CompiledInstruction`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/message/src/compiled_instruction.rs#L21)
-構造体のコンパクトエンコードされた配列です。各 _rs`CompiledInstruction`_
+構造体のコンパクトエンコードされた配列です。各 `CompiledInstruction`
 は、完全な公開鍵ではなく、 `account_keys`
 配列へのインデックスによってアカウントを参照します。以下の要素を含みます：
 
-<WithMentions>
-
-1. [`program_id_index`](mention:program-id-index): `account_keys`
+1. `program_id_index`: `account_keys`
    へのインデックスで、呼び出すプログラムを特定します。
-2. [`accounts`](mention:account-indexes): `account_keys`
+2. `accounts`: `account_keys`
    へのインデックスの配列で、プログラムに渡すアカウントを指定します。
-3. [`data`](mention:instruction-data):
+3. `data`:
    instructionの識別子とシリアライズされた引数を含むバイト配列。
 
-```rust title="CompiledInstruction"
+```rust CompiledInstruction
 pub struct CompiledInstruction {
     /// Index into the transaction keys array indicating the program account that executes this instruction.
-    // !mention program-id-index
     pub program_id_index: u8,
     /// Ordered indices into the transaction keys array indicating which accounts to pass to the program.
     #[serde(with = "short_vec")]
-    // !mention account-indexes
     pub accounts: Vec<u8>,
     /// The program input data.
     #[serde(with = "short_vec")]
-    // !mention instruction-data
     pub data: Vec<u8>,
 }
 ```
 
-</WithMentions>
-
-![Compact array of Instructions](/assets/docs/core/transactions/compact_array_of_ixs.png)
+<Frame caption="Compact array of Instructions">
+  ![Compact array of Instructions](/docs-assets/assets/docs/core/transactions/compact_array_of_ixs.png)
+</Frame>
 
 ## トランザクションのバイナリフォーマット
 
@@ -252,7 +239,7 @@ pub struct CompiledInstruction {
 
 ### サイズ計算
 
-_rs`PACKET_DATA_SIZE`_ =
+`PACKET_DATA_SIZE` =
 1,232 バイトとすると、利用可能なスペースは次のように計算できます：
 
 ```
@@ -276,14 +263,24 @@ Total = 1232 bytes
 は、トランザクションへの署名が必要であることを示しています。これにより、System
 Program が lamport を差し引くことができます。lamport 残高を変更するために、送信者と受信者の両方のアカウントが書き込み可能である必要があります。この instruction を実行するために、送信者のウォレットは署名と SOL 送金 instruction を含むメッセージを含んだトランザクションを送信します。
 
-![SOL送金ダイアグラム](/assets/docs/core/transactions/sol-transfer.svg)
+<Frame caption="SOL送金ダイアグラム">
+  <img className="block dark:hidden" src="/docs-assets/assets/docs/core/transactions/sol-transfer-light.svg" alt="SOL送金ダイアグラム" />
+
+  <img className="hidden dark:block" src="/docs-assets/assets/docs/core/transactions/sol-transfer.svg" alt="SOL送金ダイアグラム" />
+</Frame>
 
 トランザクションが送信された後、System
 Program は送金 instruction を処理し、両方のアカウントの lamport 残高を更新します。
 
-![SOL送金プロセスダイアグラム](/assets/docs/core/transactions/sol-transfer-process.svg)
+<Frame caption="SOL送金プロセスダイアグラム">
+  <img className="block dark:hidden" src="/docs-assets/assets/docs/core/transactions/sol-transfer-process-light.svg" alt="SOL送金プロセスダイアグラム" />
 
-<Callout type="warn" title="SOLを送信する前に受取人を確認してください">
+  <img className="hidden dark:block" src="/docs-assets/assets/docs/core/transactions/sol-transfer-process.svg" alt="SOL送金プロセスダイアグラム" />
+</Frame>
+
+<Warning>
+
+**SOLを送信する前に受取人を確認してください**
 
 System Program の送金は **あらゆる**
 アカウントに lamport を追加します。受取人が SOL を送り返せるかどうかのプロトコルレベルのチェックはありません。lamport はアカウントの所有プログラムによってのみ移動できるため、管理していない
@@ -298,14 +295,14 @@ Program は、アカウントが期待される mint と一致しない送金を
 送金にはそのようなガードがないため、署名前に送信者が受取人を確認する必要があります。分類ロジックの詳細については、[アドレスの確認](/docs/payments/send-payments/verify-address)
 を参照してください。
 
-</Callout>
+</Warning>
 
 以下の例は、上記の図に関連するコードを示しています。System Programの
 [`transfer`関数](https://github.com/anza-xyz/agave/blob/v3.1.8/programs/system/src/system_processor.rs#L210)をご参照ください。
 
-<CodeTabs storage="sol-transfer" flags="r">
+<CodeGroup>
 
-```ts !! title="Kit"
+```ts Kit highlight={32-37}
 import { createClient, generateKeyPairSigner, lamports } from "@solana/kit";
 import { solanaRpc, rpcAirdrop } from "@solana/kit-plugin-rpc";
 import { generatedPayer, airdropPayer } from "@solana/kit-plugin-signer";
@@ -337,7 +334,6 @@ const { value: preBalance2 } = await client.rpc
   .getBalance(recipient.address)
   .send();
 
-// !mark(1:6)
 // Create a transfer instruction for transferring SOL from sender to recipient
 const transferInstruction = client.system.instructions.transferSol({
   source: sender,
@@ -376,7 +372,7 @@ console.log(
 console.log("Transaction Signature:", transactionSignature.context.signature);
 ```
 
-```ts !! title="Legacy"
+```ts Legacy highlight={31-36}
 import {
   LAMPORTS_PER_SOL,
   SystemProgram,
@@ -407,7 +403,6 @@ const preBalance2 = await connection.getBalance(recipient.publicKey);
 // Define the amount to transfer
 const transferAmount = 0.01; // 0.01 SOL
 
-// !mark(1:6)
 // Create a transfer instruction for transferring SOL from sender to recipient
 const transferInstruction = SystemProgram.transfer({
   fromPubkey: sender.publicKey,
@@ -436,7 +431,7 @@ console.log("Recipient postbalance:", postBalance2 / LAMPORTS_PER_SOL);
 console.log("Transaction Signature:", transactionSignature);
 ```
 
-```rs !! title="Rust"
+```rs Rust
 use anyhow::Result;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_commitment_config::CommitmentConfig;
@@ -516,13 +511,13 @@ async fn main() -> Result<()> {
 }
 ```
 
-</CodeTabs>
+</CodeGroup>
 
 以下の例は、単一のSOL転送instructionsを含むトランザクションの構造を示しています。
 
-<CodeTabs storage="sol-transfer" flags="r">
+<CodeGroup>
 
-```ts !! title="Kit"
+```ts Kit
 import {
   createClient,
   generateKeyPairSigner,
@@ -585,7 +580,7 @@ const compiledTransactionMessage =
 console.log(JSON.stringify(compiledTransactionMessage, null, 2));
 ```
 
-```ts !! title="Legacy"
+```ts Legacy
 import {
   LAMPORTS_PER_SOL,
   SystemProgram,
@@ -623,7 +618,7 @@ const compiledMessage = transaction.compileMessage();
 console.log(JSON.stringify(compiledMessage, null, 2));
 ```
 
-```rs !! title="Rust"
+```rs Rust
 use anyhow::Result;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_commitment_config::CommitmentConfig;
@@ -664,32 +659,27 @@ async fn main() -> Result<()> {
 }
 ```
 
-</CodeTabs>
+</CodeGroup>
 
-<WithMentions>
 以下のコードは、前のコードスニペットの出力を示しています。
 SDKによってフォーマットは異なりますが、各instructionsには同じ必要な情報が含まれていることに注目してください。
 
-<CodeTabs storage="sol-transfer">
+<CodeGroup>
 
-```json !! title="Kit"
+```json Kit
 {
   "version": 0,
-  // !mention header
   "header": {
     "numSignerAccounts": 1,
     "numReadonlySignerAccounts": 0,
     "numReadonlyNonSignerAccounts": 1
   },
-  // !mention account_keys
   "staticAccounts": [
     "HoCy8p5xxDDYTYWEbQZasEjVNM5rxvidx8AfyqA4ywBa",
     "5T388jBjovy7d8mQ3emHxMDTbUF8b7nWvAnSiP3EAdFL",
     "11111111111111111111111111111111"
   ],
-  // !mention recent_blockhash
   "lifetimeToken": "EGCWPUEXhqHJWYBfDirq3mHZb4qDpATmYqBZMBy9TBC1",
-  // !mention instructions
   "instructions": [
     {
       "programAddressIndex": 2,
@@ -713,22 +703,19 @@ SDKによってフォーマットは異なりますが、各instructionsには�
 }
 ```
 
-```json !! title="Legacy"
+```json Legacy
 {
-  // !mention header
   "header": {
     "numRequiredSignatures": 1,
     "numReadonlySignedAccounts": 0,
     "numReadonlyUnsignedAccounts": 1
   },
-  // !mention account_keys
   "accountKeys": [
     "EPLUagqZZAuAtJ5LSbK7eeXjqeTdesd4q8WhoqVrfG3g",
     "9Txf5pi5jzm7FydFAsQafk7xn5wY9yN2UNm5LW15qvcK",
     "11111111111111111111111111111111"
   ],
   "recentBlockhash": "2qYPgehzMKXcMt4Ku1tKAk9DACKUbtYEY9EUEN42cseT",
-  // !mention instructions
   "instructions": [
     {
       "programIdIndex": 2,
@@ -740,13 +727,12 @@ SDKによってフォーマットは異なりますが、各instructionsには�
 }
 ```
 
-```json !! title="Rust"
+```json Rust
 {
   "signatures": [
     "2fPXZtQGWWj6suxfc55FBQiexS8hEhNELqasSL5DRYa1RB1GChHz86Cyy8ukiVwA6qbq91P4cY1FuvTuYtmTHmJP"
   ],
   "message": {
-    // !mention header
     "header": {
       "num_required_signatures": 1,
       "num_readonly_signed_accounts": 0,
@@ -758,7 +744,6 @@ SDKによってフォーマットは異なりますが、各instructionsには�
       "11111111111111111111111111111111"
     ],
     "recent_blockhash": "3P7CVQ9nwXx4B37MvBzghzbcM9K9p5xo7ivDE8W78dCi",
-    // !mention instructions
     "instructions": [
       {
         "program_id_index": 2,
@@ -770,8 +755,7 @@ SDKによってフォーマットは異なりますが、各instructionsには�
 }
 ```
 
-</CodeTabs>
-</WithMentions>
+</CodeGroup>
 
 ### 転送前に受取人を確認する
 
@@ -779,9 +763,7 @@ SOLの転送はどのアカウントにも成功するため、署名前に受�
 Programウォレット（または未資金の[オンカーブ](/docs/payments/send-payments/verify-address#on-curve-addresses)アドレス）にのみ送信してください。自分が管理していないミント、token
 account、プログラム、およびPDAは拒否してください。
 
-<CodeTabs flags="r">
-
-```ts !! title="Kit"
+```ts Kit
 import {
   type Address,
   createSolanaRpc,
@@ -831,22 +813,20 @@ await assertSafeSolRecipient(
 );
 ```
 
-</CodeTabs>
-
-<Callout>
+<Note>
   このスニペットはネイティブSOLの受取人を確認します。SPLトークン送信（token
   account、ATA、Token-2022）も処理する完全な分類については、[アドレスの確認](/docs/payments/send-payments/verify-address)をご参照ください。
-</Callout>
+</Note>
 
 ## トランザクション詳細の取得
 
 送信後、トランザクションの署名と [getTransaction](/docs/rpc/http/gettransaction)
 RPCメソッドを使用してトランザクションの詳細を取得します。
 
-<Callout>
+<Note>
   [Solana Explorer](https://explorer.solana.com)
   を使用してトランザクションを検索することもできます。
-</Callout>
+</Note>
 
 ```json title="Transaction Data"
 {

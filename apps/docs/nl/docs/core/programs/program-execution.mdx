@@ -2,7 +2,6 @@
 title: Programma-uitvoering
 description:
   Hoe Solana programma's compileert en uitvoert, inclusief de sBPF VM, het compute unit-model, de programmacache en syscalls.
-url: /docs/core/programs/program-execution
 type: conceptual
 prerequisites:
   - /docs/core/programs
@@ -16,12 +15,14 @@ related:
 
 {/* TOC: Compilation, Write programs, Program execution model, Program cache, Syscalls */}
 
-<Callout type="info" title="Samenvatting">
+<Info>
+  **Samenvatting**
+
   Programma's worden via LLVM gecompileerd naar sBPF en draaien in een sandbox-VM met een budget van 1,4M CU
   per transactie. De runtime slaat tot 512 gecompileerde programma's op in de cache,
   biedt syscalls voor logging, CPI, crypto en geheugen, en vertraagt nieuwe
   implementaties met 1 slot.
-</Callout>
+</Info>
 
 ## Compilatie
 
@@ -30,11 +31,11 @@ Solana gebruikt [LLVM](https://llvm.org/) om programma's te compileren naar
 die het Solana Bytecode Format (sBPF) bevatten. Het ELF-binary wordt onchain opgeslagen in een
 uitvoerbaar account.
 
-<Callout>
+<Note>
   sBPF is Solana's aangepaste variant van [eBPF](https://en.wikipedia.org/wiki/EBPF)-bytecode,
   afgestemd op de Solana-runtime. Het is geen standaard eBPF en bevat
   Solana-specifieke aanpassingen.
-</Callout>
+</Note>
 
 ## Programma's schrijven
 
@@ -42,7 +43,7 @@ Solana-programma's worden voornamelijk geschreven in
 [Rust](https://rust-book.cs.brown.edu/title-page.html) via een van de drie
 benaderingen:
 
-<Cards>
+<Columns cols={2}>
   <Card title="Anchor" href="https://www.anchor-lang.com/docs">
     Een framework dat Rust-macro's gebruikt om boilerplate te verminderen. Aanbevolen voor
     de meeste ontwikkelaars.
@@ -55,7 +56,7 @@ benaderingen:
     Directe Rust zonder frameworks. Biedt volledige controle, maar vereist meer handmatige
     implementatie.
   </Card>
-</Cards>
+</Columns>
 
 Zie [Cross-Program Invocations](/docs/core/cpi) voor CPI-concepten en voorbeelden
 die van toepassing zijn op al deze benaderingen.
@@ -76,7 +77,7 @@ Voor elke instructie doet de runtime het volgende:
 2. **Controleert precompiles.** Als het programma een
    [precompile](/docs/core/programs/precompiles) is, roept de runtime
    [`process_precompile()`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/invoke_context.rs#L491) aan,
-   wat nog steeds een stackframe plaatst en verwijdert (via _rs`push()`_ en _rs`pop()`_)
+   wat nog steeds een stackframe plaatst en verwijdert (via `push()` en `pop()`)
    maar de sBPF VM en de zoekopdracht in de programma-cache omzeilt en native code
    direct uitvoert.
 
@@ -84,7 +85,7 @@ Voor elke instructie doet de runtime het volgende:
    [`InvokeContext::process_instruction()`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/invoke_context.rs#L481)
    en
    [`process_executable_chain()`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/invoke_context.rs#L507),
-   aangeroepen vanuit _rs`process_message()`_.) Roept
+   aangeroepen vanuit `process_message()`.) Roept
    [`push()`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/invoke_context.rs#L233)
    aan op
    [`InvokeContext`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/invoke_context.rs#L184),
@@ -92,7 +93,7 @@ Voor elke instructie doet de runtime het volgende:
    programma bovenaan de instructiestack) hetzelfde programma is.
    Diepe zelfrecursie (A -> A -> A) is toegestaan, afhankelijk van de stackdieptelimieten.
    Andere hrintrede-patronen (bijv. A roept B aan, B roept A aan) retourneren
-   _rs`InstructionError::ReentrancyNotAllowed`_.
+   `InstructionError::ReentrancyNotAllowed`.
 
 4. **Bepaalt het programma.** De runtime roept
    [`process_executable_chain()`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/invoke_context.rs#L507)
@@ -112,7 +113,7 @@ Voor elke instructie doet de runtime het volgende:
    - Serialiseert accountgegevens naar een platte parameterbuffer
    - Maakt de sBPF VM aan met stack, heap en geheugenregio's
    - Voert de gecompileerde code uit en verbruikt daarbij compute units. Retourneert
-     _rs`ComputationalBudgetExceeded`_ als het budget wordt overschreden.
+     `ComputationalBudgetExceeded` als het budget wordt overschreden.
    - Deserialiseert accountgegevens van de buffer terug naar de accountstatus
 
 6. **Verwijdert het stackframe.** Roept
@@ -154,14 +155,14 @@ Nieuw geïmplementeerde of bijgewerkte programma's zijn niet onmiddellijk van kr
 [`DELAY_VISIBILITY_SLOT_OFFSET`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/loaded_programs.rs#L32)-constante
 is `1`, wat betekent dat een programma dat in slot N wordt geïmplementeerd van kracht wordt in slot
 N+1. Tijdens de implementatie-slot retourneert elke poging om de nieuwe versie aan te roepen
-_rs`DelayVisibility`_, waardoor de runtime "Program is not deployed." meldt.
+`DelayVisibility`, waardoor de runtime "Program is not deployed." meldt.
 
 ### Verwijderingsbeleid
 
 De cache bevat maximaal
 [`MAX_LOADED_ENTRY_COUNT`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/loaded_programs.rs#L31)
 (512) gecompileerde programma-items. Wanneer de limiet is bereikt, worden de minst gebruikte
-programma's verwijderd naar de _rs`Unloaded`_-status. Gebruik wordt bijgehouden via
+programma's verwijderd naar de `Unloaded`-status. Gebruik wordt bijgehouden via
 [`tx_usage_counter`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/loaded_programs.rs#L197)
 (verhoogd telkens wanneer een transactie naar het programma verwijst) en
 [`latest_access_slot`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/loaded_programs.rs#L199).
@@ -181,4 +182,4 @@ opgeslagen in een transactieniveau-
 [`TransactionReturnData`](https://github.com/anza-xyz/agave/blob/v3.1.8/transaction-context/src/lib.rs#L499)-struct
 die de gegevensbytes en de `program_id` bevat van het programma waarvan de
 instructie de syscall heeft aangeroepen. De maximale grootte is 1.024 bytes
-(_rs`MAX_RETURN_DATA`_).
+(`MAX_RETURN_DATA`).

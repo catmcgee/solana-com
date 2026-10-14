@@ -17,7 +17,7 @@ The Surfpool SDK is published as two artifacts that wrap the same Rust runtime:
 Add the crate as a dev-dependency. The SDK is async-first and expects a Tokio
 runtime, so include `tokio` with the `full` feature for tests.
 
-```toml title="Cargo.toml"
+```toml Cargo.toml
 [dev-dependencies]
 surfpool-sdk = "1"
 tokio = { version = "1", features = ["full"] }
@@ -90,11 +90,13 @@ automatically as `optionalDependencies`:
 | macOS Intel          | `x86_64-apple-darwin`      | `@solana/surfpool-darwin-x64`    |
 | Linux x86-64 (glibc) | `x86_64-unknown-linux-gnu` | `@solana/surfpool-linux-x64-gnu` |
 
-<Callout type="warn" title="Unsupported platform">
+<Warning>
+  **Unsupported platform**
+
   If the package is installed on a platform without a matching binary, the
   install completes but `Surfnet.start()` will throw at runtime. Open an issue
   if you need an additional target.
-</Callout>
+</Warning>
 
 ### Requirements
 
@@ -108,58 +110,66 @@ automatically as `optionalDependencies`:
 A one-line smoke test confirms the runtime starts and the RPC endpoint accepts
 requests.
 
-<CodeTabs storage="surfpool-lang">
+<Tabs>
+  <Tab title="Rust">
+    ```rust Rust
+    use surfpool_sdk::{Signer, Surfnet};
 
-```rust !! title="Rust"
-use surfpool_sdk::{Signer, Surfnet};
+    #[tokio::test]
+    async fn surfpool_sdk_smoke() {
+        let surfnet = Surfnet::start().await.expect("start surfnet");
+        let balance = surfnet
+            .rpc_client()
+            .get_balance(&surfnet.payer().pubkey())
+            .expect("get balance");
+        assert!(balance > 0);
+    }
+    ```
 
-#[tokio::test]
-async fn surfpool_sdk_smoke() {
-    let surfnet = Surfnet::start().await.expect("start surfnet");
-    let balance = surfnet
-        .rpc_client()
-        .get_balance(&surfnet.payer().pubkey())
-        .expect("get balance");
-    assert!(balance > 0);
-}
-```
+    Run with `cargo test --test smoke`.
+  </Tab>
 
-Run with `cargo test --test smoke`.
+  <Tab title="TypeScript">
+    ```ts TypeScript
+    import { after, test } from "node:test";
+    import assert from "node:assert/strict";
+    import { Surfnet } from "@solana/surfpool";
 
-```ts !! title="TypeScript"
-import { after, test } from "node:test";
-import assert from "node:assert/strict";
-import { Surfnet } from "@solana/surfpool";
+    const surfnet = Surfnet.start();
+    after(() => surfnet.stop());
 
-const surfnet = Surfnet.start();
-after(() => surfnet.stop());
+    test("surfpool sdk smoke", () => {
+      assert.match(surfnet.rpcUrl, /^http:\/\/127\.0\.0\.1:\d+$/);
+      assert.ok(surfnet.payer.length > 0);
+    });
+    ```
 
-test("surfpool sdk smoke", () => {
-  assert.match(surfnet.rpcUrl, /^http:\/\/127\.0\.0\.1:\d+$/);
-  assert.ok(surfnet.payer.length > 0);
-});
-```
-
-Run with `node --test smoke.test.ts` (with a TS loader) or
-`tsx --test smoke.test.ts`.
-
-</CodeTabs>
+    Run with `node --test smoke.test.ts` (with a TS loader) or
+    `tsx --test smoke.test.ts`.
+  </Tab>
+</Tabs>
 
 ## Troubleshooting
 
-<Callout type="warn" title="`failed to bind to port` on Rust">
+<Warning>
+  **\`failed to bind to port\` on Rust**
+
   Another process is binding `0.0.0.0` aggressively. Re-run the test — the SDK
   picks a new port on each call. If the failure persists, check for orphaned
   `surfpool` processes.
-</Callout>
+</Warning>
 
-<Callout type="warn" title="`Cannot find module '@solana/surfpool-...'`">
+<Warning>
+  **\`Cannot find module '@solana/surfpool-...'\`**
+
   The `optionalDependencies` entry for your platform did not install. Re-run
   install with `--include=optional`, or check that your platform appears in the
   supported table above.
-</Callout>
+</Warning>
 
-<Callout type="warn" title="`stop()` hangs in JS">
+<Warning>
+  **\`stop()\` hangs in JS**
+
   Confirm you're calling `stop()` once per `start()`. The Node wrapper keeps RPC
   and WebSocket servers bound until `stop()` returns.
-</Callout>
+</Warning>

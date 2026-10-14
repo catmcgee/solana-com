@@ -8,43 +8,14 @@
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import type {
-  AstNode,
-  ConvertContext,
-  ConvertFile,
-  Collection,
-} from "../types.ts";
+import type { ConvertContext, ConvertFile, Collection } from "../types.ts";
 import { repoRoot } from "../lib/paths.ts";
 import { DEFAULT_LOCALE, LEGACY_LOCALES } from "../lib/locales.ts";
 import { listLayoutPages, layoutKey } from "../verify/verify-urls.ts";
 import { TransformRegistry, defaultTransforms } from "./registry.ts";
+import { mdxCodec, type Codec } from "./codec.ts";
 
-/** Parse/serialize step. WP2 supplies the unified + remark-mdx codec. */
-export interface Codec {
-  name: string;
-  parse(source: string): {
-    tree: AstNode;
-    frontmatter: Record<string, unknown>;
-  };
-  stringify(tree: AstNode, frontmatter: Record<string, unknown>): string;
-}
-
-/**
- * Placeholder codec: the whole file is one `raw` node. Lets the runner, the
- * fixture harness and text-level transforms work before WP2 lands a parser.
- */
-export const rawCodec: Codec = {
-  name: "raw",
-  parse(source) {
-    return {
-      tree: { type: "root", children: [{ type: "raw", value: source }] },
-      frontmatter: {},
-    };
-  },
-  stringify(tree) {
-    return (tree.children ?? []).map((n) => String(n.value ?? "")).join("");
-  },
-};
+export { mdxCodec, rawCodec, stringifyFresh, type Codec } from "./codec.ts";
 
 export interface Diagnostic {
   file: string;
@@ -57,14 +28,26 @@ export function convertSource(
   source: string,
   file: Omit<ConvertFile, "frontmatter">,
   registry: TransformRegistry,
-  codec: Codec = rawCodec,
+  codec: Codec = mdxCodec,
 ): { output: string; diagnostics: Diagnostic[] } {
   const transforms = registry.list((t) =>
     t.appliesTo ? t.appliesTo(source, { ...file, frontmatter: {} }) : true,
   );
   if (transforms.length === 0) return { output: source, diagnostics: [] };
-  const { tree, frontmatter } = codec.parse(source);
   const diagnostics: Diagnostic[] = [];
+  let parsed: ReturnType<Codec["parse"]>;
+  try {
+    parsed = codec.parse(source, { path: file.path });
+  } catch (err) {
+    diagnostics.push({
+      file: file.path,
+      level: "error",
+      transform: `codec:${codec.name}`,
+      message: `parse failed: ${err instanceof Error ? err.message : String(err)}`,
+    });
+    return { output: source, diagnostics };
+  }
+  const { tree, frontmatter } = parsed;
   for (const t of transforms) {
     const ctx: ConvertContext = {
       repoRoot,
@@ -83,30 +66,57 @@ export function convertSource(
           message,
         }),
     };
-    t.run(tree, { ...file, frontmatter }, ctx);
+    try {
+      t.run(tree, { ...file, frontmatter, source }, ctx);
+    } catch (err) {
+      // The tree may be half-mutated: keep the file as it was.
+      diagnostics.push({
+        file: file.path,
+        level: "error",
+        transform: t.name,
+        message: `threw: ${err instanceof Error ? err.message : String(err)}`,
+      });
+      return { output: source, diagnostics };
+    }
   }
   return { output: codec.stringify(tree, frontmatter), diagnostics };
 }
 
 export interface ConvertOptions {
+  /** Path prefix, or a comma-separated list of prefixes. */
   files?: string;
+  /** Path prefixes to skip (relative to apps/docs, or repo-relative). */
+  exclude?: string[];
   locale?: string;
   check?: boolean;
+  /** Convert in memory and report changes, without writing or failing. */
+  dryRun?: boolean;
   registry?: TransformRegistry;
   codec?: Codec;
 }
 
-export function runConvert(opts: ConvertOptions = {}) {
-  const registry = opts.registry ?? defaultTransforms();
+export async function runConvert(opts: ConvertOptions = {}) {
+  const registry = opts.registry ?? (await defaultTransforms());
   const all = [...listLayoutPages()].sort();
+  const filePrefixes = opts.files
+    ?.split(",")
+    .map((x) => x.trim())
+    .filter(Boolean);
   const selected = all.filter((f) => {
     const key = layoutKey(f);
     if (!key) return false;
     if (opts.locale && key.locale !== opts.locale) return false;
     if (
-      opts.files &&
-      !f.startsWith(opts.files) &&
-      !f.startsWith(`apps/docs/${opts.files}`)
+      filePrefixes?.length &&
+      !filePrefixes.some(
+        (x) => f.startsWith(x) || f.startsWith(`apps/docs/${x}`),
+      )
+    )
+      return false;
+    if (
+      opts.exclude?.some(
+        (x) => f.startsWith(x) || f.startsWith(`apps/docs/${x}`),
+      )
     )
       return false;
     return true;
@@ -132,7 +142,7 @@ export function runConvert(opts: ConvertOptions = {}) {
     diagnostics.push(...res.diagnostics);
     if (res.output !== source) {
       changed.push(f);
-      if (!opts.check) writeFileSync(abs, res.output);
+      if (!opts.check && !opts.dryRun) writeFileSync(abs, res.output);
     }
   }
   const errors = diagnostics.filter((d) => d.level === "error");

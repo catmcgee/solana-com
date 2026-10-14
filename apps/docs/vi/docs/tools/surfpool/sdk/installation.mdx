@@ -17,7 +17,7 @@ Thêm crate này như một dev-dependency. SDK được thiết kế async-firs
 Tokio runtime, vì vậy hãy thêm `tokio` với tính năng `full` cho các bài kiểm
 tra.
 
-```toml title="Cargo.toml"
+```toml Cargo.toml
 [dev-dependencies]
 surfpool-sdk = "1"
 tokio = { version = "1", features = ["full"] }
@@ -89,11 +89,13 @@ tự động dưới dạng `optionalDependencies`:
 | macOS Intel          | `x86_64-apple-darwin`      | `@solana/surfpool-darwin-x64`    |
 | Linux x86-64 (glibc) | `x86_64-unknown-linux-gnu` | `@solana/surfpool-linux-x64-gnu` |
 
-<Callout type="warn" title="Nền tảng không được hỗ trợ">
+<Warning>
+  **Nền tảng không được hỗ trợ**
+
   Nếu gói được cài đặt trên một nền tảng không có tệp nhị phân phù hợp, quá
   trình cài đặt sẽ hoàn tất nhưng `Surfnet.start()` sẽ báo lỗi khi chạy. Hãy mở
   một issue nếu bạn cần thêm target khác.
-</Callout>
+</Warning>
 
 ### Yêu cầu
 
@@ -107,59 +109,67 @@ tự động dưới dạng `optionalDependencies`:
 Một bài kiểm tra nhanh một dòng xác nhận rằng runtime khởi động thành công và
 endpoint RPC chấp nhận các yêu cầu.
 
-<CodeTabs storage="surfpool-lang">
+<Tabs>
+  <Tab title="Rust">
+    ```rust Rust
+    use surfpool_sdk::{Signer, Surfnet};
 
-```rust !! title="Rust"
-use surfpool_sdk::{Signer, Surfnet};
+    #[tokio::test]
+    async fn surfpool_sdk_smoke() {
+        let surfnet = Surfnet::start().await.expect("start surfnet");
+        let balance = surfnet
+            .rpc_client()
+            .get_balance(&surfnet.payer().pubkey())
+            .expect("get balance");
+        assert!(balance > 0);
+    }
+    ```
 
-#[tokio::test]
-async fn surfpool_sdk_smoke() {
-    let surfnet = Surfnet::start().await.expect("start surfnet");
-    let balance = surfnet
-        .rpc_client()
-        .get_balance(&surfnet.payer().pubkey())
-        .expect("get balance");
-    assert!(balance > 0);
-}
-```
+    Chạy với `cargo test --test smoke`.
+  </Tab>
 
-Chạy với `cargo test --test smoke`.
+  <Tab title="TypeScript">
+    ```ts TypeScript
+    import { after, test } from "node:test";
+    import assert from "node:assert/strict";
+    import { Surfnet } from "@solana/surfpool";
 
-```ts !! title="TypeScript"
-import { after, test } from "node:test";
-import assert from "node:assert/strict";
-import { Surfnet } from "@solana/surfpool";
+    const surfnet = Surfnet.start();
+    after(() => surfnet.stop());
 
-const surfnet = Surfnet.start();
-after(() => surfnet.stop());
+    test("surfpool sdk smoke", () => {
+      assert.match(surfnet.rpcUrl, /^http:\/\/127\.0\.0\.1:\d+$/);
+      assert.ok(surfnet.payer.length > 0);
+    });
+    ```
 
-test("surfpool sdk smoke", () => {
-  assert.match(surfnet.rpcUrl, /^http:\/\/127\.0\.0\.1:\d+$/);
-  assert.ok(surfnet.payer.length > 0);
-});
-```
-
-Chạy với `node --test smoke.test.ts` (kèm TS loader) hoặc
-`tsx --test smoke.test.ts`.
-
-</CodeTabs>
+    Chạy với `node --test smoke.test.ts` (kèm TS loader) hoặc
+    `tsx --test smoke.test.ts`.
+  </Tab>
+</Tabs>
 
 ## Khắc phục sự cố
 
-<Callout type="warn" title="`failed to bind to port` on Rust">
+<Warning>
+  **\`failed to bind to port\` on Rust**
+
   Một tiến trình khác đang chiếm dụng `0.0.0.0` liên tục. Hãy chạy lại bài kiểm
   tra — SDK sẽ chọn một cổng mới cho mỗi lần gọi. Nếu lỗi vẫn tiếp diễn, hãy
   kiểm tra các tiến trình `surfpool` còn sót lại.
-</Callout>
+</Warning>
 
-<Callout type="warn" title="`Cannot find module '@solana/surfpool-...'`">
+<Warning>
+  **\`Cannot find module '@solana/surfpool-...'\`**
+
   Mục `optionalDependencies` cho nền tảng của bạn chưa được cài đặt. Hãy chạy
   lại lệnh cài đặt với `--include=optional`, hoặc kiểm tra xem nền tảng của bạn
   có xuất hiện trong bảng hỗ trợ ở trên không.
-</Callout>
+</Warning>
 
-<Callout type="warn" title="`stop()` hangs in JS">
+<Warning>
+  **\`stop()\` hangs in JS**
+
   Hãy xác nhận rằng bạn chỉ gọi `stop()` một lần cho mỗi `start()`. Node wrapper
   sẽ giữ các máy chủ RPC và WebSocket ở trạng thái ràng buộc cho đến khi
   `stop()` trả về.
-</Callout>
+</Warning>

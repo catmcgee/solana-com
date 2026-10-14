@@ -3,7 +3,6 @@ title: 默认状态
 description:
   配置 Token Extensions Program
   铸币账户，使新创建的代币账户以选定的默认状态启动，例如冻结状态。
-url: /docs/tokens/extensions/default-state
 type: tutorial
 prerequisites:
   - /docs/tokens/basics/create-mint
@@ -16,8 +15,8 @@ related:
 
 ## 什么是默认账户状态？
 
-Token Extensions Program 的 _rs`DefaultAccountState`_
-铸币扩展为该铸币创建的每个新 token account 设置初始 _rs`AccountState`_。
+Token Extensions Program 的 `DefaultAccountState`
+铸币扩展为该铸币创建的每个新 token account 设置初始 `AccountState`。
 
 这最常用于使新 token account 以冻结状态启动。以冻结状态启动的 token
 account 在铸币的冻结权限解冻它们之前无法使用。
@@ -26,383 +25,361 @@ account 在铸币的冻结权限解冻它们之前无法使用。
 
 要创建具有默认账户状态的铸币：
 
-1. 计算铸币账户大小以及铸币和 _rs`DefaultAccountState`_ 扩展所需的 rent。
-2. 使用 _rs`CreateAccount`_ 创建铸币账户，初始化
-   _rs`DefaultAccountState`_，并使用 _rs`InitializeMint`_ 初始化铸币。
+1. 计算铸币账户大小以及铸币和 `DefaultAccountState` 扩展所需的 rent。
+2. 使用 `CreateAccount` 创建铸币账户，初始化
+   `DefaultAccountState`，并使用 `InitializeMint` 初始化铸币。
 3. 为铸币创建 token account，并观察每个新 token account 都以当前默认状态启动。
-4. 使用 _rs`UpdateDefaultAccountState`_ 更改未来 token account 应启动的状态。
-
-<ScrollyCoding>
-
-## !!steps 计算账户大小
-
-计算基础铸币加上 _rs`DefaultAccountState`_ 扩展的铸币账户大小。这是在
-_rs`CreateAccount`_ 中使用的大小。
-
-<CodePlaceholder title="示例" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-const recipient = await generateKeyPairSigner();
-
-// !focus(1:3)
-const defaultAccountStateExtension = extension("DefaultAccountState", {
-  state: AccountState.Frozen
-});
-
-// !focus(1:1)
-const mintSpace = BigInt(getMintSize([defaultAccountStateExtension]));
-```
-
-## !!steps 计算租金
-
-使用铸币加上 _rs`DefaultAccountState`_ 扩展所需的大小计算 rent。
-
-<CodePlaceholder title="示例" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-const recipient = await generateKeyPairSigner();
-
-const defaultAccountStateExtension = extension("DefaultAccountState", {
-  state: AccountState.Frozen
-});
-
-const mintSpace = BigInt(getMintSize([defaultAccountStateExtension]));
-
-// !focus(1:3)
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
-```
-
-## !!steps 创建铸币账户
-
-使用计算出的空间和 lamport 创建铸币账户。
-
-<CodePlaceholder title="示例" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-const recipient = await generateKeyPairSigner();
-
-const defaultAccountStateExtension = extension("DefaultAccountState", {
-  state: AccountState.Frozen
-});
-
-const mintSpace = BigInt(getMintSize([defaultAccountStateExtension]));
-
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
-
-// !focus(1:9)
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  })
-]);
-```
-
-## !!steps 初始化 DefaultAccountState
-
-在铸币账户上初始化 _rs`DefaultAccountState`_ 扩展。
-
-<CodePlaceholder title="示例" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-const recipient = await generateKeyPairSigner();
-
-const defaultAccountStateExtension = extension("DefaultAccountState", {
-  state: AccountState.Frozen
-});
-
-const mintSpace = BigInt(getMintSize([defaultAccountStateExtension]));
-
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
-
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  }),
-  // !focus(1:4)
-  getInitializeDefaultAccountStateInstruction({
-    mint: mint.address,
-    state: AccountState.Frozen
-  })
-]);
-```
-
-## !!steps 初始化铸币账户
-
-在同一笔交易中使用 _rs`InitializeMint`_ 初始化铸币账户。
-
-<CodePlaceholder title="示例" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-const recipient = await generateKeyPairSigner();
-
-const defaultAccountStateExtension = extension("DefaultAccountState", {
-  state: AccountState.Frozen
-});
-
-const mintSpace = BigInt(getMintSize([defaultAccountStateExtension]));
-
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
-
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  }),
-  getInitializeDefaultAccountStateInstruction({
-    mint: mint.address,
-    state: AccountState.Frozen
-  }),
-  // !focus(1:6)
-  getInitializeMintInstruction({
-    mint: mint.address,
-    decimals: 0,
-    mintAuthority: client.payer.address,
-    freezeAuthority: client.payer.address
-  })
-]);
-```
-
-## !!steps 创建代币账户
-
-为铸币账户创建一个代币账户。由于当前默认状态为
-_rs`Frozen`_,新代币账户将以冻结状态启动。
-
-<CodePlaceholder title="示例" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-const recipient = await generateKeyPairSigner();
-
-const defaultAccountStateExtension = extension("DefaultAccountState", {
-  state: AccountState.Frozen
-});
-
-const mintSpace = BigInt(getMintSize([defaultAccountStateExtension]));
-
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
-
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  }),
-  getInitializeDefaultAccountStateInstruction({
-    mint: mint.address,
-    state: AccountState.Frozen
-  }),
-  getInitializeMintInstruction({
-    mint: mint.address,
-    decimals: 0,
-    mintAuthority: client.payer.address,
-    freezeAuthority: client.payer.address
-  })
-]);
-
-// !focus(1:12)
-const [tokenAccount] = await findAssociatedTokenPda({
-  mint: mint.address,
-  owner: recipient.address,
-  tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
-});
-
-await client.sendTransaction([
-  await getCreateAssociatedTokenInstructionAsync({
-    payer: client.payer,
-    mint: mint.address,
-    owner: recipient.address
-  })
-]);
-```
-
-## !!steps 更新默认账户状态
-
-使用 _rs`UpdateDefaultAccountState`_
-更改默认状态,使未来的代币账户不再以冻结状态启动。
-
-<CodePlaceholder title="示例" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-const recipient = await generateKeyPairSigner();
-
-const defaultAccountStateExtension = extension("DefaultAccountState", {
-  state: AccountState.Frozen
-});
-
-const mintSpace = BigInt(getMintSize([defaultAccountStateExtension]));
-
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
-
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  }),
-  getInitializeDefaultAccountStateInstruction({
-    mint: mint.address,
-    state: AccountState.Frozen
-  }),
-  getInitializeMintInstruction({
-    mint: mint.address,
-    decimals: 0,
-    mintAuthority: client.payer.address,
-    freezeAuthority: client.payer.address
-  })
-]);
-
-const [tokenAccount] = await findAssociatedTokenPda({
-  mint: mint.address,
-  owner: recipient.address,
-  tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
-});
-
-await client.sendTransaction([
-  await getCreateAssociatedTokenInstructionAsync({
-    payer: client.payer,
-    mint: mint.address,
-    owner: recipient.address
-  })
-]);
-
-await client.sendTransaction([
-  // !focus(1:6)
-  getUpdateDefaultAccountStateInstruction({
-    mint: mint.address,
-    freezeAuthority: client.payer,
-    state: AccountState.Initialized
-  })
-]);
-```
-
-</ScrollyCoding>
-
-<Callout type="info" title="指令顺序">
-  _rs`DefaultAccountStateInstruction::Initialize`_ 必须在 _rs`InitializeMint`_
-  之前执行。_rs`CreateAccount`_、
-  _rs`DefaultAccountStateInstruction::Initialize`_ 和 _rs`InitializeMint`_
+4. 使用 `UpdateDefaultAccountState` 更改未来 token account 应启动的状态。
+
+<Steps>
+  <Step title="计算账户大小">
+    计算基础铸币加上 `DefaultAccountState` 扩展的铸币账户大小。这是在
+    `CreateAccount` 中使用的大小。
+
+    ```ts 示例 focus={15-17,19}
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+    const recipient = await generateKeyPairSigner();
+
+    const defaultAccountStateExtension = extension("DefaultAccountState", {
+      state: AccountState.Frozen
+    });
+
+    const mintSpace = BigInt(getMintSize([defaultAccountStateExtension]));
+    ```
+  </Step>
+
+  <Step title="计算租金">
+    使用铸币加上 `DefaultAccountState` 扩展所需的大小计算 rent。
+
+    ```ts 示例 focus={21-23}
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+    const recipient = await generateKeyPairSigner();
+
+    const defaultAccountStateExtension = extension("DefaultAccountState", {
+      state: AccountState.Frozen
+    });
+
+    const mintSpace = BigInt(getMintSize([defaultAccountStateExtension]));
+
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
+    ```
+  </Step>
+
+  <Step title="创建铸币账户">
+    使用计算出的空间和 lamport 创建铸币账户。
+
+    ```ts 示例 focus={25-33}
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+    const recipient = await generateKeyPairSigner();
+
+    const defaultAccountStateExtension = extension("DefaultAccountState", {
+      state: AccountState.Frozen
+    });
+
+    const mintSpace = BigInt(getMintSize([defaultAccountStateExtension]));
+
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
+
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      })
+    ]);
+    ```
+  </Step>
+
+  <Step title="初始化 DefaultAccountState">
+    在铸币账户上初始化 `DefaultAccountState` 扩展。
+
+    ```ts 示例 focus={33-36}
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+    const recipient = await generateKeyPairSigner();
+
+    const defaultAccountStateExtension = extension("DefaultAccountState", {
+      state: AccountState.Frozen
+    });
+
+    const mintSpace = BigInt(getMintSize([defaultAccountStateExtension]));
+
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
+
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializeDefaultAccountStateInstruction({
+        mint: mint.address,
+        state: AccountState.Frozen
+      })
+    ]);
+    ```
+  </Step>
+
+  <Step title="初始化铸币账户">
+    在同一笔交易中使用 `InitializeMint` 初始化铸币账户。
+
+    ```ts 示例 focus={37-42} expandable
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+    const recipient = await generateKeyPairSigner();
+
+    const defaultAccountStateExtension = extension("DefaultAccountState", {
+      state: AccountState.Frozen
+    });
+
+    const mintSpace = BigInt(getMintSize([defaultAccountStateExtension]));
+
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
+
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializeDefaultAccountStateInstruction({
+        mint: mint.address,
+        state: AccountState.Frozen
+      }),
+      getInitializeMintInstruction({
+        mint: mint.address,
+        decimals: 0,
+        mintAuthority: client.payer.address,
+        freezeAuthority: client.payer.address
+      })
+    ]);
+    ```
+  </Step>
+
+  <Step title="创建代币账户">
+    为铸币账户创建一个代币账户。由于当前默认状态为
+    `Frozen`,新代币账户将以冻结状态启动。
+
+    ```ts 示例 focus={45-56} expandable
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+    const recipient = await generateKeyPairSigner();
+
+    const defaultAccountStateExtension = extension("DefaultAccountState", {
+      state: AccountState.Frozen
+    });
+
+    const mintSpace = BigInt(getMintSize([defaultAccountStateExtension]));
+
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
+
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializeDefaultAccountStateInstruction({
+        mint: mint.address,
+        state: AccountState.Frozen
+      }),
+      getInitializeMintInstruction({
+        mint: mint.address,
+        decimals: 0,
+        mintAuthority: client.payer.address,
+        freezeAuthority: client.payer.address
+      })
+    ]);
+
+    const [tokenAccount] = await findAssociatedTokenPda({
+      mint: mint.address,
+      owner: recipient.address,
+      tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
+    });
+
+    await client.sendTransaction([
+      await getCreateAssociatedTokenInstructionAsync({
+        payer: client.payer,
+        mint: mint.address,
+        owner: recipient.address
+      })
+    ]);
+    ```
+  </Step>
+
+  <Step title="更新默认账户状态">
+    使用 `UpdateDefaultAccountState`
+    更改默认状态,使未来的代币账户不再以冻结状态启动。
+
+    ```ts 示例 focus={60-65} expandable
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+    const recipient = await generateKeyPairSigner();
+
+    const defaultAccountStateExtension = extension("DefaultAccountState", {
+      state: AccountState.Frozen
+    });
+
+    const mintSpace = BigInt(getMintSize([defaultAccountStateExtension]));
+
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
+
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializeDefaultAccountStateInstruction({
+        mint: mint.address,
+        state: AccountState.Frozen
+      }),
+      getInitializeMintInstruction({
+        mint: mint.address,
+        decimals: 0,
+        mintAuthority: client.payer.address,
+        freezeAuthority: client.payer.address
+      })
+    ]);
+
+    const [tokenAccount] = await findAssociatedTokenPda({
+      mint: mint.address,
+      owner: recipient.address,
+      tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
+    });
+
+    await client.sendTransaction([
+      await getCreateAssociatedTokenInstructionAsync({
+        payer: client.payer,
+        mint: mint.address,
+        owner: recipient.address
+      })
+    ]);
+
+    await client.sendTransaction([
+      getUpdateDefaultAccountStateInstruction({
+        mint: mint.address,
+        freezeAuthority: client.payer,
+        state: AccountState.Initialized
+      })
+    ]);
+    ```
+  </Step>
+</Steps>
+
+<Info>
+  **指令顺序**
+
+  `DefaultAccountStateInstruction::Initialize` 必须在 `InitializeMint`
+  之前执行。`CreateAccount`、
+`DefaultAccountStateInstruction::Initialize` 和 `InitializeMint`
   必须包含在同一笔交易中。
-</Callout>
+</Info>
 
 ### 源码参考
 
-| 项目                                             | 描述                                                               | 源码                                                                                                                                             |
-| ------------------------------------------------ | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| _rs`DefaultAccountState`_                        | 存储新代币账户应继承状态的铸币扩展。                               | [源码](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/default_account_state/mod.rs#L16-L21)         |
-| _rs`DefaultAccountStateInstruction::Initialize`_ | 在 _rs`InitializeMint`_ 之前初始化铸币账户默认代币账户状态的指令。 | [源码](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/default_account_state/instruction.rs#L20-L36) |
-| _rs`DefaultAccountStateInstruction::Update`_     | 允许冻结权限更改未来代币账户默认状态的指令。                       | [源码](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/default_account_state/instruction.rs#L37-L53) |
-| _rs`process_initialize_default_account_state`_   | 将初始默认状态写入未初始化铸币账户的处理器逻辑。                   | [源码](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/extension/default_account_state/processor.rs#L29-L40)     |
-| _rs`process_update_default_account_state`_       | 在更改铸币账户存储的默认状态之前验证冻结权限的处理器逻辑。         | [源码](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/extension/default_account_state/processor.rs#L43-L74)     |
+| 项目                                           | 描述                                       | 源码                                                                                                                                             |
+| -------------------------------------------- | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DefaultAccountState`                        | 存储新代币账户应继承状态的铸币扩展。                       | [源码](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/default_account_state/mod.rs#L16-L21)         |
+| `DefaultAccountStateInstruction::Initialize` | 在 `InitializeMint` 之前初始化铸币账户默认代币账户状态的指令。 | [源码](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/default_account_state/instruction.rs#L20-L36) |
+| `DefaultAccountStateInstruction::Update`     | 允许冻结权限更改未来代币账户默认状态的指令。                   | [源码](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/default_account_state/instruction.rs#L37-L53) |
+| `process_initialize_default_account_state`   | 将初始默认状态写入未初始化铸币账户的处理器逻辑。                 | [源码](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/extension/default_account_state/processor.rs#L29-L40)     |
+| `process_update_default_account_state`       | 在更改铸币账户存储的默认状态之前验证冻结权限的处理器逻辑。            | [源码](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/extension/default_account_state/processor.rs#L43-L74)     |
 
 ### Typescript
 
@@ -411,9 +388,7 @@ await client.sendTransaction([
 
 #### Kit
 
-<CodeTabs storage="token-ts-kit" flags="r">
-
-```ts !! title="Instructions"
+```ts Instructions highlight={64-67,97-100}
 import {
   lamports,
   createClient,
@@ -477,7 +452,6 @@ await client.sendTransaction([
     space: mintSpace, // Account size in bytes for the mint plus DefaultAccountState.
     programAddress: TOKEN_2022_PROGRAM_ADDRESS // Program that owns the mint account.
   }),
-  // !mark(1:4)
   getInitializeDefaultAccountStateInstruction({
     mint: mint.address, // Mint account that stores the DefaultAccountState extension.
     state: AccountState.Frozen // Default state assigned to new token accounts.
@@ -511,7 +485,6 @@ const defaultAccountStateBeforeUpdate = (
 ).find((item) => isExtension("DefaultAccountState", item));
 
 await client.sendTransaction([
-  // !mark(1:4)
   getUpdateDefaultAccountStateInstruction({
     mint: mint.address, // Mint account that stores the DefaultAccountState extension.
     freezeAuthority: client.payer, // Freeze authority authorized to update the default state.
@@ -544,13 +517,9 @@ console.log(
 );
 ```
 
-</CodeTabs>
-
 #### Web3.js
 
-<CodeTabs storage="token-ts-legacy" flags="r">
-
-```ts !! title="Instructions"
+```ts Instructions highlight={63-68,134-141}
 import {
   Connection,
   Keypair,
@@ -613,7 +582,6 @@ const createMintAccountInstruction = SystemProgram.createAccount({
   programId: TOKEN_2022_PROGRAM_ID // Program that owns the mint account.
 });
 
-// !mark(1:6)
 const initializeDefaultStateInstruction =
   createInitializeDefaultAccountStateInstruction(
     mint.publicKey, // Mint account that stores the DefaultAccountState extension.
@@ -685,7 +653,6 @@ const defaultAccountStateBeforeUpdate = getDefaultAccountState(
   mintAccountBeforeUpdate
 );
 
-// !mark(1:8)
 const updateDefaultStateInstruction =
   createUpdateDefaultAccountStateInstruction(
     mint.publicKey, // Mint account that stores the DefaultAccountState extension.
@@ -739,13 +706,9 @@ console.log(
 );
 ```
 
-</CodeTabs>
-
 ### Rust
 
-<CodeTabs storage="token-rs" flags="r">
-
-```rust !! title="Rust"
+```rust Rust highlight={70-74,130-135}
 use anyhow::Result;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_commitment_config::CommitmentConfig;
@@ -815,7 +778,6 @@ async fn main() -> Result<()> {
         &TOKEN_2022_PROGRAM_ID, // Program that owns the mint account.
     );
 
-    // !mark(1:5)
     let initialize_default_account_state_instruction = initialize_default_account_state(
         &TOKEN_2022_PROGRAM_ID, // Token program that owns the mint.
         &mint.pubkey(), // Mint account that stores the DefaultAccountState extension.
@@ -876,7 +838,6 @@ async fn main() -> Result<()> {
     let default_account_state_before_update = mint_state_before_update
         .get_extension::<DefaultAccountState>()?;
 
-    // !mark(1:6)
     let update_default_account_state_instruction = update_default_account_state(
         &TOKEN_2022_PROGRAM_ID, // Token program that owns the mint.
         &mint.pubkey(), // Mint account that stores the DefaultAccountState extension.
@@ -926,5 +887,3 @@ async fn main() -> Result<()> {
     Ok(())
 }
 ```
-
-</CodeTabs>

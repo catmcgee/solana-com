@@ -3,7 +3,6 @@ title: Runtime de conta
 description:
   Como o runtime do Solana carrega e valida contas antes da execução, e o
   formato de serialização usado para passar dados de conta para programas.
-url: /docs/core/accounts/account-runtime
 type: reference
 prerequisites:
   - /docs/core/accounts
@@ -15,18 +14,20 @@ related:
   - /docs/core/constants-reference
 ---
 
-<Callout type="info" title="Resumo">
+<Info>
+  **Resumo**
+
   Antes da execução, o runtime carrega contas, valida o pagador de taxas,
   verifica a isenção de renda, e serializa dados de conta num layout de memória
   que os programas podem aceder.
-</Callout>
+</Info>
 
-<Callout>
+<Note>
   Esta página aborda os componentes internos do runtime. A maioria dos
   programadores não precisa desta informação para construir programas. Consulte
   [Estrutura de conta](/docs/core/accounts/account-structure) para a visão
   orientada ao programador.
-</Callout>
+</Note>
 
 ## Carregamento de conta
 
@@ -44,7 +45,7 @@ Este processo realiza várias validações:
    renda. As contas nonce devem sempre reter lamports suficientes para
    permanecerem isentas de renda. Se o pagador não for uma conta de sistema nem
    uma conta nonce, a transação falha com
-   _rs`TransactionError::InvalidAccountForFee`_.
+   `TransactionError::InvalidAccountForFee`.
 
 2. **Limite de tamanho de dados carregados**: o tamanho total de todas as contas
    carregadas (incluindo um
@@ -52,16 +53,16 @@ Este processo realiza várias validações:
    de 64 bytes por conta) não deve exceder
    [`MAX_LOADED_ACCOUNTS_DATA_SIZE_BYTES`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/execution_budget.rs#L53)
    (64 MiB). Exceder este limite produz
-   _rs`TransactionError::MaxLoadedAccountsDataSizeExceeded`_.
+   `TransactionError::MaxLoadedAccountsDataSizeExceeded`.
 
 3. **Validação de program account**: cada programa invocado por uma instrução
    deve existir e ser propriedade de um carregador válido: um dos
    [`PROGRAM_OWNERS`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/account/src/lib.rs#L802)
    (BPF Loader Upgradeable, BPF Loader, BPF Loader Deprecated, Loader V4) ou o
    carregador nativo. Se o program account não existir, a transação falha com
-   _rs`TransactionError::ProgramAccountNotFound`_. Se existir mas tiver um
+   `TransactionError::ProgramAccountNotFound`. Se existir mas tiver um
    proprietário inválido, a transação falha com
-   _rs`TransactionError::InvalidProgramForExecution`_.
+   `TransactionError::InvalidProgramForExecution`.
 
 4. **Contas inexistentes**: Contas que não existem onchain são carregadas como
    contas padrão (0 lamports, dados vazios, pertencentes ao System Program) com
@@ -127,15 +128,15 @@ encontrar o primeiro índice de nível de instrução que mapeia para ele:
   primeira ocorrência.
 
 Como todas as referências à mesma conta compartilham o mesmo
-_rs`AccountSharedData`_ subjacente, modificações através de qualquer referência
+`AccountSharedData` subjacente, modificações através de qualquer referência
 são imediatamente visíveis através de todas as outras referências. No entanto,
 apenas um empréstimo mutável pode ser mantido de cada vez. Tentar emprestar a
 mesma conta de forma mutável através de dois diferentes índices de conta de
-instrução simultaneamente retorna _rs`InstructionError::AccountBorrowFailed`_.
+instrução simultaneamente retorna `InstructionError::AccountBorrowFailed`.
 Os programas devem liberar um empréstimo antes de adquirir outro na mesma conta
 subjacente.
 
 Após a execução do programa, o runtime desserializa o buffer de volta
 ([`deserialize_parameters_aligned()`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/serialization.rs#L580-L667))
 e aplica quaisquer alterações a `lamports`, `data` (incluindo alterações de
-comprimento até _rs`MAX_PERMITTED_DATA_INCREASE`_), e `owner`.
+comprimento até `MAX_PERMITTED_DATA_INCREASE`), e `owner`.

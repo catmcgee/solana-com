@@ -27,88 +27,74 @@ description:
 - **Отправитель** подписывает для авторизации перевода своих токенов
 - **Спонсор** подписывает для подтверждения оплаты сетевой комиссии
 
-<Callout>
+<Note>
   Подробнее о ключевых понятиях платежей см. в разделе [Как работают платежи в
   Solana](/docs/payments/how-payments-work).
-</Callout>
+</Note>
 
 Ниже приведены основные этапы процесса. Полный рабочий код смотрите в разделе
-[Демо](#demo).
+[Демо](#демонстрация).
 
-<ScrollyCoding>
+<Steps>
+  <Step title="Создайте аккаунт спонсора">
+    Сгенерируйте отдельный keypair для спонсора, который будет оплачивать комиссии
+    за транзакции. Спонсору нужен SOL для оплаты комиссий, но не обязательно иметь
+    токены, которые переводятся.
 
-## !!steps Создайте аккаунт спонсора
+    ```ts title="Оплата комиссии спонсором"
+    const sponsor = await generateKeyPairSigner();
+    ```
+  </Step>
 
-Сгенерируйте отдельный keypair для спонсора, который будет оплачивать комиссии
-за транзакции. Спонсору нужен SOL для оплаты комиссий, но не обязательно иметь
-токены, которые переводятся.
+  <Step title="Создайте инструкцию перевода">
+    Создайте инструкцию перевода токенов с отправителем в роли владельца.
+    Отправитель владеет токенами и должен подписать перевод.
 
-<CodePlaceholder title="Оплата комиссии спонсором" />
+    ```ts title="Sponsor Transaction Fee" focus={3-10}
+    const sponsor = await generateKeyPairSigner();
 
-```ts !! title="Sponsor Transaction Fee"
-const sponsor = await generateKeyPairSigner();
-```
+    const transferInstruction = getTransferCheckedInstruction({
+      source: senderAta,
+      mint: mint.address,
+      destination: recipientAta,
+      authority: sender, // Sender signs for the transfer
+      amount: 250_000n, // adjusted for the mint's decimals
+      decimals: 6
+    });
+    ```
+  </Step>
 
-## !!steps Создайте инструкцию перевода
+  <Step title="Отправка с использованием спонсора как плательщика комиссии">
+    Создайте клиент со спонсором в качестве плательщика комиссии через
+    `payer(sponsor)`, затем вызовите `client.sendTransaction`. Спонсор подписывает
+    транзакцию для оплаты сетевой комиссии, а отправитель подписывает для
+    авторизации перевода — `sendTransaction` автоматически собирает всех упомянутых
+    подписантов.
 
-Создайте инструкцию перевода токенов с отправителем в роли владельца.
-Отправитель владеет токенами и должен подписать перевод.
+    ```ts title="Sponsor Transaction Fee" highlight={13} focus={12-16}
+    const sponsor = await generateKeyPairSigner();
 
-<CodePlaceholder title="Sponsor Transaction Fee" />
+    const transferInstruction = getTransferCheckedInstruction({
+      source: senderAta,
+      mint: mint.address,
+      destination: recipientAta,
+      authority: sender,
+      amount: 250_000n,
+      decimals: 6
+    });
 
-```ts !! title="Sponsor Transaction Fee"
-const sponsor = await generateKeyPairSigner();
+    const client = createClient()
+      .use(payer(sponsor)) // Sponsor pays the transaction fees
+      .use(solanaLocalRpc());
 
-// !focus(1:8)
-const transferInstruction = getTransferCheckedInstruction({
-  source: senderAta,
-  mint: mint.address,
-  destination: recipientAta,
-  authority: sender, // Sender signs for the transfer
-  amount: 250_000n, // adjusted for the mint's decimals
-  decimals: 6
-});
-```
-
-## !!steps Отправка с использованием спонсора как плательщика комиссии
-
-Создайте клиент со спонсором в качестве плательщика комиссии через
-`payer(sponsor)`, затем вызовите `client.sendTransaction`. Спонсор подписывает
-транзакцию для оплаты сетевой комиссии, а отправитель подписывает для
-авторизации перевода — `sendTransaction` автоматически собирает всех упомянутых
-подписантов.
-
-<CodePlaceholder title="Sponsor Transaction Fee" />
-
-```ts !! title="Sponsor Transaction Fee"
-const sponsor = await generateKeyPairSigner();
-
-const transferInstruction = getTransferCheckedInstruction({
-  source: senderAta,
-  mint: mint.address,
-  destination: recipientAta,
-  authority: sender,
-  amount: 250_000n,
-  decimals: 6
-});
-
-// !focus(1:5)
-const client = createClient()
-  // !mark
-  .use(payer(sponsor)) // Sponsor pays the transaction fees
-  .use(solanaLocalRpc());
-
-const { context } = await client.sendTransaction([transferInstruction]);
-```
-
-</ScrollyCoding>
+    const { context } = await client.sendTransaction([transferInstruction]);
+    ```
+  </Step>
+</Steps>
 
 ### Демонстрация
 
-<CodeTabs flags="r">
-
-```ts !! title="Demo"
-// !collapse(1:15) collapsed
+```ts Demo highlight={20,64} expandable
 // Click ">" icon on left to expand demo imports
 import { createClient, generateKeyPairSigner, lamports } from "@solana/kit";
 import type { KeyPairSigner } from "@solana/kit";
@@ -128,7 +114,6 @@ import {
 // Generate keypairs for sender, recipient, and sponsor (fee payer)
 const sender = await generateKeyPairSigner();
 const recipient = await generateKeyPairSigner();
-// !mark
 const sponsor = await generateKeyPairSigner();
 
 console.log("Sender Address:", sender.address);
@@ -173,7 +158,6 @@ const transferInstruction = getTransferCheckedInstruction({
 
 // Send transaction with sponsor as fee payer using @solana/kit
 // The sponsor (client.payer) pays fees; the sender signs for the transfer
-// !mark
 const { context } = await client.sendTransaction([transferInstruction]);
 const signature = context.signature;
 
@@ -207,7 +191,6 @@ console.log("Fee Payer Address:", feePayer);
 // =============================================================================
 // Demo Setup Helper Function
 // =============================================================================
-// !collapse(1:1000) collapsed
 
 /**
  * Sets up for a sponsored token transfer demo:
@@ -313,14 +296,12 @@ async function demoSetup(
 }
 ```
 
-</CodeTabs>
-
-<Callout type="caution">
+<Danger>
   Когда вы создаёте токен аккаунт для конечного пользователя, он может закрыть
   его и вернуть SOL, использованный для rent. Рассмотрите возможность взимать
   плату с пользователей за создание аккаунта в стейблкоинах или заложите эту
   стоимость в экономику вашего продукта.
-</Callout>
+</Danger>
 
 ## Абстракция комиссии в масштабе с Kora
 
@@ -368,7 +349,7 @@ console.log("Signature:", context.signature);
 
 ### Ресурсы по Kora
 
-<Cards>
+<Columns cols={2}>
   <Card
     title="Быстрый старт Kora"
     href="/docs/tools/kora/getting-started/quick-start"
@@ -384,4 +365,4 @@ console.log("Signature:", context.signature);
   <Card title="Руководство оператора ноды" href="/docs/tools/kora/operators">
     Разверните и настройте собственный экземпляр Kora.
   </Card>
-</Cards>
+</Columns>

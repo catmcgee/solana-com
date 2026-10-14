@@ -3,7 +3,6 @@ title: Runtime akun
 description:
   Bagaimana runtime Solana memuat dan memvalidasi akun sebelum eksekusi, dan
   format serialisasi yang digunakan untuk meneruskan data akun ke program.
-url: /docs/core/accounts/account-runtime
 type: reference
 prerequisites:
   - /docs/core/accounts
@@ -15,18 +14,20 @@ related:
   - /docs/core/constants-reference
 ---
 
-<Callout type="info" title="Ringkasan">
+<Info>
+  **Ringkasan**
+
   Sebelum eksekusi, runtime memuat akun, memvalidasi pembayar biaya, memeriksa
   pembebasan sewa, dan menserialisasi data akun ke dalam tata letak memori yang
   dapat diakses oleh program.
-</Callout>
+</Info>
 
-<Callout>
+<Note>
   Halaman ini membahas internal runtime. Sebagian besar developer tidak
   memerlukan informasi ini untuk membangun program. Lihat [Struktur
   akun](/docs/core/accounts/account-structure) untuk tampilan yang menghadap ke
   developer.
-</Callout>
+</Note>
 
 ## Pemuatan akun
 
@@ -43,7 +44,7 @@ Proses ini melakukan beberapa validasi:
    lamport. Akun tidak boleh berakhir di antara 0 dan minimum bebas sewa. Akun
    nonce harus selalu mempertahankan lamport yang cukup untuk tetap bebas sewa.
    Jika pembayar bukan akun sistem maupun akun nonce, transaksi gagal dengan
-   _rs`TransactionError::InvalidAccountForFee`_.
+   `TransactionError::InvalidAccountForFee`.
 
 2. **Batas ukuran data yang dimuat**: Total ukuran semua akun yang dimuat
    (termasuk
@@ -51,16 +52,16 @@ Proses ini melakukan beberapa validasi:
    sebesar 64 byte per akun) tidak boleh melebihi
    [`MAX_LOADED_ACCOUNTS_DATA_SIZE_BYTES`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/execution_budget.rs#L53)
    (64 MiB). Melebihi batas ini menghasilkan
-   _rs`TransactionError::MaxLoadedAccountsDataSizeExceeded`_.
+   `TransactionError::MaxLoadedAccountsDataSizeExceeded`.
 
 3. **Validasi akun program**: Setiap program yang dipanggil oleh instruksi harus
    ada dan dimiliki oleh loader yang valid: salah satu dari
    [`PROGRAM_OWNERS`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/account/src/lib.rs#L802)
    (BPF Loader Upgradeable, BPF Loader, BPF Loader Deprecated, Loader V4) atau
    native loader. Jika akun program tidak ada, transaksi gagal dengan
-   _rs`TransactionError::ProgramAccountNotFound`_. Jika ada tetapi memiliki
+   `TransactionError::ProgramAccountNotFound`. Jika ada tetapi memiliki
    owner yang tidak valid, transaksi gagal dengan
-   _rs`TransactionError::InvalidProgramForExecution`_.
+   `TransactionError::InvalidProgramForExecution`.
 
 4. **Akun yang tidak ada**: Akun yang tidak ada di onchain dimuat sebagai akun
    default (0 lamport, data kosong, dimiliki oleh System Program) dengan
@@ -124,15 +125,15 @@ tingkat instruksi pertama yang memetakan ke sana:
 - Jika tidak, mengembalikan `Some(first_index)`, di mana `first_index` adalah
   indeks dari kemunculan pertama.
 
-Karena semua referensi ke akun yang sama berbagi _rs`AccountSharedData`_ yang
+Karena semua referensi ke akun yang sama berbagi `AccountSharedData` yang
 sama, modifikasi melalui referensi apa pun langsung terlihat melalui semua
 referensi lainnya. Namun, hanya satu pinjaman mutable yang dapat dipegang pada
 satu waktu. Mencoba meminjam akun yang sama secara mutable melalui dua indeks
 akun instruksi yang berbeda secara bersamaan mengembalikan
-_rs`InstructionError::AccountBorrowFailed`_. Program harus melepaskan satu
+`InstructionError::AccountBorrowFailed`. Program harus melepaskan satu
 pinjaman sebelum mengambil yang lain pada akun yang sama.
 
 Setelah program dieksekusi, runtime melakukan deserialisasi buffer kembali
 ([`deserialize_parameters_aligned()`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/serialization.rs#L580-L667))
 dan menerapkan perubahan apa pun ke `lamports`, `data` (termasuk perubahan
-panjang hingga _rs`MAX_PERMITTED_DATA_INCREASE`_), dan `owner`.
+panjang hingga `MAX_PERMITTED_DATA_INCREASE`), dan `owner`.

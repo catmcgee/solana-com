@@ -16,11 +16,11 @@ có tính xác định và có thể lặp lại.
 
 Thêm `mollusk-svm` làm dependency trong `Cargo.toml`:
 
-```terminal
-$ cargo add mollusk-svm --dev
+```bash Terminal
+cargo add mollusk-svm --dev
 ```
 
-```toml title="Cargo.toml"
+```toml Cargo.toml
 [dev-dependencies]
 mollusk-svm = "0.7"
 ```
@@ -28,11 +28,11 @@ mollusk-svm = "0.7"
 Để benchmark mức sử dụng compute unit, thêm `mollusk-svm-bencher` làm dependency
 trong `Cargo.toml`:
 
-```terminal
-$ cargo add mollusk-svm-bencher --dev
+```bash Terminal
+cargo add mollusk-svm-bencher --dev
 ```
 
-```toml title="Cargo.toml"
+```toml Cargo.toml
 [dev-dependencies]
 mollusk-svm-bencher = "0.7"
 ```
@@ -41,11 +41,11 @@ mollusk-svm-bencher = "0.7"
 Token Program cho việc kiểm thử với Mollusk, thêm `mollusk-svm-programs-token`
 làm dependency trong `Cargo.toml`:
 
-```terminal
-$ cargo add mollusk-svm-programs-token --dev
+```bash Terminal
+cargo add mollusk-svm-programs-token --dev
 ```
 
-```toml title="Cargo.toml"
+```toml Cargo.toml
 [dev-dependencies]
 mollusk-svm-programs-token = "0.7"
 ```
@@ -55,124 +55,112 @@ mollusk-svm-programs-token = "0.7"
 Ví dụ sau đây cho thấy thiết lập tối thiểu để kiểm thử một Solana program cơ bản
 sử dụng Mollusk.
 
-<ScrollyCoding>
+<Steps>
+  <Step title="Hello World Program">
+    Ví dụ này minh họa cách kiểm thử một Solana program cơ bản sử dụng Mollusk.
+    Program đơn giản in "Hello, world!" vào program log khi được gọi.
 
-## !!steps Hello World Program
+    Chạy `cargo build-sbf` sẽ tạo ra compiled program tại
+    `/target/deploy/<program_name>.so`.
 
-Ví dụ này minh họa cách kiểm thử một Solana program cơ bản sử dụng Mollusk.
-Program đơn giản in "Hello, world!" vào program log khi được gọi.
+    ```rs src/lib.rs focus={16-30}
+    use solana_program::{
+        account_info::AccountInfo, entrypoint, entrypoint::ProgramResult, msg, pubkey::Pubkey,
+    };
 
-Chạy `cargo build-sbf` sẽ tạo ra compiled program tại
-`/target/deploy/<program_name>.so`.
+    entrypoint!(process_instruction);
 
-<CodePlaceholder title="src/lib.rs" />
-
-<WithMentions>
-
-Để kiểm thử một Solana program với Mollusk:
-
-1. [Tạo instance `Mollusk`](mention:mollusk) - Khởi tạo Mollusk với program ID
-   và đường dẫn đến compiled program (file `.so`)
-2. [Xây dựng instruction](mention:instruction) - Tạo instruction để gọi program
-3. [Xử lý và xác thực](mention:process) - Xử lý instruction sử dụng Mollusk và
-   xác thực kết quả
-
-```rs title="src/lib.rs"
-#[cfg(test)]
-mod tests {
-    use mollusk_svm::{result::Check, Mollusk};
-    use solana_sdk::{instruction::Instruction, pubkey::Pubkey};
-
-    #[test]
-    fn test_hello_world() {
-        let program_id = Pubkey::new_unique();
-        // !mention mollusk
-        let mollusk = Mollusk::new(&program_id, "target/deploy/hello_world");
-
-        // !mention instruction
-        let instruction = Instruction::new_with_bytes(program_id, &[], vec![]);
-
-        // !mention process
-        mollusk.process_and_validate_instruction(&instruction, &[], &[Check::success()]);
+    pub fn process_instruction(
+        _program_id: &Pubkey,
+        _accounts: &[AccountInfo],
+        _instruction_data: &[u8],
+    ) -> ProgramResult {
+        msg!("Hello, world!");
+        Ok(())
     }
-}
-```
 
-</WithMentions>
+    #[cfg(test)]
+    mod tests {
+        use mollusk_svm::{result::Check, Mollusk};
+        use solana_sdk::{instruction::Instruction, pubkey::Pubkey};
 
-Để thực thi bài kiểm tra, chạy `cargo test`.
+        #[test]
+        fn test_hello_world() {
+            let program_id = Pubkey::new_unique();
+            let mollusk = Mollusk::new(&program_id, "target/deploy/hello_world");
 
-Khi bài kiểm tra chạy thành công, bạn sẽ thấy kết quả tương tự như sau:
+            let instruction = Instruction::new_with_bytes(program_id, &[], vec![]);
 
-```txt title="Terminal"
-running 1 test
-[2025-09-22T19:25:50.427685000Z DEBUG solana_runtime::message_processor::stable_log] Program 11157t3sqMV725NVRLrVQbAu98Jjfk1uCKehJnXXQs invoke [1]
-[2025-09-22T19:25:50.429669000Z DEBUG solana_runtime::message_processor::stable_log] Program log: Hello, world!
-[2025-09-22T19:25:50.429690000Z DEBUG solana_runtime::message_processor::stable_log] Program 11157t3sqMV725NVRLrVQbAu98Jjfk1uCKehJnXXQs consumed 211 of 1400000 compute units
-[2025-09-22T19:25:50.429726000Z DEBUG solana_runtime::message_processor::stable_log] Program 11157t3sqMV725NVRLrVQbAu98Jjfk1uCKehJnXXQs success
-test tests::test_hello_world ... ok
-
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
-
-   Doc-tests hello_world
-```
-
-```rs !! title="src/lib.rs"
-use solana_program::{
-    account_info::AccountInfo, entrypoint, entrypoint::ProgramResult, msg, pubkey::Pubkey,
-};
-
-entrypoint!(process_instruction);
-
-pub fn process_instruction(
-    _program_id: &Pubkey,
-    _accounts: &[AccountInfo],
-    _instruction_data: &[u8],
-) -> ProgramResult {
-    msg!("Hello, world!");
-    Ok(())
-}
-
-// !focus(1:15)
-#[cfg(test)]
-mod tests {
-    use mollusk_svm::{result::Check, Mollusk};
-    use solana_sdk::{instruction::Instruction, pubkey::Pubkey};
-
-    #[test]
-    fn test_hello_world() {
-        let program_id = Pubkey::new_unique();
-        let mollusk = Mollusk::new(&program_id, "target/deploy/hello_world");
-
-        let instruction = Instruction::new_with_bytes(program_id, &[], vec![]);
-
-        mollusk.process_and_validate_instruction(&instruction, &[], &[Check::success()]);
+            mollusk.process_and_validate_instruction(&instruction, &[], &[Check::success()]);
+        }
     }
-}
-```
+    ```
 
-```toml !! title="Cargo.toml"
-[package]
-name = "hello_world"
-version = "0.1.0"
-edition = "2021"
+    Để kiểm thử một Solana program với Mollusk:
 
-[lib]
-crate-type = ["cdylib", "lib"]
+    1. Tạo instance `Mollusk` - Khởi tạo Mollusk với program ID
+       và đường dẫn đến compiled program (file `.so`)
+    2. Xây dựng instruction - Tạo instruction để gọi program
+    3. Xử lý và xác thực - Xử lý instruction sử dụng Mollusk và
+       xác thực kết quả
 
-[dependencies]
-solana-program = "2.2.0"
+    ```rs src/lib.rs
+    #[cfg(test)]
+    mod tests {
+        use mollusk_svm::{result::Check, Mollusk};
+        use solana_sdk::{instruction::Instruction, pubkey::Pubkey};
 
-[dev-dependencies]
-mollusk-svm = "0.5.0"
-solana-sdk = "2.2.0"
-```
+        #[test]
+        fn test_hello_world() {
+            let program_id = Pubkey::new_unique();
+            let mollusk = Mollusk::new(&program_id, "target/deploy/hello_world");
 
-```txt !! title="target/deploy/hello_world.so"
-[binary]
-```
+            let instruction = Instruction::new_with_bytes(program_id, &[], vec![]);
 
-</ScrollyCoding>
+            mollusk.process_and_validate_instruction(&instruction, &[], &[Check::success()]);
+        }
+    }
+    ```
+
+    Để thực thi bài kiểm tra, chạy `cargo test`.
+
+    Khi bài kiểm tra chạy thành công, bạn sẽ thấy kết quả tương tự như sau:
+
+    ```txt Terminal
+    running 1 test
+    [2025-09-22T19:25:50.427685000Z DEBUG solana_runtime::message_processor::stable_log] Program 11157t3sqMV725NVRLrVQbAu98Jjfk1uCKehJnXXQs invoke [1]
+    [2025-09-22T19:25:50.429669000Z DEBUG solana_runtime::message_processor::stable_log] Program log: Hello, world!
+    [2025-09-22T19:25:50.429690000Z DEBUG solana_runtime::message_processor::stable_log] Program 11157t3sqMV725NVRLrVQbAu98Jjfk1uCKehJnXXQs consumed 211 of 1400000 compute units
+    [2025-09-22T19:25:50.429726000Z DEBUG solana_runtime::message_processor::stable_log] Program 11157t3sqMV725NVRLrVQbAu98Jjfk1uCKehJnXXQs success
+    test tests::test_hello_world ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+       Doc-tests hello_world
+    ```
+
+    ```toml Cargo.toml
+    [package]
+    name = "hello_world"
+    version = "0.1.0"
+    edition = "2021"
+
+    [lib]
+    crate-type = ["cdylib", "lib"]
+
+    [dependencies]
+    solana-program = "2.2.0"
+
+    [dev-dependencies]
+    mollusk-svm = "0.5.0"
+    solana-sdk = "2.2.0"
+    ```
+
+    ```txt target/deploy/hello_world.so
+    [binary]
+    ```
+  </Step>
+</Steps>
 
 Struct
 [`Mollusk`](https://docs.rs/mollusk-svm/0.5.0/mollusk_svm/struct.Mollusk.html)
@@ -183,7 +171,7 @@ dùng cũng có thể truy cập và sửa đổi trực tiếp nếu muốn ki�
 Để khởi tạo Mollusk với instance mặc định, sử dụng phương thức
 `Mollusk::default`.
 
-```rust title="Example"
+```rust Example
 // Default instance with no custom programs
 let mollusk = Mollusk::default();
 ```
@@ -191,7 +179,7 @@ let mollusk = Mollusk::default();
 Để khởi tạo Mollusk với một chương trình cụ thể, sử dụng phương thức
 `Mollusk::new`.
 
-```rust title="Example"
+```rust Example
 // Initialize Mollusk with a specific program from a file path
 let program_id = Pubkey::new_unique();
 let mollusk = Mollusk::new(&program_id, "target/deploy/my_program");
@@ -199,7 +187,7 @@ let mollusk = Mollusk::new(&program_id, "target/deploy/my_program");
 
 Để thêm chương trình vào Mollusk, sử dụng phương thức `Mollusk::add_program`.
 
-```rust title="Example"
+```rust Example
 let mollusk = Mollusk::default();
 let program_id = Pubkey::new_unique();
 
@@ -211,21 +199,21 @@ mollusk.add_program(
 );
 ```
 
-<Callout type="info">
+<Info>
   Khi cung cấp đường dẫn tệp, không bao gồm phần mở rộng `.so`. Ví dụ,
   `"path/to/my_program"` là đúng, nhưng `"path/to/my_program.so"` thì không.
-</Callout>
+</Info>
 
 ### Xử lý lệnh
 
 Mollusk cung cấp bốn phương thức chính để xử lý lệnh:
 
-| Phương thức                                                                    | Mô tả                                                                                                   |
-| ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
-| [`process_instruction`](#single-instruction)                                   | Xử lý một lệnh và trả về kết quả.                                                                       |
-| [`process_and_validate_instruction`](#single-instruction-with-checks)          | Xử lý một lệnh và thực hiện một loạt kiểm tra trên kết quả, báo lỗi nếu có kiểm tra nào thất bại.       |
-| [`process_instruction_chain`](#multiple-instructions)                          | Xử lý nhiều lệnh và trả về kết quả.                                                                     |
-| [`process_and_validate_instruction_chain`](#multiple-instructions-with-checks) | Xử lý nhiều lệnh và thực hiện một loạt kiểm tra trên mỗi kết quả, báo lỗi nếu có kiểm tra nào thất bại. |
+| Phương thức                                                             | Mô tả                                                                                                   |
+| ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| [`process_instruction`](#chỉ-thị-đơn)                                   | Xử lý một lệnh và trả về kết quả.                                                                       |
+| [`process_and_validate_instruction`](#chỉ-thị-đơn-với-kiểm-tra)         | Xử lý một lệnh và thực hiện một loạt kiểm tra trên kết quả, báo lỗi nếu có kiểm tra nào thất bại.       |
+| [`process_instruction_chain`](#nhiều-chỉ-thị)                           | Xử lý nhiều lệnh và trả về kết quả.                                                                     |
+| [`process_and_validate_instruction_chain`](#nhiều-chỉ-thị-với-kiểm-tra) | Xử lý nhiều lệnh và thực hiện một loạt kiểm tra trên mỗi kết quả, báo lỗi nếu có kiểm tra nào thất bại. |
 
 Struct
 [`InstructionResult`](https://docs.rs/mollusk-svm-result/0.5.0/mollusk_svm_result/types/struct.InstructionResult.html)
@@ -246,17 +234,15 @@ pub fn process_instruction(
 
 Ví dụ sau đây xử lý một chỉ thị chuyển SOL mà không có kiểm tra xác thực.
 
-<Callout type="info">
+<Info>
 
 Các ví dụ dưới đây chạy Mollusk trong hàm `main` cho mục đích minh họa. Trong
 thực tế, bạn thường sẽ sử dụng Mollusk trong một module kiểm thử được chú thích
 bằng thuộc tính `#[test]`.
 
-</Callout>
+</Info>
 
-<CodeTabs flags="r">
-
-```rs !! title="Single Instruction"
+```rs title="Single Instruction"
 use mollusk_svm::Mollusk;
 use solana_sdk::{account::Account, pubkey::Pubkey};
 use solana_system_interface::{instruction::transfer, program::ID as SYSTEM_PROGRAM_ID};
@@ -310,8 +296,6 @@ fn main() {
 }
 ```
 
-</CodeTabs>
-
 #### Chỉ thị đơn với kiểm tra
 
 Sử dụng phương thức `process_and_validate_instruction` để xử lý một chỉ thị đơn
@@ -329,9 +313,7 @@ pub fn process_and_validate_instruction(
 
 Ví dụ sau đây xử lý một chỉ thị chuyển SOL với kiểm tra xác thực.
 
-<CodeTabs flags="r">
-
-```rs !! title="With Validation"
+```rs title="With Validation"
 use {
     mollusk_svm::{result::Check, Mollusk},
     solana_sdk::{account::Account, pubkey::Pubkey},
@@ -385,8 +367,6 @@ fn main() {
 }
 ```
 
-</CodeTabs>
-
 #### Nhiều chỉ thị
 
 Sử dụng phương thức `process_instruction_chain` để xử lý nhiều chỉ thị tuần tự
@@ -402,9 +382,7 @@ pub fn process_instruction_chain(
 
 Ví dụ sau đây xử lý hai chỉ thị chuyển SOL mà không có kiểm tra xác thực.
 
-<CodeTabs flags="r">
-
-```rs !! title="Multiple Instructions"
+```rs title="Multiple Instructions"
 use {
     mollusk_svm::Mollusk,
     solana_sdk::{account::Account, pubkey::Pubkey},
@@ -471,8 +449,6 @@ fn main() {
 }
 ```
 
-</CodeTabs>
-
 #### Nhiều chỉ thị với kiểm tra
 
 Sử dụng phương thức `process_and_validate_instruction_chain` để xử lý nhiều lệnh
@@ -490,9 +466,7 @@ pub fn process_and_validate_instruction_chain(
 Ví dụ sau đây xử lý chuỗi hai chỉ thị chuyển SOL với kiểm tra xác thực sau mỗi
 chỉ thị.
 
-<CodeTabs flags="r">
-
-```rs !! title="With Validation"
+```rs title="With Validation"
 use {
     mollusk_svm::{result::Check, Mollusk},
     solana_sdk::{account::Account, pubkey::Pubkey},
@@ -587,21 +561,19 @@ fn main() {
 }
 ```
 
-</CodeTabs>
-
 ### Kiểm tra xác thực
 
 Mollusk cung cấp một bộ
 [phương thức hỗ trợ](https://docs.rs/mollusk-svm-result/0.5.0/mollusk_svm_result/check/struct.Check.html)
 để kiểm tra kết quả của một lệnh đã được xử lý.
 
-```rust title="Example"
+```rust Example
 use mollusk_svm::result::Check;
 ```
 
 Sử dụng các phương thức sau để xác thực kết quả lệnh:
 
-```rust title="Example"
+```rust Example
 // Program execution succeeded
 Check::success()
 
@@ -626,7 +598,7 @@ Check::return_data(&[1, 2, 3, 4])
 
 Sử dụng các phương thức sau để xác thực trạng thái Account:
 
-```rust title="Example"
+```rust Example
 // Single account validation
 Check::account(&pubkey)
     .lamports(1_000_000)           // Exact lamports
@@ -656,7 +628,7 @@ lệnh.
 
 Tạo một `account_store` bằng phương thức `with_context`:
 
-```rust title="Example"
+```rust Example highlight={21} focus={9-19,21}
 use std::collections::HashMap;
 use solana_sdk::{account::Account, pubkey::Pubkey};
 use solana_system_interface::program::ID as SYSTEM_PROGRAM_ID;
@@ -665,7 +637,6 @@ use mollusk_svm::Mollusk;
 let mollusk = Mollusk::default();
 let account_address = Pubkey::new_unique();
 
-// !focus(1:11)
 let mut account_store = HashMap::new();
 account_store.insert(
     account_address,
@@ -678,17 +649,13 @@ account_store.insert(
     },
 );
 
-// !focus
-// !mark
 let context = mollusk.with_context(account_store);
 ```
 
 Ví dụ sau đây xử lý hai chỉ thị chuyển SOL riêng biệt với trạng thái account
 liên tục giữa các chỉ thị thông qua `account_store`.
 
-<CodeTabs flags="r">
-
-```rs !! title="Stateful Testing"
+```rs title="Stateful Testing"
 use {
     mollusk_svm::Mollusk,
     solana_sdk::{account::Account, pubkey::Pubkey},
@@ -747,8 +714,6 @@ fn main() {
 }
 ```
 
-</CodeTabs>
-
 ### Mollusk Sysvars
 
 Mollusk cung cấp một struct
@@ -758,9 +723,7 @@ tùy chỉnh để sửa đổi các giá trị của nó cho mục đích kiể
 Sử dụng phương thức `warp_to_slot` để cập nhật sysvar clock nhằm mô phỏng việc
 di chuyển về phía trước hoặc lùi về một slot cụ thể.
 
-<CodeTabs flags="r">
-
-```rust !! title="Warp to Slot"
+```rust title="Warp to Slot"
 use mollusk_svm::Mollusk;
 
 fn main() {
@@ -780,15 +743,11 @@ fn main() {
 }
 ```
 
-</CodeTabs>
-
 Ví dụ sau đây cho thấy cách sửa đổi trực tiếp sysvar của Mollusk bằng cách truy
 cập trường `sysvars` để thay đổi các tham số rent. Bạn có thể sửa đổi các giá
 trị sysvar khác theo cách tương tự.
 
-<CodeTabs flags="r">
-
-```rust !! title="Modify Sysvars"
+```rust title="Modify Sysvars"
 use {mollusk_svm::Mollusk, solana_sdk::rent::Rent};
 
 fn main() {
@@ -815,8 +774,6 @@ fn main() {
 }
 ```
 
-</CodeTabs>
-
 ## Đo lường compute unit
 
 [`MolluskComputeUnitBencher`](https://docs.rs/mollusk-svm-bencher/0.5.0/mollusk_svm_bencher/struct.MolluskComputeUnitBencher.html)
@@ -829,9 +786,7 @@ làm dependency.
 
 Ví dụ sau đây đo lường mức sử dụng compute unit của một instruction chuyển SOL.
 
-<CodeTabs>
-
-```rs !! title="Benchmark Compute Units"
+```rs title="Benchmark Compute Units" highlight={42-46} focus={42-46}
 use {
     mollusk_svm::Mollusk,
     mollusk_svm_bencher::MolluskComputeUnitBencher,
@@ -873,8 +828,6 @@ fn main() {
     ];
 
     // Run benchmark
-    // !focus(1:5)
-    // !mark(1:5)
     MolluskComputeUnitBencher::new(mollusk)
         .bench(("transfer", &transfer, &accounts))
         .must_pass(true)
@@ -883,12 +836,10 @@ fn main() {
 }
 ```
 
-</CodeTabs>
-
 Kết quả benchmark được ghi vào `out_dir` đã chỉ định dưới dạng file markdown với
 tên `compute_units.md`.
 
-```md title="comput_units.md"
+```md comput_units.md
 #### 2025-09-19 22:28:53.691839 UTC
 
 Solana CLI Version: solana-cli 2.2.20 (src:dabc99a5; feat:3073396398,
@@ -906,16 +857,14 @@ Sử dụng crate
 để thêm Token Program, token2022 program (Token Extensions), và associated token
 program vào Mollusk cho việc kiểm thử.
 
-```rust title="Example"
+```rust Example focus={3,8-13}
 use {
     mollusk_svm::Mollusk,
-    // !focus
     mollusk_svm_programs_token::{associated_token, token, token2022},
 };
 
 let mut mollusk = Mollusk::default();
 
-// !focus(1:6)
 // Add SPL Token Program
 token::add_program(&mut mollusk);
 // Add SPL Token-2022 Program
@@ -926,15 +875,13 @@ associated_token::add_program(&mut mollusk);
 
 Ví dụ sau đây minh họa việc kiểm thử một giao dịch chuyển token bằng Mollusk.
 
-<Callout type="info">
+<Info>
   Ví dụ dưới đây định nghĩa thủ công các test account cho mục đích minh họa.
   `mollusk-svm-programs-token` cũng bao gồm các hàm trợ giúp để tạo mint và
   token account.
-</Callout>
+</Info>
 
-<CodeTabs flags="r">
-
-```rs !! title="Token Transfer Example"
+```rs title="Token Transfer Example"
 use {
     mollusk_svm::{result::Check, Mollusk},
     mollusk_svm_programs_token::token,
@@ -1099,5 +1046,3 @@ fn main() {
     println!("Destination Token Account: {:#?}", dest_token);
 }
 ```
-
-</CodeTabs>

@@ -16,7 +16,7 @@ description:
 أضف الـ crate كاعتمادية تطوير. يعتمد SDK على البرمجة غير المتزامنة بالدرجة
 الأولى ويتوقع وقت تشغيل Tokio، لذا أدرج `tokio` مع ميزة `full` للاختبارات.
 
-```toml title="Cargo.toml"
+```toml Cargo.toml
 [dev-dependencies]
 surfpool-sdk = "1"
 tokio = { version = "1", features = ["full"] }
@@ -88,11 +88,13 @@ import {
 | macOS Intel          | `x86_64-apple-darwin`      | `@solana/surfpool-darwin-x64`    |
 | Linux x86-64 (glibc) | `x86_64-unknown-linux-gnu` | `@solana/surfpool-linux-x64-gnu` |
 
-<Callout type="warn" title="منصة غير مدعومة">
+<Warning>
+  **منصة غير مدعومة**
+
   إذا تم تثبيت الحزمة على منصة لا يوجد لها ملف ثنائي مطابق، فسيكتمل التثبيت لكن
   `Surfnet.start()` سيُطلق خطأً عند وقت التشغيل. افتح تذكرة إذا كنت بحاجة إلى
   دعم منصة إضافية.
-</Callout>
+</Warning>
 
 ### المتطلبات
 
@@ -106,58 +108,66 @@ import {
 يُؤكد اختبار سريع من سطر واحد أن وقت التشغيل يبدأ وأن نقطة نهاية RPC تقبل
 الطلبات.
 
-<CodeTabs storage="surfpool-lang">
+<Tabs>
+  <Tab title="Rust">
+    ```rust Rust
+    use surfpool_sdk::{Signer, Surfnet};
 
-```rust !! title="Rust"
-use surfpool_sdk::{Signer, Surfnet};
+    #[tokio::test]
+    async fn surfpool_sdk_smoke() {
+        let surfnet = Surfnet::start().await.expect("start surfnet");
+        let balance = surfnet
+            .rpc_client()
+            .get_balance(&surfnet.payer().pubkey())
+            .expect("get balance");
+        assert!(balance > 0);
+    }
+    ```
 
-#[tokio::test]
-async fn surfpool_sdk_smoke() {
-    let surfnet = Surfnet::start().await.expect("start surfnet");
-    let balance = surfnet
-        .rpc_client()
-        .get_balance(&surfnet.payer().pubkey())
-        .expect("get balance");
-    assert!(balance > 0);
-}
-```
+    شغّل باستخدام `cargo test --test smoke`.
+  </Tab>
 
-شغّل باستخدام `cargo test --test smoke`.
+  <Tab title="TypeScript">
+    ```ts TypeScript
+    import { after, test } from "node:test";
+    import assert from "node:assert/strict";
+    import { Surfnet } from "@solana/surfpool";
 
-```ts !! title="TypeScript"
-import { after, test } from "node:test";
-import assert from "node:assert/strict";
-import { Surfnet } from "@solana/surfpool";
+    const surfnet = Surfnet.start();
+    after(() => surfnet.stop());
 
-const surfnet = Surfnet.start();
-after(() => surfnet.stop());
+    test("surfpool sdk smoke", () => {
+      assert.match(surfnet.rpcUrl, /^http:\/\/127\.0\.0\.1:\d+$/);
+      assert.ok(surfnet.payer.length > 0);
+    });
+    ```
 
-test("surfpool sdk smoke", () => {
-  assert.match(surfnet.rpcUrl, /^http:\/\/127\.0\.0\.1:\d+$/);
-  assert.ok(surfnet.payer.length > 0);
-});
-```
-
-شغّل باستخدام `node --test smoke.test.ts` (مع محمّل TS) أو
-`tsx --test smoke.test.ts`.
-
-</CodeTabs>
+    شغّل باستخدام `node --test smoke.test.ts` (مع محمّل TS) أو
+    `tsx --test smoke.test.ts`.
+  </Tab>
+</Tabs>
 
 ## استكشاف الأخطاء وإصلاحها
 
-<Callout type="warn" title="`failed to bind to port` on Rust">
+<Warning>
+  **\`failed to bind to port\` on Rust**
+
   عملية أخرى تقوم بربط `0.0.0.0` بشكل متكرر. أعد تشغيل الاختبار — يختار SDK
   منفذاً جديداً في كل استدعاء. إذا استمر الفشل، تحقق من وجود عمليات `surfpool`
   معلّقة.
-</Callout>
+</Warning>
 
-<Callout type="warn" title="`Cannot find module '@solana/surfpool-...'`">
+<Warning>
+  **\`Cannot find module '@solana/surfpool-...'\`**
+
   لم يتم تثبيت إدخال `optionalDependencies` الخاص بمنصتك. أعد تشغيل التثبيت
   باستخدام `--include=optional`، أو تحقق من أن منصتك مدرجة في جدول المنصات
   المدعومة أعلاه.
-</Callout>
+</Warning>
 
-<Callout type="warn" title="`stop()` hangs in JS">
+<Warning>
+  **\`stop()\` hangs in JS**
+
   تأكد من أنك تستدعي `stop()` مرة واحدة لكل `start()`. يبقي غلاف Node خوادم RPC
   وWebSocket مرتبطة حتى يُرجع `stop()` قيمته.
-</Callout>
+</Warning>

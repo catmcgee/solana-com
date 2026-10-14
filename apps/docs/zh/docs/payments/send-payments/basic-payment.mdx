@@ -10,119 +10,105 @@ Solana 实现了即时、全球范围的代币转账，手续费低于 $0.001。
 支付会将稳定币从发送方的 token account 转入接收方的 token
 account。如果接收方首次接收该代币，其 token account 可以在同一笔交易中自动创建。
 
-<Callout>
+<Note>
   参见 [Solana 上的支付原理](/docs/payments/how-payments-work)
   了解核心支付概念。
-</Callout>
+</Note>
 
 来自 `@solana-program/token-2022` 的 `token2022Program()` 插件，为您的
 [`@solana/kit`](/docs/frontend/client) 客户端扩展了 `client.token2022`
 辅助工具。其 `transferToATA`
 方法可自动处理 ATA 派生和交易构建，非常适合单笔支付转账。
 
-以下步骤展示了核心流程。完整可运行代码请参见 [演示](#demo)。
+以下步骤展示了核心流程。完整可运行代码请参见 [演示](#演示)。
 
-<ScrollyCoding>
+<Steps>
+  <Step title="创建 Token 辅助工具">
+    使用 `.use(token2022Program())` 将 `token2022Program()`
+    插件添加到您的客户端。这将暴露 `client.token2022`，其 `instructions`
+    提供了常见 token 操作的方法。
 
-## !!steps 创建 Token 辅助工具
+    对于由 Token-2022 程序拥有的铸币，请使用 `token2022Program()`；对于由原始 Token
+    Program 拥有的铸币，请使用来自 `@solana-program/token` 的 `tokenProgram()`。
 
-使用 `.use(token2022Program())` 将 `token2022Program()`
-插件添加到您的客户端。这将暴露 `client.token2022`，其 `instructions`
-提供了常见 token 操作的方法。
+    ```ts 基础支付 focus={1-4}
+    const client = createClient()
+      .use(signer(sender))
+      .use(solanaLocalRpc())
+      .use(token2022Program());
+    ```
+  </Step>
 
-对于由 Token-2022 程序拥有的铸币，请使用 `token2022Program()`；对于由原始 Token
-Program 拥有的铸币，请使用来自 `@solana-program/token` 的 `tokenProgram()`。
+  <Step title="发送支付">
+    使用 `transferToATA()` 在钱包之间转移代币。该方法处理以下事项：
 
-<CodePlaceholder title="基础支付" />
+    - **ATA 解析**：自动为发送方和接收方派生 Associated Token
+      Accounts（ATA）。若接收方的 ATA 不存在，则创建该账户的指令将自动添加到同一笔交易中。
+    - **金额校验**：以基本单位传入 `amount`，同时传入铸币的
+      `decimals`。转账将在链上根据铸币的小数位数进行校验（例如，若铸币有 6 位小数，250000 基本单位 ->
+      0.25 个代币）。
+    - **交易构建**：`sendTransaction()` 负责构建、签名并发送交易，返回一个结果，其
+      `context.signature` 字段保存交易签名。
 
-```ts !! title="Basic Payment"
-// !focus(1:4)
-const client = createClient()
-  .use(signer(sender))
-  .use(solanaLocalRpc())
-  .use(token2022Program());
-```
+    ```ts title="Basic Payment" focus={6-14}
+    const client = createClient()
+      .use(signer(sender))
+      .use(solanaLocalRpc())
+      .use(token2022Program());
 
-## !!steps 发送支付
+    const result = await client.token2022.instructions
+      .transferToATA({
+        mint: mint.address,
+        authority: sender,
+        recipient: recipient.address,
+        amount: 250_000n,
+        decimals: 6
+      })
+      .sendTransaction();
+    ```
+  </Step>
 
-使用 `transferToATA()` 在钱包之间转移代币。该方法处理以下事项：
+  <Step title="验证余额">
+    转账完成后，从 RPC 读取代币余额。使用 `findAssociatedTokenPda()`
+    派生每个钱包的 ATA，然后调用 `getTokenAccountBalance()` 获取该账户的余额。
 
-- **ATA 解析**：自动为发送方和接收方派生 Associated Token
-  Accounts（ATA）。若接收方的 ATA 不存在，则创建该账户的指令将自动添加到同一笔交易中。
-- **金额校验**：以基本单位传入 `amount`，同时传入铸币的
-  `decimals`。转账将在链上根据铸币的小数位数进行校验（例如，若铸币有 6 位小数，250000 基本单位 ->
-  0.25 个代币）。
-- **交易构建**：`sendTransaction()` 负责构建、签名并发送交易，返回一个结果，其
-  `context.signature` 字段保存交易签名。
+    ```ts title="Basic Payment" focus={16-29}
+    const client = createClient()
+      .use(signer(sender))
+      .use(solanaLocalRpc())
+      .use(token2022Program());
 
-<CodePlaceholder title="Basic Payment" />
+    const result = await client.token2022.instructions
+      .transferToATA({
+        mint: mint.address,
+        authority: sender,
+        recipient: recipient.address,
+        amount: 250_000n,
+        decimals: 6
+      })
+      .sendTransaction();
 
-```ts !! title="Basic Payment"
-const client = createClient()
-  .use(signer(sender))
-  .use(solanaLocalRpc())
-  .use(token2022Program());
-
-// !focus(1:9)
-const result = await client.token2022.instructions
-  .transferToATA({
-    mint: mint.address,
-    authority: sender,
-    recipient: recipient.address,
-    amount: 250_000n,
-    decimals: 6
-  })
-  .sendTransaction();
-```
-
-## !!steps 验证余额
-
-转账完成后，从 RPC 读取代币余额。使用 `findAssociatedTokenPda()`
-派生每个钱包的 ATA，然后调用 `getTokenAccountBalance()` 获取该账户的余额。
-
-<CodePlaceholder title="Basic Payment" />
-
-```ts !! title="Basic Payment"
-const client = createClient()
-  .use(signer(sender))
-  .use(solanaLocalRpc())
-  .use(token2022Program());
-
-const result = await client.token2022.instructions
-  .transferToATA({
-    mint: mint.address,
-    authority: sender,
-    recipient: recipient.address,
-    amount: 250_000n,
-    decimals: 6
-  })
-  .sendTransaction();
-
-// !focus(1:14)
-const [senderAta] = await findAssociatedTokenPda({
-  mint: mint.address,
-  owner: sender.address,
-  tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
-});
-const [recipientAta] = await findAssociatedTokenPda({
-  mint: mint.address,
-  owner: recipient.address,
-  tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
-});
-const senderBalance = await client.rpc.getTokenAccountBalance(senderAta).send();
-const recipientBalance = await client.rpc
-  .getTokenAccountBalance(recipientAta)
-  .send();
-```
-
-</ScrollyCoding>
+    const [senderAta] = await findAssociatedTokenPda({
+      mint: mint.address,
+      owner: sender.address,
+      tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
+    });
+    const [recipientAta] = await findAssociatedTokenPda({
+      mint: mint.address,
+      owner: recipient.address,
+      tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
+    });
+    const senderBalance = await client.rpc.getTokenAccountBalance(senderAta).send();
+    const recipientBalance = await client.rpc
+      .getTokenAccountBalance(recipientAta)
+      .send();
+    ```
+  </Step>
+</Steps>
 
 ### 演示
 
-<CodeTabs flags="r">
-
-```ts !! title="Demo"
-// !collapse(1:14) collapsed
+```ts Demo highlight={34-42} expandable
 // Click ">" icon on left to expand demo imports
 import {
   createClient,
@@ -156,7 +142,6 @@ console.log("\nMint Address:", mint.address);
 
 // Transfer tokens from sender to recipient. The source and destination ATAs are
 // derived automatically, and the recipient's ATA is created if it does not exist.
-// !mark(1:9)
 const result = await client.token2022.instructions
   .transferToATA({
     mint: mint.address,
@@ -199,7 +184,6 @@ console.log(
 // =============================================================================
 // Demo Setup Helper Function
 // =============================================================================
-// !collapse(1:1000) collapsed
 
 /**
  * Sets up for a token transfer demo:
@@ -253,5 +237,3 @@ async function demoSetup(sender: TransactionSigner) {
   };
 }
 ```
-
-</CodeTabs>

@@ -1,0 +1,184 @@
+---
+title: "Confirm payments from your backend"
+sidebarTitle: "Confirm from your backend"
+description: "Ship an order only after your server has looked the payment up on the network and checked the amount, the recipient and the order reference."
+---
+
+import Stepper from "/snippets/paths/en/checkout/stepper-3.mdx";
+import RpcConcept from "/snippets/concepts/en/rpc.mdx";
+import CommitmentConcept from "/snippets/concepts/en/commitment.mdx";
+import ConfigExample from "/snippets/examples/paths/payments/checkout/config.mdx";
+import VerifyExample from "/snippets/examples/paths/payments/checkout/verify.mdx";
+import RouteExample from "/snippets/examples/paths/payments/checkout/route.mdx";
+import NextStep from "/snippets/paths/en/checkout/next-3.mdx";
+
+<Stepper />
+
+The checkout in the browser gives you a signature. Your server takes that
+signature, fetches the transaction from the network, and checks that it paid
+you, in USDC, the right amount, for this order. Only then does it mark the
+order paid. Run this on your own machine against devnet.
+
+## 1. Install the SDK
+
+You need Node.js and one package. There is no CLI to install and no local
+network to run.
+
+```bash
+npm install @solana/kit
+```
+
+The payment code from the previous step also uses `@solana-program/token`.
+
+For the Python version, install [solana-py](https://github.com/michaelhly/solana-py):
+
+```bash
+pip install solana
+```
+
+Your server reads the network over RPC:
+
+<RpcConcept />
+
+The examples read their network settings from environment variables and
+default to devnet:
+
+<ConfigExample />
+
+## 2. Verify a payment
+
+Given the signature and the order, fetch the transaction and check three
+things: it succeeded, it carries the order's reference, and the store's USDC
+balance went up by exactly the order amount. The balance is read for the USDC
+mint only, so a payment in any other token doesn't count.
+
+<VerifyExample />
+
+The check asks for the transaction at `confirmed` commitment:
+
+<CommitmentConcept />
+
+## 3. Add a confirm endpoint
+
+The endpoint receives `{ "signature": "…" }` for an order, runs
+`verifyPayment`, and marks the order paid. It refuses a signature that was
+already used, so one payment can never pay for two orders.
+
+<RouteExample />
+
+`getOrder`, `isSignatureUsed` and `markPaidOnce` stand in for your database.
+In production, make `markPaidOnce` a single database transaction with a unique
+constraint on the signature and on each order's paid signature, so two
+concurrent requests can't both succeed.
+
+The Node.js version has no framework. The handler body ports directly to
+Express, Fastify or Hono: read the signature, verify it, mark it used.
+
+<Note>
+  The endpoint passes the order's reference, which the `@solana/kit` payment
+  code from the previous step attaches to the transfer. `reference` is optional
+  in `verifyPayment`, but keep it. Transactions are public, so without a
+  reference anyone who sees a payment to your store could submit its
+  signature for their own order of the same amount. If your checkout can't
+  attach your reference, also check who paid, for example that the signer is
+  the customer's wallet.
+</Note>
+
+The recorded output shows the three cases your endpoint must handle:
+
+- **200** for a confirmed payment of the right amount.
+- **402 `already used`** when the same signature is sent again.
+- **402 `amount mismatch`** when a 2 USDC order was paid with 1 USDC.
+
+## 4. Call it from the checkout
+
+Build the customer's payment with `payStore` from the previous step, not with
+the playground's `PaymentButton`. `payStore` attaches the order's reference to
+the transfer, and this endpoint requires it.
+
+1. When the customer checks out, create the order on your server with a fresh
+   reference (`(await generateKeyPairSigner()).address`) and send the order's
+   `storeOwner`, `amount` and `reference` to the browser.
+2. In the browser, call `payStore(customer, order)`, where `customer` is the
+   wallet's `TransactionSigner` (for example from
+   `useWalletAccountTransactionSigner` in
+   [`@solana/react`](/docs/clients/official/javascript)). It resolves to the transaction signature once the payment is
+   confirmed.
+3. `POST` that signature to `/api/orders/<order-id>/confirm` with a JSON body
+   of `{ "signature": "…" }`.
+
+Show the confirmation page only when the response is `200` with
+`"paid": true`. Treat any other response as unpaid, and let the customer
+retry.
+
+<Warning>
+  This endpoint can't confirm a `PaymentButton` payment. The button builds its
+  own transfer and doesn't take your order's reference, so `verifyPayment`
+  answers `reference not found` and the endpoint returns `402`. If you use the
+  button anyway, you need a different check: drop `reference` from the
+  `verifyPayment` call and check instead that the payer is the customer's
+  wallet and that the signature hasn't paid for another order. Without the
+  reference, anyone who sees a payment to your store on the public ledger could
+  submit its signature for their own order of the same amount.
+</Warning>
+
+## 5. Run it on your machine
+
+The code on this page, an in-memory order store (`orders.ts`) and the tests
+that produced the recorded output live in the docs repository under
+`packages/docs-examples/paths/payments/checkout`. The test starts a local
+Surfpool network from npm, funds a test customer with SOL and 10 USDC, creates
+the orders, pays them with the payment code from the previous step, and calls
+the confirm endpoint:
+
+```sh Terminal
+git clone --branch mintlify-migration https://github.com/catmcgee/solana-com.git
+cd solana-com
+corepack enable
+pnpm install
+pnpm --filter @workspace/docs-examples exec vitest run paths/payments/checkout
+```
+
+The test passes when the paid order gets `200`, the replayed signature and the
+underpaid order get `402`, and `verifyPayment` rejects a wrong amount, mint,
+recipient or reference.
+
+<Note>
+  These examples are on the `mintlify-migration` branch of the
+  [catmcgee/solana-com](https://github.com/catmcgee/solana-com/tree/mintlify-migration/packages/docs-examples/paths/payments/checkout)
+  fork until it is merged into `solana-foundation/solana-com`.
+</Note>
+
+To call the endpoint by hand instead, against devnet, you need three things
+that match:
+
+- **An order the endpoint knows.** The route looks the order up with
+  `getOrder`, so create it first with `createOrder({ id, storeOwner, amount,
+  reference })` from `orders.ts` (or your database). Any other order id gets
+  `404 unknown order`.
+- **A devnet payment that carries that order's reference.** The `@solana/kit`
+  payment code from the previous step attaches it. A payment made with the
+  playground's `PaymentButton` doesn't, so `verifyPayment` answers
+  `reference not found`. The playground also defaults to mainnet.
+- **The same USDC mint.** `USDC_MINT` defaults to devnet USDC. Pay with that
+  mint, or set `USDC_MINT` to the one you paid with.
+
+Then start the server with `createCheckoutServer().listen(3000)` from
+`server.ts`. The order store is in memory, so create the order in the same
+process. Send the signature:
+
+```bash
+curl -X POST http://localhost:3000/api/orders/<order-id>/confirm \
+  -H "content-type: application/json" \
+  -d '{"signature":"<the payment signature>"}'
+```
+
+A paid order returns the same JSON as the first line of the recorded output
+above.
+
+<Note>
+  Want the Solana CLI, a local test network or Anchor? You don't need them for
+  payments. [Installation](/docs/intro/installation) covers them if you do.
+</Note>
+
+<NextStep />

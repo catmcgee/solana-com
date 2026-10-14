@@ -4,7 +4,6 @@ description:
   11-vaiheinen CPI-suorituskulku Solana-ajonaikaympäristön läpi, oikeuksien
   laajennussäännöt, uudelleenkutsurajoitukset ja valtuutettujen ohjelmien
   tarkistukset.
-url: /docs/core/cpi/cpi-execution
 type: reference
 prerequisites:
   - /docs/core/cpi
@@ -18,12 +17,14 @@ related:
 
 {/* TOC: CPI execution flow, Privilege rules */}
 
-<Callout type="info" title="Yhteenveto">
+<Info>
+  **Yhteenveto**
+
   CPI:t kulkevat 11 ajonaikaisen vaiheen läpi, mukaan lukien oikeuksien
   tarkistus, tilin käännös ja datan synkronointi. Maksimi kutsusyvyys: 5 (9
   SIMD-0268:n kanssa). Oikeussäännöt estävät kutsuttavaa laajentamasta oikeuksia
   yli sen, mitä kutsuja myönsi.
-</Callout>
+</Info>
 
 ## Oikeussäännöt
 
@@ -52,7 +53,7 @@ Oikeussäännöt voidaan tiivistää seuraavasti:
 2. **Allekirjoittajaoikeus vaatii valtuutuksen.** Tili voi olla allekirjoittaja
    kutsutussa vain, jos (a) se oli jo allekirjoittaja kutsujassa TAI (b) se on
    PDA, joka on johdettu kutsuvan ohjelman siemenistä
-   _rs`invoke_signed`_-funktion kautta.
+   `invoke_signed`-funktion kautta.
 3. **Oikeuksien vähentäminen on aina sallittua.** Kutsuttu voi käyttää vähemmän
    oikeuksia kuin kutsuja myönsi.
 
@@ -62,7 +63,7 @@ CPI kulkee useiden runtime-kerrosten läpi. Tämä osio dokumentoi koko putkilin
 ohjelman SDK-kutsusta syscall-rajan yli runtimeen ja takaisin. Jokainen vaihe
 viittaa sen toteuttavaan lähdetiedostoon.
 
-<Callout>
+<Note>
   Ohjelman käskyn kutsun maksimikorkeus on nimeltään
   [`max_instruction_stack_depth`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/execution_budget.rs#L66)
   ja se on asetettu
@@ -73,7 +74,7 @@ Pinosyvyys 1 on alkuperäinen transaktio-ohje. Jokainen CPI kasvattaa syvyyttä
 yhdellä. Maksimi 5 tarkoittaa, että ohjelma voi tehdä CPI-kutsuja jopa 4 tasoa
 syvälle (8 tasoa syvälle SIMD-0268:n kanssa).
 
-</Callout>
+</Note>
 
 ### Vaihe 1: Ohjelma kutsuu `invoke`- tai `invoke_signed`-funktiota
 
@@ -81,9 +82,9 @@ Ohjelma kutsuu
 [`invoke`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/program/src/program.rs#L26)
 -funktiota tai
 [`invoke_signed`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/program/src/program.rs#L51)
--funktiota. _rs`invoke`_ on ohut wrapper, joka kutsuu
-_rs`invoke_signed`_-funktiota tyhjällä allekirjoittajan siemen-taulukolla.
-SDK-funktio serialisoi _rs`Instruction`_-rakenteen, _rs`AccountInfo`_-taulukon
+-funktiota. `invoke` on ohut wrapper, joka kutsuu
+`invoke_signed`-funktiota tyhjällä allekirjoittajan siemen-taulukolla.
+SDK-funktio serialisoi `Instruction`-rakenteen, `AccountInfo`-taulukon
 ja allekirjoittajan siemenet VM-muistiin ja laukaisee sitten syscall-kutsun.
 
 ### Vaihe 2: Syscall-sisääntulo
@@ -95,7 +96,7 @@ SBF VM ohjaa
 
 ### Vaihe 3: Kutsukustannuksen kuluttaminen
 
-Ensimmäinen toiminto _rs`cpi_common`_-funktion sisällä on
+Ensimmäinen toiminto `cpi_common`-funktion sisällä on
 [kiinteän kutsukustannuksen veloittaminen](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/cpi.rs#L815-L818)
 jaetusta laskentamittarista:
 [`invoke_units`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/execution_budget.rs#L108)
@@ -106,7 +107,7 @@ jaetusta laskentamittarista:
 Syscall-käsittelijä kääntää käskyn ohjelman VM-osoiteavaruudesta isäntäpuolen
 Rust-tyyppeihin
 [`translate_instruction_rust`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/cpi.rs#L529-L590)-funktion
-kautta, joka lukee _rs`StableInstruction`_-rakenteen, validoi datan pituuden
+kautta, joka lukee `StableInstruction`-rakenteen, validoi datan pituuden
 [`MAX_INSTRUCTION_DATA_LEN`](https://github.com/anza-xyz/agave/blob/v3.1.8/transaction-context/src/lib.rs#L33)-arvoa
 vasten (10 240 tavua) ja veloittaa sitten
 [datan serialisointikustannuksen](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/cpi.rs#L551-L569).
@@ -154,16 +155,16 @@ Rikkomus palauttaa
 
 Runtime kutsuu
 [`prepare_next_instruction`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/invoke_context.rs#L293-L432)-funktiota,
-joka rakentaa kutsuttavan _rs`InstructionAccount`_-listan ja valvoo
+joka rakentaa kutsuttavan `InstructionAccount`-listan ja valvoo
 oikeussääntöjä. Katso täydellinen päätöstaulukko kohdasta
-[Oikeussäännöt](#privilege-rules).
+[Oikeussäännöt](#oikeussäännöt).
 
 ### Vaihe 8: Tilitietojen kääntäminen
 
 Käsittelijä kutsuu `translate_accounts`-funktiota, joka:
 
 1. [Validoi tilitietojen määrän](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/cpi.rs#L164-L190)
-   verrattuna _rs`MAX_CPI_ACCOUNT_INFOS`_-arvoon (128 tai 255 SIMD-0339:n
+   verrattuna `MAX_CPI_ACCOUNT_INFOS`-arvoon (128 tai 255 SIMD-0339:n
    kanssa).
 2. [Veloittaa tilitietojen käännöskustannuksen](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/cpi.rs#L969-L981)
    (vain SIMD-0339): `(num_account_infos * 80) / 250` CU:ta.
@@ -191,11 +192,11 @@ joka:
 
 1. Kutsuu
    [`push()`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/invoke_context.rs#L233-L265)-funktiota
-   lisätäkseen uuden kehyksen käskypinoon. _rs`push()`_ valvoo
+   lisätäkseen uuden kehyksen käskypinoon. `push()` valvoo
    [uudelleensisääntulosääntöä](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/invoke_context.rs#L243-L259):
    ohjelma voi kutsua itseään vain, jos se on suora kutsuja (eli ohjelma A voi
    kutsua A:ta, mutta A ei voi kutsua B:tä, joka kutsuu A:ta). Rikkomus
-   palauttaa _rs`ReentrancyNotAllowed`_-virheen.
+   palauttaa `ReentrancyNotAllowed`-virheen.
 2. Kutsuu
    [`process_executable_chain`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/invoke_context.rs#L507-L602)-funktiota,
    joka selvittää kutsuttavan ohjelman tulokohtaan ja kutsuu sitä. Kutsuttava
@@ -204,7 +205,7 @@ joka:
 3. Kutsuu
    [`pop()`](https://github.com/anza-xyz/agave/blob/v3.1.8/transaction-context/src/lib.rs#L366-L398)-funktiota
    poistaakseen kutsuttavan kehyksen ja varmistaakseen, että lamport-saldot ovat
-   muuttumattomat (_rs`UnbalancedInstruction`_, jos eivät ole).
+   muuttumattomat (`UnbalancedInstruction`, jos eivät ole).
 
 ### Vaihe 11: CPI:n jälkeinen tilisynkronointi (kutsuttavalta kutsujalle)
 

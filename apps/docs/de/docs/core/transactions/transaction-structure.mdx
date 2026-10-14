@@ -2,7 +2,6 @@
 title: Transaktionsstruktur
 description:
   Anatomie einer Solana-Transaktion einschließlich Signaturen, Nachrichtenformat, Header, Kontoadressen, Blockhash, kompilierte Anweisungen, Binärkodierung und Größenlimit.
-url: /docs/core/transactions/transaction-structure
 type: conceptual
 prerequisites:
   - /docs/core/transactions
@@ -16,50 +15,52 @@ related:
 
 {/* TOC: Signatures, Message (Header, Account addresses, Recent blockhash, Instructions), Transaction binary format, SOL transfer example */}
 
-<Callout type="info" title="Zusammenfassung">
+<Info>
+  **Zusammenfassung**
+
   Eine Transaktion besteht aus Signaturen und einer Nachricht. Die Nachricht enthält einen Header,
   Kontenadressen, einen aktuellen Blockhash und kompilierte Anweisungen. Maximale serialisierte
   Größe: 1.232 Bytes (4.096 Bytes für das kommende v1-Format).
-</Callout>
+</Info>
 
 Eine
 [`Transaction`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/transaction/src/lib.rs#L193)
 hat zwei Felder auf oberster Ebene:
 
-<WithMentions>
-
-- [`signatures`](mention:signatures): Ein Array von Signaturen
-- [`message`](mention:message): Transaktionsinformationen, einschließlich der
+- `signatures`: Ein Array von Signaturen
+- `message`: Transaktionsinformationen, einschließlich der
   Liste der zu verarbeitenden Anweisungen
 
-```rust title="Transaction"
+```rust Transaction
 pub struct Transaction {
-    // !mention signatures
     pub signatures: Vec<Signature>,
-    // !mention message
     pub message: Message,
 }
 ```
 
-</WithMentions>
-
-![Diagramm, das die zwei Teile einer Transaktion zeigt](/assets/docs/core/transactions/tx_format.png)
+<Frame caption="Diagramm, das die zwei Teile einer Transaktion zeigt">
+  ![Diagramm, das die zwei Teile einer Transaktion zeigt](/docs-assets/assets/docs/core/transactions/tx_format.png)
+</Frame>
 
 Die gesamte serialisierte Größe einer Transaktion darf
 [`PACKET_DATA_SIZE`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/packet/src/lib.rs#L32)
 (1.232 Bytes) nicht überschreiten. Dieses Limit entspricht 1.280 Bytes (die
 IPv6-Mindest-MTU) minus 48 Bytes für Netzwerk-Header (40 Bytes IPv6 + 8 Bytes
 Fragment-Header). Die 1.232 Bytes umfassen sowohl das
-[`signatures`](#signatures)-Array als auch die [`message`](#message)-Struktur.
+[`signatures`](#signaturen)-Array als auch die [`message`](#nachricht)-Struktur.
 
-<Callout type="info" title="v1-Transaktionen erhöhen das Limit auf 4.096 Bytes">
+<Info>
+  **v1-Transaktionen erhöhen das Limit auf 4.096 Bytes**
+
   Diese Seite beschreibt das Legacy-Transaktionsformat, dem das v0-Format ebenfalls
   folgt – abgesehen von seinem Versionspräfix und den Adress-Lookup-Tabellen. Das kommende
   [v1-Format](/docs/core/transactions/versioned-transactions#v1-message-format)
   erhöht das Größenlimit auf 4.096 Bytes und verwendet ein anderes Wire-Layout.
-</Callout>
+</Info>
 
-![Diagramm, das das Transaktionsformat und die Größenlimits zeigt](/assets/docs/core/transactions/issues_with_legacy_txs.png)
+<Frame caption="Diagramm, das das Transaktionsformat und die Größenlimits zeigt">
+  ![Diagramm, das das Transaktionsformat und die Größenlimits zeigt](/docs-assets/assets/docs/core/transactions/issues_with_legacy_txs.png)
+</Frame>
 
 ## Signaturen
 
@@ -67,7 +68,7 @@ Das `signatures`-Feld ist ein kompakt kodiertes Array von
 [`Signature`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/signature/src/lib.rs#L34)-Werten.
 Jede `Signature` ist eine 64-Byte-Ed25519-Signatur der serialisierten `Message`,
 signiert mit dem privaten Schlüssel des Signer-Kontos. Eine Signatur ist für
-jedes [Signer-Konto](#account-addresses) erforderlich, auf das die Anweisungen
+jedes [Signer-Konto](#konten-adressen) erforderlich, auf das die Anweisungen
 der Transaktion verweisen.
 
 Jede Signatur wird von einem privaten Schlüssel erzeugt. Wo dieser Schlüssel
@@ -89,7 +90,7 @@ Anforderungen an den Fee-Payer:
   (validiert durch
   [`validate_fee_payer`](https://github.com/anza-xyz/agave/blob/v3.1.8/svm/src/account_loader.rs#L369-L417)).
 - Muss genügend lamport halten, um `rent_exempt_minimum + total_fee` zu decken;
-  andernfalls schlägt die Transaktion mit _rs`InsufficientFundsForFee`_ fehl.
+  andernfalls schlägt die Transaktion mit `InsufficientFundsForFee` fehl.
 
 ## Nachricht
 
@@ -97,90 +98,79 @@ Das Feld `message` ist ein
 [`Message`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/message/src/legacy.rs#L161)-Struct,
 das die Nutzlast der Transaktion enthält:
 
-<WithMentions>
-
-- [`header`](mention:message-header): Der Nachrichten-[Header](#header)
-- [`account_keys`](mention:account-addresses): Ein Array von
-  [Kontenadressen](#account-addresses), die von den Anweisungen der Transaktion
+- `header`: Der Nachrichten-[Header](#header)
+- `account_keys`: Ein Array von
+  [Kontenadressen](#konten-adressen), die von den Anweisungen der Transaktion
   benötigt werden
-- [`recent_blockhash`](mention:recent-blockhash): Ein
-  [Blockhash](#recent-blockhash), der als Zeitstempel für die Transaktion dient
-- [`instructions`](mention:instructions): Ein Array von
-  [Anweisungen](#instructions)
+- `recent_blockhash`: Ein
+  [Blockhash](#aktueller-blockhash), der als Zeitstempel für die Transaktion dient
+- `instructions`: Ein Array von
+  [Anweisungen](#anweisungen)
 
-```rust title="Message"
+```rust Message
 pub struct Message {
     /// The message header, identifying signed and read-only `account_keys`.
-    // !mention message-header
     pub header: MessageHeader,
 
     /// All the account keys used by this transaction.
     #[serde(with = "short_vec")]
-    // !mention account-addresses
     pub account_keys: Vec<Pubkey>,
 
     /// The id of a recent ledger entry.
-    // !mention recent-blockhash
     pub recent_blockhash: Hash,
 
     /// Programs that will be executed in sequence and committed in
     /// one atomic transaction if all succeed.
     #[serde(with = "short_vec")]
-    // !mention instructions
     pub instructions: Vec<CompiledInstruction>,
 }
 ```
 
-</WithMentions>
-
 ### Header
-
-<WithMentions>
 
 Das Feld `header` ist ein
 [`MessageHeader`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/message/src/lib.rs#L109)-Struct
 mit drei `u8`-Feldern, die das Array `account_keys` in Berechtigungsgruppen
 unterteilen:
 
-- [`num_required_signatures`](mention:num_required_signatures): Gesamtanzahl der
+- `num_required_signatures`: Gesamtanzahl der
   für die Transaktion erforderlichen Signaturen.
-- [`num_readonly_signed_accounts`](mention:num_readonly_signed_accounts): Anzahl
+- `num_readonly_signed_accounts`: Anzahl
   der signierten Konten, die schreibgeschützt sind.
-- [`num_readonly_unsigned_accounts`](mention:num_readonly_unsigned_accounts):
+- `num_readonly_unsigned_accounts`:
   Anzahl der nicht signierten Konten, die schreibgeschützt sind.
 
-```rust title="MessageHeader"
+```rust MessageHeader
 pub struct MessageHeader {
     /// The number of signatures required for this message to be considered
     /// valid. The signers of those signatures must match the first
     /// `num_required_signatures` of [`Message::account_keys`].
-    // !mention num_required_signatures
     pub num_required_signatures: u8,
 
     /// The last `num_readonly_signed_accounts` of the signed keys are read-only
     /// accounts.
-    // !mention num_readonly_signed_accounts
     pub num_readonly_signed_accounts: u8,
 
     /// The last `num_readonly_unsigned_accounts` of the unsigned keys are
     /// read-only accounts.
-    // !mention num_readonly_unsigned_accounts
     pub num_readonly_unsigned_accounts: u8,
 }
 ```
 
-</WithMentions>
+<Info>
+  **Präfixe für Legacy- und versionierte Nachrichten**
 
-<Callout type="info" title="Präfixe für Legacy- und versionierte Nachrichten">
   In einer Legacy-Transaktionsnachricht ist das erste Nachrichtenbyte
   `num_required_signatures`, gefolgt von den anderen beiden `MessageHeader`-Bytes. In
   einer versionierten Transaktionsnachricht ist das erste Byte stattdessen ein Versionspräfix;
   der drei-Byte-`MessageHeader` beginnt unmittelbar nach diesem Präfix. Siehe
   [versionierte Transaktionen](/docs/core/transactions/versioned-transactions) für
   die vollständigen v0- und v1-Nachrichten-Layouts.
-</Callout>
+</Info>
 
-![Diagramm, das die drei Teile des Nachrichten-Headers zeigt](/assets/docs/core/transactions/message_header.png)
+<Frame caption="Diagramm, das die drei Teile des Nachrichten-Headers zeigt">
+  ![Diagramm, das die drei Teile des Nachrichten-Headers zeigt](/docs-assets/assets/docs/core/transactions/message_header.png)
+</Frame>
 
 ### Konten-Adressen
 
@@ -196,15 +186,17 @@ strikten Reihenfolge folgen:
 3. Kein Signer + Schreibbar
 4. Kein Signer + Nur-Lesen
 
-<Callout>
+<Note>
   Diese strikte Reihenfolge ermöglicht es, das `account_keys` Array mit den drei
   Zählern im [`header`](#header) des Nachrichten-Headers zu kombinieren, um die
   Berechtigungen für jedes Konten zu bestimmen, ohne Metadaten-Flags pro Konten
   zu speichern. Die Header-Zähler unterteilen das Array in die vier oben
   aufgeführten Berechtigungsgruppen.
-</Callout>
+</Note>
 
-![Diagramm, das die Reihenfolge des Arrays der Konten-Adressen zeigt](/assets/docs/core/transactions/compat_array_of_account_addresses.png)
+<Frame caption="Diagramm, das die Reihenfolge des Arrays der Konten-Adressen zeigt">
+  ![Diagramm, das die Reihenfolge des Arrays der Konten-Adressen zeigt](/docs-assets/assets/docs/core/transactions/compat_array_of_account_addresses.png)
+</Frame>
 
 ### Aktueller Blockhash
 
@@ -215,15 +207,15 @@ Das Feld `recent_blockhash` ist ein 32-Byte-Hash, der zwei Zwecken dient:
    wird.
 
 Ein Blockhash läuft nach 150 slot ab. Wenn der Blockhash nicht mehr gültig ist,
-wenn die Transaktion eintrifft, wird sie mit _rs`BlockhashNotFound`_ abgelehnt,
+wenn die Transaktion eintrifft, wird sie mit `BlockhashNotFound` abgelehnt,
 sofern es sich nicht um eine gültige
 [dauerhafte Nonce-Transaktion](/docs/core/transactions/durable-nonces) handelt.
 
-<Callout>
+<Note>
   Die [`getLatestBlockhash`](/docs/rpc/http/getlatestblockhash) RPC-Methode
   ermöglicht es Ihnen, den aktuellen Blockhash und die letzte Blockhöhe
   abzurufen, bis zu der der Blockhash gültig sein wird.
-</Callout>
+</Note>
 
 ### Anweisungen
 
@@ -231,38 +223,33 @@ Das
 [`instructions`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/message/src/legacy.rs#L176)
 Feld ist ein kompakt-kodiertes Array von
 [`CompiledInstruction`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/message/src/compiled_instruction.rs#L21)
-Structs. Jede _rs`CompiledInstruction`_ referenziert Konten über einen Index im
+Structs. Jede `CompiledInstruction` referenziert Konten über einen Index im
 `account_keys` Array statt über den vollständigen öffentlichen Schlüssel. Es
 enthält:
 
-<WithMentions>
-
-1. [`program_id_index`](mention:program-id-index): Index in `account_keys` zur
+1. `program_id_index`: Index in `account_keys` zur
    Identifikation des aufzurufenden Programms.
-2. [`accounts`](mention:account-indexes): Array von Indizes in `account_keys`
+2. `accounts`: Array von Indizes in `account_keys`
    zur Angabe der Konten, die an das Programm übergeben werden.
-3. [`data`](mention:instruction-data): Byte-Array mit dem instruction
+3. `data`: Byte-Array mit dem instruction
    Diskriminator und serialisierten Argumenten.
 
-```rust title="CompiledInstruction"
+```rust CompiledInstruction
 pub struct CompiledInstruction {
     /// Index into the transaction keys array indicating the program account that executes this instruction.
-    // !mention program-id-index
     pub program_id_index: u8,
     /// Ordered indices into the transaction keys array indicating which accounts to pass to the program.
     #[serde(with = "short_vec")]
-    // !mention account-indexes
     pub accounts: Vec<u8>,
     /// The program input data.
     #[serde(with = "short_vec")]
-    // !mention instruction-data
     pub data: Vec<u8>,
 }
 ```
 
-</WithMentions>
-
-![Kompaktes Array von Anweisungen](/assets/docs/core/transactions/compact_array_of_ixs.png)
+<Frame caption="Kompaktes Array von Anweisungen">
+  ![Kompaktes Array von Anweisungen](/docs-assets/assets/docs/core/transactions/compact_array_of_ixs.png)
+</Frame>
 
 ## Binäres Transaktionsformat
 
@@ -273,18 +260,18 @@ Byte für Werte von 0–127 und 2–3 Bytes für größere Werte.
 
 **Legacy-Transaktionslayout** (auf dem Übertragungsweg):
 
-| Feld                     | Größe                          | Beschreibung                                     |
-| ------------------------- | ----------------------------- | ----------------------------------------------- |
-| `num_signatures`          | 1-3 Bytes (compact-u16)       | Anzahl der Signaturen                            |
-| `signatures`              | `num_signatures` x 64 Bytes   | Ed25519-Signaturen                              |
-| `num_required_signatures` | 1 Byte                        | `MessageHeader` Feld 1                         |
-| `num_readonly_signed`     | 1 Byte                        | `MessageHeader` Feld 2                         |
-| `num_readonly_unsigned`   | 1 Byte                        | `MessageHeader` Feld 3                         |
-| `num_account_keys`        | 1-3 Bytes (compact-u16)       | Anzahl der statischen Kontoschlüssel                   |
-| `account_keys`            | `num_account_keys` x 32 Bytes | Öffentliche Schlüssel                                     |
-| `recent_blockhash`        | 32 Bytes                      | Blockhash                                       |
-| `num_instructions`        | 1-3 Bytes (compact-u16)       | Anzahl der Anweisungen                          |
-| `instructions`            | variabel                      | Array von [kompilierten Anweisungen](#instructions) |
+| Feld                      | Größe                         | Beschreibung                                       |
+| ------------------------- | ----------------------------- | -------------------------------------------------- |
+| `num_signatures`          | 1-3 Bytes (compact-u16)       | Anzahl der Signaturen                              |
+| `signatures`              | `num_signatures` x 64 Bytes   | Ed25519-Signaturen                                 |
+| `num_required_signatures` | 1 Byte                        | `MessageHeader` Feld 1                             |
+| `num_readonly_signed`     | 1 Byte                        | `MessageHeader` Feld 2                             |
+| `num_readonly_unsigned`   | 1 Byte                        | `MessageHeader` Feld 3                             |
+| `num_account_keys`        | 1-3 Bytes (compact-u16)       | Anzahl der statischen Kontoschlüssel               |
+| `account_keys`            | `num_account_keys` x 32 Bytes | Öffentliche Schlüssel                              |
+| `recent_blockhash`        | 32 Bytes                      | Blockhash                                          |
+| `num_instructions`        | 1-3 Bytes (compact-u16)       | Anzahl der Anweisungen                             |
+| `instructions`            | variabel                      | Array von [kompilierten Anweisungen](#anweisungen) |
 
 Jede kompilierte Anweisung wird wie folgt serialisiert:
 
@@ -298,7 +285,7 @@ Jede kompilierte Anweisung wird wie folgt serialisiert:
 
 ### Größenberechnung
 
-Gegeben _rs`PACKET_DATA_SIZE`_ = 1.232 Bytes, kann der verfügbare Speicherplatz
+Gegeben `PACKET_DATA_SIZE` = 1.232 Bytes, kann der verfügbare Speicherplatz
 berechnet werden:
 
 ```
@@ -327,14 +314,24 @@ das Empfänger-Konten müssen beschreibbar sein, damit sich ihr lamport-Guthaben
 Transaktion mit seiner Signatur und der Nachricht, die die
 SOL-Transfer-Anweisung enthält.
 
-![SOL-Transferdiagramm](/assets/docs/core/transactions/sol-transfer.svg)
+<Frame caption="SOL-Transferdiagramm">
+  <img className="block dark:hidden" src="/docs-assets/assets/docs/core/transactions/sol-transfer-light.svg" alt="SOL-Transferdiagramm" />
+
+  <img className="hidden dark:block" src="/docs-assets/assets/docs/core/transactions/sol-transfer.svg" alt="SOL-Transferdiagramm" />
+</Frame>
 
 Nachdem die Transaktion gesendet wurde, verarbeitet das System Program die
 Transfer-Anweisung und aktualisiert das lamport-Guthaben beider Konten.
 
-![SOL-Transferprozessdiagramm](/assets/docs/core/transactions/sol-transfer-process.svg)
+<Frame caption="SOL-Transferprozessdiagramm">
+  <img className="block dark:hidden" src="/docs-assets/assets/docs/core/transactions/sol-transfer-process-light.svg" alt="SOL-Transferprozessdiagramm" />
 
-<Callout type="warn" title="Empfänger vor dem Senden von SOL überprüfen">
+  <img className="hidden dark:block" src="/docs-assets/assets/docs/core/transactions/sol-transfer-process.svg" alt="SOL-Transferprozessdiagramm" />
+</Frame>
+
+<Warning>
+
+**Empfänger vor dem Senden von SOL überprüfen**
 
 Ein System Program-Transfer fügt lamports zu **jedem** Konten hinzu. Es gibt
 keine Protokoll-Überprüfung, ob der Empfänger die SOL wieder herausbewegen kann.
@@ -354,16 +351,16 @@ der Absender den Empfänger vor dem Unterzeichnen überprüfen. Siehe
 [Adresse überprüfen](/docs/payments/send-payments/verify-address) für die
 vollständige Klassifikationslogik.
 
-</Callout>
+</Warning>
 
 Das folgende Beispiel zeigt den Code, der zu den obigen Diagrammen gehört. Siehe
 die
 [`transfer` Funktion](https://github.com/anza-xyz/agave/blob/v3.1.8/programs/system/src/system_processor.rs#L210)
 des System Program.
 
-<CodeTabs storage="sol-transfer" flags="r">
+<CodeGroup>
 
-```ts !! title="Kit"
+```ts Kit highlight={32-37}
 import { createClient, generateKeyPairSigner, lamports } from "@solana/kit";
 import { solanaRpc, rpcAirdrop } from "@solana/kit-plugin-rpc";
 import { generatedPayer, airdropPayer } from "@solana/kit-plugin-signer";
@@ -395,7 +392,6 @@ const { value: preBalance2 } = await client.rpc
   .getBalance(recipient.address)
   .send();
 
-// !mark(1:6)
 // Create a transfer instruction for transferring SOL from sender to recipient
 const transferInstruction = client.system.instructions.transferSol({
   source: sender,
@@ -434,7 +430,7 @@ console.log(
 console.log("Transaction Signature:", transactionSignature.context.signature);
 ```
 
-```ts !! title="Legacy"
+```ts Legacy highlight={31-36}
 import {
   LAMPORTS_PER_SOL,
   SystemProgram,
@@ -465,7 +461,6 @@ const preBalance2 = await connection.getBalance(recipient.publicKey);
 // Define the amount to transfer
 const transferAmount = 0.01; // 0.01 SOL
 
-// !mark(1:6)
 // Create a transfer instruction for transferring SOL from sender to recipient
 const transferInstruction = SystemProgram.transfer({
   fromPubkey: sender.publicKey,
@@ -494,7 +489,7 @@ console.log("Recipient postbalance:", postBalance2 / LAMPORTS_PER_SOL);
 console.log("Transaction Signature:", transactionSignature);
 ```
 
-```rs !! title="Rust"
+```rs Rust
 use anyhow::Result;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_commitment_config::CommitmentConfig;
@@ -574,14 +569,14 @@ async fn main() -> Result<()> {
 }
 ```
 
-</CodeTabs>
+</CodeGroup>
 
 Das folgende Beispiel zeigt die Struktur einer Transaktion, die eine einzelne
 SOL-Überweisungs Anweisungen enthält.
 
-<CodeTabs storage="sol-transfer" flags="r">
+<CodeGroup>
 
-```ts !! title="Kit"
+```ts Kit
 import {
   createClient,
   generateKeyPairSigner,
@@ -644,7 +639,7 @@ const compiledTransactionMessage =
 console.log(JSON.stringify(compiledTransactionMessage, null, 2));
 ```
 
-```ts !! title="Legacy"
+```ts Legacy
 import {
   LAMPORTS_PER_SOL,
   SystemProgram,
@@ -682,7 +677,7 @@ const compiledMessage = transaction.compileMessage();
 console.log(JSON.stringify(compiledMessage, null, 2));
 ```
 
-```rs !! title="Rust"
+```rs Rust
 use anyhow::Result;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_commitment_config::CommitmentConfig;
@@ -723,33 +718,28 @@ async fn main() -> Result<()> {
 }
 ```
 
-</CodeTabs>
+</CodeGroup>
 
-<WithMentions>
 Der folgende Code zeigt die Ausgabe der vorherigen Code-Snippets.
 Das Format unterscheidet sich je nach SDK,
 beachten Sie jedoch, dass jede Anweisung dieselben erforderlichen Informationen enthält.
 
-<CodeTabs storage="sol-transfer">
+<CodeGroup>
 
-```json !! title="Kit"
+```json Kit
 {
   "version": 0,
-  // !mention header
   "header": {
     "numSignerAccounts": 1,
     "numReadonlySignerAccounts": 0,
     "numReadonlyNonSignerAccounts": 1
   },
-  // !mention account_keys
   "staticAccounts": [
     "HoCy8p5xxDDYTYWEbQZasEjVNM5rxvidx8AfyqA4ywBa",
     "5T388jBjovy7d8mQ3emHxMDTbUF8b7nWvAnSiP3EAdFL",
     "11111111111111111111111111111111"
   ],
-  // !mention recent_blockhash
   "lifetimeToken": "EGCWPUEXhqHJWYBfDirq3mHZb4qDpATmYqBZMBy9TBC1",
-  // !mention instructions
   "instructions": [
     {
       "programAddressIndex": 2,
@@ -773,22 +763,19 @@ beachten Sie jedoch, dass jede Anweisung dieselben erforderlichen Informationen 
 }
 ```
 
-```json !! title="Legacy"
+```json Legacy
 {
-  // !mention header
   "header": {
     "numRequiredSignatures": 1,
     "numReadonlySignedAccounts": 0,
     "numReadonlyUnsignedAccounts": 1
   },
-  // !mention account_keys
   "accountKeys": [
     "EPLUagqZZAuAtJ5LSbK7eeXjqeTdesd4q8WhoqVrfG3g",
     "9Txf5pi5jzm7FydFAsQafk7xn5wY9yN2UNm5LW15qvcK",
     "11111111111111111111111111111111"
   ],
   "recentBlockhash": "2qYPgehzMKXcMt4Ku1tKAk9DACKUbtYEY9EUEN42cseT",
-  // !mention instructions
   "instructions": [
     {
       "programIdIndex": 2,
@@ -800,13 +787,12 @@ beachten Sie jedoch, dass jede Anweisung dieselben erforderlichen Informationen 
 }
 ```
 
-```json !! title="Rust"
+```json Rust
 {
   "signatures": [
     "2fPXZtQGWWj6suxfc55FBQiexS8hEhNELqasSL5DRYa1RB1GChHz86Cyy8ukiVwA6qbq91P4cY1FuvTuYtmTHmJP"
   ],
   "message": {
-    // !mention header
     "header": {
       "num_required_signatures": 1,
       "num_readonly_signed_accounts": 0,
@@ -818,7 +804,6 @@ beachten Sie jedoch, dass jede Anweisung dieselben erforderlichen Informationen 
       "11111111111111111111111111111111"
     ],
     "recent_blockhash": "3P7CVQ9nwXx4B37MvBzghzbcM9K9p5xo7ivDE8W78dCi",
-    // !mention instructions
     "instructions": [
       {
         "program_id_index": 2,
@@ -830,8 +815,7 @@ beachten Sie jedoch, dass jede Anweisung dieselben erforderlichen Informationen 
 }
 ```
 
-</CodeTabs>
-</WithMentions>
+</CodeGroup>
 
 ### Empfänger vor der Überweisung überprüfen
 
@@ -842,9 +826,7 @@ eine System Program-Wallet (oder eine nicht finanzierte
 lehnen Sie Mints, token account, Programme und PDAs ab, die Sie nicht
 kontrollieren.
 
-<CodeTabs flags="r">
-
-```ts !! title="Kit"
+```ts Kit
 import {
   type Address,
   createSolanaRpc,
@@ -894,14 +876,12 @@ await assertSafeSolRecipient(
 );
 ```
 
-</CodeTabs>
-
-<Callout>
+<Note>
   Dieses Snippet überprüft native SOL-Empfänger. Die vollständige
   Klassifizierung, die auch SPL-Token-Sendungen (token account, ATAs,
   Token-2022) berücksichtigt, finden Sie unter [Verify
   Address](/docs/payments/send-payments/verify-address).
-</Callout>
+</Note>
 
 ## Transaktionsdetails abrufen
 
@@ -909,10 +889,10 @@ Nach der Übermittlung können die Transaktionsdetails mithilfe der
 Transaktionssignatur und der [getTransaction](/docs/rpc/http/gettransaction)
 RPC-Methode abgerufen werden.
 
-<Callout>
+<Note>
   Sie können die Transaktion auch über den [Solana
   Explorer](https://explorer.solana.com) finden.
-</Callout>
+</Note>
 
 ```json title="Transaction Data"
 {

@@ -4,7 +4,6 @@ description:
   Jak środowisko uruchomieniowe Solana ładuje i weryfikuje konta przed
   wykonaniem oraz jaki format serializacji jest używany do przekazywania danych
   kont do programów.
-url: /docs/core/accounts/account-runtime
 type: reference
 prerequisites:
   - /docs/core/accounts
@@ -16,18 +15,20 @@ related:
   - /docs/core/constants-reference
 ---
 
-<Callout type="info" title="Podsumowanie">
+<Info>
+  **Podsumowanie**
+
   Przed wykonaniem środowisko uruchomieniowe ładuje konta, weryfikuje płatnika
   opłat, sprawdza zwolnienie z czynszu i serializuje dane kont do układu
   pamięci, do którego mają dostęp programy.
-</Callout>
+</Info>
 
-<Callout>
+<Note>
   Ta strona opisuje wewnętrzne mechanizmy środowiska uruchomieniowego. Większość
   deweloperów nie potrzebuje tych informacji do tworzenia programów. Zobacz
   [Strukturę konta](/docs/core/accounts/account-structure) aby poznać
   perspektywę deweloperską.
-</Callout>
+</Note>
 
 ## Ładowanie konta
 
@@ -45,7 +46,7 @@ Ten proces wykonuje kilka weryfikacji:
    czynszu. Konta nonce zawsze muszą mieć wystarczającą liczbę lamportów, aby
    pozostać zwolnione z czynszu. Jeśli płatnik nie jest kontem systemowym ani
    nonce, transakcja kończy się niepowodzeniem z
-   _rs`TransactionError::InvalidAccountForFee`_.
+   `TransactionError::InvalidAccountForFee`.
 
 2. **Limit rozmiaru załadowanych danych**: Całkowity rozmiar wszystkich
    załadowanych kont (w tym
@@ -53,16 +54,16 @@ Ten proces wykonuje kilka weryfikacji:
    64 bajtów na konto) nie może przekroczyć
    [`MAX_LOADED_ACCOUNTS_DATA_SIZE_BYTES`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/execution_budget.rs#L53)
    (64 MiB). Przekroczenie tego limitu skutkuje
-   _rs`TransactionError::MaxLoadedAccountsDataSizeExceeded`_.
+   `TransactionError::MaxLoadedAccountsDataSizeExceeded`.
 
 3. **Weryfikacja konta program account**: Każdy program wywoływany przez
    instrukcję musi istnieć i być własnością prawidłowego loadera: jednego z
    [`PROGRAM_OWNERS`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/account/src/lib.rs#L802)
    (BPF Loader Upgradeable, BPF Loader, BPF Loader Deprecated, Loader V4) lub
    natywnego loadera. Jeśli konto program account nie istnieje, transakcja
-   kończy się niepowodzeniem z _rs`TransactionError::ProgramAccountNotFound`_.
+   kończy się niepowodzeniem z `TransactionError::ProgramAccountNotFound`.
    Jeśli istnieje, ale ma nieprawidłowego właściciela, transakcja kończy się
-   niepowodzeniem z _rs`TransactionError::InvalidProgramForExecution`_.
+   niepowodzeniem z `TransactionError::InvalidProgramForExecution`.
 
 4. **Nieistniejące konta**: Konta, które nie istnieją w sieci blockchain, są
    ładowane jako konta domyślne (0 lamport, puste dane, należące do System
@@ -127,14 +128,14 @@ znalezienie pierwszego indeksu na poziomie instrukcji, który do niego prowadzi:
   pierwszego wystąpienia.
 
 Ponieważ wszystkie odwołania do tego samego konta współdzielą te same dane
-bazowe _rs`AccountSharedData`_, modyfikacje przez dowolne odwołanie są
+bazowe `AccountSharedData`, modyfikacje przez dowolne odwołanie są
 natychmiast widoczne przez wszystkie inne odwołania. Jednak w danym momencie
 można posiadać tylko jeden mutowalny zapożyczenie. Próba jednoczesnego
 mutowalnego zapożyczenia tego samego konta przez dwa różne indeksy konta
-instrukcji zwraca _rs`InstructionError::AccountBorrowFailed`_. Programy muszą
+instrukcji zwraca `InstructionError::AccountBorrowFailed`. Programy muszą
 zwolnić jedno zapożyczenie, zanim uzyskają kolejne na tym samym koncie bazowym.
 
 Po wykonaniu programu środowisko wykonawcze deserializuje bufor z powrotem
 ([`deserialize_parameters_aligned()`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/serialization.rs#L580-L667))
 i stosuje wszelkie zmiany do `lamports`, `data` (w tym zmiany długości do
-_rs`MAX_PERMITTED_DATA_INCREASE`_) oraz `owner`.
+`MAX_PERMITTED_DATA_INCREASE`) oraz `owner`.

@@ -1,24 +1,53 @@
 /**
- * Runnable examples (WP5). Stub published by WP0 so the CLI surface is stable.
+ * Runnable examples (WP5).
  *
- * WP5 implements:
- * - `extract-blocks.ts`: legacy `<CodeTabs flags="r" file=...>` -> blocks.json
- *   plus snippet imports in every locale;
+ * - `extract-blocks.ts`: legacy `<CodeTabs ... file=...>` blocks -> blocks.json
+ *   in packages/docs-examples (pages are rewritten by the
+ *   `codetabs-examples` convert transform, which derives the same ids);
  * - `build-examples.ts [--check]`: blocks.json + recorded `.output.txt`
- *   (packages/docs-examples) -> apps/docs/snippets/examples/**.mdx.
+ *   -> apps/docs/snippets/examples/**.mdx + index.json.
  * Blocks without recorded output get no Run button (decisions.md).
+ *
+ * `runExamples` is what `docs-tooling examples [--check]` calls. It is
+ * synchronous and THROWS on errors or (with --check) stale output, so the CLI
+ * exits non-zero. Standalone entry with more commands: `src/examples/main.ts`.
  */
+import { buildExamples, type BuildResult } from "./build-examples.ts";
+
 export interface ExamplesOptions {
   check?: boolean;
 }
 
-export function runExamples(_opts: ExamplesOptions = {}): {
-  implemented: false;
+export function summarize(r: BuildResult, check: boolean): string {
+  const lines = [
+    `examples: ${Object.keys(r.index).length} blocks, ${r.outputsEmbedded} recorded outputs embedded`,
+  ];
+  for (const n of r.notes) lines.push(`  note ${n}`);
+  for (const e of r.errors) lines.push(`  ERROR ${e}`);
+  if (check) {
+    if (r.stale.length) {
+      lines.push(
+        `  ${r.stale.length} generated file(s) are stale; run \`examples:build\`:`,
+      );
+      for (const s of r.stale) lines.push(`    ${s}`);
+    } else lines.push("  snippets are up to date");
+  } else {
+    lines.push(`  wrote ${r.written.length}, removed ${r.removed.length}`);
+  }
+  return lines.join("\n");
+}
+
+export function runExamples(opts: ExamplesOptions = {}): {
+  implemented: true;
+  ok: boolean;
   message: string;
+  result: BuildResult;
 } {
-  return {
-    implemented: false,
-    message:
-      "examples: not implemented yet (WP5). See src/examples/index.ts for the contract.",
-  };
+  const check = Boolean(opts.check);
+  const result = buildExamples({ check, write: !check });
+  const message = summarize(result, check);
+  const ok =
+    result.errors.length === 0 && (!check || result.stale.length === 0);
+  if (!ok) throw new Error(message);
+  return { implemented: true, ok, message, result };
 }

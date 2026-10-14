@@ -27,86 +27,72 @@ Cả người gửi và nhà tài trợ đều phải ký giao dịch:
 - **Người gửi** ký để ủy quyền chuyển token của họ
 - **Nhà tài trợ** ký để ủy quyền thanh toán phí mạng
 
-<Callout>
+<Note>
   Xem [Cách thanh toán hoạt động trên Solana](/docs/payments/how-payments-work)
   để hiểu các khái niệm thanh toán cốt lõi.
-</Callout>
+</Note>
 
 Các bước dưới đây cho thấy luồng cốt lõi. Xem [Demo](#demo) để có mã hoàn chỉnh
 có thể chạy được.
 
-<ScrollyCoding>
+<Steps>
+  <Step title="Tạo tài khoản nhà tài trợ">
+    Tạo một keypair riêng cho nhà tài trợ sẽ thanh toán phí giao dịch. Nhà tài trợ
+    cần SOL cho phí nhưng không cần giữ các token đang được chuyển.
 
-## !!steps Tạo tài khoản nhà tài trợ
+    ```ts title="Tài trợ phí giao dịch"
+    const sponsor = await generateKeyPairSigner();
+    ```
+  </Step>
 
-Tạo một keypair riêng cho nhà tài trợ sẽ thanh toán phí giao dịch. Nhà tài trợ
-cần SOL cho phí nhưng không cần giữ các token đang được chuyển.
+  <Step title="Tạo lệnh chuyển">
+    Tạo lệnh chuyển token với người gửi là người có thẩm quyền. Người gửi sở hữu các
+    token và phải ký chuyển khoản.
 
-<CodePlaceholder title="Tài trợ phí giao dịch" />
+    ```ts title="Phí giao dịch được tài trợ" focus={3-10}
+    const sponsor = await generateKeyPairSigner();
 
-```ts !! title="Sponsor Transaction Fee"
-const sponsor = await generateKeyPairSigner();
-```
+    const transferInstruction = getTransferCheckedInstruction({
+      source: senderAta,
+      mint: mint.address,
+      destination: recipientAta,
+      authority: sender, // Sender signs for the transfer
+      amount: 250_000n, // adjusted for the mint's decimals
+      decimals: 6
+    });
+    ```
+  </Step>
 
-## !!steps Tạo lệnh chuyển
+  <Step title="Gửi với nhà tài trợ là người trả phí">
+    Tạo client với sponsor được đặt làm người thanh toán phí qua `payer(sponsor)`,
+    sau đó gọi `client.sendTransaction`. Sponsor ký để thanh toán phí mạng trong khi
+    người gửi ký để ủy quyền chuyển khoản—`sendTransaction` tự động thu thập mọi
+    người ký được tham chiếu.
 
-Tạo lệnh chuyển token với người gửi là người có thẩm quyền. Người gửi sở hữu các
-token và phải ký chuyển khoản.
+    ```ts title="Phí giao dịch được tài trợ" highlight={13} focus={12-16}
+    const sponsor = await generateKeyPairSigner();
 
-<CodePlaceholder title="Phí giao dịch được tài trợ" />
+    const transferInstruction = getTransferCheckedInstruction({
+      source: senderAta,
+      mint: mint.address,
+      destination: recipientAta,
+      authority: sender,
+      amount: 250_000n,
+      decimals: 6
+    });
 
-```ts !! title="Sponsor Transaction Fee"
-const sponsor = await generateKeyPairSigner();
+    const client = createClient()
+      .use(payer(sponsor)) // Sponsor pays the transaction fees
+      .use(solanaLocalRpc());
 
-// !focus(1:8)
-const transferInstruction = getTransferCheckedInstruction({
-  source: senderAta,
-  mint: mint.address,
-  destination: recipientAta,
-  authority: sender, // Sender signs for the transfer
-  amount: 250_000n, // adjusted for the mint's decimals
-  decimals: 6
-});
-```
-
-## !!steps Gửi với nhà tài trợ là người trả phí
-
-Tạo client với sponsor được đặt làm người thanh toán phí qua `payer(sponsor)`,
-sau đó gọi `client.sendTransaction`. Sponsor ký để thanh toán phí mạng trong khi
-người gửi ký để ủy quyền chuyển khoản—`sendTransaction` tự động thu thập mọi
-người ký được tham chiếu.
-
-<CodePlaceholder title="Phí giao dịch được tài trợ" />
-
-```ts !! title="Sponsor Transaction Fee"
-const sponsor = await generateKeyPairSigner();
-
-const transferInstruction = getTransferCheckedInstruction({
-  source: senderAta,
-  mint: mint.address,
-  destination: recipientAta,
-  authority: sender,
-  amount: 250_000n,
-  decimals: 6
-});
-
-// !focus(1:5)
-const client = createClient()
-  // !mark
-  .use(payer(sponsor)) // Sponsor pays the transaction fees
-  .use(solanaLocalRpc());
-
-const { context } = await client.sendTransaction([transferInstruction]);
-```
-
-</ScrollyCoding>
+    const { context } = await client.sendTransaction([transferInstruction]);
+    ```
+  </Step>
+</Steps>
 
 ### Demo
 
-<CodeTabs flags="r">
-
-```ts !! title="Demo"
-// !collapse(1:15) collapsed
+```ts Demo highlight={20,64} expandable
 // Click ">" icon on left to expand demo imports
 import { createClient, generateKeyPairSigner, lamports } from "@solana/kit";
 import type { KeyPairSigner } from "@solana/kit";
@@ -126,7 +112,6 @@ import {
 // Generate keypairs for sender, recipient, and sponsor (fee payer)
 const sender = await generateKeyPairSigner();
 const recipient = await generateKeyPairSigner();
-// !mark
 const sponsor = await generateKeyPairSigner();
 
 console.log("Sender Address:", sender.address);
@@ -171,7 +156,6 @@ const transferInstruction = getTransferCheckedInstruction({
 
 // Send transaction with sponsor as fee payer using @solana/kit
 // The sponsor (client.payer) pays fees; the sender signs for the transfer
-// !mark
 const { context } = await client.sendTransaction([transferInstruction]);
 const signature = context.signature;
 
@@ -205,7 +189,6 @@ console.log("Fee Payer Address:", feePayer);
 // =============================================================================
 // Demo Setup Helper Function
 // =============================================================================
-// !collapse(1:1000) collapsed
 
 /**
  * Sets up for a sponsored token transfer demo:
@@ -311,13 +294,11 @@ async function demoSetup(
 }
 ```
 
-</CodeTabs>
-
-<Callout type="caution">
+<Danger>
   Khi bạn tạo token account cho người dùng cuối, họ có thể đóng nó và lấy lại
   SOL đã dùng cho rent. Hãy cân nhắc tính phí người dùng cho việc tạo tài khoản
   bằng stablecoin, hoặc tính chi phí này vào mô hình kinh tế sản phẩm của bạn.
-</Callout>
+</Danger>
 
 ## Fee abstraction quy mô lớn với Kora
 
@@ -363,7 +344,7 @@ console.log("Signature:", context.signature);
 
 ### Tài nguyên Kora
 
-<Cards>
+<Columns cols={2}>
   <Card
     title="Bắt Đầu Nhanh với Kora"
     href="/docs/tools/kora/getting-started/quick-start"
@@ -379,4 +360,4 @@ console.log("Signature:", context.signature);
   <Card title="Hướng Dẫn Vận Hành Node" href="/docs/tools/kora/operators">
     Triển khai và cấu hình phiên bản Kora của riêng bạn.
   </Card>
-</Cards>
+</Columns>

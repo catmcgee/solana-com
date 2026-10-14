@@ -4,7 +4,6 @@ description:
   أنشئ حسابات على السلسلة على عناوين PDA في سولانا باستخدام invoke_signed وقيد
   init من Anchor. تدفق التحقق من invoke_signed وأنماط إنشاء PDA في Anchor مع
   أمثلة الأكواد.
-url: /docs/core/pda/pda-accounts
 type: tutorial
 prerequisites:
   - /docs/core/pda
@@ -18,16 +17,18 @@ related:
 
 {/* TOC: PDA Signing via invoke_signed, Create a PDA Account */}
 
-<Callout type="info" title="ملخص">
-  إنشاء حسابات PDA عبر _rs`invoke_signed`_ مع بذور PDA. فقط البرنامج المالك
-  يمكنه التوقيع نيابة عن PDA. قيد _rs`init`_ في Anchor يقوم بأتمتة إنشاء حساب
+<Info>
+  **ملخص**
+
+  إنشاء حسابات PDA عبر `invoke_signed` مع بذور PDA. فقط البرنامج المالك
+  يمكنه التوقيع نيابة عن PDA. قيد `init` في Anchor يقوم بأتمتة إنشاء حساب
   PDA.
-</Callout>
+</Info>
 
 ## التوقيع بواسطة PDA عبر `invoke_signed`
 
 عندما يحتاج برنامج إلى التوقيع نيابة عن PDA أثناء CPI، فإنه يستخدم
-_rs`invoke_signed`_ مع بذور PDA. يتحقق وقت التشغيل من أن البذور تشتق PDA المتوقع
+`invoke_signed` مع بذور PDA. يتحقق وقت التشغيل من أن البذور تشتق PDA المتوقع
 باستخدام **معرف البرنامج المستدعي**، مما يضمن أن البرنامج المالك فقط يمكنه
 التوقيع. للاطلاع على تدفق التحقق الكامل، راجع
 [توقيع PDA](/docs/core/cpi/cpi-cost-model#pda-signing).
@@ -37,19 +38,17 @@ _rs`invoke_signed`_ مع بذور PDA. يتحقق وقت التشغيل من أ�
 اشتقاق PDA وإنشاء حساب عند PDA هما عمليتان منفصلتان. يجب عليك إنشاء الحساب بشكل
 صريح بعد اشتقاق العنوان.
 
-لإنشاء حساب عند PDA، يستدعي البرنامج المشتق تعليمة _rs`create_account`_ الخاصة
+لإنشاء حساب عند PDA، يستدعي البرنامج المشتق تعليمة `create_account` الخاصة
 ببرنامج النظام عبر [`invoke_signed`](/docs/core/cpi)، مع تمرير بذور PDA حتى
 يتمكن وقت التشغيل من التحقق من صلاحية البرنامج على ذلك العنوان.
 
-<WithMentions>
-
 يستخدم المثال أدناه [إطار عمل Anchor](https://www.anchor-lang.com/docs) لإنشاء
 حساب جديد بعنوان مشتق من البرنامج. يتضمن البرنامج تعليمة
-[`initialize`](mention:initialize) واحدة لإنشاء الحساب الجديد، الذي سيخزن
-[عنوان المستخدم](mention:user-address) و [بذرة bump](mention:bump) المستخدمة
+`initialize` واحدة لإنشاء الحساب الجديد، الذي سيخزن
+عنوان المستخدم و بذرة bump المستخدمة
 لاشتقاق PDA.
 
-```rs title="Program"
+```rs Program highlight={12,14,27,29,40-41}
 use anchor_lang::prelude::*;
 
 declare_id!("75GJVCJNhaukaa2vCCqhreY31gaphv7XTScBChmr1ueR");
@@ -58,16 +57,11 @@ declare_id!("75GJVCJNhaukaa2vCCqhreY31gaphv7XTScBChmr1ueR");
 pub mod pda_account {
     use super::*;
 
-    // !mention initialize
     pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
         let account_data = &mut ctx.accounts.pda_account;
         // store the address of the `user`
-        // !mark
-        // !mention user-address
         account_data.user = *ctx.accounts.user.key;
         // store the canonical bump
-        // !mark
-        // !mention bump
         account_data.bump = ctx.bumps.pda_account;
         Ok(())
     }
@@ -76,18 +70,13 @@ pub mod pda_account {
 #[derive(Accounts)]
 pub struct Initialize<'info> {
     #[account(mut)]
-    // !mention user-address
     pub user: Signer<'info>,
 
     #[account(
         init,
         // define the seeds to derive the PDA
-        // !mark
-        // !mention user-address
         seeds = [b"data", user.key().as_ref()],
         // use the canonical bump
-        // !mark
-        // !mention bump
         bump,
         payer = user,
         space = 8 + DataAccount::INIT_SPACE // 8 bytes for Anchor account discriminator
@@ -99,38 +88,27 @@ pub struct Initialize<'info> {
 #[account]
 #[derive(InitSpace)]
 pub struct DataAccount {
-    // !mark
-    // !mention user-address
     pub user: Pubkey,
-    // !mark
-    // !mention bump
     pub bump: u8,
 }
 ```
 
-</WithMentions>
-
-<WithMentions>
-
-قيد [`init`](mention:init) يخبر Anchor
+قيد `init` يخبر Anchor
 [باستدعاء برنامج النظام](/docs/core/programs/builtin-programs#the-system-program)
-لإنشاء حساب جديد باستخدام PDA كعنوان. [البذور](mention:seeds) المستخدمة لإنشاء
+لإنشاء حساب جديد باستخدام PDA كعنوان. البذور المستخدمة لإنشاء
 PDA هي:
 
 - السلسلة النصية الثابتة: "data"
 - عنوان حساب المستخدم المقدم في التعليمات
-- [bump seed](mention:bump) القياسي
+- bump seed القياسي
 
 في هذا المثال، لم يتم تعيين قيمة لقيد bump، لذا سيستخدم Anchor
 _`find_program_address`_ لاشتقاق PDA والعثور على bump.
 
-```rust title="pda_account"
+```rust pda_account
 #[account(
-    // !mention init
     init,
-    // !mention seeds
     seeds = [b"data", user.key().as_ref()],
-    // !mention bump
     bump,
     payer = user,
     space = 8 + DataAccount::INIT_SPACE // 8 bytes for Anchor account discriminator
@@ -138,17 +116,13 @@ _`find_program_address`_ لاشتقاق PDA والعثور على bump.
 pub pda_account: Account<'info, DataAccount>,
 ```
 
-</WithMentions>
-
-<WithMentions>
-
 يحتوي ملف الاختبار أدناه على معاملة تستدعي تعليمات
-[`initialize`](mention:initialize) لإنشاء حساب جديد بعنوان مشتق من البرنامج.
-يحتوي الملف على كود [لاشتقاق PDA](mention:pda).
+`initialize` لإنشاء حساب جديد بعنوان مشتق من البرنامج.
+يحتوي الملف على كود لاشتقاق PDA.
 
-يوضح المثال أيضًا كيفية [جلب](mention:fetch) الحساب الجديد الذي سيتم إنشاؤه.
+يوضح المثال أيضًا كيفية جلب الحساب الجديد الذي سيتم إنشاؤه.
 
-```ts title="Test"
+```ts Test
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { PdaAccount } from "../target/types/pda_account";
@@ -161,7 +135,6 @@ describe("pda-account", () => {
   const program = anchor.workspace.PdaAccount as Program<PdaAccount>;
   const user = provider.wallet as anchor.Wallet;
 
-  // !mention(1:5) pda
   // Derive the PDA address using the seeds specified on the program
   const [PDA] = PublicKey.findProgramAddressSync(
     [Buffer.from("data"), user.publicKey.toBuffer()],
@@ -170,7 +143,6 @@ describe("pda-account", () => {
 
   it("Is initialized!", async () => {
     const transactionSignature = await program.methods
-      // !mention initialize
       .initialize()
       .accounts({
         user: user.publicKey
@@ -181,16 +153,13 @@ describe("pda-account", () => {
   });
 
   it("Fetch Account", async () => {
-    // !mention fetch
     const pdaAccount = await program.account.dataAccount.fetch(PDA);
     console.log(JSON.stringify(pdaAccount, null, 2));
   });
 });
 ```
 
-</WithMentions>
-
-<Callout type="warn">
+<Warning>
   إذا قمت باستدعاء تعليمات `initialize` مرة أخرى بنفس seed عنوان `user`، ستفشل
   المعاملة. يحدث هذا لأن حسابًا موجود بالفعل على العنوان المشتق.
-</Callout>
+</Warning>

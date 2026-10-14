@@ -2,7 +2,6 @@
 title: Pipeline de transaction
 description:
   Comment les transactions Solana sont traitées de la soumission à la validation, incluant le pipeline complet de validation en 8 étapes, la lecture des détails de transaction depuis le réseau et les erreurs de validation courantes.
-url: /docs/core/transactions/transaction-pipeline
 type: reference
 prerequisites:
   - /docs/core/transactions
@@ -14,11 +13,13 @@ related:
   - /docs/core/programs/program-execution
 ---
 
-<Callout type="info" title="Résumé">
+<Info>
+  **Résumé**
+
   Les transactions passent par 8 étapes : réception, sigverify, sanitize,
   vérifications budget/âge, validation du payeur de frais, chargement de compte,
   exécution d'instruction et validation.
-</Callout>
+</Info>
 
 ## Pipeline de traitement des transactions
 
@@ -30,9 +31,9 @@ validator [agave](https://github.com/anza-xyz/agave/tree/v3.1.8).
 ### 1. Réception et désérialisation
 
 Le validator reçoit les octets de transaction via UDP/QUIC. Les octets bruts
-doivent tenir dans un seul paquet (_rs`PACKET_DATA_SIZE`_ = 1 232 octets). Les
-octets sont désérialisés en une _rs`VersionedTransaction`_, qui contient le
-tableau de signatures et un _rs`VersionedMessage`_ (legacy ou v0).
+doivent tenir dans un seul paquet (`PACKET_DATA_SIZE` = 1 232 octets). Les
+octets sont désérialisés en une `VersionedTransaction`, qui contient le
+tableau de signatures et un `VersionedMessage` (legacy ou v0).
 
 Le prochain
 [format v1](/docs/core/transactions/versioned-transactions#v1-message-format)
@@ -57,7 +58,7 @@ morceaux de
 ### 3. Sanitize
 
 La transaction désérialisée est nettoyée pour produire une
-_rs`SanitizedTransaction`_ (ou
+`SanitizedTransaction` (ou
 [`RuntimeTransaction`](https://github.com/anza-xyz/agave/blob/v3.1.8/runtime-transaction/src/runtime_transaction.rs#L31)).
 La sanitization valide les invariants structurels :
 
@@ -66,7 +67,7 @@ La sanitization valide les invariants structurels :
   limites
 - Le payeur de frais (index de compte 0) est un signataire modifiable
 
-Le wrapper _rs`RuntimeTransaction`_ met en cache les métadonnées précalculées
+Le wrapper `RuntimeTransaction` met en cache les métadonnées précalculées
 depuis
 [`TransactionMeta`](https://github.com/anza-xyz/agave/blob/v3.1.8/runtime-transaction/src/transaction_meta.rs#L38-L44)
 : le hash du message, le flag de transaction de vote, les comptages de
@@ -84,27 +85,27 @@ effectue plusieurs vérifications par transaction :
 sont d'abord analysées et validées. Les détails des frais sont calculés à partir
 des limites du budget et des frais de priorisation. Si le budget de calcul est
 invalide ou contradictoire, la transaction échoue avec des erreurs d'analyse du
-budget de calcul telles que _rs`DuplicateInstruction`_,
+budget de calcul telles que `DuplicateInstruction`,
 `InstructionError(..., InvalidInstructionData)`, ou
-_rs`InvalidLoadedAccountsDataSizeLimit`_.
+`InvalidLoadedAccountsDataSizeLimit`.
 
 Pour les
 [transactions v1](/docs/core/transactions/versioned-transactions#v1-message-format),
 il n'y a pas d'instructions de budget de calcul à analyser : les limites et les frais de priorité
 proviennent de la configuration du message, et toute instruction ComputeBudget présente dans le message
 est ignorée pour la configuration. Les champs de configuration non définis prennent la valeur zéro par défaut, ce qui
-se manifeste plus tard lors du [chargement des comptes](#6-load-accounts).
+se manifeste plus tard lors du [chargement des comptes](#6-charger-les-comptes).
 
 **Âge du blockhash** : le `recent_blockhash` de la transaction est recherché
 dans la
 [`BlockhashQueue`](https://github.com/anza-xyz/agave/blob/v3.1.8/accounts-db/src/blockhash_queue.rs#L33).
-Si le hash est trouvé et que son âge est dans les _rs`MAX_PROCESSING_AGE`_ (150
+Si le hash est trouvé et que son âge est dans les `MAX_PROCESSING_AGE` (150
 slots), la transaction se poursuit. S'il n'est pas trouvé, le validator vérifie
 la présence d'un [nonce durable](/docs/core/transactions/durable-nonces) valide.
 
 **Cache de statut** : le hash du message de la transaction est vérifié dans un
 cache de statut. S'il est trouvé, la transaction est rejetée avec
-_rs`AlreadyProcessed`_.
+`AlreadyProcessed`.
 
 ### 5. Valider le nonce et le payeur de frais
 
@@ -116,7 +117,7 @@ dans la SVM gère deux validations :
 validator charge le compte nonce et vérifie :
 
 - Le compte appartient au System Program
-- Il s'analyse comme _rs`State::Initialized`_
+- Il s'analyse comme `State::Initialized`
 - Le nonce durable stocké correspond au `recent_blockhash` de la transaction
 - Le nonce peut être avancé (son nonce durable actuel diffère du prochain nonce
   durable, c'est-à-dire que le nonce n'a pas déjà été utilisé dans le bloc
@@ -131,18 +132,18 @@ l'index 0) est chargé et vérifié par
 [`validate_fee_payer`](https://github.com/anza-xyz/agave/blob/v3.1.8/svm/src/account_loader.rs#L369-L417)
 :
 
-- Le compte doit exister (lamports > 0), sinon _rs`AccountNotFound`_
+- Le compte doit exister (lamports > 0), sinon `AccountNotFound`
 - Le compte doit être un compte système ou un compte nonce, sinon
-  _rs`InvalidAccountForFee`_
+  `InvalidAccountForFee`
 - Les lamports doivent couvrir `min_balance + total_fee`, où `min_balance` est 0
   pour les comptes système ou `rent.minimum_balance(NonceState::size())` pour
-  les comptes nonce ; sinon _rs`InsufficientFundsForFee`_
+  les comptes nonce ; sinon `InsufficientFundsForFee`
 - Après déduction des frais, le compte doit rester exempté de loyer (ne peut pas
   passer d'exempté de loyer à payant de loyer)
 
 Les frais sont déduits du payeur de frais à cette étape. Un instantané du payeur
 de frais après déduction des frais (et du nonce avancé, le cas échéant) est
-enregistré en tant que _rs`RollbackAccounts`_, qui sont les comptes qui sont
+enregistré en tant que `RollbackAccounts`, qui sont les comptes qui sont
 validés même si l'exécution échoue.
 
 ### 6. Charger les comptes
@@ -166,25 +167,27 @@ Pour chaque compte non-payeur de frais, le chargeur :
 
 Pour chaque programme invoqué par les instructions de la transaction, le
 chargeur vérifie que le compte du programme existe et appartient à un chargeur
-valide (`NativeLoader` ou l'un des _rs`PROGRAM_OWNERS`_). Les programmes
-invalides échouent avec _rs`ProgramAccountNotFound`_ ou
-_rs`InvalidProgramForExecution`_.
+valide (`NativeLoader` ou l'un des `PROGRAM_OWNERS`). Les programmes
+invalides échouent avec `ProgramAccountNotFound` ou
+`InvalidProgramForExecution`.
 
 Les programmes LoaderV3 (évolutifs) chargent implicitement leur compte
 programdata associé, qui compte également dans la limite de taille des données
 chargées.
 
-<Callout type="warn" title="Les transactions v1 définissent cette limite à zéro par défaut">
+<Warning>
+  **Les transactions v1 définissent cette limite à zéro par défaut**
+
   La limite par défaut de 64 Mio s'applique aux transactions legacy et v0. Dans le [format
   v1](/docs/core/transactions/versioned-transactions#v1-message-format), la
   limite de taille des données des comptes chargés est lue depuis la configuration du message, et un champ
   non défini prend la valeur **0 octet** par défaut plutôt qu'une valeur généreuse. Une transaction v1
   avec une configuration vide échoue donc à cette étape avec
-  _rs`MaxLoadedAccountsDataSizeExceeded`_ — le budget demandé est trop petit
+`MaxLoadedAccountsDataSizeExceeded` — le budget demandé est trop petit
   pour le premier compte chargé, de sorte que l'échec survient avant l'exécution de toute instruction,
   avec une erreur qui ne mentionne ni v1 ni la configuration. Définissez toujours explicitement la limite d'unités de calcul et la limite de taille des données des comptes chargés lors de
   la construction de transactions v1.
-</Callout>
+</Warning>
 
 Si le chargement du compte échoue mais que le payeur de frais a été validé avec
 succès, la transaction devient un résultat
@@ -194,10 +197,10 @@ succès, la transaction devient un résultat
 ### 7. Exécuter les instructions
 
 [`execute_loaded_transaction`](https://github.com/anza-xyz/agave/blob/v3.1.8/svm/src/transaction_processor.rs#L847)
-crée un _rs`TransactionContext`_ avec tous les comptes chargés et invoque
+crée un `TransactionContext` avec tous les comptes chargés et invoque
 [`process_message`](https://github.com/anza-xyz/agave/blob/v3.1.8/svm/src/message_processor.rs).
 Les instructions s'exécutent séquentiellement dans l'ordre où elles apparaissent
-dans le message. Chaque invocation d'instruction crée un _rs`InvokeContext`_ et
+dans le message. Chaque invocation d'instruction crée un `InvokeContext` et
 appelle le programme cible.
 
 #### Détails du traitement des instructions
@@ -224,7 +227,7 @@ du runtime parcourt chaque instruction et appelle le programme cible :
 4. Une fois l'instruction terminée, le runtime
    [vérifie](https://github.com/anza-xyz/agave/blob/v3.1.8/transaction-context/src/lib.rs#L366-L398)
    que le solde total en lamports de tous les comptes de l'instruction n'a pas
-   changé (vérification _rs`UnbalancedInstruction`_).
+   changé (vérification `UnbalancedInstruction`).
 5. Si une instruction échoue, la transaction entière est annulée. Aucun
    changement d'état intermédiaire n'est validé.
 
@@ -232,8 +235,8 @@ Chaque instruction incrémente la trace d'instruction. La trace inclut à la foi
 les instructions de niveau supérieur et tous les [CPI](/docs/core/cpi) qu'elles
 invoquent. La longueur totale de la trace (instructions de niveau supérieur plus
 tous les CPI imbriqués) ne peut pas dépasser 64
-(_rs`MAX_INSTRUCTION_TRACE_LENGTH`_). Dépasser cette limite renvoie
-_rs`InstructionError::MaxInstructionTraceLengthExceeded`_.
+(`MAX_INSTRUCTION_TRACE_LENGTH`). Dépasser cette limite renvoie
+`InstructionError::MaxInstructionTraceLengthExceeded`.
 
 Après l'exécution, le runtime vérifie que :
 
@@ -243,8 +246,8 @@ Après l'exécution, le runtime vérifie que :
 ### 8. Validation ou annulation
 
 Si l'exécution réussit, les états de compte modifiés du `TransactionContext`
-sont écrits dans le cache local du batch du _rs`AccountLoader`_. Si l'exécution
-échoue, seuls les _rs`RollbackAccounts`_ (payeur de frais avec frais déduits et
+sont écrits dans le cache local du batch du `AccountLoader`. Si l'exécution
+échoue, seuls les `RollbackAccounts` (payeur de frais avec frais déduits et
 nonce avancé) sont écrits. Les frais sont toujours collectés, mais tous les
 autres changements de compte sont annulés.
 

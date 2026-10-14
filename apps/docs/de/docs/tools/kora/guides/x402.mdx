@@ -10,7 +10,7 @@ Diese Anleitung startet den Referenz-Kora-Facilitator auf dem Solana Devnet. Es 
 
 ## Architektur
 
-```mermaid title="x402 with Kora"
+```mermaid
 sequenceDiagram
     participant Client
     participant API as Resource server
@@ -34,6 +34,34 @@ sequenceDiagram
     API-->>Client: 200 + resource + PAYMENT-RESPONSE
 ```
 
+<div className="nojs-only" data-fallback="mermaid">
+  ```text Mermaid
+  sequenceDiagram
+      participant Client
+      participant API as Resource server
+      participant Facilitator
+      participant Kora
+      participant Solana
+      Client->>API: GET /protected
+      API-->>Client: 402 + PAYMENT-REQUIRED
+      Client->>API: GET /protected + PAYMENT-SIGNATURE
+      API->>Facilitator: POST /verify
+      Facilitator->>Kora: signTransaction
+      Kora->>Kora: Enforce transaction policy
+      Kora-->>Facilitator: Validated transaction
+      Facilitator-->>API: Payment is valid
+      API->>Facilitator: POST /settle
+      Facilitator->>Kora: signAndSendTransaction
+      Kora->>Solana: Sign as fee payer and submit
+      Solana-->>Kora: Transaction signature
+      Kora-->>Facilitator: Transaction signature
+      Facilitator-->>API: Settlement result
+      API-->>Client: 200 + resource + PAYMENT-RESPONSE
+  ```
+</div>
+
+<p className="sol-caption">x402 with Kora</p>
+
 Die vier Anwendungsrollen bleiben getrennt:
 
 - Der **Client** wählt eine Zahlungsanforderung aus und signiert die Zahlungsautorisierung.
@@ -55,9 +83,11 @@ cp .env.example .env
 
 Setze `KORA_PRIVATE_KEY` in `.env` auf ein wegwerfbares Devnet-keypair. Die Signer-Konfiguration des Demos akzeptiert ein Base58-Secret, ein Byte-Array-keypair oder den Pfad zu einer JSON-keypair-Datei. Lade die öffentliche Adresse mit Devnet-SOL auf, damit sie Transaktions-Fee sponsern kann.
 
-<Callout type="caution" title="Wegwerfbaren Devnet-Signer verwenden">
+<Danger>
+  **Wegwerfbaren Devnet-Signer verwenden**
+
   Das Docker-Demo lädt den Kora-Signer aus einer Umgebungsvariable. Lege keinen Produktions-Signing-Key in dieses Demo und committe die `.env`-Datei nicht.
-</Callout>
+</Danger>
 
 Starte Kora und den Facilitator:
 

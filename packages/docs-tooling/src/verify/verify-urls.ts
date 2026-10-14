@@ -263,7 +263,12 @@ export function layoutKey(
 
 /** JS/CSS that Mintlify would inject on every page (WP1 acceptance). */
 export function strayAssetsInDocsRoot(
-  allow: readonly string[] = ["apps/docs/run-examples.js", "apps/docs/styles/"],
+  allow: readonly string[] = [
+    "apps/docs/run-examples.js",
+    "apps/docs/styles/",
+    // Client-only progressive-enhancement demos (WP8b, spec §3.4.6).
+    "apps/docs/snippets/demos/",
+  ],
 ) {
   const out: string[] = [];
   const walk = (dir: string) => {

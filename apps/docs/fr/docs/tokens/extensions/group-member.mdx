@@ -4,7 +4,6 @@ description:
   Créez des mints de groupe et de membre de groupe qui stockent les données du
   groupe directement sur le compte de mint en utilisant les extensions
   GroupPointer, GroupMemberPointer, TokenGroup et TokenGroupMember.
-url: /docs/tokens/extensions/group-member
 type: tutorial
 prerequisites:
   - /docs/tokens/basics/create-mint
@@ -24,405 +23,389 @@ d'autres mints doivent représenter les éléments qui lui appartiennent.
 Le Token Extensions Program peut stocker les données de groupe de jetons
 directement sur un mint avec quatre extensions associées :
 
-- _rs`GroupPointer`_ pointe un mint vers le compte qui stocke les données du
+- `GroupPointer` pointe un mint vers le compte qui stocke les données du
   groupe.
-- _rs`TokenGroup`_ stocke les données du groupe elles-mêmes, y compris
+- `TokenGroup` stocke les données du groupe elles-mêmes, y compris
   l'autorité de mise à jour, la taille actuelle et la taille maximale.
-- _rs`GroupMemberPointer`_ pointe un mint vers le compte qui stocke les données
+- `GroupMemberPointer` pointe un mint vers le compte qui stocke les données
   du membre.
-- _rs`TokenGroupMember`_ stocke l'adresse du groupe du membre et le numéro de
+- `TokenGroupMember` stocke l'adresse du groupe du membre et le numéro de
   membre.
 
-_rs`GroupPointer`_ et _rs`GroupMemberPointer`_ peuvent référencer n'importe quel
+`GroupPointer` et `GroupMemberPointer` peuvent référencer n'importe quel
 compte détenu par un programme implémentant
 l'[interface de groupe de jetons](https://github.com/solana-program/token-group/tree/main/interface).
 
 Le Token Extensions Program implémente également cette interface directement via
-les extensions de mint _rs`TokenGroup`_ et _rs`TokenGroupMember`_.
+les extensions de mint `TokenGroup` et `TokenGroupMember`.
 
 ## Comment créer des groupes et des membres stockés sur le compte de mint
 
 Pour créer des groupes et des membres stockés sur le compte de mint :
 
-1. Créez un compte de mint de groupe et initialisez _rs`GroupPointer`_.
-2. Initialisez le mint de groupe avec _rs`InitializeMint`_.
-3. Initialisez _rs`TokenGroup`_ sur ce même mint.
-4. Créez un compte de mint de membre et initialisez _rs`GroupMemberPointer`_.
-5. Initialisez le mint de membre avec _rs`InitializeMint`_.
-6. Initialisez _rs`TokenGroupMember`_ sur ce même mint afin qu'il référence le
+1. Créez un compte de mint de groupe et initialisez `GroupPointer`.
+2. Initialisez le mint de groupe avec `InitializeMint`.
+3. Initialisez `TokenGroup` sur ce même mint.
+4. Créez un compte de mint de membre et initialisez `GroupMemberPointer`.
+5. Initialisez le mint de membre avec `InitializeMint`.
+6. Initialisez `TokenGroupMember` sur ce même mint afin qu'il référence le
    mint de groupe.
 
-<ScrollyCoding>
+<Steps>
+  <Step title="Calculer la taille et le loyer du mint de groupe">
+    Calculez la taille et le loyer nécessaires pour le mint de groupe.
 
-## !!steps Calculer la taille et le loyer du mint de groupe
+    ```ts Exemple focus={15-30}
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
 
-Calculez la taille et le loyer nécessaires pour le mint de groupe.
+    const groupMint = await generateKeyPairSigner();
+    const memberMint = await generateKeyPairSigner();
 
-<CodePlaceholder title="Exemple" />
+    const groupPointerExtension = extension("GroupPointer", {
+      authority: client.payer.address,
+      groupAddress: groupMint.address
+    });
+    const groupExtension = extension("TokenGroup", {
+      updateAuthority: client.payer.address,
+      mint: groupMint.address,
+      size: 0n,
+      maxSize: 10n
+    });
+    const groupMintSpace = BigInt(
+      getMintSize([groupPointerExtension, groupExtension])
+    );
+    const groupMintCreateSpace = BigInt(getMintSize([groupPointerExtension]));
+    const groupMintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(groupMintSpace)
+      .send();
+    ```
+  </Step>
 
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
+  <Step title="Créer et initialiser le mint de groupe">
+    Créez le compte mint de groupe, initialisez `GroupPointer`, initialisez le
+    mint et initialisez `TokenGroup` dans une seule transaction.
 
-const groupMint = await generateKeyPairSigner();
-const memberMint = await generateKeyPairSigner();
+    ```ts Exemple highlight={41-45} focus={33-59} expandable
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
 
-// !focus(1:16)
-const groupPointerExtension = extension("GroupPointer", {
-  authority: client.payer.address,
-  groupAddress: groupMint.address
-});
-const groupExtension = extension("TokenGroup", {
-  updateAuthority: client.payer.address,
-  mint: groupMint.address,
-  size: 0n,
-  maxSize: 10n
-});
-const groupMintSpace = BigInt(
-  getMintSize([groupPointerExtension, groupExtension])
-);
-const groupMintCreateSpace = BigInt(getMintSize([groupPointerExtension]));
-const groupMintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(groupMintSpace)
-  .send();
-```
+    const groupMint = await generateKeyPairSigner();
+    const memberMint = await generateKeyPairSigner();
 
-## !!steps Créer et initialiser le mint de groupe
+    const groupPointerExtension = extension("GroupPointer", {
+      authority: client.payer.address,
+      groupAddress: groupMint.address
+    });
+    const groupExtension = extension("TokenGroup", {
+      updateAuthority: client.payer.address,
+      mint: groupMint.address,
+      size: 0n,
+      maxSize: 10n
+    });
+    const groupMintSpace = BigInt(
+      getMintSize([groupPointerExtension, groupExtension])
+    );
+    const groupMintCreateSpace = BigInt(getMintSize([groupPointerExtension]));
+    const groupMintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(groupMintSpace)
+      .send();
 
-Créez le compte mint de groupe, initialisez _rs`GroupPointer`_, initialisez le
-mint et initialisez _rs`TokenGroup`_ dans une seule transaction.
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer, // Account funding the new mint account.
+        newAccount: groupMint, // New group mint account to create.
+        lamports: groupMintRent, // Lamports funding the mint account rent.
+        space: groupMintCreateSpace, // Account size in bytes for the mint plus GroupPointer.
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS // Program that owns the mint account.
+      }),
+      getInitializeGroupPointerInstruction({
+        mint: groupMint.address, // Mint account that stores the GroupPointer extension.
+        authority: client.payer.address, // Authority allowed to update the group pointer later.
+        groupAddress: groupMint.address // Account address that stores the group data.
+      }),
+      getInitializeMintInstruction({
+        mint: groupMint.address, // Mint account to initialize.
+        decimals: 0, // Number of decimals for the token.
+        mintAuthority: client.payer.address, // Authority allowed to mint new tokens.
+        freezeAuthority: client.payer.address // Authority allowed to freeze token accounts.
+      }),
+      getInitializeTokenGroupInstruction({
+        group: groupMint.address,
+        mint: groupMint.address,
+        mintAuthority: client.payer,
+        updateAuthority: client.payer.address,
+        maxSize: 10n
+      })
+    ]);
+    ```
+  </Step>
 
-<CodePlaceholder title="Exemple" />
+  <Step title="Calculer la taille et le loyer du mint de membre">
+    Calculez la taille et le loyer nécessaires pour le mint de membre.
 
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
+    ```ts Exemple highlight={41-45} focus={61-76} expandable
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
 
-const groupMint = await generateKeyPairSigner();
-const memberMint = await generateKeyPairSigner();
+    const groupMint = await generateKeyPairSigner();
+    const memberMint = await generateKeyPairSigner();
 
-const groupPointerExtension = extension("GroupPointer", {
-  authority: client.payer.address,
-  groupAddress: groupMint.address
-});
-const groupExtension = extension("TokenGroup", {
-  updateAuthority: client.payer.address,
-  mint: groupMint.address,
-  size: 0n,
-  maxSize: 10n
-});
-const groupMintSpace = BigInt(
-  getMintSize([groupPointerExtension, groupExtension])
-);
-const groupMintCreateSpace = BigInt(getMintSize([groupPointerExtension]));
-const groupMintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(groupMintSpace)
-  .send();
+    const groupPointerExtension = extension("GroupPointer", {
+      authority: client.payer.address,
+      groupAddress: groupMint.address
+    });
+    const groupExtension = extension("TokenGroup", {
+      updateAuthority: client.payer.address,
+      mint: groupMint.address,
+      size: 0n,
+      maxSize: 10n
+    });
+    const groupMintSpace = BigInt(
+      getMintSize([groupPointerExtension, groupExtension])
+    );
+    const groupMintCreateSpace = BigInt(getMintSize([groupPointerExtension]));
+    const groupMintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(groupMintSpace)
+      .send();
 
-// !focus(1:27)
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer, // Account funding the new mint account.
-    newAccount: groupMint, // New group mint account to create.
-    lamports: groupMintRent, // Lamports funding the mint account rent.
-    space: groupMintCreateSpace, // Account size in bytes for the mint plus GroupPointer.
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS // Program that owns the mint account.
-  }),
-  // !mark(1:5)
-  getInitializeGroupPointerInstruction({
-    mint: groupMint.address, // Mint account that stores the GroupPointer extension.
-    authority: client.payer.address, // Authority allowed to update the group pointer later.
-    groupAddress: groupMint.address // Account address that stores the group data.
-  }),
-  getInitializeMintInstruction({
-    mint: groupMint.address, // Mint account to initialize.
-    decimals: 0, // Number of decimals for the token.
-    mintAuthority: client.payer.address, // Authority allowed to mint new tokens.
-    freezeAuthority: client.payer.address // Authority allowed to freeze token accounts.
-  }),
-  getInitializeTokenGroupInstruction({
-    group: groupMint.address,
-    mint: groupMint.address,
-    mintAuthority: client.payer,
-    updateAuthority: client.payer.address,
-    maxSize: 10n
-  })
-]);
-```
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer, // Account funding the new mint account.
+        newAccount: groupMint, // New group mint account to create.
+        lamports: groupMintRent, // Lamports funding the mint account rent.
+        space: groupMintCreateSpace, // Account size in bytes for the mint plus GroupPointer.
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS // Program that owns the mint account.
+      }),
+      getInitializeGroupPointerInstruction({
+        mint: groupMint.address, // Mint account that stores the GroupPointer extension.
+        authority: client.payer.address, // Authority allowed to update the group pointer later.
+        groupAddress: groupMint.address // Account address that stores the group data.
+      }),
+      getInitializeMintInstruction({
+        mint: groupMint.address, // Mint account to initialize.
+        decimals: 0, // Number of decimals for the token.
+        mintAuthority: client.payer.address, // Authority allowed to mint new tokens.
+        freezeAuthority: client.payer.address // Authority allowed to freeze token accounts.
+      }),
+      getInitializeTokenGroupInstruction({
+        group: groupMint.address,
+        mint: groupMint.address,
+        mintAuthority: client.payer,
+        updateAuthority: client.payer.address,
+        maxSize: 10n
+      })
+    ]);
 
-## !!steps Calculer la taille et le loyer du mint de membre
+    const memberPointerExtension = extension("GroupMemberPointer", {
+      authority: client.payer.address,
+      memberAddress: memberMint.address
+    });
+    const memberExtension = extension("TokenGroupMember", {
+      mint: memberMint.address,
+      group: groupMint.address,
+      memberNumber: 1n
+    });
+    const memberMintSpace = BigInt(
+      getMintSize([memberPointerExtension, memberExtension])
+    );
+    const memberMintCreateSpace = BigInt(getMintSize([memberPointerExtension]));
+    const memberMintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(memberMintSpace)
+      .send();
+    ```
+  </Step>
 
-Calculez la taille et le loyer nécessaires pour le mint de membre.
+  <Step title="Créer et initialiser le mint de membre">
+    Créez le compte mint de membre, initialisez `GroupMemberPointer`,
+    initialisez le mint et initialisez `TokenGroupMember` dans une seule
+    transaction.
 
-<CodePlaceholder title="Exemple" />
+    ```ts Exemple highlight={41-45,86-90} focus={78-104} expandable
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
 
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
+    const groupMint = await generateKeyPairSigner();
+    const memberMint = await generateKeyPairSigner();
 
-const groupMint = await generateKeyPairSigner();
-const memberMint = await generateKeyPairSigner();
+    const groupPointerExtension = extension("GroupPointer", {
+      authority: client.payer.address,
+      groupAddress: groupMint.address
+    });
+    const groupExtension = extension("TokenGroup", {
+      updateAuthority: client.payer.address,
+      mint: groupMint.address,
+      size: 0n,
+      maxSize: 10n
+    });
+    const groupMintSpace = BigInt(
+      getMintSize([groupPointerExtension, groupExtension])
+    );
+    const groupMintCreateSpace = BigInt(getMintSize([groupPointerExtension]));
+    const groupMintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(groupMintSpace)
+      .send();
 
-const groupPointerExtension = extension("GroupPointer", {
-  authority: client.payer.address,
-  groupAddress: groupMint.address
-});
-const groupExtension = extension("TokenGroup", {
-  updateAuthority: client.payer.address,
-  mint: groupMint.address,
-  size: 0n,
-  maxSize: 10n
-});
-const groupMintSpace = BigInt(
-  getMintSize([groupPointerExtension, groupExtension])
-);
-const groupMintCreateSpace = BigInt(getMintSize([groupPointerExtension]));
-const groupMintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(groupMintSpace)
-  .send();
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer, // Account funding the new mint account.
+        newAccount: groupMint, // New group mint account to create.
+        lamports: groupMintRent, // Lamports funding the mint account rent.
+        space: groupMintCreateSpace, // Account size in bytes for the mint plus GroupPointer.
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS // Program that owns the mint account.
+      }),
+      getInitializeGroupPointerInstruction({
+        mint: groupMint.address, // Mint account that stores the GroupPointer extension.
+        authority: client.payer.address, // Authority allowed to update the group pointer later.
+        groupAddress: groupMint.address // Account address that stores the group data.
+      }),
+      getInitializeMintInstruction({
+        mint: groupMint.address, // Mint account to initialize.
+        decimals: 0, // Number of decimals for the token.
+        mintAuthority: client.payer.address, // Authority allowed to mint new tokens.
+        freezeAuthority: client.payer.address // Authority allowed to freeze token accounts.
+      }),
+      getInitializeTokenGroupInstruction({
+        group: groupMint.address,
+        mint: groupMint.address,
+        mintAuthority: client.payer,
+        updateAuthority: client.payer.address,
+        maxSize: 10n
+      })
+    ]);
 
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer, // Account funding the new mint account.
-    newAccount: groupMint, // New group mint account to create.
-    lamports: groupMintRent, // Lamports funding the mint account rent.
-    space: groupMintCreateSpace, // Account size in bytes for the mint plus GroupPointer.
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS // Program that owns the mint account.
-  }),
-  // !mark(1:5)
-  getInitializeGroupPointerInstruction({
-    mint: groupMint.address, // Mint account that stores the GroupPointer extension.
-    authority: client.payer.address, // Authority allowed to update the group pointer later.
-    groupAddress: groupMint.address // Account address that stores the group data.
-  }),
-  getInitializeMintInstruction({
-    mint: groupMint.address, // Mint account to initialize.
-    decimals: 0, // Number of decimals for the token.
-    mintAuthority: client.payer.address, // Authority allowed to mint new tokens.
-    freezeAuthority: client.payer.address // Authority allowed to freeze token accounts.
-  }),
-  getInitializeTokenGroupInstruction({
-    group: groupMint.address,
-    mint: groupMint.address,
-    mintAuthority: client.payer,
-    updateAuthority: client.payer.address,
-    maxSize: 10n
-  })
-]);
+    const memberPointerExtension = extension("GroupMemberPointer", {
+      authority: client.payer.address,
+      memberAddress: memberMint.address
+    });
+    const memberExtension = extension("TokenGroupMember", {
+      mint: memberMint.address,
+      group: groupMint.address,
+      memberNumber: 1n
+    });
+    const memberMintSpace = BigInt(
+      getMintSize([memberPointerExtension, memberExtension])
+    );
+    const memberMintCreateSpace = BigInt(getMintSize([memberPointerExtension]));
+    const memberMintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(memberMintSpace)
+      .send();
 
-// !focus(1:16)
-const memberPointerExtension = extension("GroupMemberPointer", {
-  authority: client.payer.address,
-  memberAddress: memberMint.address
-});
-const memberExtension = extension("TokenGroupMember", {
-  mint: memberMint.address,
-  group: groupMint.address,
-  memberNumber: 1n
-});
-const memberMintSpace = BigInt(
-  getMintSize([memberPointerExtension, memberExtension])
-);
-const memberMintCreateSpace = BigInt(getMintSize([memberPointerExtension]));
-const memberMintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(memberMintSpace)
-  .send();
-```
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer, // Account funding the new mint account.
+        newAccount: memberMint, // New member mint account to create.
+        lamports: memberMintRent, // Lamports funding the mint account rent.
+        space: memberMintCreateSpace, // Account size in bytes for the mint plus GroupMemberPointer.
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS // Program that owns the mint account.
+      }),
+      getInitializeGroupMemberPointerInstruction({
+        mint: memberMint.address, // Mint account that stores the GroupMemberPointer extension.
+        authority: client.payer.address, // Authority allowed to update the member pointer later.
+        memberAddress: memberMint.address // Account address that stores the member data.
+      }),
+      getInitializeMintInstruction({
+        mint: memberMint.address, // Mint account to initialize.
+        decimals: 0, // Number of decimals for the token.
+        mintAuthority: client.payer.address, // Authority allowed to mint new tokens.
+        freezeAuthority: client.payer.address // Authority allowed to freeze token accounts.
+      }),
+      getInitializeTokenGroupMemberInstruction({
+        member: memberMint.address,
+        memberMint: memberMint.address,
+        memberMintAuthority: client.payer,
+        group: groupMint.address,
+        groupUpdateAuthority: client.payer
+      })
+    ]);
+    ```
+  </Step>
+</Steps>
 
-## !!steps Créer et initialiser le mint de membre
+<Info>
+**Pointeurs et ordre des instructions**
 
-Créez le compte mint de membre, initialisez _rs`GroupMemberPointer`_,
-initialisez le mint et initialisez _rs`TokenGroupMember`_ dans une seule
-transaction.
+`GroupPointer` et `GroupMemberPointer` stockent l'adresse du compte
+où résident les données du groupe ou du membre. `TokenGroup` et
+`TokenGroupMember` stockent les données réelles du groupe ou du membre.
 
-<CodePlaceholder title="Exemple" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const groupMint = await generateKeyPairSigner();
-const memberMint = await generateKeyPairSigner();
-
-const groupPointerExtension = extension("GroupPointer", {
-  authority: client.payer.address,
-  groupAddress: groupMint.address
-});
-const groupExtension = extension("TokenGroup", {
-  updateAuthority: client.payer.address,
-  mint: groupMint.address,
-  size: 0n,
-  maxSize: 10n
-});
-const groupMintSpace = BigInt(
-  getMintSize([groupPointerExtension, groupExtension])
-);
-const groupMintCreateSpace = BigInt(getMintSize([groupPointerExtension]));
-const groupMintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(groupMintSpace)
-  .send();
-
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer, // Account funding the new mint account.
-    newAccount: groupMint, // New group mint account to create.
-    lamports: groupMintRent, // Lamports funding the mint account rent.
-    space: groupMintCreateSpace, // Account size in bytes for the mint plus GroupPointer.
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS // Program that owns the mint account.
-  }),
-  // !mark(1:5)
-  getInitializeGroupPointerInstruction({
-    mint: groupMint.address, // Mint account that stores the GroupPointer extension.
-    authority: client.payer.address, // Authority allowed to update the group pointer later.
-    groupAddress: groupMint.address // Account address that stores the group data.
-  }),
-  getInitializeMintInstruction({
-    mint: groupMint.address, // Mint account to initialize.
-    decimals: 0, // Number of decimals for the token.
-    mintAuthority: client.payer.address, // Authority allowed to mint new tokens.
-    freezeAuthority: client.payer.address // Authority allowed to freeze token accounts.
-  }),
-  getInitializeTokenGroupInstruction({
-    group: groupMint.address,
-    mint: groupMint.address,
-    mintAuthority: client.payer,
-    updateAuthority: client.payer.address,
-    maxSize: 10n
-  })
-]);
-
-const memberPointerExtension = extension("GroupMemberPointer", {
-  authority: client.payer.address,
-  memberAddress: memberMint.address
-});
-const memberExtension = extension("TokenGroupMember", {
-  mint: memberMint.address,
-  group: groupMint.address,
-  memberNumber: 1n
-});
-const memberMintSpace = BigInt(
-  getMintSize([memberPointerExtension, memberExtension])
-);
-const memberMintCreateSpace = BigInt(getMintSize([memberPointerExtension]));
-const memberMintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(memberMintSpace)
-  .send();
-
-// !focus(1:27)
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer, // Account funding the new mint account.
-    newAccount: memberMint, // New member mint account to create.
-    lamports: memberMintRent, // Lamports funding the mint account rent.
-    space: memberMintCreateSpace, // Account size in bytes for the mint plus GroupMemberPointer.
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS // Program that owns the mint account.
-  }),
-  // !mark(1:5)
-  getInitializeGroupMemberPointerInstruction({
-    mint: memberMint.address, // Mint account that stores the GroupMemberPointer extension.
-    authority: client.payer.address, // Authority allowed to update the member pointer later.
-    memberAddress: memberMint.address // Account address that stores the member data.
-  }),
-  getInitializeMintInstruction({
-    mint: memberMint.address, // Mint account to initialize.
-    decimals: 0, // Number of decimals for the token.
-    mintAuthority: client.payer.address, // Authority allowed to mint new tokens.
-    freezeAuthority: client.payer.address // Authority allowed to freeze token accounts.
-  }),
-  getInitializeTokenGroupMemberInstruction({
-    member: memberMint.address,
-    memberMint: memberMint.address,
-    memberMintAuthority: client.payer,
-    group: groupMint.address,
-    groupUpdateAuthority: client.payer
-  })
-]);
-```
-
-</ScrollyCoding>
-
-<Callout type="info" title="Pointeurs et ordre des instructions">
-_rs`GroupPointer`_ et _rs`GroupMemberPointer`_ stockent l'adresse du compte
-où résident les données du groupe ou du membre. _rs`TokenGroup`_ et
-_rs`TokenGroupMember`_ stockent les données réelles du groupe ou du membre.
-
-_rs`GroupPointerInstruction::Initialize`_ et
-_rs`GroupMemberPointerInstruction::Initialize`_ doivent précéder
-_rs`InitializeMint`_. _rs`TokenGroupInstruction::InitializeGroup`_ et
-_rs`TokenGroupInstruction::InitializeMember`_ doivent suivre
-_rs`InitializeMint`_. Pour chaque mint, _rs`CreateAccount`_, l'instruction
-d'initialisation du pointeur et _rs`InitializeMint`_ doivent être inclus dans la
+`GroupPointerInstruction::Initialize` et
+`GroupMemberPointerInstruction::Initialize` doivent précéder
+`InitializeMint`. `TokenGroupInstruction::InitializeGroup` et
+`TokenGroupInstruction::InitializeMember` doivent suivre
+`InitializeMint`. Pour chaque mint, `CreateAccount`, l'instruction
+d'initialisation du pointeur et `InitializeMint` doivent être inclus dans la
 même transaction.
 
-</Callout>
+</Info>
 
 ### Référence source
 
-_rs`GroupPointer`_ et _rs`GroupMemberPointer`_ sont des instructions de pointeur
-dans le Token Extensions Program. _rs`TokenGroup`_ et _rs`TokenGroupMember`_
+`GroupPointer` et `GroupMemberPointer` sont des instructions de pointeur
+dans le Token Extensions Program. `TokenGroup` et `TokenGroupMember`
 suivent l'interface Token group, que le Token Extensions Program implémente.
 
 #### Pointeur de groupe et pointeur de membre de groupe
 
-| Élément                                         | Description                                                                                              | Source                                                                                                                                            |
-| ----------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| _rs`GroupPointer`_                              | Extension de mint qui stocke l'autorité et l'adresse du compte contenant les données d'un groupe.        | [Source](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/group_pointer/mod.rs#L12-L25)                |
-| _rs`GroupMemberPointer`_                        | Extension de mint qui stocke l'autorité et l'adresse du compte contenant les données d'un membre.        | [Source](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/group_member_pointer/mod.rs#L12-L25)         |
-| _rs`GroupPointerInstruction::Initialize`_       | Initialise l'extension de pointeur de groupe avant _rs`InitializeMint`_.                                 | [Source](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/group_pointer/instruction.rs#L22-L38)        |
-| _rs`GroupPointerInstruction::Update`_           | Met à jour l'adresse de groupe stockée par l'extension _rs`GroupPointer`_ du mint.                       | [Source](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/group_pointer/instruction.rs#L39-L55)        |
-| _rs`GroupMemberPointerInstruction::Initialize`_ | Initialise l'extension de pointeur de membre de groupe avant _rs`InitializeMint`_.                       | [Source](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/group_member_pointer/instruction.rs#L22-L38) |
-| _rs`GroupMemberPointerInstruction::Update`_     | Met à jour l'adresse de membre stockée par l'extension _rs`GroupMemberPointer`_ du mint.                 | [Source](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/group_member_pointer/instruction.rs#L39-L55) |
-| _rs`process_initialize`_ (`GroupPointer`)       | Écrit l'autorité initiale _rs`GroupPointer`_ et l'adresse de groupe sur le mint.                         | [Source](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/extension/group_pointer/processor.rs#L25-L50)            |
-| _rs`process_update`_ (`GroupPointer`)           | Valide l'autorité du pointeur de groupe, puis réécrit l'adresse de groupe stockée par le mint.           | [Source](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/extension/group_pointer/processor.rs#L52-L78)            |
-| _rs`process_initialize`_ (`GroupMemberPointer`) | Écrit l'autorité initiale _rs`GroupMemberPointer`_ et l'adresse de membre sur le mint.                   | [Source](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/extension/group_member_pointer/processor.rs#L25-L50)     |
-| _rs`process_update`_ (`GroupMemberPointer`)     | Valide l'autorité du pointeur de membre de groupe, puis réécrit l'adresse de membre stockée par le mint. | [Source](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/extension/group_member_pointer/processor.rs#L52-L78)     |
+| Élément                                     | Description                                                                                              | Source                                                                                                                                            |
+| ------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GroupPointer`                              | Extension de mint qui stocke l'autorité et l'adresse du compte contenant les données d'un groupe.        | [Source](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/group_pointer/mod.rs#L12-L25)                |
+| `GroupMemberPointer`                        | Extension de mint qui stocke l'autorité et l'adresse du compte contenant les données d'un membre.        | [Source](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/group_member_pointer/mod.rs#L12-L25)         |
+| `GroupPointerInstruction::Initialize`       | Initialise l'extension de pointeur de groupe avant `InitializeMint`.                                     | [Source](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/group_pointer/instruction.rs#L22-L38)        |
+| `GroupPointerInstruction::Update`           | Met à jour l'adresse de groupe stockée par l'extension `GroupPointer` du mint.                           | [Source](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/group_pointer/instruction.rs#L39-L55)        |
+| `GroupMemberPointerInstruction::Initialize` | Initialise l'extension de pointeur de membre de groupe avant `InitializeMint`.                           | [Source](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/group_member_pointer/instruction.rs#L22-L38) |
+| `GroupMemberPointerInstruction::Update`     | Met à jour l'adresse de membre stockée par l'extension `GroupMemberPointer` du mint.                     | [Source](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/group_member_pointer/instruction.rs#L39-L55) |
+| `process_initialize` (`GroupPointer`)       | Écrit l'autorité initiale `GroupPointer` et l'adresse de groupe sur le mint.                             | [Source](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/extension/group_pointer/processor.rs#L25-L50)            |
+| `process_update` (`GroupPointer`)           | Valide l'autorité du pointeur de groupe, puis réécrit l'adresse de groupe stockée par le mint.           | [Source](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/extension/group_pointer/processor.rs#L52-L78)            |
+| `process_initialize` (`GroupMemberPointer`) | Écrit l'autorité initiale `GroupMemberPointer` et l'adresse de membre sur le mint.                       | [Source](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/extension/group_member_pointer/processor.rs#L25-L50)     |
+| `process_update` (`GroupMemberPointer`)     | Valide l'autorité du pointeur de membre de groupe, puis réécrit l'adresse de membre stockée par le mint. | [Source](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/extension/group_member_pointer/processor.rs#L52-L78)     |
 
 #### Groupe de jetons et membre du groupe de jetons
 
-| Élément                                           | Description                                                                                                                                                              | Source                                                                                                                                 |
-| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
-| _rs`TokenGroup`_                                  | État de l'interface du groupe de jetons stocké sur le mint, incluant l'autorité de mise à jour, la taille actuelle et la taille maximale.                                | [Source](https://github.com/solana-program/token-group/blob/main/interface/src/state.rs#L13-L27)                                       |
-| _rs`TokenGroupMember`_                            | État de l'interface du membre du groupe de jetons stocké sur le mint, incluant le mint du membre, l'adresse du groupe et le numéro du membre.                            | [Source](https://github.com/solana-program/token-group/blob/main/interface/src/state.rs#L64-L76)                                       |
-| _rs`TokenGroupInstruction::InitializeGroup`_      | Instruction de l'interface du groupe de jetons prise en charge par le Token Extensions Program pour initialiser un nouveau groupe pour un mint déjà initialisé.          | [Source](https://github.com/solana-program/token-group/blob/main/interface/src/instruction.rs#L52-L62)                                 |
-| _rs`TokenGroupInstruction::UpdateGroupMaxSize`_   | Instruction de l'interface du groupe de jetons prise en charge par le Token Extensions Program pour mettre à jour le nombre maximal de membres autorisés dans un groupe. | [Source](https://github.com/solana-program/token-group/blob/main/interface/src/instruction.rs#L64-L70)                                 |
-| _rs`TokenGroupInstruction::UpdateGroupAuthority`_ | Instruction de l'interface du groupe de jetons prise en charge par le Token Extensions Program pour faire pivoter ou effacer l'autorité de mise à jour du groupe.        | [Source](https://github.com/solana-program/token-group/blob/main/interface/src/instruction.rs#L72-L78)                                 |
-| _rs`TokenGroupInstruction::InitializeMember`_     | Instruction de l'interface du groupe de jetons prise en charge par le Token Extensions Program pour initialiser un nouveau membre pour un groupe déjà initialisé.        | [Source](https://github.com/solana-program/token-group/blob/main/interface/src/instruction.rs#L80-L92)                                 |
-| _rs`process_initialize_group`_                    | Valide le mint, vérifie que _rs`GroupPointer`_ est présent, et alloue l'état _rs`TokenGroup`_ sur le mint du groupe.                                                     | [Source](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/extension/token_group/processor.rs#L43-L90)   |
-| _rs`process_update_group_max_size`_               | Valide l'autorité de mise à jour actuelle, puis met à jour la taille maximale du groupe.                                                                                 | [Source](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/extension/token_group/processor.rs#L95-L117)  |
-| _rs`process_update_group_authority`_              | Valide l'autorité de mise à jour actuelle, puis fait pivoter ou efface l'autorité de mise à jour du groupe.                                                              | [Source](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/extension/token_group/processor.rs#L119-L141) |
-| _rs`process_initialize_member`_                   | Valide le mint du membre et l'autorité du groupe, incrémente la taille du groupe et alloue l'état _rs`TokenGroupMember`_ sur le mint.                                    | [Source](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/extension/token_group/processor.rs#L143-L202) |
+| Élément                                       | Description                                                                                                                                                              | Source                                                                                                                                 |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `TokenGroup`                                  | État de l'interface du groupe de jetons stocké sur le mint, incluant l'autorité de mise à jour, la taille actuelle et la taille maximale.                                | [Source](https://github.com/solana-program/token-group/blob/main/interface/src/state.rs#L13-L27)                                       |
+| `TokenGroupMember`                            | État de l'interface du membre du groupe de jetons stocké sur le mint, incluant le mint du membre, l'adresse du groupe et le numéro du membre.                            | [Source](https://github.com/solana-program/token-group/blob/main/interface/src/state.rs#L64-L76)                                       |
+| `TokenGroupInstruction::InitializeGroup`      | Instruction de l'interface du groupe de jetons prise en charge par le Token Extensions Program pour initialiser un nouveau groupe pour un mint déjà initialisé.          | [Source](https://github.com/solana-program/token-group/blob/main/interface/src/instruction.rs#L52-L62)                                 |
+| `TokenGroupInstruction::UpdateGroupMaxSize`   | Instruction de l'interface du groupe de jetons prise en charge par le Token Extensions Program pour mettre à jour le nombre maximal de membres autorisés dans un groupe. | [Source](https://github.com/solana-program/token-group/blob/main/interface/src/instruction.rs#L64-L70)                                 |
+| `TokenGroupInstruction::UpdateGroupAuthority` | Instruction de l'interface du groupe de jetons prise en charge par le Token Extensions Program pour faire pivoter ou effacer l'autorité de mise à jour du groupe.        | [Source](https://github.com/solana-program/token-group/blob/main/interface/src/instruction.rs#L72-L78)                                 |
+| `TokenGroupInstruction::InitializeMember`     | Instruction de l'interface du groupe de jetons prise en charge par le Token Extensions Program pour initialiser un nouveau membre pour un groupe déjà initialisé.        | [Source](https://github.com/solana-program/token-group/blob/main/interface/src/instruction.rs#L80-L92)                                 |
+| `process_initialize_group`                    | Valide le mint, vérifie que `GroupPointer` est présent, et alloue l'état `TokenGroup` sur le mint du groupe.                                                             | [Source](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/extension/token_group/processor.rs#L43-L90)   |
+| `process_update_group_max_size`               | Valide l'autorité de mise à jour actuelle, puis met à jour la taille maximale du groupe.                                                                                 | [Source](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/extension/token_group/processor.rs#L95-L117)  |
+| `process_update_group_authority`              | Valide l'autorité de mise à jour actuelle, puis fait pivoter ou efface l'autorité de mise à jour du groupe.                                                              | [Source](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/extension/token_group/processor.rs#L119-L141) |
+| `process_initialize_member`                   | Valide le mint du membre et l'autorité du groupe, incrémente la taille du groupe et alloue l'état `TokenGroupMember` sur le mint.                                        | [Source](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/extension/token_group/processor.rs#L143-L202) |
 
 ### Typescript
 
@@ -432,9 +415,7 @@ de groupe de jetons sont inclus à titre de référence.
 
 #### Kit
 
-<CodeTabs storage="token-ts-kit" flags="r">
-
-```ts !! title="Instructions"
+```ts Instructions highlight={73-79,107-111,118-124}
 import {
   lamports,
   createClient,
@@ -507,7 +488,6 @@ await client.sendTransaction([
     mintAuthority: client.payer.address, // Authority allowed to mint new tokens.
     freezeAuthority: client.payer.address // Authority allowed to freeze token accounts.
   }),
-  // !mark(1:7)
   getInitializeTokenGroupInstruction({
     group: groupMint.address, // Mint account that stores the group data.
     mint: groupMint.address, // Mint that the group data describes.
@@ -542,7 +522,6 @@ await client.sendTransaction([
     space: memberMintCreateSpace, // Account size in bytes for the mint plus GroupMemberPointer.
     programAddress: TOKEN_2022_PROGRAM_ADDRESS // Program that owns the mint account.
   }),
-  // !mark(1:5)
   getInitializeGroupMemberPointerInstruction({
     mint: memberMint.address, // Mint account that stores the GroupMemberPointer extension.
     authority: client.payer.address, // Authority allowed to update the member pointer later.
@@ -554,7 +533,6 @@ await client.sendTransaction([
     mintAuthority: client.payer.address, // Authority allowed to mint new tokens.
     freezeAuthority: client.payer.address // Authority allowed to freeze token accounts.
   }),
-  // !mark(1:7)
   getInitializeTokenGroupMemberInstruction({
     member: memberMint.address, // Mint account that stores the member data.
     memberMint: memberMint.address, // Mint that the member data describes.
@@ -591,13 +569,9 @@ console.log(
 );
 ```
 
-</CodeTabs>
-
 #### Web3.js
 
-<CodeTabs storage="token-ts-legacy" flags="r">
-
-```ts !! title="Instructions"
+```ts Instructions highlight={62-68,78-85,135-141,151-158}
 import {
   Connection,
   Keypair,
@@ -659,7 +633,6 @@ const createGroupMintAccountInstruction = SystemProgram.createAccount({
   programId: TOKEN_2022_PROGRAM_ID // Program that owns the mint account.
 });
 
-// !mark(1:7)
 const initializeGroupPointerInstruction =
   createInitializeGroupPointerInstruction(
     groupMint.publicKey, // Mint account that stores the GroupPointer extension.
@@ -676,7 +649,6 @@ const initializeGroupMintInstruction = createInitializeMintInstruction(
   TOKEN_2022_PROGRAM_ID // Program that owns the mint account.
 );
 
-// !mark(1:8)
 const initializeGroupInstruction = createInitializeGroupInstruction({
   programId: TOKEN_2022_PROGRAM_ID, // Token program that owns the mint.
   group: groupMint.publicKey, // Mint account that stores the group data.
@@ -734,7 +706,6 @@ const createMemberMintAccountInstruction = SystemProgram.createAccount({
   programId: TOKEN_2022_PROGRAM_ID // Program that owns the mint account.
 });
 
-// !mark(1:7)
 const initializeMemberPointerInstruction =
   createInitializeGroupMemberPointerInstruction(
     memberMint.publicKey, // Mint account that stores the GroupMemberPointer extension.
@@ -751,7 +722,6 @@ const initializeMemberMintInstruction = createInitializeMintInstruction(
   TOKEN_2022_PROGRAM_ID // Program that owns the mint account.
 );
 
-// !mark(1:8)
 const initializeMemberInstruction = createInitializeMemberInstruction({
   programId: TOKEN_2022_PROGRAM_ID, // Token program that owns the mint.
   member: memberMint.publicKey, // Mint account that stores the member data.
@@ -810,13 +780,9 @@ console.log(
 );
 ```
 
-</CodeTabs>
-
 ### Rust
 
-<CodeTabs storage="token-rs" flags="r">
-
-```rust !! title="Rust"
+```rust Rust highlight={67-72,82-89,129-134,144-151}
 use anyhow::Result;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_commitment_config::CommitmentConfig;
@@ -883,7 +849,6 @@ async fn main() -> Result<()> {
         &TOKEN_2022_PROGRAM_ID,  // Program that owns the mint account.
     );
 
-    // !mark(1:6)
     let initialize_group_pointer_instruction = initialize_group_pointer(
         &TOKEN_2022_PROGRAM_ID,
         &group_mint.pubkey(),      // Mint account that stores the GroupPointer extension.
@@ -899,7 +864,6 @@ async fn main() -> Result<()> {
         0,                         // Number of decimals for the token.
     )?;
 
-    // !mark(1:8)
     let initialize_group_instruction = initialize_group(
         &TOKEN_2022_PROGRAM_ID,   // Program that owns the mint account.
         &group_mint.pubkey(),     // Mint account that stores the group data.
@@ -947,7 +911,6 @@ async fn main() -> Result<()> {
         &TOKEN_2022_PROGRAM_ID,   // Program that owns the mint account.
     );
 
-    // !mark(1:6)
     let initialize_member_pointer_instruction = initialize_group_member_pointer(
         &TOKEN_2022_PROGRAM_ID,
         &member_mint.pubkey(),      // Mint account that stores the GroupMemberPointer extension.
@@ -963,7 +926,6 @@ async fn main() -> Result<()> {
         0,                         // Number of decimals for the token.
     )?;
 
-    // !mark(1:8)
     let initialize_member_instruction = initialize_member(
         &TOKEN_2022_PROGRAM_ID, // Program that owns the mint account.
         &member_mint.pubkey(),  // Mint account that stores the member data.
@@ -1010,5 +972,3 @@ async fn main() -> Result<()> {
     Ok(())
 }
 ```
-
-</CodeTabs>

@@ -2,7 +2,6 @@
 title: 计算预算
 description:
   Solana 上的计算单元限制、ComputeBudgetInstruction 变体、调度器成本模型、区块限制和执行预算常量。
-url: /docs/core/fees/compute-budget
 type: reference
 prerequisites:
   - /docs/core/fees
@@ -16,26 +15,27 @@ related:
 
 {/* TOC: Compute unit limit, Compute budget instructions, Scheduler cost model, Block limits, Execution budget constants */}
 
-<Callout type="info" title="摘要">
+<Info>
+  **摘要**
+
   每条指令默认分配 20 万 CU，每笔交易最多 140 万 CU。可使用
   `SetComputeUnitLimit` 和 `SetComputeUnitPrice` 指令进行优化。
   优先费用基于请求的 CU 数量，而非实际使用量。
-</Callout>
+</Info>
 
-<Callout
-  type="warn"
-  title="ComputeBudget 指令不适用于 v1 交易"
->
+<Warning>
+  **ComputeBudget 指令不适用于 v1 交易**
+
   本页面介绍的是旧版和 v0 交易。在即将推出的 [v1
   格式](/docs/core/transactions/versioned-transactions#v1-message-format)中，ComputeBudget 指令在配置方面会被忽略（它们作为无操作指令执行，仍会消耗 150 个 CU 以及一个指令 slot）——限制和优先费用直接在消息配置中设置，未设置的限制默认为 **零**，而非以下所示的值。
-</Callout>
+</Warning>
 
 ## 计算单元限制
 
 每条指令分配
 [默认 200,000 CU](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/execution_budget.rs#L44)，每笔交易上限为
 [1,400,000 CU](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/execution_budget.rs#L39)。如果没有显式的
-_rs`SetComputeUnitLimit`_ 指令，
+`SetComputeUnitLimit` 指令，
 [默认值将根据指令类型计算](https://github.com/anza-xyz/agave/blob/v3.1.8/compute-budget-instruction/src/compute_budget_instruction_details.rs#L196-L219)：
 
 ```text title="Default CU limit calculation"
@@ -55,7 +55,7 @@ default_cu_limit = (num_non_migratable_builtin_instructions * 3,000)
 - **正在迁移的内置指令**（已完成 SBF 迁移并启用相关功能）：视为非内置指令（每条 200,000
   CU）。
 
-结果会被限制在 _rs`MAX_COMPUTE_UNIT_LIMIT`_ （1,400,000）以内。
+结果会被限制在 `MAX_COMPUTE_UNIT_LIMIT` （1,400,000）以内。
 
 你可以在交易中包含
 [`SetComputeUnitLimit`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/compute-budget-interface/src/lib.rs#L32)
@@ -66,9 +66,9 @@ default_cu_limit = (num_non_migratable_builtin_instructions * 3,000)
 1. 通过模拟交易测量 CU 消耗。
 2. 在模拟值基础上增加 10% 的安全余量。
 
-<Callout type="warn">
+<Warning>
   优先费用由交易中请求的计算单元上限决定，*而不是*实际使用的计算单元数量。如果你设置的计算单元上限过高或直接使用默认值，将会为未使用的计算单元支付费用。
-</Callout>
+</Warning>
 
 ## 计算预算指令
 
@@ -88,13 +88,13 @@ default_cu_limit = (num_non_migratable_builtin_instructions * 3,000)
 在[处理计算预算指令](https://github.com/anza-xyz/agave/blob/v3.1.8/compute-budget-instruction/src/compute_budget_instruction_details.rs#L101-L153)时，适用以下规则：
 
 - **每种类型仅允许一个**：每笔交易中，每种指令变体只能包含一个。若包含重复项，将导致
-  _rs`DuplicateInstruction`_ 错误（整个交易失败）。
+  `DuplicateInstruction` 错误（整个交易失败）。
 - **`RequestHeapFrame`**：该值必须介于
   [`MIN_HEAP_FRAME_BYTES`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/execution_budget.rs#L49)（32
   KiB）和
   [`MAX_HEAP_FRAME_BYTES`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/execution_budget.rs#L48)（256
   KiB）之间，并且必须为[1,024 的倍数](https://github.com/anza-xyz/agave/blob/v3.1.8/compute-budget-instruction/src/compute_budget_instruction_details.rs#L192-L194)。否则，交易将以
-  _rs`InvalidInstructionData`_
+  `InvalidInstructionData`
   失败。堆大小适用于交易中调用的每个程序（包括 CPI）。
 - **`SetComputeUnitLimit`**：接受任意 `u32` 值。实际限制会被限制为
   [`MAX_COMPUTE_UNIT_LIMIT`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/execution_budget.rs#L39)（1,400,000）。
@@ -104,13 +104,13 @@ default_cu_limit = (num_non_migratable_builtin_instructions * 3,000)
   [`MAX_LOADED_ACCOUNTS_DATA_SIZE_BYTES`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/execution_budget.rs#L53)（64
   MiB）。
 - **未识别的数据**：任何发送到 Compute Budget
-  Program 且无法反序列化为已知变体的指令，都会以 _rs`InvalidInstructionData`_
+  Program 且无法反序列化为已知变体的指令，都会以 `InvalidInstructionData`
   失败。
 
-<Callout>
+<Note>
   下文的调度器成本模型描述了 validator
   内部的预执行成本估算。大多数开发者只需关注上文提到的 compute budget 指令。
-</Callout>
+</Note>
 
 ## 调度器成本模型
 
@@ -171,10 +171,10 @@ total_cost = signature_cost
 | [`MAX_VOTE_UNITS`](https://github.com/anza-xyz/agave/blob/v3.1.8/cost-model/src/block_cost_limits.rs#L39)                     | 36,000,000 |
 | [`MAX_BLOCK_ACCOUNTS_DATA_SIZE_DELTA`](https://github.com/anza-xyz/agave/blob/v3.1.8/cost-model/src/block_cost_limits.rs#L43) | 100 MB     |
 
-<Callout>
+<Note>
   [SIMD-0286](https://github.com/solana-foundation/solana-improvement-documents/blob/main/proposals/0286-raise-block-limits-to-100M.md)
-  提议将 _rs`MAX_BLOCK_UNITS`_ 增加到 100,000,000。
-</Callout>
+  提议将 `MAX_BLOCK_UNITS` 增加到 100,000,000。
+</Note>
 
 ## 执行预算常量
 

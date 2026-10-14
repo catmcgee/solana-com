@@ -56,4 +56,15 @@ describe("cross-app URL configuration", () => {
     expect(shouldUseNextLink("/changelog")).toBe(true);
     expect(shouldUseNextLink("/changelog/rss.xml")).toBe(true);
   });
+
+  it("serves the /developers and /learn landings from apps/web", async () => {
+    const shouldUseNextLink = await loadShouldUseNextLink();
+
+    expect(shouldUseNextLink("/developers")).toBe(true);
+    expect(shouldUseNextLink("/learn")).toBe(true);
+    expect(shouldUseNextLink("/developers/payments")).toBe(true);
+    expect(shouldUseNextLink("/learn/what-is-solana")).toBe(false);
+    expect(shouldUseNextLink("/developers/cookbook")).toBe(false);
+    expect(shouldUseNextLink("/developers/bootcamp/foundations")).toBe(false);
+  });
 });

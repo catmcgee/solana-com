@@ -2,7 +2,6 @@
 title: Transactiepijplijn
 description:
   Hoe Solana-transacties worden verwerkt van indiening tot commit, inclusief de volledige 8-staps validatiepijplijn, het lezen van transactiedetails van het netwerk en veelvoorkomende validatiefouten.
-url: /docs/core/transactions/transaction-pipeline
 type: reference
 prerequisites:
   - /docs/core/transactions
@@ -14,11 +13,13 @@ related:
   - /docs/core/programs/program-execution
 ---
 
-<Callout type="info" title="Samenvatting">
+<Info>
+  **Samenvatting**
+
   Transacties doorlopen 8 fasen: ontvangen, sigverify, sanitize,
   budget/leeftijdscontroles, validatie van de fee payer, laden van accounts,
   uitvoering van instructies en commit.
-</Callout>
+</Info>
 
 ## Transactieverwerkingspijplijn
 
@@ -30,9 +31,9 @@ van ontvangst tot commit, met verwijzingen naar bronbestanden in de
 ### 1. Ontvangen en deserialiseren
 
 De validator ontvangt transactiebytes via UDP/QUIC. De ruwe bytes moeten binnen
-één enkel pakket passen (_rs`PACKET_DATA_SIZE`_ = 1.232 bytes). De bytes worden
-gedeserialiseerd naar een _rs`VersionedTransaction`_, die de handtekeningenarray
-en een _rs`VersionedMessage`_ (legacy of v0) bevat.
+één enkel pakket passen (`PACKET_DATA_SIZE` = 1.232 bytes). De bytes worden
+gedeserialiseerd naar een `VersionedTransaction`, die de handtekeningenarray
+en een `VersionedMessage` (legacy of v0) bevat.
 
 De aankomende
 [v1-indeling](/docs/core/transactions/versioned-transactions#v1-message-format)
@@ -54,7 +55,7 @@ chunks van
 ### 3. Sanitize
 
 De gedeserialiseerde transactie wordt gesanitized om een
-_rs`SanitizedTransaction`_ (of
+`SanitizedTransaction` (of
 [`RuntimeTransaction`](https://github.com/anza-xyz/agave/blob/v3.1.8/runtime-transaction/src/runtime_transaction.rs#L31))
 te produceren. Sanitization valideert structurele invarianten:
 
@@ -63,7 +64,7 @@ te produceren. Sanitization valideert structurele invarianten:
   grenzen
 - De fee payer (accountindex 0) is een schrijfbare ondertekenaar
 
-De _rs`RuntimeTransaction`_ wrapper cachet vooraf berekende metadata van
+De `RuntimeTransaction` wrapper cachet vooraf berekende metadata van
 [`TransactionMeta`](https://github.com/anza-xyz/agave/blob/v3.1.8/runtime-transaction/src/transaction_meta.rs#L38-L44):
 de berichthash, vote-transactievlag, precompile-handtekeningaantallen
 (Ed25519/secp256k1/secp256r1), compute budget-instructiedetails en totale
@@ -79,24 +80,24 @@ methode voert verschillende controles per transactie uit:
 geparseerd en gevalideerd. Kostendetails worden berekend op basis van de
 budgetlimieten en prioriteringskosten. Als het compute budget ongeldig of
 tegenstrijdig is, mislukt de transactie met compute-budget parsefouten zoals
-_rs`DuplicateInstruction`_, `InstructionError(..., InvalidInstructionData)`, of
-_rs`InvalidLoadedAccountsDataSizeLimit`_.
+`DuplicateInstruction`, `InstructionError(..., InvalidInstructionData)`, of
+`InvalidLoadedAccountsDataSizeLimit`.
 
 Voor
 [v1-transacties](/docs/core/transactions/versioned-transactions#v1-message-format)
-zijn er geen compute budget-instructies om te verwerken: de limieten en prioriteitstoeslag komen uit de berichtconfiguratie, en eventuele ComputeBudget-instructies in het bericht worden genegeerd voor configuratie. Configuratievelden die niet zijn ingesteld, krijgen standaard de waarde nul, wat later zichtbaar wordt bij [het laden van accounts](#6-load-accounts).
+zijn er geen compute budget-instructies om te verwerken: de limieten en prioriteitstoeslag komen uit de berichtconfiguratie, en eventuele ComputeBudget-instructies in het bericht worden genegeerd voor configuratie. Configuratievelden die niet zijn ingesteld, krijgen standaard de waarde nul, wat later zichtbaar wordt bij [het laden van accounts](#6-accounts-laden).
 
 **Blockhash-leeftijd**: De `recent_blockhash` van de transactie wordt opgezocht
 in de
 [`BlockhashQueue`](https://github.com/anza-xyz/agave/blob/v3.1.8/accounts-db/src/blockhash_queue.rs#L33).
-Als de hash wordt gevonden en de leeftijd binnen _rs`MAX_PROCESSING_AGE`_ (150
+Als de hash wordt gevonden en de leeftijd binnen `MAX_PROCESSING_AGE` (150
 slots) valt, gaat de transactie door. Indien niet gevonden, controleert de
 validator op een geldige
 [durable nonce](/docs/core/transactions/durable-nonces).
 
 **Statuscache**: De message hash van de transactie wordt gecontroleerd tegen een
 statuscache. Indien gevonden, wordt de transactie afgewezen met
-_rs`AlreadyProcessed`_.
+`AlreadyProcessed`.
 
 ### 5. Valideer nonce en fee payer
 
@@ -108,7 +109,7 @@ methode in de SVM behandelt twee validaties:
 validator het nonce-account en verifieert:
 
 - Het account is eigendom van het System Program
-- Het parseert als _rs`State::Initialized`_
+- Het parseert als `State::Initialized`
 - De opgeslagen durable nonce komt overeen met de `recent_blockhash` van de
   transactie
 - De nonce kan worden verhoogd (de huidige durable nonce verschilt van de
@@ -124,19 +125,19 @@ Zie
 gecontroleerd door
 [`validate_fee_payer`](https://github.com/anza-xyz/agave/blob/v3.1.8/svm/src/account_loader.rs#L369-L417):
 
-- Account moet bestaan (lamports > 0), anders _rs`AccountNotFound`_
+- Account moet bestaan (lamports > 0), anders `AccountNotFound`
 - Account moet een systeemaccount of nonce-account zijn, anders
-  _rs`InvalidAccountForFee`_
+  `InvalidAccountForFee`
 - Lamports moeten `min_balance + total_fee` dekken, waarbij `min_balance` 0 is
   voor systeemaccounts of `rent.minimum_balance(NonceState::size())` voor nonce-
-  accounts; anders _rs`InsufficientFundsForFee`_
+  accounts; anders `InsufficientFundsForFee`
 - Na aftrek van de kosten moet het account rent-exempt blijven (kan niet
   overgaan van rent-exempt naar rent-paying)
 
 De vergoeding wordt in deze fase afgetrokken van de vergoedingsbetaler. Een
 momentopname van de vergoedingsbetaler na aftrek van de vergoeding (en
 geavanceerde nonce, indien van toepassing) wordt opgeslagen als
-_rs`RollbackAccounts`_, dit zijn de accounts die worden vastgelegd zelfs als de
+`RollbackAccounts`, dit zijn de accounts die worden vastgelegd zelfs als de
 uitvoering mislukt.
 
 ### 6. Accounts laden
@@ -160,16 +161,18 @@ Voor elk account dat geen vergoedingsbetaler is, doet de loader het volgende:
 
 Voor elk programma dat wordt aangeroepen door de instructies van de transactie,
 verifieert de loader dat het program account bestaat en eigendom is van een
-geldige loader (`NativeLoader` of een van de _rs`PROGRAM_OWNERS`_). Ongeldige
-programma's mislukken met _rs`ProgramAccountNotFound`_ of
-_rs`InvalidProgramForExecution`_.
+geldige loader (`NativeLoader` of een van de `PROGRAM_OWNERS`). Ongeldige
+programma's mislukken met `ProgramAccountNotFound` of
+`InvalidProgramForExecution`.
 
 LoaderV3 (upgradeable) programma's laden impliciet hun bijbehorende programdata
 account, wat ook meetelt voor de limiet van geladen gegevensgrootte.
 
-<Callout type="warn" title="v1-transacties stellen deze limiet standaard in op nul">
-  De standaardwaarde van 64 MiB geldt voor legacy- en v0-transacties. In de [v1-indeling](/docs/core/transactions/versioned-transactions#v1-message-format) wordt de groottelimiet voor geladen accountgegevens uitgelezen uit de berichtconfiguratie, en een niet-ingesteld veld krijgt standaard **0 bytes** in plaats van een ruime standaardwaarde. Een v1-transactie met een lege configuratie mislukt daarom in deze fase met _rs`MaxLoadedAccountsDataSizeExceeded`_ — het gevraagde budget is te klein voor het eerste geladen account, waardoor de fout optreedt voordat er een instructie wordt uitgevoerd, met een foutmelding die noch v1 noch de configuratie vermeldt. Stel altijd expliciet de compute unit-limiet en de groottelimiet voor geladen accountgegevens in bij het bouwen van v1-transacties.
-</Callout>
+<Warning>
+  **v1-transacties stellen deze limiet standaard in op nul**
+
+  De standaardwaarde van 64 MiB geldt voor legacy- en v0-transacties. In de [v1-indeling](/docs/core/transactions/versioned-transactions#v1-message-format) wordt de groottelimiet voor geladen accountgegevens uitgelezen uit de berichtconfiguratie, en een niet-ingesteld veld krijgt standaard **0 bytes** in plaats van een ruime standaardwaarde. Een v1-transactie met een lege configuratie mislukt daarom in deze fase met `MaxLoadedAccountsDataSizeExceeded` — het gevraagde budget is te klein voor het eerste geladen account, waardoor de fout optreedt voordat er een instructie wordt uitgevoerd, met een foutmelding die noch v1 noch de configuratie vermeldt. Stel altijd expliciet de compute unit-limiet en de groottelimiet voor geladen accountgegevens in bij het bouwen van v1-transacties.
+</Warning>
 
 Als het laden van accounts mislukt maar de vergoedingsbetaler succesvol is
 gevalideerd, wordt de transactie een
@@ -180,10 +183,10 @@ uitgevoerd.
 ### 7. Instructies uitvoeren
 
 [`execute_loaded_transaction`](https://github.com/anza-xyz/agave/blob/v3.1.8/svm/src/transaction_processor.rs#L847)
-creëert een _rs`TransactionContext`_ met alle geladen accounts en roept
+creëert een `TransactionContext` met alle geladen accounts en roept
 [`process_message`](https://github.com/anza-xyz/agave/blob/v3.1.8/svm/src/message_processor.rs)
 aan. Instructies worden sequentieel uitgevoerd in de volgorde waarin ze in het
-bericht verschijnen. Elke instructie-aanroep creëert een _rs`InvokeContext`_ en
+bericht verschijnen. Elke instructie-aanroep creëert een `InvokeContext` en
 roept het doelprogramma aan.
 
 #### Details van instructieverwerking
@@ -211,15 +214,15 @@ aan:
 4. Nadat de instructie is voltooid,
    [verifieert](https://github.com/anza-xyz/agave/blob/v3.1.8/transaction-context/src/lib.rs#L366-L398)
    de runtime dat het totale lamport-saldo over alle instruction accounts niet
-   is veranderd (_rs`UnbalancedInstruction`_-controle).
+   is veranderd (`UnbalancedInstruction`-controle).
 5. Als een instructie mislukt, wordt de gehele transactie teruggedraaid. Geen
    tussentijdse statuswijzigingen worden vastgelegd.
 
 Elke instructie verhoogt de instruction trace. De trace bevat zowel top-level
 instructies als alle [CPI's](/docs/core/cpi) die ze aanroepen. De totale
 trace-lengte (top-level instructies plus alle geneste CPI's) mag niet groter
-zijn dan 64 (_rs`MAX_INSTRUCTION_TRACE_LENGTH`_). Het overschrijden van deze
-limiet retourneert _rs`InstructionError::MaxInstructionTraceLengthExceeded`_.
+zijn dan 64 (`MAX_INSTRUCTION_TRACE_LENGTH`). Het overschrijden van deze
+limiet retourneert `InstructionError::MaxInstructionTraceLengthExceeded`.
 
 Na uitvoering verifieert de runtime dat:
 
@@ -230,8 +233,8 @@ Na uitvoering verifieert de runtime dat:
 
 Als de uitvoering slaagt, worden de gewijzigde accountstatussen uit de
 `TransactionContext` teruggeschreven naar de batch-lokale cache van de
-_rs`AccountLoader`_. Als de uitvoering mislukt, worden alleen de
-_rs`RollbackAccounts`_ (fee payer met ingehouden fee en gevorderde nonce)
+`AccountLoader`. Als de uitvoering mislukt, worden alleen de
+`RollbackAccounts` (fee payer met ingehouden fee en gevorderde nonce)
 teruggeschreven. De fee wordt nog steeds geïnd, maar alle andere
 accountwijzigingen worden verworpen.
 

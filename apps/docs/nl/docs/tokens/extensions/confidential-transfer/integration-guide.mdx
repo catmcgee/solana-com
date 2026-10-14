@@ -137,9 +137,9 @@ veelgebruikte opties:
 De `@solana-program/token-2022`-client wordt geleverd met helpers voor het
 aanbevolen pad:
 
-<CodeTabs>
+<CodeGroup>
 
-```ts !! title="JS-derive-keys.ts"
+```ts JS-derive-keys.ts
 import {
   deriveElGamalKeypairForOwnerMint,
   deriveAeKeyForOwnerMint
@@ -158,7 +158,7 @@ const aesKey = await deriveAeKeyForOwnerMint({
 });
 ```
 
-```rust !! title="rust-derive-keys.rs"
+```rust rust-derive-keys.rs
 use solana_zk_sdk::encryption::derivation::derive_confidential_keys;
 
 // `signer` is the account owner; the token account address is the public seed.
@@ -169,23 +169,23 @@ let (elgamal_keypair, aes_key) =
         .expect("Failed to derive confidential keys");
 ```
 
-</CodeTabs>
+</CodeGroup>
 
-<Callout type="warn">
+<Warning>
   Vertrouwelijke sleutels zijn decryptiesleutels. Behandel een verzoek om het
   afleidingsbericht te ondertekenen als het ontgrendelen van een privéweergave
   van de saldi van de gebruiker. Leid ze bij voorkeur op aanvraag af in plaats
   van ze op te slaan; als u ze toch opslaat (bijvoorbeeld in een custodiale
   service), bescherm ze dan met dezelfde zorgvuldigheid als
   ondertekeningssleutels.
-</Callout>
+</Warning>
 
 De afleiding-helpers retourneren geserialiseerd sleutelmateriaal. De
 hulpfuncties voor bewerkingen op hoog niveau (later weergegeven) accepteren WASM
 `ElGamalKeypair`- en `AeKey`-objecten, dus herstel ze vanuit de bytes wanneer je
 ze nodig hebt:
 
-```ts !! title="JS-rebuild-keys.ts"
+```ts JS-rebuild-keys.ts
 import {
   ElGamalKeypair,
   ElGamalSecretKey,
@@ -225,14 +225,14 @@ de eigenaar of bewijs nodig is bij de configuratie, alleen een betaler voor
 rent. Dit is het mechanisme dat je moet gebruiken als je vertrouwelijke accounts
 voor gebruikers soepel wilt inrichten.
 
-<Callout type="info">
+<Info>
   Registerconfiguratie is vandaag beschikbaar in de Rust `spl-token-client`
   (`confidential_transfer_configure_token_account_with_registry`) en het
   `spl-elgamal-registry`-programma. Equivalente hulpfuncties in de
   `@solana-program/token-2022` JS-client zijn nog niet beschikbaar, dus
   JS-integraties die het registerpad nodig hebben, dienen de releases van die
   client bij te houden.
-</Callout>
+</Info>
 
 ## Saldi weergeven
 
@@ -245,9 +245,9 @@ de AES-sleutel, wat constante tijd kost. Het direct ontsleutelen van de ElGamal
 `available_balance` vereist het oplossen van een discrete logaritme en moet
 worden vermeden voor routinematige weergave.
 
-<CodeTabs>
+<CodeGroup>
 
-```ts !! title="JS-display-balance.ts"
+```ts JS-display-balance.ts
 import { AeCiphertext } from "@solana/zk-sdk/bundler";
 import { fetchToken } from "@solana-program/token-2022";
 import { unwrapOption } from "@solana/kit";
@@ -269,7 +269,7 @@ if (ct) {
 }
 ```
 
-```rust !! title="rust-display-balance.rs"
+```rust rust-display-balance.rs
 // `token` is an spl_token_client `Token`. These helpers decrypt for you.
 let pending = token
     .confidential_transfer_get_pending_balance(&token_account, elgamal_keypair.secret())
@@ -282,7 +282,7 @@ let total = token
     .await?;
 ```
 
-</CodeTabs>
+</CodeGroup>
 
 Wanneer de gebruiker zijn sleutels niet heeft ontgrendeld, toon het publieke
 saldo en geef aan dat er een vertrouwelijk saldo bestaat maar vergrendeld is, in
@@ -304,9 +304,9 @@ Integraties die namens gebruikers fondsen beheren, dienen:
 - Het openstaande saldo namens de gebruiker te verwerken op geschikte momenten
   (bijvoorbeeld vóór een verzending), zodat saldi niet vastlopen.
 
-<CodeTabs>
+<CodeGroup>
 
-```ts !! title="JS-apply-pending.ts"
+```ts JS-apply-pending.ts
 import { getApplyConfidentialPendingBalanceInstructionFromToken } from "@solana-program/token-2022";
 
 // Builds a single instruction; no proofs are needed to apply.
@@ -319,7 +319,7 @@ const instruction = getApplyConfidentialPendingBalanceInstructionFromToken({
 });
 ```
 
-```rust !! title="rust-apply-pending.rs"
+```rust rust-apply-pending.rs
 token
     .confidential_transfer_apply_pending_balance(
         &token_account,
@@ -332,7 +332,7 @@ token
     .await?;
 ```
 
-</CodeTabs>
+</CodeGroup>
 
 Zie de pagina
 [Openstaand saldo verwerken](/docs/tokens/extensions/confidential-transfer/apply-pending-balance)
@@ -365,9 +365,9 @@ U hoeft de bewijzen niet handmatig samen te stellen. Beide clients bieden een
 high-level helper die de bewijzen opbouwt en de in te dienen instructies
 genereert:
 
-<CodeTabs>
+<CodeGroup>
 
-```ts !! title="JS-transfer.ts"
+```ts JS-transfer.ts
 import { getConfidentialTransferInstructionPlan } from "@solana-program/token-2022";
 
 // Returns an instruction plan covering proof setup, the transfer, and cleanup.
@@ -390,7 +390,7 @@ const plan = await getConfidentialTransferInstructionPlan({
 // Execute the plan with your instruction-plan executor of choice.
 ```
 
-```rust !! title="rust-transfer.rs"
+```rust rust-transfer.rs
 // Verify the three proofs into context state accounts first (see the Transfer
 // Tokens page), then reference them here. Passing None for a proof account
 // inlines that proof instead, which a full transfer cannot fit within today's
@@ -414,7 +414,7 @@ token
     .await?;
 ```
 
-</CodeTabs>
+</CodeGroup>
 
 Als u meer controle nodig heeft, zijn de low-level bouwstenen ook beschikbaar:
 `@solana/zk-sdk` genereert de gegevens van elk bewijs
@@ -471,9 +471,7 @@ classificeren, plus per-instructie parsers (bijvoorbeeld
 decoderen. De versleutelde bedragen blijven cipherteksten: geef ze weer als
 vertrouwelijk in plaats van de bytes als een getal te tonen.
 
-<CodeTabs>
-
-```ts !! title="JS-parse-instruction.ts"
+```ts JS-parse-instruction.ts
 import {
   identifyToken2022Instruction,
   Token2022Instruction,
@@ -503,8 +501,6 @@ for (const ix of instructions) {
   }
 }
 ```
-
-</CodeTabs>
 
 Indexeringsbeperkingen om rekening mee te houden:
 

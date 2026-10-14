@@ -18,7 +18,7 @@ Dodaj skrzynkę jako zależność deweloperską. SDK jest zaprojektowany
 asynchronicznie i wymaga środowiska uruchomieniowego Tokio, dlatego dołącz
 `tokio` z funkcją `full` dla testów.
 
-```toml title="Cargo.toml"
+```toml Cargo.toml
 [dev-dependencies]
 surfpool-sdk = "1"
 tokio = { version = "1", features = ["full"] }
@@ -91,12 +91,14 @@ instalowane automatycznie jako `optionalDependencies`:
 | macOS Intel          | `x86_64-apple-darwin`      | `@solana/surfpool-darwin-x64`    |
 | Linux x86-64 (glibc) | `x86_64-unknown-linux-gnu` | `@solana/surfpool-linux-x64-gnu` |
 
-<Callout type="warn" title="Nieobsługiwana platforma">
+<Warning>
+  **Nieobsługiwana platforma**
+
   Jeśli pakiet zostanie zainstalowany na platformie bez pasującego pliku
   binarnego, instalacja zakończy się pomyślnie, ale `Surfnet.start()` zgłosi
   błąd w czasie wykonywania. Otwórz zgłoszenie, jeśli potrzebujesz dodatkowego
   celu.
-</Callout>
+</Warning>
 
 ### Wymagania
 
@@ -110,59 +112,67 @@ instalowane automatycznie jako `optionalDependencies`:
 Jednoliniowy test dymny potwierdza, że środowisko uruchomieniowe startuje i
 punkt końcowy RPC przyjmuje żądania.
 
-<CodeTabs storage="surfpool-lang">
+<Tabs>
+  <Tab title="Rust">
+    ```rust Rust
+    use surfpool_sdk::{Signer, Surfnet};
 
-```rust !! title="Rust"
-use surfpool_sdk::{Signer, Surfnet};
+    #[tokio::test]
+    async fn surfpool_sdk_smoke() {
+        let surfnet = Surfnet::start().await.expect("start surfnet");
+        let balance = surfnet
+            .rpc_client()
+            .get_balance(&surfnet.payer().pubkey())
+            .expect("get balance");
+        assert!(balance > 0);
+    }
+    ```
 
-#[tokio::test]
-async fn surfpool_sdk_smoke() {
-    let surfnet = Surfnet::start().await.expect("start surfnet");
-    let balance = surfnet
-        .rpc_client()
-        .get_balance(&surfnet.payer().pubkey())
-        .expect("get balance");
-    assert!(balance > 0);
-}
-```
+    Uruchom z `cargo test --test smoke`.
+  </Tab>
 
-Uruchom z `cargo test --test smoke`.
+  <Tab title="TypeScript">
+    ```ts TypeScript
+    import { after, test } from "node:test";
+    import assert from "node:assert/strict";
+    import { Surfnet } from "@solana/surfpool";
 
-```ts !! title="TypeScript"
-import { after, test } from "node:test";
-import assert from "node:assert/strict";
-import { Surfnet } from "@solana/surfpool";
+    const surfnet = Surfnet.start();
+    after(() => surfnet.stop());
 
-const surfnet = Surfnet.start();
-after(() => surfnet.stop());
+    test("surfpool sdk smoke", () => {
+      assert.match(surfnet.rpcUrl, /^http:\/\/127\.0\.0\.1:\d+$/);
+      assert.ok(surfnet.payer.length > 0);
+    });
+    ```
 
-test("surfpool sdk smoke", () => {
-  assert.match(surfnet.rpcUrl, /^http:\/\/127\.0\.0\.1:\d+$/);
-  assert.ok(surfnet.payer.length > 0);
-});
-```
-
-Uruchom z `node --test smoke.test.ts` (z programem ładującym TS) lub
-`tsx --test smoke.test.ts`.
-
-</CodeTabs>
+    Uruchom z `node --test smoke.test.ts` (z programem ładującym TS) lub
+    `tsx --test smoke.test.ts`.
+  </Tab>
+</Tabs>
 
 ## Rozwiązywanie problemów
 
-<Callout type="warn" title="`failed to bind to port` on Rust">
+<Warning>
+  **\`failed to bind to port\` on Rust**
+
   Inny proces agresywnie zajmuje `0.0.0.0`. Uruchom test ponownie — SDK wybiera
   nowy port przy każdym wywołaniu. Jeśli błąd się utrzymuje, sprawdź, czy nie ma
   osieroconych procesów `surfpool`.
-</Callout>
+</Warning>
 
-<Callout type="warn" title="`Cannot find module '@solana/surfpool-...'`">
+<Warning>
+  **\`Cannot find module '@solana/surfpool-...'\`**
+
   Wpis `optionalDependencies` dla Twojej platformy nie został zainstalowany.
   Uruchom instalację ponownie z `--include=optional` lub sprawdź, czy Twoja
   platforma widnieje w powyższej tabeli obsługiwanych platform.
-</Callout>
+</Warning>
 
-<Callout type="warn" title="`stop()` hangs in JS">
+<Warning>
+  **\`stop()\` hangs in JS**
+
   Upewnij się, że wywołujesz `stop()` raz na `start()`. Opakowanie Node
   utrzymuje serwery RPC i WebSocket w stanie połączonym do momentu zwrócenia
   przez `stop()` wartości.
-</Callout>
+</Warning>

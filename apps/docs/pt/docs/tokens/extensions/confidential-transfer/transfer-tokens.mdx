@@ -6,7 +6,7 @@ description:
 
 ## Como transferir tokens confidencialmente de um token account para outro
 
-Para transferir tokens de forma confidencial de um token account para outro, tanto o remetente quanto o destinatário devem ter token accounts configurados com o estado _rs`ConfidentialTransferAccount`_ e aprovados para usar Saldos Confidenciais. O token account do remetente também deve ter um saldo confidencial disponível para transferência.
+Para transferir tokens de forma confidencial de um token account para outro, tanto o remetente quanto o destinatário devem ter token accounts configurados com o estado `ConfidentialTransferAccount` e aprovados para usar Saldos Confidenciais. O token account do remetente também deve ter um saldo confidencial disponível para transferência.
 
 Para transferir tokens confidencialmente:
 
@@ -51,7 +51,7 @@ Para transferir tokens confidencialmente:
 O diagrama a seguir mostra as etapas envolvidas na transferência de tokens do
 token account do remetente para o token account do destinatário.
 
-```mermaid title="Transfer Tokens"
+```mermaid
 sequenceDiagram
     participant Owner as Sender Wallet
     participant ElGamal as ZK ElGamal Proof Program
@@ -76,6 +76,36 @@ sequenceDiagram
     Owner->>ElGamal: Close proof accounts
     deactivate ElGamal
 ```
+
+<div className="nojs-only" data-fallback="mermaid">
+  ```text Mermaid
+  sequenceDiagram
+      participant Owner as Sender Wallet
+      participant ElGamal as ZK ElGamal Proof Program
+      participant Token22 as Token Extensions Program
+      participant SourceAccount as Sender Token Account
+      participant DestAccount as Recepient Token Account
+
+      Owner->>Owner: Generate proof data using<br>ElGamal keypair & AES key
+
+      Owner->>ElGamal: Create equality proof account
+      activate ElGamal
+      Owner->>ElGamal: Create ciphertext validity proof account
+      Owner->>ElGamal: Create range proof account
+      ElGamal-->>ElGamal: Verify proofs
+
+      Owner->>Token22: confidential_transfer_transfer
+      activate Token22
+      Token22-->>SourceAccount: Decrease encrypted available balance
+      Token22-->>DestAccount: Increase encrypted pending balance
+      deactivate Token22
+
+      Owner->>ElGamal: Close proof accounts
+      deactivate ElGamal
+  ```
+</div>
+
+<p className="sol-caption">Transfer Tokens</p>
 
 ### Instruções Necessárias
 
@@ -108,10 +138,9 @@ Execute o exemplo em um desses ambientes (o código usa a devnet) com um pagador
 
 ### Rust
 
-<CodeTabs>
+<CodeGroup>
 
-```rust !! title="main.rs"
-// !collapse(1:49) collapsed
+```rust main.rs expandable
 // Imports: dependencies used by this example.
 use anyhow::{Context, Result};
 use solana_address::Address;
@@ -357,7 +386,6 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-// !collapse(1:1000) collapsed
 // Setup: helper functions to create accounts and sender funds.
 fn send_tx(client: &RpcClient, instructions: &[Instruction], signers: &[&Keypair]) -> Result<()> {
     let blockhash = client.get_latest_blockhash()?;
@@ -580,7 +608,7 @@ fn load_keypair() -> Result<Keypair> {
 }
 ```
 
-```toml !! title="Cargo.toml"
+```toml Cargo.toml
 [package]
 name = "confidential-transfer"
 version = "0.1.0"
@@ -614,14 +642,13 @@ dirs = "6.0.0"
 serde_json = "1.0"
 ```
 
-</CodeTabs>
+</CodeGroup>
 
 ### Typescript
 
-<CodeTabs>
+<CodeGroup>
 
-```ts !! title="index.ts"
-// !collapse(1:46) collapsed
+```ts index.ts expandable
 // Imports: dependencies used by this example.
 import {
   deriveAeKeyForOwnerMint,
@@ -679,7 +706,6 @@ const client = await createClient()
   )
   // Temporary custom plugin to skip the default compute-budget estimate
   // so proof instructions fit within the transaction message cap.
-  // !collapse(1:39) collapsed
   .use((client) =>
     extendClient(client, {
       // A planner that builds a bare versioned message with no provisory
@@ -774,7 +800,6 @@ const signature =
     .context.signature;
 console.log(`Transferred ${amount} tokens confidentially: ${signature}`);
 
-// !collapse(1:1000) collapsed
 // Setup: helper functions to create and fund confidential token accounts.
 async function getAuditorElgamalPubkey(
   kitClient: typeof client,
@@ -950,7 +975,7 @@ async function pauseForPublicRpc() {
 }
 ```
 
-```json !! title="package.json"
+```json package.json
 {
   "name": "confidential-transfer",
   "version": "0.1.0",
@@ -971,4 +996,4 @@ async function pauseForPublicRpc() {
 }
 ```
 
-</CodeTabs>
+</CodeGroup>

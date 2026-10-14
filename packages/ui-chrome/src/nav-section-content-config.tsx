@@ -115,6 +115,47 @@ export const useSolanaSafetyItems: NavItemDefinition[] = [
   },
 ];
 
+/**
+ * "What are you building?" column of the Build dropdown. Each entry links to a
+ * job-path intro in the docs; DeFi, games and agents sit behind "More use
+ * cases" until their paths exist. Token Extensions moved into the
+ * tokenization path, so it is no longer listed here.
+ */
+export const buildJobItems: NavItemDefinition[] = [
+  {
+    id: "build-job-payments",
+    titleKey: "nav.build.jobs.items.payments.title",
+    descriptionKey: "nav.build.jobs.items.payments.description",
+    href: "/docs/payments/checkout",
+    icon: MoneyIcon,
+    variant: "large",
+  },
+  {
+    id: "build-job-pay-per-call",
+    titleKey: "nav.build.jobs.items.payPerCall.title",
+    descriptionKey: "nav.build.jobs.items.payPerCall.description",
+    href: "/docs/payments/paywall-api",
+    icon: ApiConnectionBuildIcon,
+    variant: "large",
+  },
+  {
+    id: "build-job-asset",
+    titleKey: "nav.build.jobs.items.asset.title",
+    descriptionKey: "nav.build.jobs.items.asset.description",
+    href: "/docs/assets/issue-asset",
+    icon: CoinsAddIcon,
+    variant: "large",
+  },
+  {
+    id: "build-job-more",
+    titleKey: "nav.build.jobs.items.more.title",
+    descriptionKey: "nav.build.jobs.items.more.description",
+    href: "/docs/finance",
+    icon: SparklesIcon,
+    variant: "large",
+  },
+];
+
 export const buildStartItems: NavItemDefinition[] = [
   {
     id: "build-docs",
@@ -213,12 +254,6 @@ export const buildUseCaseItems: NavItemDefinition[] = [
     titleKey: "nav.build.useCases.items.gaming.title",
     href: "/developers/gaming",
     icon: GlobusIcon,
-  },
-  {
-    id: "build-token-extensions",
-    titleKey: "nav.build.useCases.items.tokenExtensions.title",
-    href: "/solutions/token-extensions",
-    icon: CoinsAddIcon,
   },
   {
     id: "build-ai",

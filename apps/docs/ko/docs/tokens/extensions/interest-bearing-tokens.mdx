@@ -2,7 +2,6 @@
 title: 이자 발생 토큰
 description:
   온체인 이자율을 가진 Token Extensions Program 민트를 생성하고, 해당 이자율을 업데이트하며, 토큰 수량을 이자가 포함된 UI 수량으로 변환합니다.
-url: /docs/tokens/extensions/interest-bearing-tokens
 type: tutorial
 prerequisites:
   - /docs/tokens/basics/create-mint
@@ -14,7 +13,7 @@ related:
 
 ## 이자 발생 민트란 무엇인가요?
 
-Token Extensions Program의 _rs`InterestBearingConfig`_ 민트 확장 기능을 사용하면
+Token Extensions Program의 `InterestBearingConfig` 민트 확장 기능을 사용하면
 민트가 연간 이자율을 온체인에 직접 저장할 수 있습니다.
 
 이자 발생 토큰은 시간이 지남에 따라 토큰 계정에 더 많은 토큰을 추가하지
@@ -47,440 +46,420 @@ UI 수량은 증가할 수 있습니다.
 
 이자 발생 토큰을 생성하고 사용하려면:
 
-1. 민트와 _rs`InterestBearingConfig`_ 확장에 필요한 민트 계정 크기와 rent를
+1. 민트와 `InterestBearingConfig` 확장에 필요한 민트 계정 크기와 rent를
    계산합니다.
-2. *rs`CreateAccount`*로 민트 계정을 생성하고, *rs`InterestBearingConfig`*를
-   초기화한 다음, *rs`InitializeMint`*로 민트를 초기화합니다.
+2. `CreateAccount`로 민트 계정을 생성하고, `InterestBearingConfig`를
+   초기화한 다음, `InitializeMint`로 민트를 초기화합니다.
 3. 일반적인 방법으로 토큰을 민팅합니다.
-4. 시간이 지남에 따라 민트의 현재 이자율을 변경하려면 *rs`UpdateRate`*를
+4. 시간이 지남에 따라 민트의 현재 이자율을 변경하려면 `UpdateRate`를
    사용합니다.
-5. _rs`AmountToUiAmount`_ 또는 민트 계정과 clock sysvar를 가져온 다음 트랜잭션을
+5. `AmountToUiAmount` 또는 민트 계정과 clock sysvar를 가져온 다음 트랜잭션을
    전송하지 않고 UI 수량을 계산하는 헬퍼 메서드를 사용하여 토큰 수량을 이자가
    포함된 UI 수량으로 변환합니다.
 
-<Callout type="info" title="오프체인 및 온체인 UI 금액 변환">
+<Info>
+  **오프체인 및 온체인 UI 금액 변환**
+
   오프체인 헬퍼 경로는 mint account와 클록 시스템 변수를 가져온 다음 트랜잭션을
   전송하지 않고 로컬에서 UI 금액을 계산합니다. 온체인 경로는 Token Program에서
-  실행되고 트랜잭션 반환 데이터로 UI 금액을 반환하는 _rs`AmountToUiAmount`_를
-  사용합니다. _rs`AmountToUiAmount`_는 트랜잭션으로 전송하거나 시뮬레이션할 수
+  실행되고 트랜잭션 반환 데이터로 UI 금액을 반환하는 `AmountToUiAmount`를
+  사용합니다. `AmountToUiAmount`는 트랜잭션으로 전송하거나 시뮬레이션할 수
   있습니다.
-</Callout>
-
-<ScrollyCoding>
-
-## !!steps 계정 크기 계산
-
-기본 민트에 대한 mint account 크기와 _rs`InterestBearingConfig`_ 확장을
-계산합니다. 이는 *rs`CreateAccount`*에서 사용되는 크기입니다.
-
-<CodePlaceholder title="예제" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-
-// !focus(1:7)
-const interestBearingExtension = extension("InterestBearingConfig", {
-  rateAuthority: client.payer.address,
-  initializationTimestamp: BigInt(Math.floor(Date.now() / 1000)),
-  lastUpdateTimestamp: BigInt(Math.floor(Date.now() / 1000)),
-  preUpdateAverageRate: 30000,
-  currentRate: 30000
-});
-
-// !focus(1:1)
-const mintSpace = BigInt(getMintSize([interestBearingExtension]));
-```
-
-## !!steps rent 계산
-
-민트에 필요한 크기와 _rs`InterestBearingConfig`_ 확장을 사용하여 rent를
-계산합니다.
-
-<CodePlaceholder title="예제" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-
-const interestBearingExtension = extension("InterestBearingConfig", {
-  rateAuthority: client.payer.address,
-  initializationTimestamp: BigInt(Math.floor(Date.now() / 1000)),
-  lastUpdateTimestamp: BigInt(Math.floor(Date.now() / 1000)),
-  preUpdateAverageRate: 30000,
-  currentRate: 30000
-});
-
-const mintSpace = BigInt(getMintSize([interestBearingExtension]));
-
-// !focus(1:3)
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
-```
-
-## !!steps mint account 생성
-
-계산된 공간과 lamport로 mint account를 생성합니다.
-
-<CodePlaceholder title="예제" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-
-const interestBearingExtension = extension("InterestBearingConfig", {
-  rateAuthority: client.payer.address,
-  initializationTimestamp: BigInt(Math.floor(Date.now() / 1000)),
-  lastUpdateTimestamp: BigInt(Math.floor(Date.now() / 1000)),
-  preUpdateAverageRate: 30000,
-  currentRate: 30000
-});
-
-const mintSpace = BigInt(getMintSize([interestBearingExtension]));
-
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
-
-// !focus(1:9)
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  })
-]);
-```
-
-## !!steps InterestBearingConfig 초기화
-
-민트에서 _rs`InterestBearingConfig`_ 확장을 초기화합니다.
-
-<CodePlaceholder title="예제" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-
-const interestBearingExtension = extension("InterestBearingConfig", {
-  rateAuthority: client.payer.address,
-  initializationTimestamp: BigInt(Math.floor(Date.now() / 1000)),
-  lastUpdateTimestamp: BigInt(Math.floor(Date.now() / 1000)),
-  preUpdateAverageRate: 30000,
-  currentRate: 30000
-});
-
-const mintSpace = BigInt(getMintSize([interestBearingExtension]));
-
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
-
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  }),
-  // !focus(1:5)
-  getInitializeInterestBearingMintInstruction({
-    mint: mint.address,
-    rateAuthority: client.payer.address,
-    rate: 30000
-  })
-]);
-```
-
-## !!steps 민트 초기화
-
-동일한 트랜잭션에서 *rs`InitializeMint`*로 민트를 초기화합니다.
-
-<CodePlaceholder title="예제" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-
-const interestBearingExtension = extension("InterestBearingConfig", {
-  rateAuthority: client.payer.address,
-  initializationTimestamp: BigInt(Math.floor(Date.now() / 1000)),
-  lastUpdateTimestamp: BigInt(Math.floor(Date.now() / 1000)),
-  preUpdateAverageRate: 30000,
-  currentRate: 30000
-});
-
-const mintSpace = BigInt(getMintSize([interestBearingExtension]));
-
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
-
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  }),
-  getInitializeInterestBearingMintInstruction({
-    mint: mint.address,
-    rateAuthority: client.payer.address,
-    rate: 30000
-  }),
-  // !focus(1:6)
-  getInitializeMintInstruction({
-    mint: mint.address,
-    decimals: 0,
-    mintAuthority: client.payer.address,
-    freezeAuthority: client.payer.address
-  })
-]);
-```
-
-## !!steps token account 생성 및 토큰 발행
-
-민트에 대한 token account를 생성한 다음 해당 token account에 토큰을 발행합니다.
-
-<CodePlaceholder title="예제" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-
-const interestBearingExtension = extension("InterestBearingConfig", {
-  rateAuthority: client.payer.address,
-  initializationTimestamp: BigInt(Math.floor(Date.now() / 1000)),
-  lastUpdateTimestamp: BigInt(Math.floor(Date.now() / 1000)),
-  preUpdateAverageRate: 30000,
-  currentRate: 30000
-});
-
-const mintSpace = BigInt(getMintSize([interestBearingExtension]));
-
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
-
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  }),
-  getInitializeInterestBearingMintInstruction({
-    mint: mint.address,
-    rateAuthority: client.payer.address,
-    rate: 30000
-  }),
-  getInitializeMintInstruction({
-    mint: mint.address,
-    decimals: 0,
-    mintAuthority: client.payer.address,
-    freezeAuthority: client.payer.address
-  })
-]);
-
-// !focus(1:21)
-const recipient = await generateKeyPairSigner();
-const tokenAmount = 1_000_000_000_000n;
-const [tokenAccount] = await findAssociatedTokenPda({
-  mint: mint.address,
-  owner: recipient.address,
-  tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
-});
-await client.sendTransaction([
-  await getCreateAssociatedTokenInstructionAsync({
-    payer: client.payer,
-    mint: mint.address,
-    owner: recipient.address
-  }),
-  getMintToCheckedInstruction({
-    mint: mint.address,
-    token: tokenAccount,
-    mintAuthority: client.payer,
-    amount: tokenAmount,
-    decimals: 0
-  })
-]);
-```
-
-## !!steps 오프체인 헬퍼로 UI 금액 계산하기
-
-mint account와 clock sysvar를 가져온 다음, 트랜잭션을 전송하지 않고 UI 금액을
-계산합니다.
-
-<CodePlaceholder title="예제" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-
-const interestBearingExtension = extension("InterestBearingConfig", {
-  rateAuthority: client.payer.address,
-  initializationTimestamp: BigInt(Math.floor(Date.now() / 1000)),
-  lastUpdateTimestamp: BigInt(Math.floor(Date.now() / 1000)),
-  preUpdateAverageRate: 30000,
-  currentRate: 30000
-});
-
-const mintSpace = BigInt(getMintSize([interestBearingExtension]));
-
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
-
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  }),
-  getInitializeInterestBearingMintInstruction({
-    mint: mint.address,
-    rateAuthority: client.payer.address,
-    rate: 30000
-  }),
-  getInitializeMintInstruction({
-    mint: mint.address,
-    decimals: 0,
-    mintAuthority: client.payer.address,
-    freezeAuthority: client.payer.address
-  })
-]);
-
-const recipient = await generateKeyPairSigner();
-const tokenAmount = 1_000_000_000_000n;
-const [tokenAccount] = await findAssociatedTokenPda({
-  mint: mint.address,
-  owner: recipient.address,
-  tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
-});
-await client.sendTransaction([
-  await getCreateAssociatedTokenInstructionAsync({
-    payer: client.payer,
-    mint: mint.address,
-    owner: recipient.address
-  }),
-  getMintToCheckedInstruction({
-    mint: mint.address,
-    token: tokenAccount,
-    mintAuthority: client.payer,
-    amount: tokenAmount,
-    decimals: 0
-  })
-]);
-
-await new Promise((resolve) => setTimeout(resolve, 2_000));
-
-// !focus(1:5)
-const offchainUiAmount = await amountToUiAmountForMintWithoutSimulation(
-  client.rpc,
-  mint.address,
-  tokenAmount
-);
-```
-
-</ScrollyCoding>
-
-<Callout type="info" title="명령어 순서">
-  _rs`InterestBearingMintInstruction::Initialize`_는 _rs`InitializeMint`_보다
-  먼저 실행되어야 합니다. _rs`CreateAccount`_,
-  _rs`InterestBearingMintInstruction::Initialize`_, 그리고
-  _rs`InitializeMint`_는 동일한 트랜잭션에 포함되어야 합니다.
-</Callout>
+</Info>
+
+<Steps>
+  <Step title="계정 크기 계산">
+    기본 민트에 대한 mint account 크기와 `InterestBearingConfig` 확장을
+    계산합니다. 이는 `CreateAccount`에서 사용되는 크기입니다.
+
+    ```ts 예제 focus={14-20,22}
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+
+    const interestBearingExtension = extension("InterestBearingConfig", {
+      rateAuthority: client.payer.address,
+      initializationTimestamp: BigInt(Math.floor(Date.now() / 1000)),
+      lastUpdateTimestamp: BigInt(Math.floor(Date.now() / 1000)),
+      preUpdateAverageRate: 30000,
+      currentRate: 30000
+    });
+
+    const mintSpace = BigInt(getMintSize([interestBearingExtension]));
+    ```
+  </Step>
+
+  <Step title="rent 계산">
+    민트에 필요한 크기와 `InterestBearingConfig` 확장을 사용하여 rent를
+    계산합니다.
+
+    ```ts 예제 focus={24-26}
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+
+    const interestBearingExtension = extension("InterestBearingConfig", {
+      rateAuthority: client.payer.address,
+      initializationTimestamp: BigInt(Math.floor(Date.now() / 1000)),
+      lastUpdateTimestamp: BigInt(Math.floor(Date.now() / 1000)),
+      preUpdateAverageRate: 30000,
+      currentRate: 30000
+    });
+
+    const mintSpace = BigInt(getMintSize([interestBearingExtension]));
+
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
+    ```
+  </Step>
+
+  <Step title="mint account 생성">
+    계산된 공간과 lamport로 mint account를 생성합니다.
+
+    ```ts 예제 focus={28-36}
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+
+    const interestBearingExtension = extension("InterestBearingConfig", {
+      rateAuthority: client.payer.address,
+      initializationTimestamp: BigInt(Math.floor(Date.now() / 1000)),
+      lastUpdateTimestamp: BigInt(Math.floor(Date.now() / 1000)),
+      preUpdateAverageRate: 30000,
+      currentRate: 30000
+    });
+
+    const mintSpace = BigInt(getMintSize([interestBearingExtension]));
+
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
+
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      })
+    ]);
+    ```
+  </Step>
+
+  <Step title="InterestBearingConfig 초기화">
+    민트에서 `InterestBearingConfig` 확장을 초기화합니다.
+
+    ```ts 예제 focus={36-40} expandable
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+
+    const interestBearingExtension = extension("InterestBearingConfig", {
+      rateAuthority: client.payer.address,
+      initializationTimestamp: BigInt(Math.floor(Date.now() / 1000)),
+      lastUpdateTimestamp: BigInt(Math.floor(Date.now() / 1000)),
+      preUpdateAverageRate: 30000,
+      currentRate: 30000
+    });
+
+    const mintSpace = BigInt(getMintSize([interestBearingExtension]));
+
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
+
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializeInterestBearingMintInstruction({
+        mint: mint.address,
+        rateAuthority: client.payer.address,
+        rate: 30000
+      })
+    ]);
+    ```
+  </Step>
+
+  <Step title="민트 초기화">
+    동일한 트랜잭션에서 `InitializeMint`로 민트를 초기화합니다.
+
+    ```ts 예제 focus={41-46} expandable
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+
+    const interestBearingExtension = extension("InterestBearingConfig", {
+      rateAuthority: client.payer.address,
+      initializationTimestamp: BigInt(Math.floor(Date.now() / 1000)),
+      lastUpdateTimestamp: BigInt(Math.floor(Date.now() / 1000)),
+      preUpdateAverageRate: 30000,
+      currentRate: 30000
+    });
+
+    const mintSpace = BigInt(getMintSize([interestBearingExtension]));
+
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
+
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializeInterestBearingMintInstruction({
+        mint: mint.address,
+        rateAuthority: client.payer.address,
+        rate: 30000
+      }),
+      getInitializeMintInstruction({
+        mint: mint.address,
+        decimals: 0,
+        mintAuthority: client.payer.address,
+        freezeAuthority: client.payer.address
+      })
+    ]);
+    ```
+  </Step>
+
+  <Step title="token account 생성 및 토큰 발행">
+    민트에 대한 token account를 생성한 다음 해당 token account에 토큰을 발행합니다.
+
+    ```ts 예제 focus={49-69} expandable
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+
+    const interestBearingExtension = extension("InterestBearingConfig", {
+      rateAuthority: client.payer.address,
+      initializationTimestamp: BigInt(Math.floor(Date.now() / 1000)),
+      lastUpdateTimestamp: BigInt(Math.floor(Date.now() / 1000)),
+      preUpdateAverageRate: 30000,
+      currentRate: 30000
+    });
+
+    const mintSpace = BigInt(getMintSize([interestBearingExtension]));
+
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
+
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializeInterestBearingMintInstruction({
+        mint: mint.address,
+        rateAuthority: client.payer.address,
+        rate: 30000
+      }),
+      getInitializeMintInstruction({
+        mint: mint.address,
+        decimals: 0,
+        mintAuthority: client.payer.address,
+        freezeAuthority: client.payer.address
+      })
+    ]);
+
+    const recipient = await generateKeyPairSigner();
+    const tokenAmount = 1_000_000_000_000n;
+    const [tokenAccount] = await findAssociatedTokenPda({
+      mint: mint.address,
+      owner: recipient.address,
+      tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
+    });
+    await client.sendTransaction([
+      await getCreateAssociatedTokenInstructionAsync({
+        payer: client.payer,
+        mint: mint.address,
+        owner: recipient.address
+      }),
+      getMintToCheckedInstruction({
+        mint: mint.address,
+        token: tokenAccount,
+        mintAuthority: client.payer,
+        amount: tokenAmount,
+        decimals: 0
+      })
+    ]);
+    ```
+  </Step>
+
+  <Step title="오프체인 헬퍼로 UI 금액 계산하기">
+    mint account와 clock sysvar를 가져온 다음, 트랜잭션을 전송하지 않고 UI 금액을
+    계산합니다.
+
+    ```ts 예제 focus={73-77} expandable
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+
+    const interestBearingExtension = extension("InterestBearingConfig", {
+      rateAuthority: client.payer.address,
+      initializationTimestamp: BigInt(Math.floor(Date.now() / 1000)),
+      lastUpdateTimestamp: BigInt(Math.floor(Date.now() / 1000)),
+      preUpdateAverageRate: 30000,
+      currentRate: 30000
+    });
+
+    const mintSpace = BigInt(getMintSize([interestBearingExtension]));
+
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
+
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializeInterestBearingMintInstruction({
+        mint: mint.address,
+        rateAuthority: client.payer.address,
+        rate: 30000
+      }),
+      getInitializeMintInstruction({
+        mint: mint.address,
+        decimals: 0,
+        mintAuthority: client.payer.address,
+        freezeAuthority: client.payer.address
+      })
+    ]);
+
+    const recipient = await generateKeyPairSigner();
+    const tokenAmount = 1_000_000_000_000n;
+    const [tokenAccount] = await findAssociatedTokenPda({
+      mint: mint.address,
+      owner: recipient.address,
+      tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
+    });
+    await client.sendTransaction([
+      await getCreateAssociatedTokenInstructionAsync({
+        payer: client.payer,
+        mint: mint.address,
+        owner: recipient.address
+      }),
+      getMintToCheckedInstruction({
+        mint: mint.address,
+        token: tokenAccount,
+        mintAuthority: client.payer,
+        amount: tokenAmount,
+        decimals: 0
+      })
+    ]);
+
+    await new Promise((resolve) => setTimeout(resolve, 2_000));
+
+    const offchainUiAmount = await amountToUiAmountForMintWithoutSimulation(
+      client.rpc,
+      mint.address,
+      tokenAmount
+    );
+    ```
+  </Step>
+</Steps>
+
+<Info>
+  **명령어 순서**
+
+  `InterestBearingMintInstruction::Initialize`는 `InitializeMint`보다
+  먼저 실행되어야 합니다. `CreateAccount`,
+`InterestBearingMintInstruction::Initialize`, 그리고
+`InitializeMint`는 동일한 트랜잭션에 포함되어야 합니다.
+</Info>
 
 ### 소스 참조
 
-| 항목                                             | 설명                                                                                                                   | 소스                                                                                                                                              |
-| ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| _rs`InterestBearingConfig`_                      | 이자율 권한, 타임스탬프, 현재 및 과거 이자율을 저장하는 민트 확장입니다.                         | [소스](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/interest_bearing_mint/mod.rs#L40-L153)         |
-| _rs`InterestBearingMintInstruction::Initialize`_ | _rs`InitializeMint`_ 전에 이자 부과 설정을 초기화하는 명령어입니다.                                         | [소스](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/interest_bearing_mint/instruction.rs#L17-L90)  |
-| _rs`InterestBearingMintInstruction::UpdateRate`_ | 민트의 현재 이자율을 변경하는 명령어입니다.                                                                    | [소스](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/interest_bearing_mint/instruction.rs#L35-L113) |
-| _rs`AmountToUiAmount`_                           | 민트의 활성 설정을 사용하여 토큰 금액에 대한 현재 UI 금액 문자열을 반환하는 명령어입니다.                      | [소스](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/instruction.rs#L520-L538)                                |
-| _rs`InterestBearingConfig::amount_to_ui_amount`_ | 타임스탬프에 대한 이자를 포함한 토큰 금액을 UI 금액으로 변환하는 헬퍼입니다.                                           | [소스](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/interest_bearing_mint/mod.rs#L85-L96)          |
-| _rs`process_initialize`_                         | *rs`InterestBearingConfig`*를 초기화하고 초기 타임스탬프와 이자율을 기록하는 프로세서 로직입니다.                     | [소스](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/extension/interest_bearing_mint/processor.rs#L21-L43)      |
-| _rs`process_update_rate`_                        | 현재 이자율을 업데이트하고 시간 가중 평균 이자율을 재계산하며 업데이트 타임스탬프를 기록하는 프로세서 로직입니다. | [소스](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/extension/interest_bearing_mint/processor.rs#L46-L77)      |
-| _rs`process_amount_to_ui_amount`_                | 민트의 활성 이자 부과 설정을 사용하여 UI 금액 문자열을 반환하는 프로세서 로직입니다.                     | [소스](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/processor.rs#L1548-L1569)                                  |
+| 항목                                           | 설명                                                              | 소스                                                                                                                                              |
+| -------------------------------------------- | --------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `InterestBearingConfig`                      | 이자율 권한, 타임스탬프, 현재 및 과거 이자율을 저장하는 민트 확장입니다.                      | [소스](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/interest_bearing_mint/mod.rs#L40-L153)         |
+| `InterestBearingMintInstruction::Initialize` | `InitializeMint` 전에 이자 부과 설정을 초기화하는 명령어입니다.                     | [소스](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/interest_bearing_mint/instruction.rs#L17-L90)  |
+| `InterestBearingMintInstruction::UpdateRate` | 민트의 현재 이자율을 변경하는 명령어입니다.                                        | [소스](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/interest_bearing_mint/instruction.rs#L35-L113) |
+| `AmountToUiAmount`                           | 민트의 활성 설정을 사용하여 토큰 금액에 대한 현재 UI 금액 문자열을 반환하는 명령어입니다.            | [소스](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/instruction.rs#L520-L538)                                |
+| `InterestBearingConfig::amount_to_ui_amount` | 타임스탬프에 대한 이자를 포함한 토큰 금액을 UI 금액으로 변환하는 헬퍼입니다.                    | [소스](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/interest_bearing_mint/mod.rs#L85-L96)          |
+| `process_initialize`                         | `InterestBearingConfig`를 초기화하고 초기 타임스탬프와 이자율을 기록하는 프로세서 로직입니다.  | [소스](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/extension/interest_bearing_mint/processor.rs#L21-L43)      |
+| `process_update_rate`                        | 현재 이자율을 업데이트하고 시간 가중 평균 이자율을 재계산하며 업데이트 타임스탬프를 기록하는 프로세서 로직입니다. | [소스](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/extension/interest_bearing_mint/processor.rs#L46-L77)      |
+| `process_amount_to_ui_amount`                | 민트의 활성 이자 부과 설정을 사용하여 UI 금액 문자열을 반환하는 프로세서 로직입니다.               | [소스](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/processor.rs#L1548-L1569)                                  |
 
 ### 타입스크립트
 
@@ -489,9 +468,7 @@ const offchainUiAmount = await amountToUiAmountForMintWithoutSimulation(
 
 #### Kit
 
-<CodeTabs storage="token-ts-kit" flags="r">
-
-```ts !! title="Instructions"
+```ts Instructions highlight={74-78,110-113,138-142}
 import {
   lamports,
   createClient,
@@ -565,7 +542,6 @@ await client.sendTransaction([
     space: mintSpace, // Account size in bytes for the mint plus InterestBearingConfig.
     programAddress: TOKEN_2022_PROGRAM_ADDRESS // Program that owns the mint account.
   }),
-  // !mark(1:5)
   getInitializeInterestBearingMintInstruction({
     mint: mint.address, // Mint account that stores the InterestBearingConfig extension.
     rateAuthority: client.payer.address, // Authority allowed to update the interest rate later.
@@ -602,7 +578,6 @@ const calculatedUiAmount = await amountToUiAmountForMintWithoutSimulation(
   tokenAmount
 );
 
-// !mark(1:4)
 const amountToUiInstruction = getAmountToUiAmountInstruction({
   mint: mint.address, // Mint whose UI amount conversion is being simulated.
   amount: tokenAmount // Token amount in base units.
@@ -631,7 +606,6 @@ const simulatedUiAmount = Buffer.from(
   "base64"
 ).toString("utf8");
 
-// !mark(1:5)
 const updateRateInstruction = getUpdateRateInterestBearingMintInstruction({
   mint: mint.address, // Mint account that stores the InterestBearingConfig extension.
   rateAuthority: client.payer, // Signer authorized to update the interest rate.
@@ -652,13 +626,9 @@ console.log("Simulated UI Amount:", simulatedUiAmount);
 console.log("InterestBearingConfig:", interestBearingConfig);
 ```
 
-</CodeTabs>
-
 #### Web3.js
 
-<CodeTabs storage="token-ts-legacy" flags="r">
-
-```ts !! title="Instructions"
+```ts Instructions highlight={67-73,133-138,149-156}
 import {
   Connection,
   Keypair,
@@ -725,7 +695,6 @@ const createMintAccountInstruction = SystemProgram.createAccount({
   programId: TOKEN_2022_PROGRAM_ID // Program that owns the mint account.
 });
 
-// !mark(1:7)
 const initializeInterestBearingInstruction =
   createInitializeInterestBearingMintInstruction(
     mint.publicKey, // Mint account that stores the InterestBearingConfig extension.
@@ -792,7 +761,6 @@ const calculatedUiAmount = await amountToUiAmountForMintWithoutSimulation(
   tokenAmount
 );
 
-// !mark(1:6)
 const amountToUiInstruction = createAmountToUiAmountInstruction(
   mint.publicKey, // Mint whose UI amount conversion is being simulated.
   tokenAmount, // Token amount in base units.
@@ -809,7 +777,6 @@ const simulatedUiAmount = Buffer.from(
   "base64"
 ).toString("utf8");
 
-// !mark(1:8)
 const updateRateInstruction = createUpdateRateInterestBearingMintInstruction(
   mint.publicKey, // Mint account that stores the InterestBearingConfig extension.
   feePayer.publicKey, // Signer authorized to update the interest rate.
@@ -839,13 +806,9 @@ console.log("Simulated UI Amount:", simulatedUiAmount);
 console.log("InterestBearingConfig:", interestBearingConfig);
 ```
 
-</CodeTabs>
-
 ### Rust
 
-<CodeTabs storage="token-rs" flags="r">
-
-```rust !! title="Rust"
+```rust Rust highlight={68-73,147-151,171-176}
 use anyhow::{anyhow, Result};
 use base64::prelude::{Engine as _, BASE64_STANDARD};
 use solana_client::nonblocking::rpc_client::RpcClient;
@@ -913,7 +876,6 @@ async fn main() -> Result<()> {
         &TOKEN_2022_PROGRAM_ID, // Program that owns the mint account.
     );
 
-    // !mark(1:6)
     let initialize_interest_bearing_instruction = initialize_interest_bearing_instruction(
         &TOKEN_2022_PROGRAM_ID, // Token program that owns the mint.
         &mint.pubkey(), // Mint account that stores the InterestBearingConfig extension.
@@ -993,7 +955,6 @@ async fn main() -> Result<()> {
         .amount_to_ui_amount(token_amount, mint_state.base.decimals, clock.unix_timestamp)
         .ok_or_else(|| anyhow!("Failed to calculate UI amount"))?;
 
-    // !mark(1:5)
     let amount_to_ui_instruction = amount_to_ui_amount(
         &TOKEN_2022_PROGRAM_ID, // Token program that owns the mint.
         &mint.pubkey(), // Mint whose UI amount conversion is being simulated.
@@ -1018,7 +979,6 @@ async fn main() -> Result<()> {
         )?,
     )?;
 
-    // !mark(1:6)
     let update_rate_instruction = update_rate(
         &TOKEN_2022_PROGRAM_ID, // Token program that owns the mint.
         &mint.pubkey(), // Mint account that stores the InterestBearingConfig extension.
@@ -1051,5 +1011,3 @@ async fn main() -> Result<()> {
     Ok(())
 }
 ```
-
-</CodeTabs>

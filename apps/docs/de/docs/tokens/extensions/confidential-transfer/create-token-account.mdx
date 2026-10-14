@@ -13,7 +13,7 @@ erforderlichen aktivierten Erweiterung erstellt wird.
 Das folgende Diagramm zeigt die Schritte zur Erstellung eines token account mit
 aktivierten Confidential Balances:
 
-```mermaid title="Create Token Account with Confidential Balances"
+```mermaid
 sequenceDiagram
     participant Payer as Wallet
     participant ATA as Associated Token Program
@@ -48,6 +48,46 @@ sequenceDiagram
     Token22-->>TokenAccount: Configure Confidential Balances
     deactivate Token22
 ```
+
+<div className="nojs-only" data-fallback="mermaid">
+  ```text Mermaid
+  sequenceDiagram
+      participant Payer as Wallet
+      participant ATA as Associated Token Program
+      participant Token22 as Token Extensions Program
+      participant ZK as ZK ElGamal Proof Program
+      participant TokenAccount as Token Account
+
+      Payer->>ATA: create_associated_token_account()
+      activate ATA
+      ATA->>Token22: Create token account at deterministic address
+      deactivate ATA
+      activate Token22
+      Token22-->>TokenAccount: Initialize Token Account
+      deactivate Token22
+
+      Payer->>Token22: reallocate() for ConfidentialTransferAccount extension
+      activate Token22
+      Token22-->>TokenAccount: Add space for extension data
+      deactivate Token22
+
+      Payer->>Payer: Derive ElGamal keypair and AES key
+      Payer->>Payer: Generate pubkey validity proof
+      Payer->>Payer: Encrypt initial balance (0) with AES key
+
+      Payer->>ZK: VerifyPubkeyValidity into context state account
+      activate ZK
+      ZK-->>ZK: Verify proof and store result in context state account
+      deactivate ZK
+
+      Payer->>Token22: configure_account() referencing the proof context account
+      activate Token22
+      Token22-->>TokenAccount: Configure Confidential Balances
+      deactivate Token22
+  ```
+</div>
+
+<p className="sol-caption">Create Token Account with Confidential Balances</p>
 
 ### Confidential Balances Token Account-Zustand
 
@@ -105,7 +145,7 @@ pub struct ConfidentialTransferAccount {
 }
 ```
 
-Das _rs`ConfidentialTransferAccount`_ enthält mehrere Felder zur Verwaltung
+Das `ConfidentialTransferAccount` enthält mehrere Felder zur Verwaltung
 von Confidential Balances:
 
 - **approved**: Der Genehmigungsstatus des Konten für Confidential Balances. Wenn die
@@ -140,19 +180,19 @@ von Confidential Balances:
   Guthabengutschriften aus Einzahlungs- und Übertragungs- Anweisungen.
 
 - **maximum_pending_balance_credit_counter**: Das Zähllimit für ausstehende
-  Gutschriften, bevor eine _rs`ApplyPendingBalance`_ Anweisungen erforderlich
+  Gutschriften, bevor eine `ApplyPendingBalance` Anweisungen erforderlich
   ist, um das ausstehende Guthaben in das verfügbare Guthaben umzuwandeln.
 
 - **expected_pending_balance_credit_counter**: Der
   `pending_balance_credit_counter`-Wert, der vom Client über die instruction
-  data beim letzten Verarbeiten der _rs`ApplyPendingBalance`_ Anweisungen
+  data beim letzten Verarbeiten der `ApplyPendingBalance` Anweisungen
   übermittelt wurde.
 
 - **actual_pending_balance_credit_counter**: Der
   `pending_balance_credit_counter` Wert im token account zum Zeitpunkt, als die
-  letzte _rs`ApplyPendingBalance`_ Anweisung verarbeitet wurde.
+  letzte `ApplyPendingBalance` Anweisung verarbeitet wurde.
 
-<Callout type="info">
+<Info>
   **Ausstehender vs. verfügbarer Saldo**
 
 Vertrauliche Salden werden in ausstehende und verfügbare Salden unterteilt, um
@@ -164,14 +204,14 @@ zwischen dem Zeitpunkt der Einreichung und der Verarbeitung der Transaktion
 ändern würde, was zu einer fehlgeschlagenen Transaktion führen würde.
 
 Alle Einzahlungen und Überweisungsbeträge werden zunächst dem ausstehenden Saldo
-hinzugefügt. Token account-Inhaber müssen die _rs`ApplyPendingBalance`_
+hinzugefügt. Token account-Inhaber müssen die `ApplyPendingBalance`
 Anweisung verwenden, um den ausstehenden Saldo in den verfügbaren Saldo
 umzuwandeln. Eingehende Überweisungen oder Einzahlungen wirken sich nicht auf
 den verfügbaren Saldo eines token account aus.
 
-</Callout>
+</Info>
 
-<Callout type="info">
+<Info>
   **Aufteilung des ausstehenden Saldos in Hoch/Niedrig**
 
 Der vertrauliche ausstehende Saldo wird in `pending_balance_lo` und
@@ -179,16 +219,16 @@ Der vertrauliche ausstehende Saldo wird in `pending_balance_lo` und
 Zahlen mehr Rechenaufwand erfordert. Die Implementierung der
 Chiffretext-Arithmetik finden Sie
 [hier](https://github.com/solana-program/token-2022/blob/efd0c957fefbd79882d77df5fb2dac88c001249c/confidential-transfer/ciphertext-arithmetic/src/lib.rs#L54),
-die in der _rs`ApplyPendingBalance`_ Anweisung
+die in der `ApplyPendingBalance` Anweisung
 [hier](https://github.com/solana-program/token-2022/blob/efd0c957fefbd79882d77df5fb2dac88c001249c/program/src/extension/confidential_transfer/processor.rs#L1180-L1184)
 verwendet wird.
 
-</Callout>
+</Info>
 
-<Callout type="info">
+<Info>
   **Ausstehende Saldo-Kreditzähler**
 
-Beim Aufrufen der _rs`ApplyPendingBalance`_ Anweisung zur Umwandlung des
+Beim Aufrufen der `ApplyPendingBalance` Anweisung zur Umwandlung des
 ausstehenden Saldos in den verfügbaren Saldo:
 
 1. Der Client ruft den aktuellen ausstehenden und verfügbaren Saldo ab,
@@ -198,13 +238,13 @@ ausstehenden Saldos in den verfügbaren Saldo:
 
 2. Die erwarteten und tatsächlichen ausstehenden Kreditzähler verfolgen
    Änderungen am Zählerwert zwischen dem Zeitpunkt, an dem die
-   _rs`ApplyPendingBalance`_ Anweisung erstellt und verarbeitet wird:
+   `ApplyPendingBalance` Anweisung erstellt und verarbeitet wird:
    - `expected_pending_balance_credit_counter`: Der
      `pending_balance_credit_counter` Wert, wenn der Client die
-     _rs`ApplyPendingBalance`_ Anweisung erstellt
+     `ApplyPendingBalance` Anweisung erstellt
    - `actual_pending_balance_credit_counter`: Der
      `pending_balance_credit_counter` Wert im token account zum Zeitpunkt, als
-     die _rs`ApplyPendingBalance`_ Anweisung verarbeitet wird
+     die `ApplyPendingBalance` Anweisung verarbeitet wird
 
 Übereinstimmende erwartete/tatsächliche Zähler zeigen an, dass der
 `decryptable_available_balance` mit dem `available_balance` übereinstimmt.
@@ -228,7 +268,7 @@ abzugleichen:
    - Ziel-Chiffretext-Beträge aus Überweisungs- Anweisungen entschlüsseln und
      addieren
 
-</Callout>
+</Info>
 
 ### Erforderliche Anweisungen
 
@@ -236,42 +276,42 @@ Das Erstellen und Konfigurieren eines token account für Confidential Balances v
 folgenden Anweisungen, die alle in eine einzige Transaktion passen:
 
 1. **Token Account erstellen**: Rufen Sie die
-   _rs`AssociatedTokenAccountInstruction::Create`_-Anweisung des Associated
+   `AssociatedTokenAccountInstruction::Create`-Anweisung des Associated
    Token Program auf, um den token account an seiner deterministischen Adresse
    zu erstellen.
 
 2. **Kontospeicherplatz neu zuweisen**: Rufen Sie die
-   _rs`TokenInstruction::Reallocate`_-Anweisung des Token Extensions Program
-   auf, um Speicherplatz für den _rs`ConfidentialTransferAccount`_-Zustand
+   `TokenInstruction::Reallocate`-Anweisung des Token Extensions Program
+   auf, um Speicherplatz für den `ConfidentialTransferAccount`-Zustand
    hinzuzufügen.
 
 3. **Pubkey-Gültigkeitsbeweis verifizieren**: Erstellen Sie ein Konten, das dem
    ZK ElGamal Proof-Programm gehört, und rufen Sie dann dessen
-   _rs`VerifyPubkeyValidity`_-Anweisung auf, um den Beweis zu verifizieren und
+   `VerifyPubkeyValidity`-Anweisung auf, um den Beweis zu verifizieren und
    das verifizierte Ergebnis in diesem Kontext-Zustandskonten zu speichern.
 
 4. **Confidential Balances konfigurieren**: Rufen Sie die
    [ConfidentialTransferInstruction::ConfigureAccount](https://github.com/solana-program/token-2022/blob/efd0c957fefbd79882d77df5fb2dac88c001249c/program/src/extension/confidential_transfer/processor.rs#L201)-Anweisung des Token Extensions Program auf,
    referenzieren Sie das Proof-Kontext-Zustands-Konto über
-   _rs`ProofLocation::ContextStateAccount`_, um den
-   _rs`ConfidentialTransferAccount`_-Zustand zu initialisieren.
+   `ProofLocation::ContextStateAccount`, um den
+   `ConfidentialTransferAccount`-Zustand zu initialisieren.
 
-<Callout type="info">
+<Info>
 
 **Nur der Eigentümer des token account kann Confidential Balances für ein token
 account aktivieren**.
 
-Die _rs`ConfigureAccount`_-Anweisung erfordert die clientseitige Generierung von
+Die `ConfigureAccount`-Anweisung erfordert die clientseitige Generierung von
 Verschlüsselungsschlüsseln und einen Beweis, der nur vom Eigentümer des token account
 generiert werden kann.
 
-Der pubkey-Gültigkeitsbeweis verifiziert, dass der ElGamal-öffentliche Schlüssel des Konten gültig ist. Er wird mit _rs`build_pubkey_validity_proof_data`_ generiert, on-chain vom ZK ElGamal Proof-Programm in ein Kontext-Zustands-Konto verifiziert und anschließend von _rs`ConfigureAccount`_ über
-_rs`ProofLocation::ContextStateAccount`_ referenziert, sodass keine Proof-Bytes in der Token-Anweisung selbst übertragen werden. Implementierungsdetails finden Sie unter:
+Der pubkey-Gültigkeitsbeweis verifiziert, dass der ElGamal-öffentliche Schlüssel des Konten gültig ist. Er wird mit `build_pubkey_validity_proof_data` generiert, on-chain vom ZK ElGamal Proof-Programm in ein Kontext-Zustands-Konto verifiziert und anschließend von `ConfigureAccount` über
+`ProofLocation::ContextStateAccount` referenziert, sodass keine Proof-Bytes in der Token-Anweisung selbst übertragen werden. Implementierungsdetails finden Sie unter:
 
 - [PubkeyValidityProofData](https://github.com/anza-xyz/agave/blob/b39a9764005ac8596b7e14e61d381305ce57ecaa/zk-sdk/src/zk_elgamal_proof_program/proof_data/pubkey_validity.rs#L58)
 - [PubkeyValidityProof](https://github.com/anza-xyz/agave/blob/b39a9764005ac8596b7e14e61d381305ce57ecaa/zk-sdk/src/sigma_proofs/pubkey_validity.rs#L65)
 
-</Callout>
+</Info>
 
 ## Beispielcode
 
@@ -286,10 +326,9 @@ und ersetzen Sie den Mint-Platzhalter durch einen Mint, der gemäß
 
 ### Rust
 
-<CodeTabs>
+<CodeGroup>
 
-```rust !! title="main.rs"
-// !collapse(1:36) collapsed
+```rust main.rs expandable
 // Imports: dependencies used by this example.
 use anyhow::{Context, Result};
 use solana_address::Address;
@@ -447,7 +486,6 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-// !collapse(1:1000) collapsed
 // Setup: helper function to create the confidential mint.
 fn create_confidential_mint(rpc_client: &RpcClient, payer: &Keypair, decimals: u8) -> Result<Pubkey> {
     let mint = Keypair::new();
@@ -515,7 +553,7 @@ fn load_keypair() -> Result<Keypair> {
 }
 ```
 
-```toml !! title="Cargo.toml"
+```toml Cargo.toml
 [package]
 name = "confidential-transfer"
 version = "0.1.0"
@@ -547,14 +585,13 @@ dirs = "6.0.0"
 serde_json = "1.0"
 ```
 
-</CodeTabs>
+</CodeGroup>
 
 ### Typescript
 
-<CodeTabs>
+<CodeGroup>
 
-```ts !! title="index.ts"
-// !collapse(1:21) collapsed
+```ts index.ts expandable
 // Imports: dependencies used by this example.
 import {
   deriveAeKeyForOwnerMint,
@@ -631,7 +668,6 @@ console.log(
   `Enabled Confidential Balances on token account ${tokenAccount}: ${result.context.signature}`
 );
 
-// !collapse(1:1000) collapsed
 // Setup: helper function to create the confidential mint.
 async function createConfidentialMint(
   kitClient: typeof client,
@@ -666,7 +702,7 @@ async function createConfidentialMint(
 }
 ```
 
-```json !! title="package.json"
+```json package.json
 {
   "name": "confidential-account",
   "version": "0.1.0",
@@ -686,9 +722,9 @@ async function createConfidentialMint(
 }
 ```
 
-</CodeTabs>
+</CodeGroup>
 
-<Callout type="info">
+<Info>
   Die TypeScript-Hilfsfunktionen befinden sich im Unterpfad
   `@solana-program/token-2022/confidential` und bauen auf `@solana/zk-sdk` für
   die Verschlüsselungsprimitive auf. `owner` und `client` stammen aus Ihrem
@@ -696,4 +732,4 @@ async function createConfidentialMint(
   Anweisungen-Plan-Unterstützung von `@solana/kit` gesendet, die die Arbeit auf
   mehrere Transaktionen aufteilt, wenn die Beweise für eine einzelne zu groß
   sind.
-</Callout>
+</Info>

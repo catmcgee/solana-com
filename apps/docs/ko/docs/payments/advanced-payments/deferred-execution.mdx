@@ -32,23 +32,43 @@ _고유한_ 값을 저장하는 특수 계정인 **논스 계정**을 사용합�
 사용하는 각 트랜잭션은 첫 번째 명령어로 논스를 "진행"해야 합니다. 각 논스 값은
 하나의 트랜잭션에만 사용할 수 있습니다.
 
-```mermaid title="Durable Nonce"
+```mermaid
 flowchart LR
     D1[Sign] --> D2[Store] --> D3[Submit]
     D3 -. "✓ No time limit" .-> D4[Success]
 ```
 
-```mermaid title="Standard Blockhash"
+<div className="nojs-only" data-fallback="mermaid">
+  ```text Mermaid
+  flowchart LR
+      D1[Sign] --> D2[Store] --> D3[Submit]
+      D3 -. "✓ No time limit" .-> D4[Success]
+  ```
+</div>
+
+<p className="sol-caption">Durable Nonce</p>
+
+```mermaid
 flowchart LR
     S1[Sign] --> S2[Submit]
     S2 -. "⏱️ ~90 sec limit" .-> S3[Expires]
 ```
 
-<Callout type="info">
+<div className="nojs-only" data-fallback="mermaid">
+  ```text Mermaid
+  flowchart LR
+      S1[Sign] --> S2[Submit]
+      S2 -. "⏱️ ~90 sec limit" .-> S3[Expires]
+  ```
+</div>
+
+<p className="sol-caption">Standard Blockhash</p>
+
+<Info>
   논스 계정은 rent 면제를 위해 약 0.0015 SOL이 필요합니다. 하나의 논스 계정 = 한
   번에 하나의 대기 중인 트랜잭션입니다. 병렬 워크플로우의 경우 여러 논스 계정을
   생성하세요.
-</Callout>
+</Info>
 
 ### 논스 계정 생성
 
@@ -57,335 +77,292 @@ flowchart LR
 1. System Program의 `getCreateAccountInstruction`를 사용하여 **계정 생성**
 2. `getInitializeNonceAccountInstruction`를 사용하여 **논스로 초기화**
 
-<ScrollyCoding>
+<Steps>
+  <Step title="키페어 생성">
+    논스 계정 주소로 사용할 새 keypair를 생성하고 필요한 공간과 rent를 계산합니다.
 
-## !!steps 키페어 생성
+    ```ts title="Create Nonce Account"
+    const nonceKeypair = await generateKeyPairSigner();
+    const nonceSpace = BigInt(getNonceSize());
+    const nonceRent = await rpc
+      .getMinimumBalanceForRentExemption(nonceSpace)
+      .send();
+    ```
+  </Step>
 
-논스 계정 주소로 사용할 새 keypair를 생성하고 필요한 공간과 rent를 계산합니다.
+  <Step title="계정 생성 명령어">
+    rent 면제를 위한 충분한 lamports로 System Program이 소유한 계정을 생성합니다.
 
-<CodePlaceholder title="Create Nonce Account" />
+    ```ts title="Create Nonce Account" focus={7-13}
+    const nonceKeypair = await generateKeyPairSigner();
+    const nonceSpace = BigInt(getNonceSize());
+    const nonceRent = await rpc
+      .getMinimumBalanceForRentExemption(nonceSpace)
+      .send();
 
-```ts !! title="Create Nonce Account"
-const nonceKeypair = await generateKeyPairSigner();
-const nonceSpace = BigInt(getNonceSize());
-const nonceRent = await rpc
-  .getMinimumBalanceForRentExemption(nonceSpace)
-  .send();
-```
+    const createNonceAccountIx = getCreateAccountInstruction({
+      payer: sender,
+      newAccount: nonceKeypair,
+      lamports: nonceRent,
+      space: nonceSpace,
+      programAddress: SYSTEM_PROGRAM_ADDRESS
+    });
+    ```
+  </Step>
 
-## !!steps 계정 생성 명령어
+  <Step title="논스 초기화 명령어">
+    계정을 논스 계정으로 초기화하고, 이를 진행할 수 있는 권한을 설정합니다.
 
-rent 면제를 위한 충분한 lamports로 System Program이 소유한 계정을 생성합니다.
+    ```ts title="Create Nonce Account" focus={15-18}
+    const nonceKeypair = await generateKeyPairSigner();
+    const nonceSpace = BigInt(getNonceSize());
+    const nonceRent = await rpc
+      .getMinimumBalanceForRentExemption(nonceSpace)
+      .send();
 
-<CodePlaceholder title="Create Nonce Account" />
+    const createNonceAccountIx = getCreateAccountInstruction({
+      payer: sender,
+      newAccount: nonceKeypair,
+      lamports: nonceRent,
+      space: nonceSpace,
+      programAddress: SYSTEM_PROGRAM_ADDRESS
+    });
 
-```ts !! title="Create Nonce Account"
-const nonceKeypair = await generateKeyPairSigner();
-const nonceSpace = BigInt(getNonceSize());
-const nonceRent = await rpc
-  .getMinimumBalanceForRentExemption(nonceSpace)
-  .send();
+    const initNonceIx = getInitializeNonceAccountInstruction({
+      nonceAccount: nonceKeypair.address,
+      nonceAuthority: sender.address
+    });
+    ```
+  </Step>
 
-// !focus(1:7)
-const createNonceAccountIx = getCreateAccountInstruction({
-  payer: sender,
-  newAccount: nonceKeypair,
-  lamports: nonceRent,
-  space: nonceSpace,
-  programAddress: SYSTEM_PROGRAM_ADDRESS
-});
-```
+  <Step title="트랜잭션 구성">
+    두 명령어를 포함한 트랜잭션을 구성합니다.
 
-## !!steps 논스 초기화 명령어
+    ```ts title="Create Nonce Account" focus={20-26}
+    const nonceKeypair = await generateKeyPairSigner();
+    const nonceSpace = BigInt(getNonceSize());
+    const nonceRent = await rpc
+      .getMinimumBalanceForRentExemption(nonceSpace)
+      .send();
 
-계정을 논스 계정으로 초기화하고, 이를 진행할 수 있는 권한을 설정합니다.
+    const createNonceAccountIx = getCreateAccountInstruction({
+      payer: sender,
+      newAccount: nonceKeypair,
+      lamports: nonceRent,
+      space: nonceSpace,
+      programAddress: SYSTEM_PROGRAM_ADDRESS
+    });
 
-<CodePlaceholder title="Create Nonce Account" />
+    const initNonceIx = getInitializeNonceAccountInstruction({
+      nonceAccount: nonceKeypair.address,
+      nonceAuthority: sender.address
+    });
 
-```ts !! title="Create Nonce Account"
-const nonceKeypair = await generateKeyPairSigner();
-const nonceSpace = BigInt(getNonceSize());
-const nonceRent = await rpc
-  .getMinimumBalanceForRentExemption(nonceSpace)
-  .send();
+    const { value: blockhash } = await rpc.getLatestBlockhash().send();
+    const createNonceTx = pipe(
+      createTransactionMessage({ version: 0 }),
+      (tx) => setTransactionMessageFeePayerSigner(sender, tx),
+      (tx) => setTransactionMessageLifetimeUsingBlockhash(blockhash, tx),
+      (tx) =>
+        appendTransactionMessageInstructions(
+          [createNonceAccountIx, initNonceIx],
+          tx
+        )
+    );
+    ```
+  </Step>
 
-const createNonceAccountIx = getCreateAccountInstruction({
-  payer: sender,
-  newAccount: nonceKeypair,
-  lamports: nonceRent,
-  space: nonceSpace,
-  programAddress: SYSTEM_PROGRAM_ADDRESS
-});
+  <Step title="서명 및 전송">
+    논스 계정을 생성하고 초기화하기 위해 트랜잭션에 서명하고 전송합니다.
 
-// !focus(1:4)
-const initNonceIx = getInitializeNonceAccountInstruction({
-  nonceAccount: nonceKeypair.address,
-  nonceAuthority: sender.address
-});
-```
+    ```ts title="논스 계정 생성" focus={32-37}
+    const nonceKeypair = await generateKeyPairSigner();
+    const nonceSpace = BigInt(getNonceSize());
+    const nonceRent = await rpc
+      .getMinimumBalanceForRentExemption(nonceSpace)
+      .send();
 
-## !!steps 트랜잭션 구성
+    const createNonceAccountIx = getCreateAccountInstruction({
+      payer: sender,
+      newAccount: nonceKeypair,
+      lamports: nonceRent,
+      space: nonceSpace,
+      programAddress: SYSTEM_PROGRAM_ADDRESS
+    });
 
-두 명령어를 포함한 트랜잭션을 구성합니다.
+    const initNonceIx = getInitializeNonceAccountInstruction({
+      nonceAccount: nonceKeypair.address,
+      nonceAuthority: sender.address
+    });
 
-<CodePlaceholder title="Create Nonce Account" />
+    const { value: blockhash } = await rpc.getLatestBlockhash().send();
+    const createNonceTx = pipe(
+      createTransactionMessage({ version: 0 }),
+      (tx) => setTransactionMessageFeePayerSigner(sender, tx),
+      (tx) => setTransactionMessageLifetimeUsingBlockhash(blockhash, tx),
+      (tx) =>
+        appendTransactionMessageInstructions(
+          [createNonceAccountIx, initNonceIx],
+          tx
+        )
+    );
 
-```ts !! title="Create Nonce Account"
-const nonceKeypair = await generateKeyPairSigner();
-const nonceSpace = BigInt(getNonceSize());
-const nonceRent = await rpc
-  .getMinimumBalanceForRentExemption(nonceSpace)
-  .send();
+    const signedCreateNonceTx =
+      await signTransactionMessageWithSigners(createNonceTx);
 
-const createNonceAccountIx = getCreateAccountInstruction({
-  payer: sender,
-  newAccount: nonceKeypair,
-  lamports: nonceRent,
-  space: nonceSpace,
-  programAddress: SYSTEM_PROGRAM_ADDRESS
-});
-
-const initNonceIx = getInitializeNonceAccountInstruction({
-  nonceAccount: nonceKeypair.address,
-  nonceAuthority: sender.address
-});
-
-// !focus(1:7)
-const { value: blockhash } = await rpc.getLatestBlockhash().send();
-const createNonceTx = pipe(
-  createTransactionMessage({ version: 0 }),
-  (tx) => setTransactionMessageFeePayerSigner(sender, tx),
-  (tx) => setTransactionMessageLifetimeUsingBlockhash(blockhash, tx),
-  (tx) =>
-    appendTransactionMessageInstructions(
-      [createNonceAccountIx, initNonceIx],
-      tx
-    )
-);
-```
-
-## !!steps 서명 및 전송
-
-논스 계정을 생성하고 초기화하기 위해 트랜잭션에 서명하고 전송합니다.
-
-<CodePlaceholder title="논스 계정 생성" />
-
-```ts !! title="Create Nonce Account"
-const nonceKeypair = await generateKeyPairSigner();
-const nonceSpace = BigInt(getNonceSize());
-const nonceRent = await rpc
-  .getMinimumBalanceForRentExemption(nonceSpace)
-  .send();
-
-const createNonceAccountIx = getCreateAccountInstruction({
-  payer: sender,
-  newAccount: nonceKeypair,
-  lamports: nonceRent,
-  space: nonceSpace,
-  programAddress: SYSTEM_PROGRAM_ADDRESS
-});
-
-const initNonceIx = getInitializeNonceAccountInstruction({
-  nonceAccount: nonceKeypair.address,
-  nonceAuthority: sender.address
-});
-
-const { value: blockhash } = await rpc.getLatestBlockhash().send();
-const createNonceTx = pipe(
-  createTransactionMessage({ version: 0 }),
-  (tx) => setTransactionMessageFeePayerSigner(sender, tx),
-  (tx) => setTransactionMessageLifetimeUsingBlockhash(blockhash, tx),
-  (tx) =>
-    appendTransactionMessageInstructions(
-      [createNonceAccountIx, initNonceIx],
-      tx
-    )
-);
-
-// !focus(1:6)
-const signedCreateNonceTx =
-  await signTransactionMessageWithSigners(createNonceTx);
-
-await sendAndConfirmTransactionFactory({ rpc, rpcSubscriptions })(
-  signedCreateNonceTx,
-  { commitment: "confirmed" }
-);
-```
-
-</ScrollyCoding>
+    await sendAndConfirmTransactionFactory({ rpc, rpcSubscriptions })(
+      signedCreateNonceTx,
+      { commitment: "confirmed" }
+    );
+    ```
+  </Step>
+</Steps>
 
 ### 지연 트랜잭션 구축
 
 최근 블록해시 대신 논스 계정의 `blockhash`를 트랜잭션의 수명으로 사용합니다.
 
-<ScrollyCoding>
+<Steps>
+  <Step title="논스 가져오기">
+    논스 계정에서 데이터를 가져옵니다. 논스 계정의 `blockhash`를 트랜잭션의 수명으로
+    사용합니다.
 
-## !!steps 논스 가져오기
+    ```sh title="Example Nonce Account Data" highlight={5}
+    {
+      version: 1,
+      state: 1,
+      authority: 'HgjaL8artMtmntaQDVM2UBk3gppsYYERS4PkUhiaLZD1',
+      blockhash: '5U7seXqfgZx1uh5DFhdH1vyBhr7XGRrKxBAnJJTbbUa',
+      lamportsPerSignature: 5000n
+    }
+    ```
 
-논스 계정에서 데이터를 가져옵니다. 논스 계정의 `blockhash`를 트랜잭션의 수명으로
-사용합니다.
+    ```ts title="지연 트랜잭션 구축" focus={1}
+    const { data: nonceData } = await fetchNonce(rpc, nonceKeypair.address);
+    ```
+  </Step>
 
-```sh title="Example Nonce Account Data"
-{
-  version: 1,
-  state: 1,
-  authority: 'HgjaL8artMtmntaQDVM2UBk3gppsYYERS4PkUhiaLZD1',
-  # !mark
-  blockhash: '5U7seXqfgZx1uh5DFhdH1vyBhr7XGRrKxBAnJJTbbUa',
-  lamportsPerSignature: 5000n
-}
-```
+  <Step title="전송 명령어 생성">
+    결제를 위한 명령어를 생성합니다. 이 예제는 토큰 전송을 보여줍니다.
 
-<CodePlaceholder title="지연 트랜잭션 구축" />
+    ```ts title="지연 트랜잭션 구축" focus={3-8}
+    const { data: nonceData } = await fetchNonce(rpc, nonceKeypair.address);
 
-```ts !! title="Build Deferred Transaction"
-// !focus(1:1)
-const { data: nonceData } = await fetchNonce(rpc, nonceKeypair.address);
-```
+    const transferInstruction = getTransferInstruction({
+      source: senderAta,
+      destination: recipientAta,
+      authority: sender.address,
+      amount: 250_000n
+    });
+    ```
+  </Step>
 
-## !!steps 전송 명령어 생성
+  <Step title="지속 가능한 논스로 트랜잭션 구축">
+    `setTransactionMessageLifetimeUsingDurableNonce`를 사용하여 논스를 블록해시로
+    설정하고 논스 진행 명령어를 자동으로 앞에 추가합니다.
 
-결제를 위한 명령어를 생성합니다. 이 예제는 토큰 전송을 보여줍니다.
+    ```ts title="지연 트랜잭션 구축" highlight={14-21} focus={10-23}
+    const { data: nonceData } = await fetchNonce(rpc, nonceKeypair.address);
 
-<CodePlaceholder title="지연 트랜잭션 구축" />
+    const transferInstruction = getTransferInstruction({
+      source: senderAta,
+      destination: recipientAta,
+      authority: sender.address,
+      amount: 250_000n
+    });
 
-```ts !! title="Build Deferred Transaction"
-const { data: nonceData } = await fetchNonce(rpc, nonceKeypair.address);
+    const transactionMessage = pipe(
+      createTransactionMessage({ version: 0 }),
+      (tx) => setTransactionMessageFeePayerSigner(sender, tx),
+      (tx) =>
+        setTransactionMessageLifetimeUsingDurableNonce(
+          {
+            nonce: nonceData.blockhash as Nonce,
+            nonceAccountAddress: nonceKeypair.address,
+            nonceAuthorityAddress: nonceData.authority
+          },
+          tx
+        ),
+      (tx) => appendTransactionMessageInstructions([transferInstruction], tx)
+    );
+    ```
+  </Step>
 
-// !focus(1:6)
-const transferInstruction = getTransferInstruction({
-  source: senderAta,
-  destination: recipientAta,
-  authority: sender.address,
-  amount: 250_000n
-});
-```
+  <Step title="트랜잭션 서명">
+    트랜잭션에 서명합니다. 이제 표준 블록해시 대신 지속 가능한 논스를 사용합니다.
 
-## !!steps 지속 가능한 논스로 트랜잭션 구축
+    ```ts title="지연 트랜잭션 구축" focus={25-26}
+    const { data: nonceData } = await fetchNonce(rpc, nonceKeypair.address);
 
-`setTransactionMessageLifetimeUsingDurableNonce`를 사용하여 논스를 블록해시로
-설정하고 논스 진행 명령어를 자동으로 앞에 추가합니다.
+    const transferInstruction = getTransferInstruction({
+      source: senderAta,
+      destination: recipientAta,
+      authority: sender.address,
+      amount: 250_000n
+    });
 
-<CodePlaceholder title="지연 트랜잭션 구축" />
+    const transactionMessage = pipe(
+      createTransactionMessage({ version: 0 }),
+      (tx) => setTransactionMessageFeePayerSigner(sender, tx),
+      (tx) =>
+        setTransactionMessageLifetimeUsingDurableNonce(
+          {
+            nonce: nonceData.blockhash as Nonce,
+            nonceAccountAddress: nonceKeypair.address,
+            nonceAuthorityAddress: nonceData.authority
+          },
+          tx
+        ),
+      (tx) => appendTransactionMessageInstructions([transferInstruction], tx)
+    );
 
-```ts !! title="Build Deferred Transaction"
-const { data: nonceData } = await fetchNonce(rpc, nonceKeypair.address);
-
-const transferInstruction = getTransferInstruction({
-  source: senderAta,
-  destination: recipientAta,
-  authority: sender.address,
-  amount: 250_000n
-});
-
-// !focus(1:14)
-const transactionMessage = pipe(
-  createTransactionMessage({ version: 0 }),
-  (tx) => setTransactionMessageFeePayerSigner(sender, tx),
-  (tx) =>
-    // !mark(1:8)
-    setTransactionMessageLifetimeUsingDurableNonce(
-      {
-        nonce: nonceData.blockhash as Nonce,
-        nonceAccountAddress: nonceKeypair.address,
-        nonceAuthorityAddress: nonceData.authority
-      },
-      tx
-    ),
-  (tx) => appendTransactionMessageInstructions([transferInstruction], tx)
-);
-```
-
-## !!steps 트랜잭션 서명
-
-트랜잭션에 서명합니다. 이제 표준 블록해시 대신 지속 가능한 논스를 사용합니다.
-
-<CodePlaceholder title="지연 트랜잭션 구축" />
-
-```ts !! title="Build Deferred Transaction"
-const { data: nonceData } = await fetchNonce(rpc, nonceKeypair.address);
-
-const transferInstruction = getTransferInstruction({
-  source: senderAta,
-  destination: recipientAta,
-  authority: sender.address,
-  amount: 250_000n
-});
-
-const transactionMessage = pipe(
-  createTransactionMessage({ version: 0 }),
-  (tx) => setTransactionMessageFeePayerSigner(sender, tx),
-  (tx) =>
-    setTransactionMessageLifetimeUsingDurableNonce(
-      {
-        nonce: nonceData.blockhash as Nonce,
-        nonceAccountAddress: nonceKeypair.address,
-        nonceAuthorityAddress: nonceData.authority
-      },
-      tx
-    ),
-  (tx) => appendTransactionMessageInstructions([transferInstruction], tx)
-);
-
-// !focus(1:2)
-const signedTransaction =
-  await signTransactionMessageWithSigners(transactionMessage);
-```
-
-</ScrollyCoding>
+    const signedTransaction =
+      await signTransactionMessageWithSigners(transactionMessage);
+    ```
+  </Step>
+</Steps>
 
 ### 트랜잭션 저장 또는 전송
 
 서명 후 저장을 위해 트랜잭션을 인코딩하세요. 준비가 되면 네트워크로 전송합니다.
 
-<ScrollyCoding>
+<Steps>
+  <Step title="저장을 위한 인코딩">
+    서명된 트랜잭션을 base64로 인코딩하세요. 이 값을 데이터베이스에 저장합니다.
 
-## !!steps 저장을 위한 인코딩
+    ```ts title="저장 및 실행" focus={4-5}
+    const signedTransaction =
+      await signTransactionMessageWithSigners(transactionMessage);
 
-서명된 트랜잭션을 base64로 인코딩하세요. 이 값을 데이터베이스에 저장합니다.
+    const base64EncodedTransaction =
+      getBase64EncodedWireTransaction(signedTransaction);
 
-<CodePlaceholder title="저장 및 실행" />
+    // Store base64EncodedTransaction in your database
+    ```
+  </Step>
 
-```ts !! title="Store and Execute"
-const signedTransaction =
-  await signTransactionMessageWithSigners(transactionMessage);
+  <Step title="트랜잭션 전송">
+    준비가 되면 서명된 트랜잭션을 전송하세요. 트랜잭션은 논스가 진행될 때까지
+    유효합니다.
 
-// !focus(1:2)
-const base64EncodedTransaction =
-  getBase64EncodedWireTransaction(signedTransaction);
+    ```ts title="저장 및 실행" focus={8-10}
+    const signedTransaction =
+      await signTransactionMessageWithSigners(transactionMessage);
 
-// Store base64EncodedTransaction in your database
-```
+    const base64EncodedTransaction =
+      getBase64EncodedWireTransaction(signedTransaction);
 
-## !!steps 트랜잭션 전송
-
-준비가 되면 서명된 트랜잭션을 전송하세요. 트랜잭션은 논스가 진행될 때까지
-유효합니다.
-
-<CodePlaceholder title="저장 및 실행" />
-
-```ts !! title="Store and Execute"
-const signedTransaction =
-  await signTransactionMessageWithSigners(transactionMessage);
-
-const base64EncodedTransaction =
-  getBase64EncodedWireTransaction(signedTransaction);
-
-// When ready to execute (could be days later):
-// !focus(1:3)
-await rpc
-  .sendTransaction(base64EncodedTransaction, { encoding: "base64" })
-  .send();
-```
-
-</ScrollyCoding>
+    // When ready to execute (could be days later):
+    await rpc
+      .sendTransaction(base64EncodedTransaction, { encoding: "base64" })
+      .send();
+    ```
+  </Step>
+</Steps>
 
 ### 데모
 
-<CodeTabs flags="r">
-
-```ts !! title="Demo"
-// !collapse(1:39) collapsed
+```ts Demo highlight={54,57-60,63-69,72-75,106,139-146,156-157,161-166} expandable
 // Click ">" icon on left to expand demo imports
 import {
   airdropFactory,
@@ -439,18 +416,15 @@ const { rpc, rpcSubscriptions, mint } = await demoSetup(sender, recipient);
 // Step 1: Create a Nonce Account
 // =============================================================================
 
-// !mark
 const nonceKeypair = await generateKeyPairSigner();
 console.log("\nNonce Account Address:", nonceKeypair.address);
 
-// !mark(1:4)
 const nonceSpace = BigInt(getNonceSize());
 const nonceRent = await rpc
   .getMinimumBalanceForRentExemption(nonceSpace)
   .send();
 
 // Instruction to create new account for the nonce
-// !mark(1:7)
 const createNonceAccountIx = getCreateAccountInstruction({
   payer: sender,
   newAccount: nonceKeypair,
@@ -460,7 +434,6 @@ const createNonceAccountIx = getCreateAccountInstruction({
 });
 
 // Instruction to initialize the nonce account
-// !mark(1:4)
 const initNonceIx = getInitializeNonceAccountInstruction({
   nonceAccount: nonceKeypair.address,
   nonceAuthority: sender.address
@@ -495,7 +468,6 @@ console.log("Nonce Account created.");
 // =============================================================================
 
 // Fetch current nonce value from the nonce account
-// !mark
 const { data: nonceData } = await fetchNonce(rpc, nonceKeypair.address);
 console.log("Nonce Account data:", nonceData);
 
@@ -529,7 +501,6 @@ const transactionMessage = pipe(
   createTransactionMessage({ version: 0 }),
   (tx) => setTransactionMessageFeePayerSigner(sender, tx),
   (tx) =>
-    // !mark(1:8)
     setTransactionMessageLifetimeUsingDurableNonce(
       {
         nonce: nonceData.blockhash as string as Nonce,
@@ -547,13 +518,11 @@ assertIsTransactionWithDurableNonceLifetime(signedTransaction);
 const transactionSignature = getSignatureFromTransaction(signedTransaction);
 
 // Encode the transaction to base64, optionally save and send at a later time
-// !mark(1:2)
 const base64EncodedTransaction =
   getBase64EncodedWireTransaction(signedTransaction);
 console.log("\nBase64 Encoded Transaction:", base64EncodedTransaction);
 
 // Send the encoded transaction, blockhash does not expire
-// !mark(1:6)
 await rpc
   .sendTransaction(base64EncodedTransaction, {
     encoding: "base64",
@@ -567,7 +536,6 @@ console.log("Transaction Signature:", transactionSignature);
 // =============================================================================
 // Demo Setup Helper Function
 // =============================================================================
-// !collapse(1:1000) collapsed
 
 /**
  * Sets up for a token transfer demo:
@@ -669,8 +637,6 @@ async function demoSetup(sender: KeyPairSigner, recipient: KeyPairSigner) {
   return { rpc, rpcSubscriptions, mint };
 }
 ```
-
-</CodeTabs>
 
 ## 대기 중인 트랜잭션 무효화
 

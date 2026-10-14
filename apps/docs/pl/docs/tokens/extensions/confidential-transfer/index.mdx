@@ -6,7 +6,13 @@ description:
 
 ## Czym są Poufne Salda?
 
-<Embed url="https://youtu.be/Bqs95tFcRIU" />
+<Frame>
+  <iframe src="https://www.youtube-nocookie.com/embed/Bqs95tFcRIU" title="YouTube video player" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerPolicy="strict-origin-when-cross-origin" allowFullScreen className="w-full aspect-video" />
+</Frame>
+
+<div className="nojs-only">
+  [https://www.youtube.com/watch?v=Bqs95tFcRIU](https://www.youtube.com/watch?v=Bqs95tFcRIU)
+</div>
 
 Poufne Salda to rozszerzenie Token-2022, które umożliwia przesyłanie tokenów
 między token accounts bez ujawniania kwoty transferu. Jest to przydatne w przypadku
@@ -27,7 +33,7 @@ Rozszerzenie Poufnych Sald dodaje
 do programu Token Extension, które umożliwiają przesyłanie tokenów między
 kontami bez ujawniania kwoty transferu.
 
-```mermaid title="Confidential Balances Basic Overview"
+```mermaid
     sequenceDiagram
 
     participant A as Sender Wallet
@@ -44,6 +50,28 @@ kontami bez ujawniania kwoty transferu.
     B->>BB: Withdraw
 
 ```
+
+<div className="nojs-only" data-fallback="mermaid">
+  ```text Mermaid
+      sequenceDiagram
+
+      participant A as Sender Wallet
+      participant AA as Sender Token Account
+      participant BB as Recipient Token Account
+      participant B as Recipient Wallet
+
+      A->>AA: Deposit
+      A->>AA: Apply
+
+      AA->>BB: Transfer
+      B->>BB: Apply
+
+      B->>BB: Withdraw
+
+  ```
+</div>
+
+<p className="sol-caption">Confidential Balances Basic Overview</p>
 
 Podstawowy przebieg poufnych transferów tokenów jest następujący:
 
@@ -62,7 +90,7 @@ Podstawowy przebieg poufnych transferów tokenów jest następujący:
 
 Mint account z Poufnymi Saldami może przechowywać opcjonalny globalny klucz publiczny ElGamal audytora. Gdy jest skonfigurowany, każdy poufny transfer zawiera kwotę zaszyfrowaną dla nadawcy, odbiorcy i audytora. Dowód transferu weryfikuje, że wszystkie trzy szyfrogramy zawierają tę samą kwotę. Publiczność nadal nie może odczytać kwoty, ale posiadacz tajnego klucza audytora może odszyfrować kwoty transferów dla danego minta.
 
-Uprawnienia Poufnych Sald ustawiają klucz audytora podczas inicjalizacji rozszerzenia lub zmieniają go później za pomocą _rs`UpdateMint`_. Uprawnienia mogą rotować lub usuwać klucz. Rotacja dotyczy tylko przyszłych transferów, dlatego należy zachować poprzednie tajne klucze, gdy wymagany jest historyczny dostęp do audytu. Klucze audytora zapewniają dostęp do odczytu; nie autoryzują transferów tokenów ani nie ujawniają pełnego poufnego salda konta.
+Uprawnienia Poufnych Sald ustawiają klucz audytora podczas inicjalizacji rozszerzenia lub zmieniają go później za pomocą `UpdateMint`. Uprawnienia mogą rotować lub usuwać klucz. Rotacja dotyczy tylko przyszłych transferów, dlatego należy zachować poprzednie tajne klucze, gdy wymagany jest historyczny dostęp do audytu. Klucze audytora zapewniają dostęp do odczytu; nie autoryzują transferów tokenów ani nie ujawniają pełnego poufnego salda konta.
 
 Przykłady konfiguracji i rotacji można znaleźć w sekcji
 [Konfiguracja audytora](/docs/tokens/extensions/confidential-transfer/issuer-guide#configure-an-auditor).
@@ -72,7 +100,7 @@ Portfele, eksploratory, giełdy i dostawcy usług compliance powinni również z
 Aby uzyskać więcej informacji na temat kroków w procesie poufnego transferu,
 zapoznaj się z odpowiednimi stronami:
 
-<Cards>
+<Columns cols={2}>
   <Card
     title="Utwórz Mint Account"
     href="/docs/tokens/extensions/confidential-transfer/create-mint"
@@ -121,12 +149,12 @@ zapoznaj się z odpowiednimi stronami:
   >
     Jak emitować i zarządzać tokenem Poufnych Sald (polityka zatwierdzania, audytorzy, opłaty, mintowanie i spalanie)
   </Card>
-</Cards>
+</Columns>
 
 Poniższy diagram przedstawia szczegółową sekwencję podstawowego przepływu dla
 poufnych przelewów tokenów:
 
-```mermaid title="Confidential Balances Detailed Overview"
+```mermaid
 sequenceDiagram
     participant Sender as Sender Wallet
     participant SenderAccount as Sender Token Account
@@ -269,26 +297,173 @@ sequenceDiagram
     end
 ```
 
+<div className="nojs-only" data-fallback="mermaid">
+  ```text Mermaid
+  sequenceDiagram
+      participant Sender as Sender Wallet
+      participant SenderAccount as Sender Token Account
+      participant Mint as Token Mint
+      participant Token22 as Token Extensions Program
+      participant ATAProgram as Associated Token Program
+      participant ElGamal as ZK ElGamal Proof Program
+      participant RecipientAccount as Recipient Token Account
+      participant Recipient as Recipient Wallet
+
+      rect rgba(120, 160, 235, 0.3)
+      Note over Sender,Mint: 1. Initialize Mint
+
+      activate Sender
+      Sender->>Token22: create_mint (with Confidential Balances)
+      activate Token22
+      Token22-->>Mint: Initialize mint
+      deactivate Token22
+      deactivate Sender
+      end
+
+      rect rgba(130, 210, 170, 0.3)
+      Note over Sender,SenderAccount: 2. Set Up Sender Account
+
+      activate Sender
+      Note right of Sender: Generate encryption keys
+      Sender->>Sender: Generate ElGamal keypair
+      Sender->>Sender: Generate AES key
+
+      Sender->>ATAProgram: create_associated_token_account
+      activate ATAProgram
+      ATAProgram->>Token22: Create token account at deterministic address
+      activate Token22
+      Token22-->>SenderAccount: Initialize account
+      deactivate Token22
+      deactivate ATAProgram
+
+      Sender->>Token22: reallocate & configure_account
+      activate Token22
+      Token22-->>SenderAccount: Configure Confidential Balances
+      deactivate Token22
+      deactivate Sender
+      end
+
+      rect rgba(130, 210, 170, 0.3)
+      Note over Recipient,RecipientAccount: 3. Set Up Recipient Account
+
+      activate Recipient
+      Note right of Recipient: Generate encryption keys
+      Recipient->>Recipient: Generate ElGamal keypair
+      Recipient->>Recipient: Generate AES key
+
+      Recipient->>ATAProgram: create_associated_token_account
+      activate ATAProgram
+      ATAProgram->>Token22: Create token account at deterministic address
+      activate Token22
+      Token22-->>RecipientAccount: Initialize account
+      deactivate Token22
+      deactivate ATAProgram
+
+      Recipient->>Token22: reallocate & configure_account
+      activate Token22
+      Token22-->>RecipientAccount: Configure Confidential Balances
+      deactivate Token22
+      deactivate Recipient
+      end
+
+      rect rgba(235, 160, 80, 0.3)
+      Note over Sender,SenderAccount: 4. Mint & Convert to Confidential Balance
+
+      activate Sender
+      Sender->>Token22: mint_tokens
+      activate Token22
+      Token22-->>SenderAccount: Increase token account public balance
+      deactivate Token22
+
+      Sender->>Token22: deposit_tokens
+      activate Token22
+      Token22-->>SenderAccount: Convert to confidential pending balance
+      deactivate Token22
+
+      Sender->>Sender: Use ElGamal keypair & AES key to decrypt
+      Sender->>Token22: apply_pending_balance
+      activate Token22
+      Token22-->>SenderAccount: Convert pending balance to available balance
+      deactivate Token22
+      deactivate Sender
+      end
+
+      rect rgba(235, 120, 120, 0.3)
+      Note over Sender,RecipientAccount: 5. Confidential Transfer
+
+      activate Sender
+      Note right of Sender: Create proofs
+      Sender->>Sender: Generate proof data for transfer
+
+      Sender->>ElGamal: Create equality proof context account
+      activate ElGamal
+      Sender->>ElGamal: Create ciphertext validity proof context account
+      Sender->>ElGamal: Create range proof context account
+      ElGamal-->>ElGamal: Verify proofs
+
+      Sender->>Token22: transfer_tokens, providing proof context accounts
+      activate Token22
+      Token22-->>SenderAccount: Decrease encrypted available balance
+      Token22-->>RecipientAccount: Increase encrypted pending balance
+      deactivate Token22
+
+      Sender->>ElGamal: Close proof context accounts
+      deactivate ElGamal
+      deactivate Sender
+      end
+
+      rect rgba(180, 150, 235, 0.3)
+      Note over Recipient,RecipientAccount: 6. Apply & Withdraw
+
+      activate Recipient
+      Recipient->>Recipient: Use ElGamal keypair & AES key to decrypt
+      Recipient->>Token22: apply_pending_balance
+      activate Token22
+      Token22-->>RecipientAccount: Convert pending balance to available balance
+      deactivate Token22
+
+      Note right of Recipient: Optional withdrawal
+      Recipient->>Recipient: Generate proof data for withdraw
+
+      Recipient->>ElGamal: Create equality proof context account
+      activate ElGamal
+      Recipient->>ElGamal: Create range proof context account
+      ElGamal-->>ElGamal: Verify proofs
+
+      Recipient->>Token22: withdraw_tokens, providing proof context accounts
+      activate Token22
+      Token22-->>RecipientAccount: Convert from available confidential balance to public balance
+      deactivate Token22
+
+      Recipient->>ElGamal: Close proof context accounts
+      deactivate ElGamal
+      deactivate Recipient
+      end
+  ```
+</div>
+
+<p className="sol-caption">Confidential Balances Detailed Overview</p>
+
 ## Instrukcje Poufnych Sald
 
 Pełna lista
 [instrukcji](https://github.com/solana-program/token-2022/blob/efd0c957fefbd79882d77df5fb2dac88c001249c/program/src/extension/confidential_transfer/instruction.rs#L29)
 rozszerzenia Poufnych Sald jest następująca:
 
-| Instrukcja                         | Opis                                                                                                                                                       |
-| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| _rs`InitializeMint`_                | Włącza Poufne Salda na mint account. Ta instrukcja musi być zawarta w tej samej transakcji co instrukcja _rs`TokenInstruction::InitializeMint`_. |
-| _rs`UpdateMint`_                    | Aktualizuje politykę zatwierdzania kont minta oraz opcjonalny globalny klucz publiczny ElGamal audytora.                                                                        |
-| _rs`ConfigureAccount`_              | Włącza Poufne Salda na token account.                                                                                                                 |
-| _rs`ApproveAccount`_                | Zatwierdza token account dla Poufnych Sald, jeśli mint wymaga zatwierdzenia dla nowych token accounts.                                                          |
-| _rs`EmptyAccount`_                  | Opróżnia oczekujące i dostępne poufne salda, aby umożliwić zamknięcie token account.                                                                         |
-| _rs`Deposit`_                       | Konwertuje publiczne saldo tokenów na oczekujące poufne saldo.                                                                                                  |
-| _rs`Withdraw`_                      | Konwertuje dostępne poufne saldo z powrotem na saldo publiczne.                                                                                                   |
-| _rs`Transfer`_                      | Poufnie przesyła tokeny między token accounts.                                                                                                           |
-| _rs`ApplyPendingBalance`_           | Konwertuje oczekujące saldo na dostępne saldo po wpłatach lub przelewach.                                                                                      |
-| _rs`EnableConfidentialCredits`_     | Umożliwia token account odbieranie poufnych przelewów tokenów.                                                                                                   |
-| _rs`DisableConfidentialCredits`_    | Blokuje przychodzące poufne przelewy, jednocześnie zezwalając na publiczne przelewy.                                                                                     |
-| _rs`EnableNonConfidentialCredits`_  | Umożliwia token account odbieranie publicznych przelewów tokenów.                                                                                                         |
-| _rs`DisableNonConfidentialCredits`_ | Blokuje zwykłe przelewy, aby token account odbierał wyłącznie poufne przelewy.                                                                                     |
-| _rs`TransferWithFee`_               | Poufnie przesyła tokeny między token accounts z opłatą.                                                                                                |
-| _rs`ConfigureAccountWithRegistry`_  | Alternatywny sposób konfigurowania token accounts dla Poufnych Sald przy użyciu konta _rs`ElGamalRegistry`_ zamiast dowodu _rs`VerifyPubkeyValidity`_.         |
+| Instrukcja                      | Opis                                                                                                                                           |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `InitializeMint`                | Włącza Poufne Salda na mint account. Ta instrukcja musi być zawarta w tej samej transakcji co instrukcja `TokenInstruction::InitializeMint`.   |
+| `UpdateMint`                    | Aktualizuje politykę zatwierdzania kont minta oraz opcjonalny globalny klucz publiczny ElGamal audytora.                                       |
+| `ConfigureAccount`              | Włącza Poufne Salda na token account.                                                                                                          |
+| `ApproveAccount`                | Zatwierdza token account dla Poufnych Sald, jeśli mint wymaga zatwierdzenia dla nowych token accounts.                                         |
+| `EmptyAccount`                  | Opróżnia oczekujące i dostępne poufne salda, aby umożliwić zamknięcie token account.                                                           |
+| `Deposit`                       | Konwertuje publiczne saldo tokenów na oczekujące poufne saldo.                                                                                 |
+| `Withdraw`                      | Konwertuje dostępne poufne saldo z powrotem na saldo publiczne.                                                                                |
+| `Transfer`                      | Poufnie przesyła tokeny między token accounts.                                                                                                 |
+| `ApplyPendingBalance`           | Konwertuje oczekujące saldo na dostępne saldo po wpłatach lub przelewach.                                                                      |
+| `EnableConfidentialCredits`     | Umożliwia token account odbieranie poufnych przelewów tokenów.                                                                                 |
+| `DisableConfidentialCredits`    | Blokuje przychodzące poufne przelewy, jednocześnie zezwalając na publiczne przelewy.                                                           |
+| `EnableNonConfidentialCredits`  | Umożliwia token account odbieranie publicznych przelewów tokenów.                                                                              |
+| `DisableNonConfidentialCredits` | Blokuje zwykłe przelewy, aby token account odbierał wyłącznie poufne przelewy.                                                                 |
+| `TransferWithFee`               | Poufnie przesyła tokeny między token accounts z opłatą.                                                                                        |
+| `ConfigureAccountWithRegistry`  | Alternatywny sposób konfigurowania token accounts dla Poufnych Sald przy użyciu konta `ElGamalRegistry` zamiast dowodu `VerifyPubkeyValidity`. |

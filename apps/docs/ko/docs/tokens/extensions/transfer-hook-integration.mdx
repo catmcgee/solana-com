@@ -2,7 +2,6 @@
 title: Transfer Hook 통합 가이드
 description:
   Transfer Hook 확장 기능을 사용하는 토큰을 지갑, 커스터디언, dapp에 통합하는 방법을 알아보세요. 확장 기능 감지, 훅에 필요한 추가 계정 확인, 시뮬레이션 및 실행 오류 처리 방법을 다룹니다.
-url: /docs/tokens/extensions/transfer-hook-integration
 type: conceptual
 prerequisites:
   - /docs/tokens/extensions
@@ -24,7 +23,7 @@ Invocation (CPI)을 요구할 수 있습니다. 민트는 훅 프로그램의 �
 이 가이드는 클라이언트가 hook이 활성화된 토큰의 전송, 수신 및 시뮬레이션을 올바르게 수행하기 위해 해야 할 일에 초점을 맞춥니다.
 
 다른 대부분의 Token-2022 확장 기능과 달리, transfer hook은 계정 수준에서 선택 사항이 아닙니다. 민트에 transfer hook이 구성되어 있다면, **해당 토큰의 모든 전송에는 훅의 추가 계정이 필요합니다.** 귀하의 제품이 훅의 로직을 활용하는지 여부와 관계없이 마찬가지입니다. 해당 계정을 확인하지 않는 클라이언트는 토큰을 전혀 전송할 수 없습니다. 전송 명령이 온체인에서 실패하며, 훅을 자동으로 건너뛰지 않습니다. 전송 경로에 바로 적용할 수 있는 완전한 함수는
-[transfer-hook 토큰 전송하기](#sending-a-transfer-hook-token) 아래에 Kit와 Web3.js 모두에 대해 제공됩니다.
+[transfer-hook 토큰 전송하기](#transfer-hook-토큰-전송하기) 아래에 Kit와 Web3.js 모두에 대해 제공됩니다.
 
 ### 리소스
 
@@ -43,7 +42,7 @@ Invocation (CPI)을 요구할 수 있습니다. 민트는 훅 프로그램의 �
 - transfer hook 민트는 **훅 프로그램 주소**를 저장합니다. 모든 전송은 해당 프로그램으로 CPI를 수행하며, CPI에는 표준 전송 계정 외에 추가 계정이 필요합니다.
 - 훅에 필요한 추가 계정은 온체인 **`ExtraAccountMetaList`** 계정에 나열되어 있으며, 이는 훅 프로그램과 민트에서 파생된 PDA입니다. 클라이언트는 이 계정을 읽어 전송 명령에 추가할 계정을 확인합니다.
 - **확인은 선택 사항이 아닙니다.** 추가 계정이 누락되거나 오래된 경우, 전송 명령이 온체인에서 실패합니다. 훅 없이 토큰을 자동으로 전송하는 대체 수단은 없습니다.
-- **Kit (`@solana-program/token-2022`)와 Web3.js (`@solana/spl-token`) 모두 hook이 활성화된 전송을 처음부터 끝까지 전송할 수 있습니다** — [transfer-hook 토큰 전송하기](#sending-a-transfer-hook-token) 아래의 완전한 함수를 참고하세요. 각각 `ExtraAccountMetaList`를 네이티브로 확인합니다: Kit는 `getTransferCheckedWithTransferHookInstructionAsync`를 통해, Web3.js는 `createTransferCheckedWithTransferHookInstruction`을 통해 처리합니다.
+- **Kit (`@solana-program/token-2022`)와 Web3.js (`@solana/spl-token`) 모두 hook이 활성화된 전송을 처음부터 끝까지 전송할 수 있습니다** — [transfer-hook 토큰 전송하기](#transfer-hook-토큰-전송하기) 아래의 완전한 함수를 참고하세요. 각각 `ExtraAccountMetaList`를 네이티브로 확인합니다: Kit는 `getTransferCheckedWithTransferHookInstructionAsync`를 통해, Web3.js는 `createTransferCheckedWithTransferHookInstruction`을 통해 처리합니다.
 - **항상 전송 전에 시뮬레이션을 실행하세요.** 훅 프로그램은 자체적으로 정의한 임의의 조건(허용 목록 확인, 일시 중지 상태, 위임 누락)으로 전송을 실패시킬 수 있으며, 발행자가 훅을 업데이트하면 추가 계정 목록도 변경될 수 있습니다. 시뮬레이션을 통해 사용자가 서명하기 전에 두 가지 문제 모두를 발견할 수 있습니다.
 - 훅 실행은 컴퓨팅 유닛을 추가로 소비하며, 사전 자금이 충전되거나 사전 승인된 사이드 계정(위임된 수수료 계정, 사용자가 아직 초기화하지 않은 카운터 PDA)이 필요한 훅의 경우, 첫 번째 전송이 성공하기 전에 설정 트랜잭션이 필요할 수 있습니다.
 
@@ -63,7 +62,7 @@ hook이 활성화된 모든 전송은 네 가지 작업을 수행해야 합니�
 
 `@solana-program/token-2022` 클라이언트는 `getTransferCheckedWithTransferHookInstructionAsync`를 통해 모든 것을 네이티브로 확인합니다: 민트를 가져오고, transfer hook이 구성되어 있는지 감지하고, `ExtraAccountMetaList`를 확인하고, 훅의 추가 계정을 추가합니다. 민트에 훅이 없을 경우 일반 `transferChecked`를 반환하므로, 레거시 클라이언트와의 연결 없이 동일한 호출로 두 경우를 모두 처리할 수 있습니다.
 
-```ts title="send-transfer-hook-token-kit.ts"
+```ts send-transfer-hook-token-kit.ts
 import {
   appendTransactionMessageInstructions,
   assertIsTransactionWithBlockhashLifetime,
@@ -164,16 +163,16 @@ export async function sendTokenTransfer({
 }
 ```
 
-<Callout type="info">
+<Info>
   `getTransferCheckedWithTransferHookInstructionAsync`는 하위 수준의 Kit 확인기(`resolveExtraAccountMetasForExecute`,
-  `findExtraAccountMetaListPda`)를 래핑하며, 이는 아래 [수동으로 계정 조합하기](#assembling-accounts-manually)에서 다룹니다. 직접 조합하는 명령에 훅 계정을 추가하는 경우에만 해당 함수를 직접 사용하세요.
-</Callout>
+  `findExtraAccountMetaListPda`)를 래핑하며, 이는 아래 [수동으로 계정 조합하기](#수동으로-계정-조합하기)에서 다룹니다. 직접 조합하는 명령에 훅 계정을 추가하는 경우에만 해당 함수를 직접 사용하세요.
+</Info>
 
 ### Web3.js
 
 레거시 `@solana/spl-token` 클라이언트는 별도의 연결 없이 모든 것을 네이티브로 확인합니다.
 
-```ts title="send-transfer-hook-token.ts"
+```ts send-transfer-hook-token.ts
 import {
   Connection,
   PublicKey,
@@ -281,9 +280,9 @@ export async function sendTokenTransfer({
 위의 두 함수 모두 매 전송 시마다 민트를 다시 가져와 훅을 확인합니다:
 Web3.js는 `getMint`를 통해 명시적으로, Kit는 `getTransferCheckedWithTransferHookInstructionAsync` 내부에서 처리하며, 이 함수는 무언가를 확인하기 전에 민트를 가져옵니다.
 
-<Callout type="info">
+<Info>
   민트의 훅 프로그램 주소는 민트의 transfer hook authority(`UpdateTransferHook`)에 의해 업데이트될 수 있으며, 훅이 요구하는 추가 계정도 독립적으로 변경될 수 있습니다(`UpdateExtraAccountMetaList`). 두 값 모두 단일 전송 흐름보다 길게 캐시하지 마세요. 사용자가 새 전송을 시작할 때 다시 가져오세요.
-</Callout>
+</Info>
 
 쌍을 이루는 `TransferHookAccount` 확장은 민트가 아닌 token account에 존재합니다. 통합자는 일반적으로 이를 직접 읽을 필요가 없습니다. 이 확장은 훅 프로그램 자체가 호출이 실제 전송 내에서 발생했는지, 클라이언트가 `Execute`를 직접 호출한 것이 아닌지 확인하기 위해 존재합니다.
 
@@ -291,7 +290,7 @@ Web3.js는 `getMint`를 통해 명시적으로, Kit는 `getTransferCheckedWithTr
 
 hook이 활성화된 모든 전송에는 표준 네 가지 전송 계정(소스, 민트, 목적지, 소유자/권한)과 해당 민트의 `ExtraAccountMetaList` 계정이 지정하는 계정이 추가로 필요합니다. 이 목록은 훅 프로그램에서 파생된 PDA입니다:
 
-```ts title="derive-extra-account-meta-list.ts"
+```ts derive-extra-account-meta-list.ts
 // Kit (@solana-program/token-2022)
 import { findExtraAccountMetaListPda } from "@solana-program/token-2022";
 

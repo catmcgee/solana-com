@@ -3,18 +3,18 @@ title: Обзор
 description: Архитектура и поток данных протокола Private Channels
 ---
 
-<Callout type="warning">
+<Warning>
   Private Channels не прошёл аудит безопасности и не рекомендуется для
   использования в продакшене с реальными средствами без тщательной проверки безопасности.
-</Callout>
+</Warning>
 
-<Callout type="info">
+<Info>
   **Развёртываете экземпляр?** Перейдите к [руководству
   оператора](/docs/tools/private-channels/operators). **Интегрируетесь с
   существующим экземпляром?** Перейдите к
   [Quickstart](/docs/tools/private-channels/quickstart/installation). Эта страница
   является справочником по архитектуре для обеих аудиторий.
-</Callout>
+</Info>
 
 ## Архитектура
 
@@ -102,11 +102,11 @@ PostgreSQL на наличие изменений состояния. Streamer �
 - Эндпоинт проверки работоспособности: `GET /health` — возвращает `503`, если любой внутренний
   цикл опроса зависает дольше 30 секунд
 
-<Callout type="warning">
+<Warning>
   Схема событий WebSocket ещё не задокументирована публично. До появления официальной
   документации обращайтесь к [`core/src/bin/streamer.rs`](https://github.com/solana-foundation/solana-private-channels/blob/main/core/src/bin/streamer.rs)
   для получения подробностей реализации.
-</Callout>
+</Warning>
 
 ```mermaid
 flowchart TB
@@ -147,6 +147,48 @@ flowchart TB
     RN --> GW
     PG_P --> ST
 ```
+
+<div className="nojs-only" data-fallback="mermaid">
+  ```text Mermaid
+  flowchart TB
+      Wallet([User Wallet])
+      Escrow[Escrow Program<br/><i>Solana Mainnet</i>]
+      IS[Solana Mainnet Indexer]
+      IC[Private Channel Indexer]
+      PG_I[(Indexer DB)]
+      OS[Operator - Solana Side]
+      OC[Operator - Channel Side]
+      GW[Gateway :8899]
+      WN[Write Node :8900]
+      WP[Withdraw Program]
+      PG_P[(Postgres Primary)]
+      PG_R[(Postgres Replica)]
+      RN[Read Node :8901]
+      ST[Streamer :8902]
+
+      Wallet -- deposit --> Escrow
+      Wallet -- transact / withdraw --> GW
+      ST -. WebSocket .-> Wallet
+
+      Escrow -- watch --> IS
+      IS -- deposit events --> PG_I
+      PG_I -- pending deposits --> OS
+      OS -- mint --> GW
+
+      GW -- sendTransaction --> WN
+      WN --> WP
+      GW -- watch --> IC
+      IC -- withdrawal events --> PG_I
+      PG_I -- pending withdrawals --> OC
+      OC -- release --> Escrow
+
+      WN -- settle --> PG_P
+      PG_P -- replication --> PG_R
+      PG_R --> RN
+      RN --> GW
+      PG_P --> ST
+  ```
+</div>
 
 ## Конвейер транзакций
 
@@ -218,7 +260,7 @@ Off-chain конвейер исключает время блока Solana из 
 
 ## Операционная безопасность ключей
 
-<Callout type="warning">
+<Warning>
   Off-chain сервисы используют собственный набор ключей подписантов, не связанный с
   on-chain полномочиями администратора/оператора, описанными в разделе «Модель безопасности» выше.
   `ADMIN_PRIVATE_KEY` обязателен для каждого сервиса оператора и оплачивает комиссии
@@ -228,7 +270,7 @@ Off-chain конвейер исключает время блока Solana из 
   на уровне протокола (используемый для `CreateInstance` / `AddOperator` / `SetNewAdmin`)
   ни в одну из этих переменных и не раскрывайте его во время выполнения; держите этот ключ
   в холодном хранилище и офлайн.
-</Callout>
+</Warning>
 
 `ReleaseFunds` и `ResetSmtRoot` требуют двух on-chain подписей: плательщика комиссии
 (из `ADMIN_PRIVATE_KEY`) и авторизующей стороны PDA Operator (из
@@ -252,7 +294,7 @@ Off-chain конвейер исключает время блока Solana из 
 
 ## Следующие шаги
 
-<Cards>
+<Columns cols={2}>
   <Card
     title="Quickstart"
     href="/docs/tools/private-channels/quickstart/installation"
@@ -274,4 +316,4 @@ Off-chain конвейер исключает время блока Solana из 
   >
     Полный справочник инструкций для всех программ.
   </Card>
-</Cards>
+</Columns>

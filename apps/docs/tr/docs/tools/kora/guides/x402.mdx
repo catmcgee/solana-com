@@ -10,7 +10,7 @@ Bu kılavuz, referans Kora kolaylaştırıcısını Solana Devnet üzerinde baş
 
 ## Mimari
 
-```mermaid title="x402 with Kora"
+```mermaid
 sequenceDiagram
     participant Client
     participant API as Resource server
@@ -34,6 +34,34 @@ sequenceDiagram
     API-->>Client: 200 + resource + PAYMENT-RESPONSE
 ```
 
+<div className="nojs-only" data-fallback="mermaid">
+  ```text Mermaid
+  sequenceDiagram
+      participant Client
+      participant API as Resource server
+      participant Facilitator
+      participant Kora
+      participant Solana
+      Client->>API: GET /protected
+      API-->>Client: 402 + PAYMENT-REQUIRED
+      Client->>API: GET /protected + PAYMENT-SIGNATURE
+      API->>Facilitator: POST /verify
+      Facilitator->>Kora: signTransaction
+      Kora->>Kora: Enforce transaction policy
+      Kora-->>Facilitator: Validated transaction
+      Facilitator-->>API: Payment is valid
+      API->>Facilitator: POST /settle
+      Facilitator->>Kora: signAndSendTransaction
+      Kora->>Solana: Sign as fee payer and submit
+      Solana-->>Kora: Transaction signature
+      Kora-->>Facilitator: Transaction signature
+      Facilitator-->>API: Settlement result
+      API-->>Client: 200 + resource + PAYMENT-RESPONSE
+  ```
+</div>
+
+<p className="sol-caption">x402 with Kora</p>
+
 Dört uygulama rolü birbirinden ayrı kalır:
 
 - **İstemci**, bir ödeme gereksinimini seçer ve ödeme yetkisini imzalar.
@@ -55,9 +83,11 @@ cp .env.example .env
 
 `.env` dosyasındaki `KORA_PRIVATE_KEY` değerini tek kullanımlık bir Devnet keypair olarak ayarlayın. Demo imzalayıcı yapılandırması bir base58 secret, bayt dizisi keypair veya bir JSON keypair dosyasının yolunu kabul eder. İşlem ücretlerini sponsorlu olarak karşılayabilmesi için genel adresini Devnet SOL ile finanse edin.
 
-<Callout type="caution" title="Tek kullanımlık bir Devnet imzalayıcısı kullanın">
+<Danger>
+  **Tek kullanımlık bir Devnet imzalayıcısı kullanın**
+
   Docker demosu, Kora imzalayıcısını bir ortam değişkeninden yükler. Bu demoya üretim imzalama anahtarı koymayın ve `.env` dosyasını commit etmeyin.
-</Callout>
+</Danger>
 
 Kora ve kolaylaştırıcıyı başlatın:
 

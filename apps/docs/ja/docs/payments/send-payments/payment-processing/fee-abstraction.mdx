@@ -20,82 +20,68 @@ Solanaトランザクションには、指定された手数料支払者、つ�
 - **送信者**は、トークンの転送を承認するために署名します
 - **スポンサー**は、ネットワーク手数料の支払いを承認するために署名します
 
-<Callout>
+<Note>
   コア決済の概念については、[Solanaでの決済の仕組み](/docs/payments/how-payments-work)を参照してください。
-</Callout>
+</Note>
 
-以下の手順は、コアフローを示しています。完全な実行可能なコードについては、[デモ](#demo)を参照してください。
+以下の手順は、コアフローを示しています。完全な実行可能なコードについては、[デモ](#デモ)を参照してください。
 
-<ScrollyCoding>
+<Steps>
+  <Step title="スポンサーアカウントの作成">
+    トランザクション手数料を支払うスポンサー用に、別のkeypairを生成します。スポンサーは手数料のためにSOLが必要ですが、転送されるトークンを保有する必要はありません。
 
-## !!steps スポンサーアカウントの作成
+    ```ts トランザクション手数料のスポンサー
+    const sponsor = await generateKeyPairSigner();
+    ```
+  </Step>
 
-トランザクション手数料を支払うスポンサー用に、別のkeypairを生成します。スポンサーは手数料のためにSOLが必要ですが、転送されるトークンを保有する必要はありません。
+  <Step title="転送命令の作成">
+    送信者を権限者として、トークン転送命令を作成します。送信者はトークンを所有しており、転送に署名する必要があります。
 
-<CodePlaceholder title="トランザクション手数料のスポンサー" />
+    ```ts スポンサートランザクション手数料 focus={3-10}
+    const sponsor = await generateKeyPairSigner();
 
-```ts !! title="Sponsor Transaction Fee"
-const sponsor = await generateKeyPairSigner();
-```
+    const transferInstruction = getTransferCheckedInstruction({
+      source: senderAta,
+      mint: mint.address,
+      destination: recipientAta,
+      authority: sender, // Sender signs for the transfer
+      amount: 250_000n, // adjusted for the mint's decimals
+      decimals: 6
+    });
+    ```
+  </Step>
 
-## !!steps 転送命令の作成
+  <Step title="スポンサーを手数料支払者として送信">
+    スポンサーを手数料支払者として設定したクライアントを `payer(sponsor)`
+    で作成し、その後 `client.sendTransaction`
+    を呼び出します。スポンサーはネットワーク手数料を支払うために署名し、送信者は送金を承認するために署名します。`sendTransaction`
+    は参照されたすべての署名者を自動的に収集します。
 
-送信者を権限者として、トークン転送命令を作成します。送信者はトークンを所有しており、転送に署名する必要があります。
+    ```ts スポンサートランザクション手数料 highlight={13} focus={12-16}
+    const sponsor = await generateKeyPairSigner();
 
-<CodePlaceholder title="スポンサートランザクション手数料" />
+    const transferInstruction = getTransferCheckedInstruction({
+      source: senderAta,
+      mint: mint.address,
+      destination: recipientAta,
+      authority: sender,
+      amount: 250_000n,
+      decimals: 6
+    });
 
-```ts !! title="Sponsor Transaction Fee"
-const sponsor = await generateKeyPairSigner();
+    const client = createClient()
+      .use(payer(sponsor)) // Sponsor pays the transaction fees
+      .use(solanaLocalRpc());
 
-// !focus(1:8)
-const transferInstruction = getTransferCheckedInstruction({
-  source: senderAta,
-  mint: mint.address,
-  destination: recipientAta,
-  authority: sender, // Sender signs for the transfer
-  amount: 250_000n, // adjusted for the mint's decimals
-  decimals: 6
-});
-```
-
-## !!steps スポンサーを手数料支払者として送信
-
-スポンサーを手数料支払者として設定したクライアントを `payer(sponsor)`
-で作成し、その後 `client.sendTransaction`
-を呼び出します。スポンサーはネットワーク手数料を支払うために署名し、送信者は送金を承認するために署名します。`sendTransaction`
-は参照されたすべての署名者を自動的に収集します。
-
-<CodePlaceholder title="スポンサートランザクション手数料" />
-
-```ts !! title="Sponsor Transaction Fee"
-const sponsor = await generateKeyPairSigner();
-
-const transferInstruction = getTransferCheckedInstruction({
-  source: senderAta,
-  mint: mint.address,
-  destination: recipientAta,
-  authority: sender,
-  amount: 250_000n,
-  decimals: 6
-});
-
-// !focus(1:5)
-const client = createClient()
-  // !mark
-  .use(payer(sponsor)) // Sponsor pays the transaction fees
-  .use(solanaLocalRpc());
-
-const { context } = await client.sendTransaction([transferInstruction]);
-```
-
-</ScrollyCoding>
+    const { context } = await client.sendTransaction([transferInstruction]);
+    ```
+  </Step>
+</Steps>
 
 ### デモ
 
-<CodeTabs flags="r">
-
-```ts !! title="Demo"
-// !collapse(1:15) collapsed
+```ts Demo highlight={20,64} expandable
 // Click ">" icon on left to expand demo imports
 import { createClient, generateKeyPairSigner, lamports } from "@solana/kit";
 import type { KeyPairSigner } from "@solana/kit";
@@ -115,7 +101,6 @@ import {
 // Generate keypairs for sender, recipient, and sponsor (fee payer)
 const sender = await generateKeyPairSigner();
 const recipient = await generateKeyPairSigner();
-// !mark
 const sponsor = await generateKeyPairSigner();
 
 console.log("Sender Address:", sender.address);
@@ -160,7 +145,6 @@ const transferInstruction = getTransferCheckedInstruction({
 
 // Send transaction with sponsor as fee payer using @solana/kit
 // The sponsor (client.payer) pays fees; the sender signs for the transfer
-// !mark
 const { context } = await client.sendTransaction([transferInstruction]);
 const signature = context.signature;
 
@@ -194,7 +178,6 @@ console.log("Fee Payer Address:", feePayer);
 // =============================================================================
 // Demo Setup Helper Function
 // =============================================================================
-// !collapse(1:1000) collapsed
 
 /**
  * Sets up for a sponsored token transfer demo:
@@ -300,11 +283,9 @@ async function demoSetup(
 }
 ```
 
-</CodeTabs>
-
-<Callout type="caution">
+<Danger>
   エンドユーザーのためにトークンアカウントを作成する場合、ユーザーはそれを閉じて、rentに使用されたSOLを取り戻すことができます。ステーブルコインでアカウント作成料金をユーザーに請求するか、この費用を製品の経済性に組み込むことを検討してください。
-</Callout>
+</Danger>
 
 ## Koraによる大規模な手数料抽象化
 
@@ -345,7 +326,7 @@ console.log("Signature:", context.signature);
 
 ### Koraリソース
 
-<Cards>
+<Columns cols={2}>
   <Card
     title="Koraクイックスタート"
     href="/docs/tools/kora/getting-started/quick-start"
@@ -361,4 +342,4 @@ console.log("Signature:", context.signature);
   <Card title="ノードオペレーターガイド" href="/docs/tools/kora/operators">
     独自のKoraインスタンスをデプロイして設定します。
   </Card>
-</Cards>
+</Columns>

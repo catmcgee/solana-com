@@ -4,7 +4,6 @@ description:
   Invoquez le Token Program depuis un programme on-chain avec une Cross Program
   Invocation (CPI) — transférez, émettez et brûlez des tokens, signez avec une
   autorité PDA, et regroupez plusieurs instructions de token dans une seule CPI.
-url: /docs/tokens/advanced/cpi
 type: tutorial
 related:
   - /docs/core/cpi
@@ -16,12 +15,12 @@ related:
 Les programmes on-chain déplacent des tokens en émettant une
 [Cross Program Invocation (CPI)](/docs/core/cpi) vers le Token Program. Votre
 programme construit une instruction du Token Program, fournit les comptes
-nécessaires, et appelle _rs`invoke`_ (ou _rs`invoke_signed`_ lorsqu'un Program
+nécessaires, et appelle `invoke` (ou `invoke_signed` lorsqu'un Program
 Derived Address signe). Le Token Program exécute ensuite cette instruction avec
 les privilèges que votre programme lui accorde.
 
 Cette page couvre le côté spécifique aux tokens de ce flux. Pour le mécanisme
-CPI lui-même — comment _rs`invoke`_ et _rs`invoke_signed`_ fonctionnent, comment
+CPI lui-même — comment `invoke` et `invoke_signed` fonctionnent, comment
 les privilèges de signataire et d'écriture se propagent, ainsi que le
 [modèle de coût par CPI](/docs/core/cpi/cpi-cost-model) — consultez
 [Cross Program Invocation](/docs/core/cpi).
@@ -30,12 +29,12 @@ les privilèges de signataire et d'écriture se propagent, ainsi que le
 
 La plupart des CPI de tokens suivent la même structure : construire
 l'instruction, passer les token accounts et une autorité, puis invoquer.
-L'exemple ci-dessous transfère des tokens avec _rs`TransferChecked`_, qui
+L'exemple ci-dessous transfère des tokens avec `TransferChecked`, qui
 vérifie le mint et les décimales dans le cadre du transfert.
 
-<CodeTabs>
+<CodeGroup>
 
-```rust !! title="Anchor"
+```rust Anchor
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface::{transfer_checked, Mint, TokenAccount, TokenInterface, TransferChecked};
 
@@ -74,7 +73,7 @@ pub struct TokenTransfer<'info> {
 }
 ```
 
-```rust !! title="Native (Pinocchio)"
+```rust title="Native (Pinocchio)"
 use pinocchio::{account::AccountView, error::ProgramError, ProgramResult};
 use pinocchio_token::instructions::TransferChecked;
 
@@ -106,11 +105,11 @@ pub fn process(accounts: &[AccountView], data: &[u8]) -> ProgramResult {
 }
 ```
 
-</CodeTabs>
+</CodeGroup>
 
 L'émission, la destruction et la fermeture de comptes suivent le même modèle
-avec une instruction différente — _rs`MintTo`_, _rs`Burn`_, et
-_rs`CloseAccount`_ dans le module
+avec une instruction différente — `MintTo`, `Burn`, et
+`CloseAccount` dans le module
 [`anchor_spl::token`](https://docs.rs/anchor-spl/latest/anchor_spl/token/index.html)
 d'Anchor, ou les constructeurs correspondants dans
 [`pinocchio-token`](https://crates.io/crates/pinocchio-token). Pour des
@@ -123,16 +122,16 @@ l'exemple « Transfer Tokens ».
 
 Lorsque l'autorité sur un token account est un
 [Program Derived Address](/docs/core/pda) détenu par votre programme, le
-programme signe lui-même la CPI avec _rs`invoke_signed`_, en passant les seeds
+programme signe lui-même la CPI avec `invoke_signed`, en passant les seeds
 du Program Derived Address comme seeds de signataire. Dans Anchor, utilisez
-_rs`CpiContext::new_with_signer`_ avec les seeds à la place de
-_rs`CpiContext::new`_. L'instruction est par ailleurs identique aux exemples
+`CpiContext::new_with_signer` avec les seeds à la place de
+`CpiContext::new`. L'instruction est par ailleurs identique aux exemples
 ci-dessus. Consultez [CPIs with PDA Signers](/docs/core/cpi/cpi-with-pda) pour
 les mécanismes complets.
 
 ## Traitement par lots
 
-L'instruction _rs`Batch`_ exécute plusieurs instructions Token Program au sein
+L'instruction `Batch` exécute plusieurs instructions Token Program au sein
 d'une seule invocation de programme. Comme chaque CPI entraîne un coût de calcul
 fixe, regrouper plusieurs opérations de token dans un seul lot CPI consomme
 moins d' [unités de calcul](/docs/core/fees/compute-budget) que d'émettre un CPI
@@ -148,34 +147,34 @@ instruction. Les usages courants incluent la distribution d'un transfert vers de
 nombreux destinataires, ou l'exécution d'un flux multi-étapes (par exemple
 synchronisation, transfert et fermeture) dans un seul CPI.
 
-<Callout type="info">
+<Info>
 
-_rs`Batch`_ accepte uniquement des instructions Token Program en tant
+`Batch` accepte uniquement des instructions Token Program en tant
 qu'enfants, et un lot ne peut pas contenir un autre lot. Pour les opérations qui
 déplacent des tokens (telles que les transferts, les frappes et les
 destructions), le programme vérifie que les comptes concernés sont bien détenus
 par le Token Program avant de les exécuter.
 
-</Callout>
+</Info>
 
 ### Référence source
 
-| Élément             | Description                             | Source                                                                                               |
-| ------------------- | --------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| _rs`Batch`_         | L'instruction Batch (discriminant 255). | [Source](https://github.com/solana-program/token/blob/main/pinocchio/interface/src/instruction.rs)   |
-| _rs`process_batch`_ | Logique du processeur de lot.           | [Source](https://github.com/solana-program/token/blob/main/pinocchio/program/src/processor/batch.rs) |
+| Élément         | Description                             | Source                                                                                               |
+| --------------- | --------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `Batch`         | L'instruction Batch (discriminant 255). | [Source](https://github.com/solana-program/token/blob/main/pinocchio/interface/src/instruction.rs)   |
+| `process_batch` | Logique du processeur de lot.           | [Source](https://github.com/solana-program/token/blob/main/pinocchio/program/src/processor/batch.rs) |
 
 ### Appel de Batch via CPI
 
 La crate [`pinocchio-token`](https://crates.io/crates/pinocchio-token) expose un
-constructeur _rs`Batch`_ sous _rs`pinocchio_token::instructions::Batch`_. Vous
+constructeur `Batch` sous `pinocchio_token::instructions::Batch`. Vous
 préparez chaque instruction enfant dans les tampons du lot, puis émettez un seul
-CPI avec _rs`invoke`_.
+CPI avec `invoke`.
 
-Un _rs`Batch`_ s'appuie sur trois tampons fournis par l'appelant : un pour les
+Un `Batch` s'appuie sur trois tampons fournis par l'appelant : un pour les
 instruction data sérialisées, un pour les métadonnées de compte des instructions
 enfants, et un pour les vues de compte transmises au CPI. Construisez-les en
-tant que tranches _rs`MaybeUninit`_, passez-les à _rs`Batch::new`_, ajoutez les
+tant que tranches `MaybeUninit`, passez-les à `Batch::new`, ajoutez les
 enfants, puis invoquez :
 
 ```rust title="Batch two transfers in one CPI"
@@ -240,32 +239,32 @@ pub fn process(accounts: &[AccountView], data: &[u8]) -> ProgramResult {
 }
 ```
 
-_rs`Batch::new`_ écrit le discriminateur de lot dans le premier octet du tampon
-de données et retourne un _rs`Batch`_ qui suit la quantité utilisée de chaque
-tampon. Chaque constructeur d'instruction Token Program (tel que _rs`Transfer`_,
-_rs`TransferChecked`_, _rs`MintTo`_ et _rs`Burn`_) implémente le trait
-_rs`IntoBatch`_, de sorte que _rs`into_batch`_ ajoute les données de cette
+`Batch::new` écrit le discriminateur de lot dans le premier octet du tampon
+de données et retourne un `Batch` qui suit la quantité utilisée de chaque
+tampon. Chaque constructeur d'instruction Token Program (tel que `Transfer`,
+`TransferChecked`, `MintTo` et `Burn`) implémente le trait
+`IntoBatch`, de sorte que `into_batch` ajoute les données de cette
 instruction, les métadonnées de compte et les vues de compte au lot. L'appel de
-_rs`invoke`_ émet le lot assemblé sous forme d'un seul CPI vers le Token
+`invoke` émet le lot assemblé sous forme d'un seul CPI vers le Token
 Program.
 
 Les tampons délimitent la capacité du lot. Dimensionnez le tampon de données à
 `1 + Σ(2 + child_data_len)` octets (le discriminateur, plus un en-tête de 2
 octets et les données sérialisées de chaque enfant) et chaque tampon de compte
 au nombre total de comptes pour tous les enfants. Si un enfant ne tient pas,
-_rs`into_batch`_ retourne _rs`ProgramError::InvalidArgument`_. À titre de
-référence, _rs`Batch::MAX_DATA_LEN`_ correspond à 10 Kio et
-_rs`Batch::MAX_ACCOUNTS_LEN`_ est égal au nombre maximum de comptes CPI du
+`into_batch` retourne `ProgramError::InvalidArgument`. À titre de
+référence, `Batch::MAX_DATA_LEN` correspond à 10 Kio et
+`Batch::MAX_ACCOUNTS_LEN` est égal au nombre maximum de comptes CPI du
 runtime.
 
 Pour les lots dont la taille n'est connue qu'à l'exécution, activez la
 fonctionnalité `alloc` du crate et utilisez
-_rs`BatchState::new(accounts_len, data_len)`_ pour allouer les tampons sur le
-tas, puis appelez _rs`as_batch`_ pour obtenir un _rs`Batch`_.
+`BatchState::new(accounts_len, data_len)` pour allouer les tampons sur le
+tas, puis appelez `as_batch` pour obtenir un `Batch`.
 
 Lorsque l'autorité d'une instruction enfant est un PDA appartenant à votre
-programme, signez le CPI avec _rs`invoke_signed`_ plutôt qu'avec _rs`invoke`_,
-en passant les seeds du PDA sous forme d'entrées _rs`Signer`_.
+programme, signez le CPI avec `invoke_signed` plutôt qu'avec `invoke`,
+en passant les seeds du PDA sous forme d'entrées `Signer`.
 
 ### Disposition des instruction data
 
@@ -282,15 +281,15 @@ réseau :
 //   [data: u8; data_len]// the instruction data (begins with its own discriminator)
 ```
 
-<Callout type="warn">
+<Warning>
 
-La capacité d'un lot est délimitée par les tampons passés à _rs`Batch::new`_ :
+La capacité d'un lot est délimitée par les tampons passés à `Batch::new` :
 le tampon de données doit contenir le discriminateur ainsi que l'en-tête et les
 données de chaque enfant, et les tampons de compte doivent contenir tous les
 comptes de chaque enfant. Dimensionnez-les pour le lot le plus grand que vous
-construisez, ou utilisez _rs`BatchState`_ (avec la fonctionnalité `alloc`) pour
+construisez, ou utilisez `BatchState` (avec la fonctionnalité `alloc`) pour
 les dimensionner à l'exécution. Le CPI combiné reste soumis aux limites de
 compte et de taille de la transaction ; pour les très grands fan-outs, utilisez
 des Address Lookup Tables afin de faire tenir davantage de comptes.
 
-</Callout>
+</Warning>

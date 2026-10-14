@@ -3,7 +3,6 @@ title: Закрытие Mint
 description:
   Создайте минт с расширением MintCloseAuthority в Token Extensions Program,
   затем сожгите оставшееся предложение и закройте минт.
-url: /docs/tokens/extensions/close-mint
 type: tutorial
 prerequisites:
   - /docs/tokens/basics/create-mint
@@ -16,7 +15,7 @@ related:
 
 ## Что такое Mint Close Authority?
 
-Расширение _rs`MintCloseAuthority`_ минта в Token Extensions Program позволяет
+Расширение `MintCloseAuthority` минта в Token Extensions Program позволяет
 назначенному полномочию закрыть аккаунт минта и вернуть его rent после того, как
 общее предложение минта достигнет нуля.
 
@@ -31,240 +30,224 @@ related:
 Чтобы создать и закрыть минт:
 
 1. Рассчитайте размер аккаунта минта и rent, необходимый для минта и расширения
-   _rs`MintCloseAuthority`_.
-2. Создайте аккаунт минта с помощью _rs`CreateAccount`_, инициализируйте
-   _rs`MintCloseAuthority`_ и инициализируйте минт с помощью
-   _rs`InitializeMint`_.
+   `MintCloseAuthority`.
+2. Создайте аккаунт минта с помощью `CreateAccount`, инициализируйте
+   `MintCloseAuthority` и инициализируйте минт с помощью
+   `InitializeMint`.
 3. Если общее предложение равно нулю, аккаунт минта может быть закрыт с помощью
-   _rs`CloseAccount`_, подписанного полномочием закрытия.
+   `CloseAccount`, подписанного полномочием закрытия.
 
-<ScrollyCoding>
+<Steps>
+  <Step title="Рассчитайте размер аккаунта">
+    Рассчитайте размер аккаунта минта для базового минта плюс расширение
+    `MintCloseAuthority`. Это размер, используемый в `CreateAccount`.
 
-## !!steps Рассчитайте размер аккаунта
+    ```ts Пример focus={15-17,19}
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
 
-Рассчитайте размер аккаунта минта для базового минта плюс расширение
-_rs`MintCloseAuthority`_. Это размер, используемый в _rs`CreateAccount`_.
+    const mint = await generateKeyPairSigner();
+    const destination = await generateKeyPairSigner();
 
-<CodePlaceholder title="Пример" />
+    const mintCloseAuthorityExtension = extension("MintCloseAuthority", {
+      closeAuthority: client.payer.address
+    });
 
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
+    const mintSpace = BigInt(getMintSize([mintCloseAuthorityExtension]));
+    ```
+  </Step>
 
-const mint = await generateKeyPairSigner();
-const destination = await generateKeyPairSigner();
+  <Step title="Рассчитайте rent">
+    Рассчитайте rent, используя размер, необходимый для минта плюс расширение
+    `MintCloseAuthority`.
 
-// !focus(1:3)
-const mintCloseAuthorityExtension = extension("MintCloseAuthority", {
-  closeAuthority: client.payer.address
-});
+    ```ts Пример focus={21-23}
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
 
-// !focus(1:1)
-const mintSpace = BigInt(getMintSize([mintCloseAuthorityExtension]));
-```
+    const mint = await generateKeyPairSigner();
+    const destination = await generateKeyPairSigner();
 
-## !!steps Рассчитайте rent
+    const mintCloseAuthorityExtension = extension("MintCloseAuthority", {
+      closeAuthority: client.payer.address
+    });
 
-Рассчитайте rent, используя размер, необходимый для минта плюс расширение
-_rs`MintCloseAuthority`_.
+    const mintSpace = BigInt(getMintSize([mintCloseAuthorityExtension]));
 
-<CodePlaceholder title="Пример" />
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
+    ```
+  </Step>
 
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
+  <Step title="Создайте аккаунт минта">
+    Создайте mint account с рассчитанным пространством и lamports.
 
-const mint = await generateKeyPairSigner();
-const destination = await generateKeyPairSigner();
+    ```ts Пример focus={25-33}
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
 
-const mintCloseAuthorityExtension = extension("MintCloseAuthority", {
-  closeAuthority: client.payer.address
-});
+    const mint = await generateKeyPairSigner();
+    const destination = await generateKeyPairSigner();
 
-const mintSpace = BigInt(getMintSize([mintCloseAuthorityExtension]));
+    const mintCloseAuthorityExtension = extension("MintCloseAuthority", {
+      closeAuthority: client.payer.address
+    });
 
-// !focus(1:3)
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
-```
+    const mintSpace = BigInt(getMintSize([mintCloseAuthorityExtension]));
 
-## !!steps Создайте аккаунт минта
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
 
-Создайте mint account с рассчитанным пространством и lamports.
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      })
+    ]);
+    ```
+  </Step>
 
-<CodePlaceholder title="Пример" />
+  <Step title="Инициализация MintCloseAuthority">
+    Инициализируйте расширение `MintCloseAuthority` для минта.
 
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
+    ```ts Пример focus={33-36}
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
 
-const mint = await generateKeyPairSigner();
-const destination = await generateKeyPairSigner();
+    const mint = await generateKeyPairSigner();
+    const destination = await generateKeyPairSigner();
 
-const mintCloseAuthorityExtension = extension("MintCloseAuthority", {
-  closeAuthority: client.payer.address
-});
+    const mintCloseAuthorityExtension = extension("MintCloseAuthority", {
+      closeAuthority: client.payer.address
+    });
 
-const mintSpace = BigInt(getMintSize([mintCloseAuthorityExtension]));
+    const mintSpace = BigInt(getMintSize([mintCloseAuthorityExtension]));
 
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
 
-// !focus(1:9)
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  })
-]);
-```
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializeMintCloseAuthorityInstruction({
+        mint: mint.address,
+        closeAuthority: client.payer.address
+      })
+    ]);
+    ```
+  </Step>
 
-## !!steps Инициализация MintCloseAuthority
+  <Step title="Инициализация минта">
+    Инициализируйте минт с помощью `InitializeMint` в той же транзакции.
 
-Инициализируйте расширение _rs`MintCloseAuthority`_ для минта.
+    ```ts Пример focus={37-42} expandable
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
 
-<CodePlaceholder title="Пример" />
+    const mint = await generateKeyPairSigner();
+    const destination = await generateKeyPairSigner();
 
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
+    const mintCloseAuthorityExtension = extension("MintCloseAuthority", {
+      closeAuthority: client.payer.address
+    });
 
-const mint = await generateKeyPairSigner();
-const destination = await generateKeyPairSigner();
+    const mintSpace = BigInt(getMintSize([mintCloseAuthorityExtension]));
 
-const mintCloseAuthorityExtension = extension("MintCloseAuthority", {
-  closeAuthority: client.payer.address
-});
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
 
-const mintSpace = BigInt(getMintSize([mintCloseAuthorityExtension]));
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializeMintCloseAuthorityInstruction({
+        mint: mint.address,
+        closeAuthority: client.payer.address
+      }),
+      getInitializeMintInstruction({
+        mint: mint.address,
+        decimals: 0,
+        mintAuthority: client.payer.address,
+        freezeAuthority: client.payer.address
+      })
+    ]);
+    ```
+  </Step>
+</Steps>
 
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
+<Info>
+  **Порядок инструкций**
 
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  }),
-  // !focus(1:4)
-  getInitializeMintCloseAuthorityInstruction({
-    mint: mint.address,
-    closeAuthority: client.payer.address
-  })
-]);
-```
-
-## !!steps Инициализация минта
-
-Инициализируйте минт с помощью _rs`InitializeMint`_ в той же транзакции.
-
-<CodePlaceholder title="Пример" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-const destination = await generateKeyPairSigner();
-
-const mintCloseAuthorityExtension = extension("MintCloseAuthority", {
-  closeAuthority: client.payer.address
-});
-
-const mintSpace = BigInt(getMintSize([mintCloseAuthorityExtension]));
-
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
-
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  }),
-  getInitializeMintCloseAuthorityInstruction({
-    mint: mint.address,
-    closeAuthority: client.payer.address
-  }),
-  // !focus(1:6)
-  getInitializeMintInstruction({
-    mint: mint.address,
-    decimals: 0,
-    mintAuthority: client.payer.address,
-    freezeAuthority: client.payer.address
-  })
-]);
-```
-
-</ScrollyCoding>
-
-<Callout type="info" title="Порядок инструкций">
-  _rs`InitializeMintCloseAuthority`_ должна выполняться перед
-  _rs`InitializeMint`_. _rs`CreateAccount`_, _rs`InitializeMintCloseAuthority`_
-  и _rs`InitializeMint`_ должны быть включены в одну транзакцию.
-</Callout>
+  `InitializeMintCloseAuthority` должна выполняться перед
+`InitializeMint`. `CreateAccount`, `InitializeMintCloseAuthority`
+  и `InitializeMint` должны быть включены в одну транзакцию.
+</Info>
 
 ### Справочная информация
 
-| Элемент                                       | Описание                                                                                                               | Источник                                                                                                                                |
-| --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| _rs`MintCloseAuthority`_                      | Расширение минта, которое хранит полномочия, позволяющие закрыть минт после того, как его предложение достигнет нуля.  | [Источник](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/mint_close_authority.rs#L14-L20) |
-| _rs`InitializeMintCloseAuthority`_            | Инструкция, которая инициализирует полномочия закрытия минта перед _rs`InitializeMint`_.                               | [Источник](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/instruction.rs#L1830-L1843)                |
-| _rs`CloseAccount`_                            | Базовая инструкция токена, которая закрывает аккаунт минта после того, как общее предложение достигнет нуля.           | [Источник](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/instruction.rs#L1582-L1608)                |
-| _rs`process_initialize_mint_close_authority`_ | Логика процессора, которая записывает расширение _rs`MintCloseAuthority`_ на неинициализированный минт.                | [Источник](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/processor.rs#L1376-L1389)                    |
-| _rs`process_close_account`_                   | Общий обработчик закрытия аккаунта, который применяет правило нулевого предложения для минтов с полномочиями закрытия. | [Источник](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/processor.rs#L1197-L1288)                    |
+| Элемент                                   | Описание                                                                                                               | Источник                                                                                                                                |
+| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `MintCloseAuthority`                      | Расширение минта, которое хранит полномочия, позволяющие закрыть минт после того, как его предложение достигнет нуля.  | [Источник](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/mint_close_authority.rs#L14-L20) |
+| `InitializeMintCloseAuthority`            | Инструкция, которая инициализирует полномочия закрытия минта перед `InitializeMint`.                                   | [Источник](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/instruction.rs#L1830-L1843)                |
+| `CloseAccount`                            | Базовая инструкция токена, которая закрывает аккаунт минта после того, как общее предложение достигнет нуля.           | [Источник](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/instruction.rs#L1582-L1608)                |
+| `process_initialize_mint_close_authority` | Логика процессора, которая записывает расширение `MintCloseAuthority` на неинициализированный минт.                    | [Источник](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/processor.rs#L1376-L1389)                    |
+| `process_close_account`                   | Общий обработчик закрытия аккаунта, который применяет правило нулевого предложения для минтов с полномочиями закрытия. | [Источник](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/processor.rs#L1197-L1288)                    |
 
 ### Typescript
 
@@ -274,9 +257,7 @@ await client.sendTransaction([
 
 #### Kit
 
-<CodeTabs storage="token-ts-kit" flags="r">
-
-```ts !! title="Instructions"
+```ts Instructions highlight={48-51,89-93}
 import { lamports, createClient, generateKeyPairSigner } from "@solana/kit";
 import { solanaRpc, rpcAirdrop } from "@solana/kit-plugin-rpc";
 import { generatedPayer, airdropPayer } from "@solana/kit-plugin-signer";
@@ -324,7 +305,6 @@ await client.sendTransaction([
     space: mintSpace,
     programAddress: TOKEN_2022_PROGRAM_ADDRESS
   }),
-  // !mark(1:4)
   getInitializeMintCloseAuthorityInstruction({
     mint: mint.address, // Mint account that stores the MintCloseAuthority extension.
     closeAuthority: client.payer.address // Authority allowed to close the mint.
@@ -366,7 +346,6 @@ await client.sendTransaction([
     amount: 1n,
     decimals: 0
   }),
-  // !mark(1:5)
   getCloseAccountInstruction({
     account: mint.address, // Mint account to close.
     destination: destination.address, // Account receiving the reclaimed lamports.
@@ -381,13 +360,9 @@ console.log("Destination Address:", destination.address);
 console.log("Mint Closed:", mintInfo.value === null);
 ```
 
-</CodeTabs>
-
 #### Web3.js
 
-<CodeTabs storage="token-ts-legacy" flags="r">
-
-```ts !! title="Instructions"
+```ts Instructions highlight={51-56,87-92}
 import {
   Connection,
   Keypair,
@@ -438,7 +413,6 @@ const createAccountInstruction = SystemProgram.createAccount({
   programId: TOKEN_2022_PROGRAM_ID
 });
 
-// !mark(1:6)
 const initializeMintCloseAuthorityInstruction =
   createInitializeMintCloseAuthorityInstruction(
     mint.publicKey, // Mint account that stores the MintCloseAuthority extension.
@@ -475,7 +449,6 @@ console.log("Transaction Signature:", transactionSignature);
 
 const latestBlockhash2 = await connection.getLatestBlockhash();
 
-// !mark(1:6)
 const closeMintInstruction = createCloseAccountInstruction(
   mint.publicKey, // Mint account to close.
   destination.publicKey, // Account receiving the reclaimed lamports.
@@ -500,13 +473,9 @@ console.log("\nDestination Address:", destination.publicKey.toBase58());
 console.log("Transaction Signature:", transactionSignature3);
 ```
 
-</CodeTabs>
-
 ### Rust
 
-<CodeTabs storage="token-rs" flags="r">
-
-```rust !! title="Rust"
+```rust Rust highlight={57-61,95-100}
 use anyhow::Result;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_commitment_config::CommitmentConfig;
@@ -563,7 +532,6 @@ async fn main() -> Result<()> {
         &TOKEN_2022_PROGRAM_ID, // program id
     );
 
-    // !mark(1:5)
     let initialize_close_mint_instruction = initialize_mint_close_authority(
         &TOKEN_2022_PROGRAM_ID,    // token program
         &mint.pubkey(),            // mint
@@ -602,7 +570,6 @@ async fn main() -> Result<()> {
     let mint_close_authority = mint_state.get_extension::<MintCloseAuthority>()?;
     println!("\n{:#?}", mint_close_authority);
 
-    // !mark(1:6)
     let close_mint_instruction = close_account(
         &TOKEN_2022_PROGRAM_ID, // Token program that owns the mint.
         &mint.pubkey(), // Mint account to close.
@@ -628,5 +595,3 @@ async fn main() -> Result<()> {
     Ok(())
 }
 ```
-
-</CodeTabs>

@@ -2,7 +2,6 @@
 title: CPI 执行与权限
 description:
   Solana 运行时中的 11 步 CPI 执行流程、权限扩展规则、重入限制以及授权程序检查。
-url: /docs/core/cpi/cpi-execution
 type: reference
 prerequisites:
   - /docs/core/cpi
@@ -16,10 +15,12 @@ related:
 
 {/* 目录：CPI 执行流程，权限规则 */}
 
-<Callout type="info" title="摘要">
+<Info>
+  **摘要**
+
   CPI 会经过 11 个运行时步骤，包括权限检查、账户转换和数据同步。最大调用深度为
   5（使用 SIMD-0268 时为 9）。权限规则防止被调用方获得超出调用方授予的权限。
-</Callout>
+</Info>
 
 ## 权限规则
 
@@ -47,14 +48,14 @@ CPI 会将调用方的账户权限扩展给被调用方，并严格执行。运�
    如果调用方将账户标记为只读，被调用方不能将其标记为可写。
 2. **签名者权限需要授权。**
    只有在以下情况下，被调用方中的账户才能成为签名者：(a) 该账户在调用方中已是签名者，或 (b) 该账户是通过调用程序的种子派生出的 PDA（程序派生地址），方式为
-   _rs`invoke_signed`_。
+   `invoke_signed`。
 3. **权限降低始终允许。** 被调用方可以使用比调用方授予的更少的权限。
 
 ## CPI 执行流程
 
 CPI 会经过多个运行时层。本节将记录从程序 SDK 调用到越过 syscall 边界进入运行时再返回的完整流程。每一步都引用了实现该步骤的源文件。
 
-<Callout>
+<Note>
   程序指令调用的最大高度称为
   [`max_instruction_stack_depth`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/execution_budget.rs#L66)
   ，其值由
@@ -63,7 +64,7 @@ CPI 会经过多个运行时层。本节将记录从程序 SDK 调用到越过 s
 
 堆栈高度为 1 时表示初始交易指令。每次 CPI 调用高度加 1。最大为 5 意味着程序最多可进行 4 层嵌套 CPI 调用（启用 SIMD-0268 时可达 8 层）。
 
-</Callout>
+</Note>
 
 ### 步骤 1：程序调用 `invoke` 或 `invoke_signed`
 
@@ -71,8 +72,8 @@ CPI 会经过多个运行时层。本节将记录从程序 SDK 调用到越过 s
 [`invoke`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/program/src/program.rs#L26)
 或
 [`invoke_signed`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/program/src/program.rs#L51)。
-_rs`invoke`_ 是一个简单封装器，会以空的签名者种子数组调用
-_rs`invoke_signed`_。SDK 函数会将 _rs`Instruction`_、 _rs`AccountInfo`_
+`invoke` 是一个简单封装器，会以空的签名者种子数组调用
+`invoke_signed`。SDK 函数会将 `Instruction`、 `AccountInfo`
 切片和签名者种子序列化到 VM 内存中，然后触发 syscall。
 
 ### 步骤 2：Syscall 入口
@@ -84,7 +85,7 @@ syscall 处理器，并调用共享入口点：
 
 ### 步骤 3：消耗调用费用
 
-在 _rs`cpi_common`_ 内部的第一个操作是
+在 `cpi_common` 内部的第一个操作是
 [收取固定调用费用](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/cpi.rs#L815-L818)
 ，费用从共享计算计量器中扣除：
 [`invoke_units`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/execution_budget.rs#L108)
@@ -94,7 +95,7 @@ syscall 处理器，并调用共享入口点：
 
 系统调用处理器会将指令从程序的 VM 地址空间转换为主机端 Rust 类型，通过
 [`translate_instruction_rust`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/cpi.rs#L529-L590)
-实现。它会读取一个 _rs`StableInstruction`_ 结构体，并根据
+实现。它会读取一个 `StableInstruction` 结构体，并根据
 [`MAX_INSTRUCTION_DATA_LEN`](https://github.com/anza-xyz/agave/blob/v3.1.8/transaction-context/src/lib.rs#L33)
 （10,240 字节）校验数据长度，然后收取
 [数据序列化费用](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/cpi.rs#L551-L569)。
@@ -138,15 +139,15 @@ syscall 处理器，并调用共享入口点：
 
 运行时会调用
 [`prepare_next_instruction`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/invoke_context.rs#L293-L432)
-，构建被调用方的 _rs`InstructionAccount`_
-列表并强制执行权限规则。完整决策表请参见下方的[权限规则](#privilege-rules)。
+，构建被调用方的 `InstructionAccount`
+列表并强制执行权限规则。完整决策表请参见下方的[权限规则](#权限规则)。
 
 ### 步骤 8：翻译账户信息
 
 处理程序会调用 `translate_accounts`，其功能如下：
 
 1. [验证账户信息数量](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/cpi.rs#L164-L190)
-   是否符合 _rs`MAX_CPI_ACCOUNT_INFOS`_ （128，或在 SIMD-0339 下为 255）。
+   是否符合 `MAX_CPI_ACCOUNT_INFOS` （128，或在 SIMD-0339 下为 255）。
 2. [收取账户信息翻译费用](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/cpi.rs#L969-L981)
    （仅限 SIMD-0339）：`(num_account_infos * 80) / 250` CU。
 3. 对于每个非可执行且非重复的账户，通过将指针从 VM 内存翻译到主机内存，构建一个
@@ -167,14 +168,14 @@ syscall 处理器，并调用共享入口点：
 
 1. 调用
    [`push()`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/invoke_context.rs#L233-L265)，向指令栈添加一个新帧。
-   _rs`push()`_ 会强制执行
+   `push()` 会强制执行
    [可重入性规则](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/invoke_context.rs#L243-L259)：程序只能在直接调用者的情况下调用自身（即程序 A 可以调用 A，但 A 不能调用 B 再调用 A）。如违反则返回
-   _rs`ReentrancyNotAllowed`_。
+   `ReentrancyNotAllowed`。
 2. 调用
    [`process_executable_chain`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/invoke_context.rs#L507-L602)，解析被调用方的程序入口并执行。被调用方与调用方共享同一个计算预算，所有被调用方消耗的 CU 都会减少调用方剩余预算。
 3. 调用
    [`pop()`](https://github.com/anza-xyz/agave/blob/v3.1.8/transaction-context/src/lib.rs#L366-L398)，移除被调用方的帧，并验证 lamport 余额是否未变（如有变则返回
-   _rs`UnbalancedInstruction`_）。
+   `UnbalancedInstruction`）。
 
 ### 步骤 11：CPI 后账户同步（被调用方到调用方）
 

@@ -12,15 +12,17 @@ Surfpoolランタイムは3つのタイムトラベルヘルパーを提供し�
 | `time_travel_to_epoch` / `timeTravelToEpoch`         | 絶対epoch番号          | 新しい`epoch`を含む`EpochInfo`         |
 | `time_travel_to_timestamp` / `timeTravelToTimestamp` | ミリ秒単位のUnixタイムスタンプ | 対応するslotを反映した`EpochInfo`  |
 
-<Callout type="warn" title="前方方向のみ">
+<Warning>
+  **前方方向のみ**
+
   タイムトラベルはクロックを**前方**にのみ移動できます。過去のターゲットは無視されるのではなく、拒否されます — Rustヘルパーは`Err`を返し、JSヘルパーはスローします。メッセージは、どのユニットが後退したかを示します。例：`Cannot travel to past slot: target=1000, current=2000`
-</Callout>
+</Warning>
 
 ## slotへジャンプ
 
-<CodeTabs storage="surfpool-lang">
+<CodeGroup>
 
-```rust !! title="Rust"
+```rust Rust
 use surfpool_sdk::Surfnet;
 
 let surfnet = Surfnet::start().await?;
@@ -30,7 +32,7 @@ let info = cheats.time_travel_to_slot(1_000_000)?;
 assert!(info.absolute_slot >= 1_000_000);
 ```
 
-```ts !! title="TypeScript"
+```ts TypeScript
 import { Surfnet } from "@solana/surfpool";
 
 const surfnet = Surfnet.start();
@@ -42,45 +44,47 @@ try {
 }
 ```
 
-</CodeTabs>
+</CodeGroup>
 
 ## epochへジャンプ
 
-<CodeTabs storage="surfpool-lang">
+<CodeGroup>
 
-```rust !! title="Rust"
+```rust Rust
 let info = cheats.time_travel_to_epoch(420)?;
 assert_eq!(info.epoch, 420);
 ```
 
-```ts !! title="TypeScript"
+```ts TypeScript
 const info = surfnet.timeTravelToEpoch(420);
 console.assert(info.epoch === 420);
 ```
 
-</CodeTabs>
+</CodeGroup>
 
 ## Unixタイムスタンプへジャンプ
 
 タイムスタンプはUnix epochからの**ミリ秒**で渡してください — JavaScriptの`Date.now()`と同じ単位であり、秒ではありません。ランタイムはそのタイムスタンプに最も近いslotを計算します。
 
-<CodeTabs storage="surfpool-lang">
+<CodeGroup>
 
-```rust !! title="Rust"
+```rust Rust
 // 2030-01-01T00:00:00Z
 let info = cheats.time_travel_to_timestamp(1_893_456_000_000)?;
 ```
 
-```ts !! title="TypeScript"
+```ts TypeScript
 // 2030-01-01T00:00:00Z
 const info = surfnet.timeTravelToTimestamp(1_893_456_000_000);
 ```
 
-</CodeTabs>
+</CodeGroup>
 
-<Callout type="warn" title="クロックはミリ秒ではなく秒を報告します">
+<Warning>
+  **クロックはミリ秒ではなく秒を報告します**
+
   ランタイムから読み返すタイムスタンプはすべて**秒単位**です — オンチェーンの`Clock` sysvarの`unix_timestamp`、および`systemClockUpdated`イベントが持つ[`ClockValue`](/docs/tools/surfpool/sdk/js-reference#clockvalue)も同様です。これらの値をそのままタイムトラベルヘルパーに渡すと、1970年代初頭の時点に解決されるため、過去のターゲットとして拒否されます。先に1000を掛けてください。
-</Callout>
+</Warning>
 
 ```ts
 // WRONG — `unixTimestamp` is in seconds, so this is a past target.
@@ -143,12 +147,14 @@ surfnet.stop();
 
 ### マルチepochシナリオを実行する
 
-<Callout type="warn" title="中間のslotはスキップされます">
+<Warning>
+  **中間のslotはスキップされます**
+
   タイムトラベルはターゲットに直接ジャンプします — epoch 1からepoch
   5に移動すると、 その間のslotはスキップされます。プログラムが各中間epoch
   の境界での処理を必要とする場合（たとえば、epochごとの報酬を付与するなど）、
   間に必要なトランザクションを挟みながら、`time_travel_to_epoch`をepochごとに1回呼び出してください。
-</Callout>
+</Warning>
 
 ```rust
 for epoch in 2..=5 {

@@ -13,7 +13,7 @@ token account. يشرح هذا القسم كيفية إنشاء token account م
 يوضح المخطط التالي الخطوات المتبعة في إنشاء token account مع تفعيل الأرصدة
 السرية:
 
-```mermaid title="Create Token Account with Confidential Balances"
+```mermaid
 sequenceDiagram
     participant Payer as Wallet
     participant ATA as Associated Token Program
@@ -48,6 +48,46 @@ sequenceDiagram
     Token22-->>TokenAccount: Configure Confidential Balances
     deactivate Token22
 ```
+
+<div className="nojs-only" data-fallback="mermaid">
+  ```text Mermaid
+  sequenceDiagram
+      participant Payer as Wallet
+      participant ATA as Associated Token Program
+      participant Token22 as Token Extensions Program
+      participant ZK as ZK ElGamal Proof Program
+      participant TokenAccount as Token Account
+
+      Payer->>ATA: create_associated_token_account()
+      activate ATA
+      ATA->>Token22: Create token account at deterministic address
+      deactivate ATA
+      activate Token22
+      Token22-->>TokenAccount: Initialize Token Account
+      deactivate Token22
+
+      Payer->>Token22: reallocate() for ConfidentialTransferAccount extension
+      activate Token22
+      Token22-->>TokenAccount: Add space for extension data
+      deactivate Token22
+
+      Payer->>Payer: Derive ElGamal keypair and AES key
+      Payer->>Payer: Generate pubkey validity proof
+      Payer->>Payer: Encrypt initial balance (0) with AES key
+
+      Payer->>ZK: VerifyPubkeyValidity into context state account
+      activate ZK
+      ZK-->>ZK: Verify proof and store result in context state account
+      deactivate ZK
+
+      Payer->>Token22: configure_account() referencing the proof context account
+      activate Token22
+      Token22-->>TokenAccount: Configure Confidential Balances
+      deactivate Token22
+  ```
+</div>
+
+<p className="sol-caption">Create Token Account with Confidential Balances</p>
 
 ### حالة token account للأرصدة السرية
 
@@ -105,7 +145,7 @@ pub struct ConfidentialTransferAccount {
 }
 ```
 
-يحتوي _rs`ConfidentialTransferAccount`_ على عدة حقول تُدير الأرصدة السرية:
+يحتوي `ConfidentialTransferAccount` على عدة حقول تُدير الأرصدة السرية:
 
 - **approved**: حالة الموافقة على الحساب للأرصدة السرية. إذا كان إعداد
   `auto_approve_new_accounts` في mint account مضبوطاً على `true`، فسيتم
@@ -135,18 +175,18 @@ pub struct ConfidentialTransferAccount {
   تعليمات الإيداع والتحويل.
 
 - **maximum_pending_balance_credit_counter**: حد العدد للائتمانات المعلقة قبل
-  الاشتراط بتعليمة _rs`ApplyPendingBalance`_ لتحويل الرصيد المعلق إلى الرصيد
+  الاشتراط بتعليمة `ApplyPendingBalance` لتحويل الرصيد المعلق إلى الرصيد
   المتاح.
 
 - **expected_pending_balance_credit_counter**: قيمة
   `pending_balance_credit_counter` التي يوفرها العميل من خلال instruction data
-  في آخر مرة تمت فيها معالجة تعليمة _rs`ApplyPendingBalance`_.
+  في آخر مرة تمت فيها معالجة تعليمة `ApplyPendingBalance`.
 
 - **actual_pending_balance_credit_counter**: قيمة
   `pending_balance_credit_counter` على token account في وقت معالجة آخر تعليمة
-  _rs`ApplyPendingBalance`_.
+  `ApplyPendingBalance`.
 
-<Callout type="info">
+<Info>
   **الرصيد المعلق مقابل الرصيد المتاح**
 
 تنقسم الأرصدة السرية إلى أرصدة معلقة وأرصدة متاحة للحماية من هجمات حجب الخدمة
@@ -156,28 +196,28 @@ account، مما يعيق قدرة مالك token account على تحويل ال
 إرسال المعاملة ووقت معالجتها، مما يؤدي إلى فشل المعاملة.
 
 تُضاف جميع مبالغ الإيداع والتحويل في البداية إلى الرصيد المعلق. يجب على أصحاب
-token account استخدام تعليمة _rs`ApplyPendingBalance`_ لتحويل الرصيد المعلق إلى
+token account استخدام تعليمة `ApplyPendingBalance` لتحويل الرصيد المعلق إلى
 الرصيد المتاح. لا تؤثر التحويلات أو الإيداعات الواردة على الرصيد المتاح لـ token
 account.
 
-</Callout>
+</Info>
 
-<Callout type="info">
+<Info>
   **تقسيم الرصيد المعلق إلى قيمة عالية/منخفضة**
 
 يُقسَّم الرصيد المعلق السري إلى `pending_balance_lo` و`pending_balance_hi` لأن
 فك تشفير ElGamal يتطلب قدرًا أكبر من الحسابات للأعداد الكبيرة. يمكنك الاطلاع على
 تنفيذ العمليات الحسابية على النص المشفر
 [هنا](https://github.com/solana-program/token-2022/blob/efd0c957fefbd79882d77df5fb2dac88c001249c/confidential-transfer/ciphertext-arithmetic/src/lib.rs#L54)،
-والذي يُستخدم في تعليمة _rs`ApplyPendingBalance`_
+والذي يُستخدم في تعليمة `ApplyPendingBalance`
 [هنا](https://github.com/solana-program/token-2022/blob/efd0c957fefbd79882d77df5fb2dac88c001249c/program/src/extension/confidential_transfer/processor.rs#L1180-L1184).
 
-</Callout>
+</Info>
 
-<Callout type="info">
+<Info>
   **عدادات ائتمان الرصيد المعلق**
 
-عند استدعاء تعليمة _rs`ApplyPendingBalance`_ لتحويل الرصيد المعلق إلى الرصيد
+عند استدعاء تعليمة `ApplyPendingBalance` لتحويل الرصيد المعلق إلى الرصيد
 المتاح:
 
 1. يبحث العميل عن الأرصدة المعلقة والمتاحة الحالية، ويشفّر مجموعها، ويوفر
@@ -185,13 +225,13 @@ account.
    account.
 
 2. يتتبع عدادا الائتمان المعلق المتوقع والفعلي التغييرات في قيمة العداد بين وقت
-   إنشاء تعليمة _rs`ApplyPendingBalance`_ ووقت معالجتها:
+   إنشاء تعليمة `ApplyPendingBalance` ووقت معالجتها:
    - `expected_pending_balance_credit_counter`: قيمة
      `pending_balance_credit_counter` عندما ينشئ العميل تعليمة
-     _rs`ApplyPendingBalance`_
+     `ApplyPendingBalance`
    - `actual_pending_balance_credit_counter`: قيمة
      `pending_balance_credit_counter` على token account في وقت معالجة تعليمة
-     _rs`ApplyPendingBalance`_
+     `ApplyPendingBalance`
 
 تشير قيم العدادات المتطابقة (المتوقعة/الفعلية) إلى أن
 `decryptable_available_balance` يتطابق مع `available_balance`.
@@ -211,7 +251,7 @@ account.
    - أضف المبالغ العلنية من تعليمات الإيداع
    - فكّ تشفير وأضف مبالغ النص المشفر للوجهة من تعليمات التحويل
 
-</Callout>
+</Info>
 
 ### التعليمات المطلوبة
 
@@ -219,40 +259,40 @@ account.
 تتناسب جميعها مع معاملة واحدة:
 
 1. **إنشاء Token Account**: استدعاء تعليمة
-   _rs`AssociatedTokenAccountInstruction::Create`_ الخاصة بـ Associated Token
+   `AssociatedTokenAccountInstruction::Create` الخاصة بـ Associated Token
    Program لإنشاء token account على عنوانه الحتمي.
 
 2. **إعادة تخصيص مساحة الحساب**: استدعاء تعليمة
-   _rs`TokenInstruction::Reallocate`_ الخاصة بـ Token Extensions Program لإضافة
-   مساحة لحالة _rs`ConfidentialTransferAccount`_.
+   `TokenInstruction::Reallocate` الخاصة بـ Token Extensions Program لإضافة
+   مساحة لحالة `ConfidentialTransferAccount`.
 
 3. **التحقق من صحة إثبات pubkey**: إنشاء حساب مملوك لبرنامج ZK ElGamal Proof، ثم
-   استدعاء تعليمة _rs`VerifyPubkeyValidity`_ الخاصة به للتحقق من الإثبات وتخزين
+   استدعاء تعليمة `VerifyPubkeyValidity` الخاصة به للتحقق من الإثبات وتخزين
    النتيجة المتحقق منها في حساب حالة السياق ذلك.
 
 4. **ضبط الأرصدة السرية**: استدعاء تعليمة
    [ConfidentialTransferInstruction::ConfigureAccount](https://github.com/solana-program/token-2022/blob/efd0c957fefbd79882d77df5fb2dac88c001249c/program/src/extension/confidential_transfer/processor.rs#L201)
    الخاصة بـ Token Extension Program، مع الإشارة إلى حساب حالة سياق الإثبات
-   عبر _rs`ProofLocation::ContextStateAccount`_، لتهيئة حالة
-   _rs`ConfidentialTransferAccount`_.
+   عبر `ProofLocation::ContextStateAccount`، لتهيئة حالة
+   `ConfidentialTransferAccount`.
 
-<Callout type="info">
+<Info>
 
 **يستطيع مالك token account فقط تفعيل الأرصدة السرية على token account**.
 
-تتطلب تعليمة _rs`ConfigureAccount`_ إنشاء مفاتيح تشفير وإثبات من جانب العميل،
+تتطلب تعليمة `ConfigureAccount` إنشاء مفاتيح تشفير وإثبات من جانب العميل،
 ولا يمكن إنشاؤه إلا من قِبل مالك token account.
 
 يتحقق إثبات صحة pubkey من أن مفتاح ElGamal العام للحساب صالح. يُنشأ باستخدام
-_rs`build_pubkey_validity_proof_data`_، ويُتحقق منه على السلسلة بواسطة برنامج
-ZK ElGamal Proof في حساب حالة سياق، ثم يُشار إليه من _rs`ConfigureAccount`_
-عبر _rs`ProofLocation::ContextStateAccount`_، بحيث لا تنتقل أي بيانات إثبات
+`build_pubkey_validity_proof_data`، ويُتحقق منه على السلسلة بواسطة برنامج
+ZK ElGamal Proof في حساب حالة سياق، ثم يُشار إليه من `ConfigureAccount`
+عبر `ProofLocation::ContextStateAccount`، بحيث لا تنتقل أي بيانات إثبات
 في تعليمة الرمز نفسها. للاطلاع على تفاصيل التنفيذ، راجع:
 
 - [PubkeyValidityProofData](https://github.com/anza-xyz/agave/blob/b39a9764005ac8596b7e14e61d381305ce57ecaa/zk-sdk/src/zk_elgamal_proof_program/proof_data/pubkey_validity.rs#L58)
 - [PubkeyValidityProof](https://github.com/anza-xyz/agave/blob/b39a9764005ac8596b7e14e61d381305ce57ecaa/zk-sdk/src/sigma_proofs/pubkey_validity.rs#L65)
 
-</Callout>
+</Info>
 
 ## مثال على الكود
 
@@ -268,10 +308,9 @@ mint متوافق موجود مسبقاً.
 
 ### Rust
 
-<CodeTabs>
+<CodeGroup>
 
-```rust !! title="main.rs"
-// !collapse(1:36) collapsed
+```rust main.rs expandable
 // Imports: dependencies used by this example.
 use anyhow::{Context, Result};
 use solana_address::Address;
@@ -429,7 +468,6 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-// !collapse(1:1000) collapsed
 // Setup: helper function to create the confidential mint.
 fn create_confidential_mint(rpc_client: &RpcClient, payer: &Keypair, decimals: u8) -> Result<Pubkey> {
     let mint = Keypair::new();
@@ -497,7 +535,7 @@ fn load_keypair() -> Result<Keypair> {
 }
 ```
 
-```toml !! title="Cargo.toml"
+```toml Cargo.toml
 [package]
 name = "confidential-transfer"
 version = "0.1.0"
@@ -529,14 +567,13 @@ dirs = "6.0.0"
 serde_json = "1.0"
 ```
 
-</CodeTabs>
+</CodeGroup>
 
 ### Typescript
 
-<CodeTabs>
+<CodeGroup>
 
-```ts !! title="index.ts"
-// !collapse(1:21) collapsed
+```ts index.ts expandable
 // Imports: dependencies used by this example.
 import {
   deriveAeKeyForOwnerMint,
@@ -613,7 +650,6 @@ console.log(
   `Enabled Confidential Balances on token account ${tokenAccount}: ${result.context.signature}`
 );
 
-// !collapse(1:1000) collapsed
 // Setup: helper function to create the confidential mint.
 async function createConfidentialMint(
   kitClient: typeof client,
@@ -648,7 +684,7 @@ async function createConfidentialMint(
 }
 ```
 
-```json !! title="package.json"
+```json package.json
 {
   "name": "confidential-account",
   "version": "0.1.0",
@@ -668,13 +704,13 @@ async function createConfidentialMint(
 }
 ```
 
-</CodeTabs>
+</CodeGroup>
 
-<Callout type="info">
+<Info>
   تتوفر مساعدات TypeScript في المسار الفرعي
   `@solana-program/token-2022/confidential` وتعتمد على `@solana/zk-sdk` لعناصر
   التشفير الأساسية. يأتي `owner` و `client` من إعداد `@solana/kit` الخاص بك؛
   ويتم إرسال خطة التعليمات المُعادة مع دعم خطط التعليمات في `@solana/kit`، الذي
   يوزّع العمل عبر معاملات متعددة عندما تكون الإثباتات أكبر من أن تتسع لمعاملة
   واحدة.
-</Callout>
+</Info>

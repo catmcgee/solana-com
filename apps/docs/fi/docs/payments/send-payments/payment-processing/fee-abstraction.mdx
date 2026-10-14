@@ -27,88 +27,74 @@ Sekä lähettäjän että sponsorin on allekirjoitettava transaktio:
 - **Lähettäjä** allekirjoittaa valtuuttaakseen tokeniensa siirron
 - **Sponsori** allekirjoittaa valtuuttaakseen verkkokulujen maksamisen
 
-<Callout>
+<Note>
   Katso [Miten maksut toimivat Solanassa](/docs/payments/how-payments-work)
   ydinmaksukonsepteja varten.
-</Callout>
+</Note>
 
 Alla olevat vaiheet näyttävät ydinkulun. Katso [Demo](#demo) täydellisestä
 ajettavasta koodista.
 
-<ScrollyCoding>
+<Steps>
+  <Step title="Luo sponsoritili">
+    Luo erillinen keypair sponsorille, joka maksaa transaktiokulut. Sponsori
+    tarvitsee SOL:ia kuluihin, mutta sen ei tarvitse pitää hallussaan siirrettäviä
+    tokeneita.
 
-## !!steps Luo sponsoritili
+    ```ts title="Sponsoroi transaktiokulut"
+    const sponsor = await generateKeyPairSigner();
+    ```
+  </Step>
 
-Luo erillinen keypair sponsorille, joka maksaa transaktiokulut. Sponsori
-tarvitsee SOL:ia kuluihin, mutta sen ei tarvitse pitää hallussaan siirrettäviä
-tokeneita.
+  <Step title="Luo siirto-ohje">
+    Luo tokenin siirto-ohje lähettäjän ollessa valtuutettu. Lähettäjä omistaa
+    tokenit ja hänen on allekirjoitettava siirto.
 
-<CodePlaceholder title="Sponsoroi transaktiokulut" />
+    ```ts title="Sponsor Transaction Fee" focus={3-10}
+    const sponsor = await generateKeyPairSigner();
 
-```ts !! title="Sponsor Transaction Fee"
-const sponsor = await generateKeyPairSigner();
-```
+    const transferInstruction = getTransferCheckedInstruction({
+      source: senderAta,
+      mint: mint.address,
+      destination: recipientAta,
+      authority: sender, // Sender signs for the transfer
+      amount: 250_000n, // adjusted for the mint's decimals
+      decimals: 6
+    });
+    ```
+  </Step>
 
-## !!steps Luo siirto-ohje
+  <Step title="Lähetä sponsorin ollessa maksajana">
+    Luo asiakas sponsori määritettynä maksun maksajaksi käyttämällä
+    `payer(sponsor)`, sitten kutsu `client.sendTransaction`. Sponsori allekirjoittaa
+    verkkumaksun maksamiseksi samalla kun lähettäjä allekirjoittaa siirron
+    valtuuttamiseksi—`sendTransaction` kerää jokaisen viitatun allekirjoittajan
+    automaattisesti.
 
-Luo tokenin siirto-ohje lähettäjän ollessa valtuutettu. Lähettäjä omistaa
-tokenit ja hänen on allekirjoitettava siirto.
+    ```ts title="Sponsor Transaction Fee" highlight={13} focus={12-16}
+    const sponsor = await generateKeyPairSigner();
 
-<CodePlaceholder title="Sponsor Transaction Fee" />
+    const transferInstruction = getTransferCheckedInstruction({
+      source: senderAta,
+      mint: mint.address,
+      destination: recipientAta,
+      authority: sender,
+      amount: 250_000n,
+      decimals: 6
+    });
 
-```ts !! title="Sponsor Transaction Fee"
-const sponsor = await generateKeyPairSigner();
+    const client = createClient()
+      .use(payer(sponsor)) // Sponsor pays the transaction fees
+      .use(solanaLocalRpc());
 
-// !focus(1:8)
-const transferInstruction = getTransferCheckedInstruction({
-  source: senderAta,
-  mint: mint.address,
-  destination: recipientAta,
-  authority: sender, // Sender signs for the transfer
-  amount: 250_000n, // adjusted for the mint's decimals
-  decimals: 6
-});
-```
-
-## !!steps Lähetä sponsorin ollessa maksajana
-
-Luo asiakas sponsori määritettynä maksun maksajaksi käyttämällä
-`payer(sponsor)`, sitten kutsu `client.sendTransaction`. Sponsori allekirjoittaa
-verkkumaksun maksamiseksi samalla kun lähettäjä allekirjoittaa siirron
-valtuuttamiseksi—`sendTransaction` kerää jokaisen viitatun allekirjoittajan
-automaattisesti.
-
-<CodePlaceholder title="Sponsor Transaction Fee" />
-
-```ts !! title="Sponsor Transaction Fee"
-const sponsor = await generateKeyPairSigner();
-
-const transferInstruction = getTransferCheckedInstruction({
-  source: senderAta,
-  mint: mint.address,
-  destination: recipientAta,
-  authority: sender,
-  amount: 250_000n,
-  decimals: 6
-});
-
-// !focus(1:5)
-const client = createClient()
-  // !mark
-  .use(payer(sponsor)) // Sponsor pays the transaction fees
-  .use(solanaLocalRpc());
-
-const { context } = await client.sendTransaction([transferInstruction]);
-```
-
-</ScrollyCoding>
+    const { context } = await client.sendTransaction([transferInstruction]);
+    ```
+  </Step>
+</Steps>
 
 ### Demo
 
-<CodeTabs flags="r">
-
-```ts !! title="Demo"
-// !collapse(1:15) collapsed
+```ts Demo highlight={20,64} expandable
 // Click ">" icon on left to expand demo imports
 import { createClient, generateKeyPairSigner, lamports } from "@solana/kit";
 import type { KeyPairSigner } from "@solana/kit";
@@ -128,7 +114,6 @@ import {
 // Generate keypairs for sender, recipient, and sponsor (fee payer)
 const sender = await generateKeyPairSigner();
 const recipient = await generateKeyPairSigner();
-// !mark
 const sponsor = await generateKeyPairSigner();
 
 console.log("Sender Address:", sender.address);
@@ -173,7 +158,6 @@ const transferInstruction = getTransferCheckedInstruction({
 
 // Send transaction with sponsor as fee payer using @solana/kit
 // The sponsor (client.payer) pays fees; the sender signs for the transfer
-// !mark
 const { context } = await client.sendTransaction([transferInstruction]);
 const signature = context.signature;
 
@@ -207,7 +191,6 @@ console.log("Fee Payer Address:", feePayer);
 // =============================================================================
 // Demo Setup Helper Function
 // =============================================================================
-// !collapse(1:1000) collapsed
 
 /**
  * Sets up for a sponsored token transfer demo:
@@ -313,14 +296,12 @@ async function demoSetup(
 }
 ```
 
-</CodeTabs>
-
-<Callout type="caution">
+<Danger>
   Kun luot token accountin loppukäyttäjälle, he voivat sulkea sen ja saada
   takaisin vuokraan käytetyn SOL:n. Harkitse käyttäjiltä veloittamista tilin
   luomisesta stablecoineilla tai ota tämä kustannus huomioon tuotteesi
   taloudessa.
-</Callout>
+</Danger>
 
 ## Maksun abstrahointi mittakaavassa Koran avulla
 
@@ -368,7 +349,7 @@ console.log("Signature:", context.signature);
 
 ### Kora-resurssit
 
-<Cards>
+<Columns cols={2}>
   <Card
     title="Koran pika-aloitus"
     href="/docs/tools/kora/getting-started/quick-start"
@@ -384,4 +365,4 @@ console.log("Signature:", context.signature);
   <Card title="Solmuoperaattorin opas" href="/docs/tools/kora/operators">
     Ota käyttöön ja konfiguroi oma Kora-instanssisi.
   </Card>
-</Cards>
+</Columns>

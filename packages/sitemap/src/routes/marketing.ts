@@ -7,6 +7,7 @@ import {
   createLocalizedEntries,
   dedupeEntries,
   getFileLastModified,
+  toAbsoluteUrl,
   walkFiles,
 } from "../utils";
 
@@ -35,6 +36,21 @@ const archivedRoutes = new Set([
   "/nftshowdown",
   "/playgg",
 ]);
+
+/**
+ * Developer landings served by apps/web (spec §5.11: moved here from
+ * docs.ts). WP10 builds them under src/app/[locale]/{developers,learn}; they
+ * are listed even before their page files exist, as they were before.
+ */
+const developerLandingRoutes = ["/developers", "/learn"];
+
+/**
+ * Greek developer URLs redirect to English (decisions.md drops Greek docs),
+ * so they are not listed even though apps/web still serves other /el pages.
+ */
+const greekRedirectedUrls = new Set(
+  developerLandingRoutes.map((route) => toAbsoluteUrl(`/el${route}`)),
+);
 
 function toRoutePath(filePath: string) {
   const relativeDir = path.relative(appLocaleRoot, path.dirname(filePath));
@@ -101,7 +117,16 @@ export const marketingRoutes: RouteGenerator = () => {
       return createLocalizedEntries(routePath, options);
     });
 
-    return dedupeEntries(entries);
+    const landingEntries = developerLandingRoutes.flatMap((routePath) =>
+      createLocalizedEntries(routePath, {
+        changeFrequency: "weekly",
+        priority: 0.8,
+      }),
+    );
+
+    return dedupeEntries([...entries, ...landingEntries]).filter(
+      (entry) => !greekRedirectedUrls.has(entry.url),
+    );
   } catch (error) {
     console.error("Failed to build marketing sitemap routes", error);
     return [];

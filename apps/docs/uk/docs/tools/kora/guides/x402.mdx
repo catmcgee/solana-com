@@ -10,7 +10,7 @@ Kora може забезпечити рівень підписання тран�
 
 ## Архітектура
 
-```mermaid title="x402 with Kora"
+```mermaid
 sequenceDiagram
     participant Client
     participant API as Resource server
@@ -34,6 +34,34 @@ sequenceDiagram
     API-->>Client: 200 + resource + PAYMENT-RESPONSE
 ```
 
+<div className="nojs-only" data-fallback="mermaid">
+  ```text Mermaid
+  sequenceDiagram
+      participant Client
+      participant API as Resource server
+      participant Facilitator
+      participant Kora
+      participant Solana
+      Client->>API: GET /protected
+      API-->>Client: 402 + PAYMENT-REQUIRED
+      Client->>API: GET /protected + PAYMENT-SIGNATURE
+      API->>Facilitator: POST /verify
+      Facilitator->>Kora: signTransaction
+      Kora->>Kora: Enforce transaction policy
+      Kora-->>Facilitator: Validated transaction
+      Facilitator-->>API: Payment is valid
+      API->>Facilitator: POST /settle
+      Facilitator->>Kora: signAndSendTransaction
+      Kora->>Solana: Sign as fee payer and submit
+      Solana-->>Kora: Transaction signature
+      Kora-->>Facilitator: Transaction signature
+      Facilitator-->>API: Settlement result
+      API-->>Client: 200 + resource + PAYMENT-RESPONSE
+  ```
+</div>
+
+<p className="sol-caption">x402 with Kora</p>
+
 Чотири ролі застосунку залишаються розділеними:
 
 - **Клієнт** обирає вимогу до оплати та підписує авторизацію платежу.
@@ -55,9 +83,11 @@ cp .env.example .env
 
 Встановіть `KORA_PRIVATE_KEY` у файлі `.env` на одноразовий keypair Devnet. Конфігурація підписувача демо приймає секрет у форматі base58, масив байтів keypair або шлях до файлу JSON keypair. Поповніть публічну адресу SOL у Devnet, щоб вона могла спонсорувати комісії транзакцій.
 
-<Callout type="caution" title="Використовуйте одноразовий підписувач Devnet">
+<Danger>
+  **Використовуйте одноразовий підписувач Devnet**
+
   Демо Docker завантажує підписувач Kora зі змінної середовища. Не розміщуйте продакшн-ключ підписання в цьому демо та не додавайте файл `.env` до репозиторію.
-</Callout>
+</Danger>
 
 Запустіть Kora та фасилітатор:
 

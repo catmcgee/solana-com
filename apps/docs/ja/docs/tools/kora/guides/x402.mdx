@@ -10,7 +10,7 @@ Koraは、[x402 V2ファシリテーター](/docs/tools/x402-facilitator)の背�
 
 ## アーキテクチャ
 
-```mermaid title="x402 with Kora"
+```mermaid
 sequenceDiagram
     participant Client
     participant API as Resource server
@@ -34,6 +34,34 @@ sequenceDiagram
     API-->>Client: 200 + resource + PAYMENT-RESPONSE
 ```
 
+<div className="nojs-only" data-fallback="mermaid">
+  ```text Mermaid
+  sequenceDiagram
+      participant Client
+      participant API as Resource server
+      participant Facilitator
+      participant Kora
+      participant Solana
+      Client->>API: GET /protected
+      API-->>Client: 402 + PAYMENT-REQUIRED
+      Client->>API: GET /protected + PAYMENT-SIGNATURE
+      API->>Facilitator: POST /verify
+      Facilitator->>Kora: signTransaction
+      Kora->>Kora: Enforce transaction policy
+      Kora-->>Facilitator: Validated transaction
+      Facilitator-->>API: Payment is valid
+      API->>Facilitator: POST /settle
+      Facilitator->>Kora: signAndSendTransaction
+      Kora->>Solana: Sign as fee payer and submit
+      Solana-->>Kora: Transaction signature
+      Kora-->>Facilitator: Transaction signature
+      Facilitator-->>API: Settlement result
+      API-->>Client: 200 + resource + PAYMENT-RESPONSE
+  ```
+</div>
+
+<p className="sol-caption">x402 with Kora</p>
+
 4つのアプリケーションロールは独立して機能します：
 
 - **クライアント**は支払い要件を選択し、支払い承認に署名します。
@@ -55,9 +83,11 @@ cp .env.example .env
 
 `.env`の`KORA_PRIVATE_KEY`に使い捨てのDevnet keypairを設定してください。デモの署名者設定は、base58形式のシークレット、バイト配列のkeypair、またはJSON keypairファイルへのパスを受け付けます。トランザクション手数料をスポンサーできるよう、その公開アドレスにDevnet SOLを送金してください。
 
-<Callout type="caution" title="使い捨てのDevnet署名者を使用する">
+<Danger>
+  **使い捨てのDevnet署名者を使用する**
+
   Dockerデモは環境変数からKora署名者を読み込みます。このデモに本番用署名キーを使用したり、`.env`ファイルをコミットしたりしないでください。
-</Callout>
+</Danger>
 
 Koraとファシリテーターを起動します：
 

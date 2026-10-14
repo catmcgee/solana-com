@@ -16,8 +16,9 @@ const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME;
  * Routes not matching will use <a> tags for full page load.
  */
 const APP_INTERNAL_ROUTES: Record<string, RegExp> = {
-  // docs app handles: /docs/*, /learn/*, /developers, /developers/cookbook/*, /developers/bootcamp/*
-  docs: /^\/(?:docs|learn)(?:\/|$)|^\/developers(?:$|\/(?:cookbook|bootcamp)(?:\/|$))/,
+  // docs (Mintlify) handles: /docs/*, /learn/<slug>, /developers/cookbook/*, /developers/bootcamp/*.
+  // The /developers and /learn landings are served by apps/web.
+  docs: /^\/docs(?:\/|$)|^\/learn\/[^/]|^\/developers\/(?:cookbook|bootcamp)(?:\/|$)/,
   media: /^\/(?:changelog|news|podcasts)(?:\/|$)/,
   // templates app handles: /developers/templates/*
   templates: /^\/developers\/templates(?:\/|$)/,

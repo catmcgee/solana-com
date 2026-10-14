@@ -15,13 +15,13 @@ Die Validierung hängt davon ab, was Sie senden:
   SPL-Token-Sendungen.
 - **Natives SOL** verfügt über keinen solchen Schutz. Eine System
   Program-Überweisung gelingt in jedes Konto, sodass ein falscher Empfänger das
-  SOL dauerhaft sperrt. Siehe [Natives SOL senden](#sending-native-sol).
+  SOL dauerhaft sperrt. Siehe [Natives SOL senden](#natives-sol-senden).
 
-<Callout>
+<Note>
   Siehe [Wie Zahlungen auf Solana
   funktionieren](/docs/payments/how-payments-work) für grundlegende
   Zahlungskonzepte.
-</Callout>
+</Note>
 
 ## Solana-Adressen verstehen
 
@@ -52,12 +52,12 @@ Verwenden Sie die Adresse, um ein [Konto](/docs/core/accounts) aus dem Netzwerk
 abzurufen, und überprüfen Sie den Programmeigentümer sowie den Kontotyp, um zu
 bestimmen, wie die Adresse zu behandeln ist.
 
-<Callout>
+<Note>
   Ob eine Adresse On-Curve oder Off-Curve ist, sagt Ihnen nicht, welchen Typ das
   Konto hat, welches Programm es besitzt oder ob an dieser Adresse überhaupt ein
   Konto existiert. Sie müssen das Konto aus dem Netzwerk abrufen, um diese
   Details zu ermitteln.
-</Callout>
+</Note>
 
 ### System Program Konten (Wallets)
 
@@ -75,12 +75,12 @@ SOL vom Sender nicht zurückgefordert werden.
 
 System-Konten können Off-Curve existieren. Wenn Ihr Nutzer Token an eine Off-Curve-Adresse senden möchte, wird empfohlen, den Nutzer aufzufordern zu bestätigen, dass er beabsichtigt, Guthaben an eine Smart Wallet zu senden.
 
-<Callout type="warn">
+<Warning>
   Ohne Schutzmaßnahmen kann die Subventionierung der ATA-Erstellung ausgenutzt
   werden. Ein böswilliger Nutzer könnte eine Überweisung anfordern, seine ATA
   auf Ihre Kosten erstellen lassen, die ATA schließen, um den rent SOL
   zurückzuerhalten, und diesen Vorgang wiederholen.
-</Callout>
+</Warning>
 
 ### Token Accounts
 
@@ -90,11 +90,11 @@ die Sie erhalten, einem Token-Programm gehört, sollten Sie überprüfen, ob das
 Konto ein token account ist (kein mint account) und mit dem erwarteten token
 mint account übereinstimmt, bevor Sie senden.
 
-<Callout type="info">
+<Info>
   Die Token Programs validieren automatisch, dass beide token accounts in einer
   Überweisung Token desselben Mint halten. Schlägt die Validierung fehl, wird
   die Transaktion abgelehnt und es gehen keine Mittel verloren.
-</Callout>
+</Info>
 
 ### Mint Accounts
 
@@ -127,20 +127,20 @@ Beim Senden von nativem SOL ist nur ein `IS_WALLET`-Ergebnis akzeptabel.
 `IS_TOKEN_ACCOUNT` ist es **nicht**: Ein token account enthält SPL-Token, und
 dorthin gesendetes SOL liegt außerhalb der Kontrolle des Absenders.
 
-<Callout type="warn">
+<Warning>
   Dies ist eine häufige Ursache für den Verlust von SOL: Ein Benutzer fügt die
   Mint-Adresse eines Tokens (oder eine Programm-Adresse) in eine SOL-Auszahlung
   ein. Die Überweisung wird erfolgreich durchgeführt und das SOL ist nicht
   wiederherstellbar. Klassifizieren Sie den Empfänger immer, bevor Sie eine
   SOL-Überweisung unterzeichnen.
-</Callout>
+</Warning>
 
 ## Verifizierungsablauf
 
 Das folgende Diagramm zeigt einen Referenz-Entscheidungsbaum zur Validierung
 einer Adresse:
 
-```mermaid title="Address Verification Flow"
+```mermaid
 flowchart TD
     A["Input address"]
     B["Fetch account info"]
@@ -169,17 +169,46 @@ flowchart TD
     K -- "No" --> V2["VERIFY: Confirm the recipient intends to use a smart wallet"]
 ```
 
-<Steps>
-<Step>
+<div className="nojs-only" data-fallback="mermaid">
+  ```text Mermaid
+  flowchart TD
+      A["Input address"]
+      B["Fetch account info"]
 
-### Konten abrufen
+      A --> B
+      B --> C{"Account exists onchain?"}
+
+      %% --- Non-existent account path ---
+      C -- "No" --> D{"Is address off-curve (PDA)?"}
+      D -- "Yes" --> V1["VERIFY: Confirm the recipient intends to use a smart wallet"]
+      D -- "No" --> W1["IS_WALLET: Valid unfunded public key address"]
+
+      %% --- Existing account path ---
+      C -- "Yes" --> F{"Check program owner"}
+
+      F -- "Token Program / Token-2022" --> G{"Is token account for expected mint?"}
+      G -- "Yes" --> T1["IS_TOKEN_ACCOUNT: Send directly"]
+      G -- "No" --> R1["REJECT: Wrong account type or mint"]
+
+      F -- "System Program" --> H{"Is address off-curve?"}
+      H -- "No" --> W2["IS_WALLET: Derive ATA and send"]
+      H -- "Yes" --> V3["VERIFY: Confirm the recipient intends to use a smart wallet"]
+
+      F -- "Other Program" --> K{"Allowed by policy?"}
+      K -- "Yes" --> W3["IS_WALLET: Derive ATA and send"]
+      K -- "No" --> V2["VERIFY: Confirm the recipient intends to use a smart wallet"]
+  ```
+</div>
+
+<p className="sol-caption">Address Verification Flow</p>
+
+<Steps titleSize="h3">
+<Step title="Konten abrufen">
 
 Verwenden Sie die Adresse, um die Kontendetails aus dem Netzwerk abzurufen.
 
 </Step>
-<Step>
-
-### Konten existiert nicht
+<Step title="Konten existiert nicht">
 
 Wenn unter dieser Adresse kein Konto existiert, prüfen Sie, ob die Adresse On-Curve oder Off-Curve ist:
 
@@ -188,9 +217,7 @@ Wenn unter dieser Adresse kein Konto existiert, prüfen Sie, ob die Adresse On-C
 - **On-Curve**: Dies ist eine gültige Wallet-Adresse (öffentlicher Schlüssel), die noch nicht finanziert wurde. Leiten Sie die ATA ab, prüfen Sie, ob sie existiert, und senden Sie Token daran. Sie müssen eine Grundsatzentscheidung treffen, ob Sie die Erstellung der ATA finanzieren, falls sie nicht existiert.
 
 </Step>
-<Step>
-
-### Konten existiert
+<Step title="Konten existiert">
 
 Wenn ein Konto existiert, prüfen Sie, welches Programm es besitzt:
 
@@ -215,13 +242,13 @@ Wenn ein Konto existiert, prüfen Sie, welches Programm es besitzt:
 Das folgende Beispiel zeigt nur die Adressvalidierungslogik. Dies ist
 Referenzcode zu Illustrationszwecken.
 
-<Callout>
+<Note>
   Die Demo zeigt nicht, wie ein ATA abgeleitet oder eine Transaktion zum Senden
   von Token erstellt wird. Für Beispielcode verweisen Sie auf die Dokumentation
   zu [token
   account](/docs/tokens/basics/create-token-account#how-to-create-an-associated-token-account)
   und [token transfer](/docs/tokens/basics/transfer-tokens).
-</Callout>
+</Note>
 
 Die folgende Demo verwendet drei mögliche Ergebnisse:
 
@@ -234,10 +261,7 @@ Die folgende Demo verwendet drei mögliche Ergebnisse:
 
 Anschließend ordnet es jedem Ergebnis die asset-spezifische Empfangbarkeit mit `canReceiveNativeSol` (nur Wallets) und `canReceiveSplToken` (Wallets oder token accounts) zu. Ein `USER_VERIFICATION`-Ergebnis wird nicht automatisch akzeptiert; Ihre Anwendung sollte den Nutzer seine Absicht bestätigen lassen, bevor SPL-Token gesendet werden. Ein token account gibt `IS_TOKEN_ACCOUNT` zurück und kann daher SPL-Token, aber **kein** natives SOL empfangen – die Unterscheidung, die verhindert, dass SOL gesperrt wird.
 
-<CodeTabs flags="r">
-
-```ts !! title="Demo"
-// !collapse(1:35) collapsed
+```ts Demo expandable
 
 import {
   type Address,
@@ -367,7 +391,6 @@ function canReceiveSplToken(result: ValidationResult): boolean {
 // =============================================================================
 // Examples
 // =============================================================================
-// !collapse(1:1000) collapsed
 
 // Wallets
 const EXISTING_WALLET =
@@ -442,5 +465,3 @@ console.log("\n" + "═".repeat(60));
 console.log("  Done!");
 console.log("═".repeat(60) + "\n");
 ```
-
-</CodeTabs>

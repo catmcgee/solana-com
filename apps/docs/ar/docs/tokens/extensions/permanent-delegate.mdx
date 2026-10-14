@@ -3,7 +3,6 @@ title: المفوض الدائم
 description:
   أنشئ mint في Token Extensions Program مع مفوض دائم يمكنه تحويل أو حرق الرموز
   من أي حساب لذلك الـ mint.
-url: /docs/tokens/extensions/permanent-delegate
 type: tutorial
 prerequisites:
   - /docs/tokens/basics/create-mint
@@ -16,7 +15,7 @@ related:
 
 ## ما هو المفوض الدائم؟
 
-امتداد _rs`PermanentDelegate`_ الخاص بـ Token Extensions Program يعين صلاحية
+امتداد `PermanentDelegate` الخاص بـ Token Extensions Program يعين صلاحية
 مفوض إلى الـ mint نفسه.
 
 المفوض الدائم هو صلاحية على مستوى الـ mint يمكنها الترخيص بالتحويلات والحرق لأي
@@ -24,442 +23,419 @@ token account لذلك الـ mint. يعمل كمفوض شامل لجميع حس
 mint، ولا يمكن لأصحاب حسابات الرموز إلغاء المفوض الدائم من حساباتهم.
 
 يمكن لصلاحية الـ mint أيضاً تدوير المفوض الدائم لاحقاً باستخدام
-_rs`SetAuthority`_ عبر _rs`AuthorityType::PermanentDelegate`_.
+`SetAuthority` عبر `AuthorityType::PermanentDelegate`.
 
 ## كيفية إنشاء واستخدام مفوض دائم
 
 لإنشاء واستخدام مفوض دائم:
 
 1. احسب حجم حساب الـ mint والـ rent المطلوب للـ mint وامتداد
-   _rs`PermanentDelegate`_.
-2. أنشئ حساب الـ mint باستخدام _rs`CreateAccount`_، وقم بتهيئة
-   _rs`PermanentDelegate`_، ثم قم بتهيئة الـ mint باستخدام _rs`InitializeMint`_.
-3. أرسل _rs`TransferChecked`_ أو _rs`BurnChecked`_ موقعة من قبل المفوض الدائم.
+   `PermanentDelegate`.
+2. أنشئ حساب الـ mint باستخدام `CreateAccount`، وقم بتهيئة
+   `PermanentDelegate`، ثم قم بتهيئة الـ mint باستخدام `InitializeMint`.
+3. أرسل `TransferChecked` أو `BurnChecked` موقعة من قبل المفوض الدائم.
    يعالج Token Program هذه التعليمات بنفس الطريقة كما لو أن صاحب token account
    وقعها.
 
-<ScrollyCoding>
-
-## !!steps احسب حجم الحساب
-
-احسب حجم حساب الـ mint للـ mint الأساسي بالإضافة إلى امتداد
-_rs`PermanentDelegate`_. هذا هو الحجم المستخدم في _rs`CreateAccount`_.
-
-<CodePlaceholder title="مثال" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-const owner = await generateKeyPairSigner();
-const delegate = await generateKeyPairSigner();
-const recipient = await generateKeyPairSigner();
-
-// !focus(1:3)
-const permanentDelegateExtension = extension("PermanentDelegate", {
-  delegate: delegate.address
-});
-
-// !focus(1:1)
-const mintSpace = BigInt(getMintSize([permanentDelegateExtension]));
-```
-
-## !!steps احسب الـ rent
-
-احسب الـ rent باستخدام الحجم المطلوب للـ mint بالإضافة إلى امتداد
-_rs`PermanentDelegate`_.
-
-<CodePlaceholder title="مثال" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-const owner = await generateKeyPairSigner();
-const delegate = await generateKeyPairSigner();
-const recipient = await generateKeyPairSigner();
-
-const permanentDelegateExtension = extension("PermanentDelegate", {
-  delegate: delegate.address
-});
-
-const mintSpace = BigInt(getMintSize([permanentDelegateExtension]));
-
-// !focus(1:3)
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
-```
-
-## !!steps أنشئ حساب الـ mint
-
-أنشئ mint account بالمساحة المحسوبة و lamport.
-
-<CodePlaceholder title="مثال" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-const owner = await generateKeyPairSigner();
-const delegate = await generateKeyPairSigner();
-const recipient = await generateKeyPairSigner();
-
-const permanentDelegateExtension = extension("PermanentDelegate", {
-  delegate: delegate.address
-});
-
-const mintSpace = BigInt(getMintSize([permanentDelegateExtension]));
-
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
-
-// !focus(1:9)
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  })
-]);
-```
-
-## !!steps تهيئة PermanentDelegate
-
-قم بتهيئة امتداد _rs`PermanentDelegate`_ على النعناع.
-
-<CodePlaceholder title="مثال" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-const owner = await generateKeyPairSigner();
-const delegate = await generateKeyPairSigner();
-const recipient = await generateKeyPairSigner();
-
-const permanentDelegateExtension = extension("PermanentDelegate", {
-  delegate: delegate.address
-});
-
-const mintSpace = BigInt(getMintSize([permanentDelegateExtension]));
-
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
-
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  }),
-  // !focus(1:4)
-  getInitializePermanentDelegateInstruction({
-    mint: mint.address,
-    delegate: delegate.address
-  })
-]);
-```
-
-## !!steps تهيئة النعناع
-
-قم بتهيئة النعناع باستخدام _rs`InitializeMint`_ في نفس المعاملة.
-
-<CodePlaceholder title="مثال" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-const owner = await generateKeyPairSigner();
-const delegate = await generateKeyPairSigner();
-const recipient = await generateKeyPairSigner();
-
-const permanentDelegateExtension = extension("PermanentDelegate", {
-  delegate: delegate.address
-});
-
-const mintSpace = BigInt(getMintSize([permanentDelegateExtension]));
-
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
-
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  }),
-  getInitializePermanentDelegateInstruction({
-    mint: mint.address,
-    delegate: delegate.address
-  }),
-  // !focus(1:6)
-  getInitializeMintInstruction({
-    mint: mint.address,
-    decimals: 0,
-    mintAuthority: client.payer.address,
-    freezeAuthority: client.payer.address
-  })
-]);
-```
-
-## !!steps إنشاء token accounts وسك الرموز
-
-أنشئ token accounts للمالك والمستلم، ثم اسك الرموز إلى token account المالك.
-
-<CodePlaceholder title="مثال" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-const owner = await generateKeyPairSigner();
-const delegate = await generateKeyPairSigner();
-const recipient = await generateKeyPairSigner();
-
-const permanentDelegateExtension = extension("PermanentDelegate", {
-  delegate: delegate.address
-});
-
-const mintSpace = BigInt(getMintSize([permanentDelegateExtension]));
-
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
-
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  }),
-  getInitializePermanentDelegateInstruction({
-    mint: mint.address,
-    delegate: delegate.address
-  }),
-  getInitializeMintInstruction({
-    mint: mint.address,
-    decimals: 0,
-    mintAuthority: client.payer.address,
-    freezeAuthority: client.payer.address
-  })
-]);
-
-const [sourceToken] = await findAssociatedTokenPda({
-  mint: mint.address,
-  owner: owner.address,
-  tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
-});
-const [destinationToken] = await findAssociatedTokenPda({
-  mint: mint.address,
-  owner: recipient.address,
-  tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
-});
-
-// !focus(1:19)
-await client.sendTransaction([
-  await getCreateAssociatedTokenInstructionAsync({
-    payer: client.payer,
-    mint: mint.address,
-    owner: owner.address
-  }),
-  await getCreateAssociatedTokenInstructionAsync({
-    payer: client.payer,
-    mint: mint.address,
-    owner: recipient.address
-  }),
-  getMintToCheckedInstruction({
-    mint: mint.address,
-    token: sourceToken,
-    mintAuthority: client.payer,
-    amount: 1n,
-    decimals: 0
-  })
-]);
-```
-
-## !!steps النقل باستخدام المفوض الدائم
-
-انقل الرموز باستخدام _rs`TransferChecked`_ موقع من قبل المفوض الدائم.
-
-<CodePlaceholder title="مثال" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-const owner = await generateKeyPairSigner();
-const delegate = await generateKeyPairSigner();
-const recipient = await generateKeyPairSigner();
-
-const permanentDelegateExtension = extension("PermanentDelegate", {
-  delegate: delegate.address
-});
-
-const mintSpace = BigInt(getMintSize([permanentDelegateExtension]));
-
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
-
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  }),
-  getInitializePermanentDelegateInstruction({
-    mint: mint.address,
-    delegate: delegate.address
-  }),
-  getInitializeMintInstruction({
-    mint: mint.address,
-    decimals: 0,
-    mintAuthority: client.payer.address,
-    freezeAuthority: client.payer.address
-  })
-]);
-
-const [sourceToken] = await findAssociatedTokenPda({
-  mint: mint.address,
-  owner: owner.address,
-  tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
-});
-const [destinationToken] = await findAssociatedTokenPda({
-  mint: mint.address,
-  owner: recipient.address,
-  tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
-});
-
-await client.sendTransaction([
-  await getCreateAssociatedTokenInstructionAsync({
-    payer: client.payer,
-    mint: mint.address,
-    owner: owner.address
-  }),
-  await getCreateAssociatedTokenInstructionAsync({
-    payer: client.payer,
-    mint: mint.address,
-    owner: recipient.address
-  }),
-  getMintToCheckedInstruction({
-    mint: mint.address,
-    token: sourceToken,
-    mintAuthority: client.payer,
-    amount: 1n,
-    decimals: 0
-  })
-]);
-
-// !focus(1:10)
-await client.sendTransaction([
-  getTransferCheckedInstruction({
-    source: sourceToken,
-    mint: mint.address,
-    destination: destinationToken,
-    // !mark(1:1)
-    authority: delegate,
-    amount: 1n,
-    decimals: 0
-  })
-]);
-```
-
-</ScrollyCoding>
-
-<Callout type="info" title="ترتيب التعليمات">
-  يجب أن يأتي _rs`InitializePermanentDelegate`_ قبل _rs`InitializeMint`_. يجب
-  تضمين _rs`CreateAccount`_ و _rs`InitializePermanentDelegate`_ و
-  _rs`InitializeMint`_ في نفس المعاملة.
-</Callout>
+<Steps>
+  <Step title="احسب حجم الحساب">
+    احسب حجم حساب الـ mint للـ mint الأساسي بالإضافة إلى امتداد
+    `PermanentDelegate`. هذا هو الحجم المستخدم في `CreateAccount`.
+
+    ```ts مثال focus={17-19,21}
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+    const owner = await generateKeyPairSigner();
+    const delegate = await generateKeyPairSigner();
+    const recipient = await generateKeyPairSigner();
+
+    const permanentDelegateExtension = extension("PermanentDelegate", {
+      delegate: delegate.address
+    });
+
+    const mintSpace = BigInt(getMintSize([permanentDelegateExtension]));
+    ```
+  </Step>
+
+  <Step title="احسب الـ rent">
+    احسب الـ rent باستخدام الحجم المطلوب للـ mint بالإضافة إلى امتداد
+    `PermanentDelegate`.
+
+    ```ts مثال focus={23-25}
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+    const owner = await generateKeyPairSigner();
+    const delegate = await generateKeyPairSigner();
+    const recipient = await generateKeyPairSigner();
+
+    const permanentDelegateExtension = extension("PermanentDelegate", {
+      delegate: delegate.address
+    });
+
+    const mintSpace = BigInt(getMintSize([permanentDelegateExtension]));
+
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
+    ```
+  </Step>
+
+  <Step title="أنشئ حساب الـ mint">
+    أنشئ mint account بالمساحة المحسوبة و lamport.
+
+    ```ts مثال focus={27-35}
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+    const owner = await generateKeyPairSigner();
+    const delegate = await generateKeyPairSigner();
+    const recipient = await generateKeyPairSigner();
+
+    const permanentDelegateExtension = extension("PermanentDelegate", {
+      delegate: delegate.address
+    });
+
+    const mintSpace = BigInt(getMintSize([permanentDelegateExtension]));
+
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
+
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      })
+    ]);
+    ```
+  </Step>
+
+  <Step title="تهيئة PermanentDelegate">
+    قم بتهيئة امتداد `PermanentDelegate` على النعناع.
+
+    ```ts مثال focus={35-38}
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+    const owner = await generateKeyPairSigner();
+    const delegate = await generateKeyPairSigner();
+    const recipient = await generateKeyPairSigner();
+
+    const permanentDelegateExtension = extension("PermanentDelegate", {
+      delegate: delegate.address
+    });
+
+    const mintSpace = BigInt(getMintSize([permanentDelegateExtension]));
+
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
+
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializePermanentDelegateInstruction({
+        mint: mint.address,
+        delegate: delegate.address
+      })
+    ]);
+    ```
+  </Step>
+
+  <Step title="تهيئة النعناع">
+    قم بتهيئة النعناع باستخدام `InitializeMint` في نفس المعاملة.
+
+    ```ts مثال focus={39-44} expandable
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+    const owner = await generateKeyPairSigner();
+    const delegate = await generateKeyPairSigner();
+    const recipient = await generateKeyPairSigner();
+
+    const permanentDelegateExtension = extension("PermanentDelegate", {
+      delegate: delegate.address
+    });
+
+    const mintSpace = BigInt(getMintSize([permanentDelegateExtension]));
+
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
+
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializePermanentDelegateInstruction({
+        mint: mint.address,
+        delegate: delegate.address
+      }),
+      getInitializeMintInstruction({
+        mint: mint.address,
+        decimals: 0,
+        mintAuthority: client.payer.address,
+        freezeAuthority: client.payer.address
+      })
+    ]);
+    ```
+  </Step>
+
+  <Step title="إنشاء token accounts وسك الرموز">
+    أنشئ token accounts للمالك والمستلم، ثم اسك الرموز إلى token account المالك.
+
+    ```ts مثال focus={58-76} expandable
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+    const owner = await generateKeyPairSigner();
+    const delegate = await generateKeyPairSigner();
+    const recipient = await generateKeyPairSigner();
+
+    const permanentDelegateExtension = extension("PermanentDelegate", {
+      delegate: delegate.address
+    });
+
+    const mintSpace = BigInt(getMintSize([permanentDelegateExtension]));
+
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
+
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializePermanentDelegateInstruction({
+        mint: mint.address,
+        delegate: delegate.address
+      }),
+      getInitializeMintInstruction({
+        mint: mint.address,
+        decimals: 0,
+        mintAuthority: client.payer.address,
+        freezeAuthority: client.payer.address
+      })
+    ]);
+
+    const [sourceToken] = await findAssociatedTokenPda({
+      mint: mint.address,
+      owner: owner.address,
+      tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
+    });
+    const [destinationToken] = await findAssociatedTokenPda({
+      mint: mint.address,
+      owner: recipient.address,
+      tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
+    });
+
+    await client.sendTransaction([
+      await getCreateAssociatedTokenInstructionAsync({
+        payer: client.payer,
+        mint: mint.address,
+        owner: owner.address
+      }),
+      await getCreateAssociatedTokenInstructionAsync({
+        payer: client.payer,
+        mint: mint.address,
+        owner: recipient.address
+      }),
+      getMintToCheckedInstruction({
+        mint: mint.address,
+        token: sourceToken,
+        mintAuthority: client.payer,
+        amount: 1n,
+        decimals: 0
+      })
+    ]);
+    ```
+  </Step>
+
+  <Step title="النقل باستخدام المفوض الدائم">
+    انقل الرموز باستخدام `TransferChecked` موقع من قبل المفوض الدائم.
+
+    ```ts مثال highlight={83} focus={78-87} expandable
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+    const owner = await generateKeyPairSigner();
+    const delegate = await generateKeyPairSigner();
+    const recipient = await generateKeyPairSigner();
+
+    const permanentDelegateExtension = extension("PermanentDelegate", {
+      delegate: delegate.address
+    });
+
+    const mintSpace = BigInt(getMintSize([permanentDelegateExtension]));
+
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
+
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializePermanentDelegateInstruction({
+        mint: mint.address,
+        delegate: delegate.address
+      }),
+      getInitializeMintInstruction({
+        mint: mint.address,
+        decimals: 0,
+        mintAuthority: client.payer.address,
+        freezeAuthority: client.payer.address
+      })
+    ]);
+
+    const [sourceToken] = await findAssociatedTokenPda({
+      mint: mint.address,
+      owner: owner.address,
+      tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
+    });
+    const [destinationToken] = await findAssociatedTokenPda({
+      mint: mint.address,
+      owner: recipient.address,
+      tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
+    });
+
+    await client.sendTransaction([
+      await getCreateAssociatedTokenInstructionAsync({
+        payer: client.payer,
+        mint: mint.address,
+        owner: owner.address
+      }),
+      await getCreateAssociatedTokenInstructionAsync({
+        payer: client.payer,
+        mint: mint.address,
+        owner: recipient.address
+      }),
+      getMintToCheckedInstruction({
+        mint: mint.address,
+        token: sourceToken,
+        mintAuthority: client.payer,
+        amount: 1n,
+        decimals: 0
+      })
+    ]);
+
+    await client.sendTransaction([
+      getTransferCheckedInstruction({
+        source: sourceToken,
+        mint: mint.address,
+        destination: destinationToken,
+        authority: delegate,
+        amount: 1n,
+        decimals: 0
+      })
+    ]);
+    ```
+  </Step>
+</Steps>
+
+<Info>
+  **ترتيب التعليمات**
+
+  يجب أن يأتي `InitializePermanentDelegate` قبل `InitializeMint`. يجب
+  تضمين `CreateAccount` و `InitializePermanentDelegate` و
+`InitializeMint` في نفس المعاملة.
+</Info>
 
 ### المرجع المصدري
 
-| العنصر                                      | الوصف                                                                                           | المصدر                                                                                                                              |
-| ------------------------------------------- | ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| _rs`PermanentDelegate`_                     | امتداد النعناع الذي يخزن المفوض المصرح له عبر كل token account للنعناع.                         | [المصدر](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/permanent_delegate.rs#L15-L21) |
-| _rs`InitializePermanentDelegate`_           | التعليمات التي تهيئ المفوض الدائم قبل _rs`InitializeMint`_.                                     | [المصدر](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/instruction.rs#L1952-L1967)              |
-| _rs`SetAuthority`_                          | تعليمات الرمز الأساسية المستخدمة مع _rs`AuthorityType::PermanentDelegate`_ لتدوير المفوض.       | [المصدر](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/instruction.rs#L1488-L1520)              |
-| _rs`AuthorityType::PermanentDelegate`_      | محدد السلطة المستخدم مع _rs`SetAuthority`_ لتدوير المفوض الدائم على النعناع.                    | [المصدر](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/instruction.rs#L1138-L1139)              |
-| _rs`process_initialize_permanent_delegate`_ | منطق المعالج الذي يكتب امتداد المفوض الدائم على النعناع.                                        | [المصدر](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/processor.rs#L1542-L1557)                  |
-| _rs`process_set_authority`_                 | منطق المعالج الذي يتحقق ويدور المفوض الدائم عند استخدام _rs`AuthorityType::PermanentDelegate`_. | [المصدر](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/processor.rs#L849-L860)                    |
+| العنصر                                  | الوصف                                                                                       | المصدر                                                                                                                              |
+| --------------------------------------- | ------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `PermanentDelegate`                     | امتداد النعناع الذي يخزن المفوض المصرح له عبر كل token account للنعناع.                     | [المصدر](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/permanent_delegate.rs#L15-L21) |
+| `InitializePermanentDelegate`           | التعليمات التي تهيئ المفوض الدائم قبل `InitializeMint`.                                     | [المصدر](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/instruction.rs#L1952-L1967)              |
+| `SetAuthority`                          | تعليمات الرمز الأساسية المستخدمة مع `AuthorityType::PermanentDelegate` لتدوير المفوض.       | [المصدر](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/instruction.rs#L1488-L1520)              |
+| `AuthorityType::PermanentDelegate`      | محدد السلطة المستخدم مع `SetAuthority` لتدوير المفوض الدائم على النعناع.                    | [المصدر](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/instruction.rs#L1138-L1139)              |
+| `process_initialize_permanent_delegate` | منطق المعالج الذي يكتب امتداد المفوض الدائم على النعناع.                                    | [المصدر](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/processor.rs#L1542-L1557)                  |
+| `process_set_authority`                 | منطق المعالج الذي يتحقق ويدور المفوض الدائم عند استخدام `AuthorityType::PermanentDelegate`. | [المصدر](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/processor.rs#L849-L860)                    |
 
 ### تايب سكريبت
 
@@ -468,9 +444,7 @@ await client.sendTransaction([
 
 #### Kit
 
-<CodeTabs storage="token-ts-kit" flags="r">
-
-```ts !! title="Instructions"
+```ts Instructions highlight={56-59,100-107}
 import {
   lamports,
   createClient,
@@ -526,7 +500,6 @@ await client.sendTransaction([
     space: mintSpace, // Account size in bytes for the mint plus PermanentDelegate.
     programAddress: TOKEN_2022_PROGRAM_ADDRESS // Program that owns the mint account.
   }),
-  // !mark(1:4)
   getInitializePermanentDelegateInstruction({
     mint: mint.address, // Mint account that stores the PermanentDelegate extension.
     delegate: delegate.address // Permanent delegate authorized for all token accounts for the mint.
@@ -571,7 +544,6 @@ await client.sendTransaction([
 ]);
 
 await client.sendTransaction([
-  // !mark(1:8)
   getTransferCheckedInstruction({
     source: sourceToken, // Token account sending the transfer.
     mint: mint.address, // Mint with the permanent delegate configuration.
@@ -593,13 +565,9 @@ console.log("Destination Amount:", destinationAccount.data.amount);
 console.log("Permanent Delegate Extension:", permanentDelegate);
 ```
 
-</CodeTabs>
-
 #### Web3.js
 
-<CodeTabs storage="token-ts-legacy" flags="r">
-
-```ts !! title="Instructions"
+```ts Instructions highlight={72-77,138-147}
 import {
   Connection,
   Keypair,
@@ -671,7 +639,6 @@ const createMintAccountInstruction = SystemProgram.createAccount({
   programId: TOKEN_2022_PROGRAM_ID // Program that owns the mint account.
 });
 
-// !mark(1:6)
 const initializePermanentDelegateInstruction =
   createInitializePermanentDelegateInstruction(
     mint.publicKey, // Mint account that stores the PermanentDelegate extension.
@@ -738,7 +705,6 @@ await sendAndConfirmTransaction(
 await sendAndConfirmTransaction(
   connection,
   new Transaction().add(
-    // !mark(1:10)
     createTransferCheckedInstruction(
       sourceToken, // Token account sending the transfer.
       mint.publicKey, // Mint with the permanent delegate configuration.
@@ -775,13 +741,9 @@ console.log("Destination Amount:", destinationAccount.amount.toString());
 console.log("Permanent Delegate Extension:", permanentDelegate);
 ```
 
-</CodeTabs>
-
 ### Rust
 
-<CodeTabs storage="token-rs" flags="r">
-
-```rust !! title="Rust"
+```rust Rust highlight={64-68,139-148}
 use anyhow::Result;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_commitment_config::CommitmentConfig;
@@ -845,7 +807,6 @@ async fn main() -> Result<()> {
         &TOKEN_2022_PROGRAM_ID, // Program that owns the mint account.
     );
 
-    // !mark(1:5)
     let initialize_permanent_delegate_ix = initialize_permanent_delegate(
         &TOKEN_2022_PROGRAM_ID, // Token program that owns the mint.
         &mint.pubkey(), // Mint account that stores the PermanentDelegate extension.
@@ -921,7 +882,6 @@ async fn main() -> Result<()> {
 
     let transfer_transaction = Transaction::new_signed_with_payer(
         &[
-            // !mark(1:10)
             transfer_checked(
                 &TOKEN_2022_PROGRAM_ID, // Token program that processes the transfer.
                 &source_token, // Token account sending the transfer.
@@ -959,5 +919,3 @@ async fn main() -> Result<()> {
     Ok(())
 }
 ```
-
-</CodeTabs>

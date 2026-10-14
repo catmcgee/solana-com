@@ -10,7 +10,7 @@ Les Confidential Balances permettent des transferts de tokens privés en ajoutan
 
 Le diagramme suivant illustre les étapes nécessaires à la création d'un token account avec les Confidential Balances activées :
 
-```mermaid title="Create Token Account with Confidential Balances"
+```mermaid
 sequenceDiagram
     participant Payer as Wallet
     participant ATA as Associated Token Program
@@ -45,6 +45,46 @@ sequenceDiagram
     Token22-->>TokenAccount: Configure Confidential Balances
     deactivate Token22
 ```
+
+<div className="nojs-only" data-fallback="mermaid">
+  ```text Mermaid
+  sequenceDiagram
+      participant Payer as Wallet
+      participant ATA as Associated Token Program
+      participant Token22 as Token Extensions Program
+      participant ZK as ZK ElGamal Proof Program
+      participant TokenAccount as Token Account
+
+      Payer->>ATA: create_associated_token_account()
+      activate ATA
+      ATA->>Token22: Create token account at deterministic address
+      deactivate ATA
+      activate Token22
+      Token22-->>TokenAccount: Initialize Token Account
+      deactivate Token22
+
+      Payer->>Token22: reallocate() for ConfidentialTransferAccount extension
+      activate Token22
+      Token22-->>TokenAccount: Add space for extension data
+      deactivate Token22
+
+      Payer->>Payer: Derive ElGamal keypair and AES key
+      Payer->>Payer: Generate pubkey validity proof
+      Payer->>Payer: Encrypt initial balance (0) with AES key
+
+      Payer->>ZK: VerifyPubkeyValidity into context state account
+      activate ZK
+      ZK-->>ZK: Verify proof and store result in context state account
+      deactivate ZK
+
+      Payer->>Token22: configure_account() referencing the proof context account
+      activate Token22
+      Token22-->>TokenAccount: Configure Confidential Balances
+      deactivate Token22
+  ```
+</div>
+
+<p className="sol-caption">Create Token Account with Confidential Balances</p>
 
 ### État du token account avec Confidential Balances
 
@@ -102,7 +142,7 @@ pub struct ConfidentialTransferAccount {
 }
 ```
 
-Le _rs`ConfidentialTransferAccount`_ contient plusieurs champs qui gèrent les Confidential Balances :
+Le `ConfidentialTransferAccount` contient plusieurs champs qui gèrent les Confidential Balances :
 
 - **approved** : Le statut d'approbation du compte pour les Confidential Balances. Si la configuration `auto_approve_new_accounts` du mint account est définie sur `true`, tous les token accounts sont automatiquement approuvés pour les Confidential Balances.
 
@@ -131,18 +171,18 @@ Le _rs`ConfidentialTransferAccount`_ contient plusieurs champs qui gèrent les C
   attente entrants provenant des instructions de dépôt et de transfert.
 
 - **maximum_pending_balance_credit_counter** : La limite du nombre de crédits en
-  attente avant d'exiger une instruction _rs`ApplyPendingBalance`_ pour
+  attente avant d'exiger une instruction `ApplyPendingBalance` pour
   convertir le solde en attente en solde disponible.
 
 - **expected_pending_balance_credit_counter** : La valeur
   `pending_balance_credit_counter` fournie par le client via l'instruction data
-  lors du dernier traitement de l'instruction _rs`ApplyPendingBalance`_.
+  lors du dernier traitement de l'instruction `ApplyPendingBalance`.
 
 - **actual_pending_balance_credit_counter** : La valeur
   `pending_balance_credit_counter` sur le token account au moment où la dernière
-  instruction _rs`ApplyPendingBalance`_ a été traitée.
+  instruction `ApplyPendingBalance` a été traitée.
 
-<Callout type="info">
+<Info>
   **Solde en attente vs solde disponible**
 
 Les soldes confidentiels sont séparés en soldes en attente et soldes disponibles
@@ -155,13 +195,13 @@ soumise et celui où elle est traitée, entraînant l'échec de la transaction.
 
 Tous les dépôts et montants de transfert sont initialement ajoutés au solde en
 attente. Les propriétaires de token account doivent utiliser l'instruction
-_rs`ApplyPendingBalance`_ pour convertir le solde en attente en solde
+`ApplyPendingBalance` pour convertir le solde en attente en solde
 disponible. Les transferts entrants ou les dépôts n'affectent pas le solde
 disponible d'un token account.
 
-</Callout>
+</Info>
 
-<Callout type="info">
+<Info>
   **Séparation haute/basse du solde en attente**
 
 Le solde en attente confidentiel est divisé en `pending_balance_lo` et
@@ -169,15 +209,15 @@ Le solde en attente confidentiel est divisé en `pending_balance_lo` et
 calculs pour les grands nombres. Vous pouvez trouver l'implémentation de
 l'arithmétique sur les textes chiffrés
 [ici](https://github.com/solana-program/token-2022/blob/efd0c957fefbd79882d77df5fb2dac88c001249c/confidential-transfer/ciphertext-arithmetic/src/lib.rs#L54),
-utilisée dans l'instruction _rs`ApplyPendingBalance`_
+utilisée dans l'instruction `ApplyPendingBalance`
 [ici](https://github.com/solana-program/token-2022/blob/efd0c957fefbd79882d77df5fb2dac88c001249c/program/src/extension/confidential_transfer/processor.rs#L1180-L1184).
 
-</Callout>
+</Info>
 
-<Callout type="info">
+<Info>
   **Compteurs de crédit du solde en attente**
 
-Lors de l'appel de l'instruction _rs`ApplyPendingBalance`_ pour convertir le
+Lors de l'appel de l'instruction `ApplyPendingBalance` pour convertir le
 solde en attente en solde disponible :
 
 1. Le client récupère les soldes en attente et disponibles actuels, chiffre leur
@@ -186,13 +226,13 @@ solde en attente en solde disponible :
 
 2. Les compteurs de crédit en attente attendu et réel suivent les modifications
    de la valeur du compteur entre le moment où l'instruction
-   _rs`ApplyPendingBalance`_ est créée et celui où elle est traitée :
+   `ApplyPendingBalance` est créée et celui où elle est traitée :
    - `expected_pending_balance_credit_counter` : La valeur
      `pending_balance_credit_counter` au moment où le client crée l'instruction
-     _rs`ApplyPendingBalance`_
+     `ApplyPendingBalance`
    - `actual_pending_balance_credit_counter` : La valeur
      `pending_balance_credit_counter` sur le token account au moment où
-     l'instruction _rs`ApplyPendingBalance`_ est traitée
+     l'instruction `ApplyPendingBalance` est traitée
 
 Des compteurs attendus/réels identiques indiquent que le
 `decryptable_available_balance` correspond au `available_balance`.
@@ -215,44 +255,44 @@ ces étapes pour réconcilier le `decryptable_available_balance` :
    - Déchiffrer et ajouter les montants du texte chiffré de destination des
      instructions de transfert
 
-</Callout>
+</Info>
 
 ### Instructions requises
 
 La création et la configuration d'un token account pour les Confidential Balances utilisent les instructions suivantes, qui tiennent toutes dans une seule transaction :
 
 1. **Créer le token account** : Invoquer l'instruction
-   _rs`AssociatedTokenAccountInstruction::Create`_ de l'Associated Token Program
+   `AssociatedTokenAccountInstruction::Create` de l'Associated Token Program
    pour créer le token account à son adresse déterministe.
 
 2. **Réallouer l'espace du compte** : Invoquer l'instruction
-   _rs`TokenInstruction::Reallocate`_ du Token Extension Program pour ajouter de
-   l'espace à l'état _rs`ConfidentialTransferAccount`_.
+   `TokenInstruction::Reallocate` du Token Extension Program pour ajouter de
+   l'espace à l'état `ConfidentialTransferAccount`.
 
 3. **Vérifier la preuve de validité du Pubkey** : Créer un compte appartenant au
    programme ZK ElGamal Proof, puis invoquer son instruction
-   _rs`VerifyPubkeyValidity`_ pour vérifier la preuve et stocker le résultat
+   `VerifyPubkeyValidity` pour vérifier la preuve et stocker le résultat
    vérifié dans ce compte d'état de contexte.
 
 4. **Configurer les Confidential Balances** : Invoquez l'instruction
    [ConfidentialTransferInstruction::ConfigureAccount](https://github.com/solana-program/token-2022/blob/efd0c957fefbd79882d77df5fb2dac88c001249c/program/src/extension/confidential_transfer/processor.rs#L201)
    du Token Extensions Program, en référençant le compte d'état de contexte de preuve via
-   _rs`ProofLocation::ContextStateAccount`_, pour initialiser l'état
-   _rs`ConfidentialTransferAccount`_.
+   `ProofLocation::ContextStateAccount`, pour initialiser l'état
+   `ConfidentialTransferAccount`.
 
-<Callout type="info">
+<Info>
 
 **Seul le propriétaire du token account peut activer les Confidential Balances sur un token account**.
 
-L'instruction _rs`ConfigureAccount`_ nécessite la génération côté client de clés de chiffrement et d'une preuve qui ne peut être générée que par le propriétaire du token account.
+L'instruction `ConfigureAccount` nécessite la génération côté client de clés de chiffrement et d'une preuve qui ne peut être générée que par le propriétaire du token account.
 
-La preuve de validité du pubkey vérifie que la clé publique ElGamal du compte est valide. Elle est générée avec _rs`build_pubkey_validity_proof_data`_, vérifiée on-chain par le programme ZK ElGamal Proof dans un compte d'état de contexte, puis référencée depuis _rs`ConfigureAccount`_ via
-_rs`ProofLocation::ContextStateAccount`_, de sorte qu'aucun octet de preuve ne transite dans l'instruction du token elle-même. Pour les détails d'implémentation, voir :
+La preuve de validité du pubkey vérifie que la clé publique ElGamal du compte est valide. Elle est générée avec `build_pubkey_validity_proof_data`, vérifiée on-chain par le programme ZK ElGamal Proof dans un compte d'état de contexte, puis référencée depuis `ConfigureAccount` via
+`ProofLocation::ContextStateAccount`, de sorte qu'aucun octet de preuve ne transite dans l'instruction du token elle-même. Pour les détails d'implémentation, voir :
 
 - [PubkeyValidityProofData](https://github.com/anza-xyz/agave/blob/b39a9764005ac8596b7e14e61d381305ce57ecaa/zk-sdk/src/zk_elgamal_proof_program/proof_data/pubkey_validity.rs#L58)
 - [PubkeyValidityProof](https://github.com/anza-xyz/agave/blob/b39a9764005ac8596b7e14e61d381305ce57ecaa/zk-sdk/src/sigma_proofs/pubkey_validity.rs#L65)
 
-</Callout>
+</Info>
 
 ## Exemple de code
 
@@ -263,10 +303,9 @@ Exécutez l'exemple sur l'un de ces environnements (le code utilise le devnet) a
 
 ### Rust
 
-<CodeTabs>
+<CodeGroup>
 
-```rust !! title="main.rs"
-// !collapse(1:36) collapsed
+```rust main.rs expandable
 // Imports: dependencies used by this example.
 use anyhow::{Context, Result};
 use solana_address::Address;
@@ -424,7 +463,6 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-// !collapse(1:1000) collapsed
 // Setup: helper function to create the confidential mint.
 fn create_confidential_mint(rpc_client: &RpcClient, payer: &Keypair, decimals: u8) -> Result<Pubkey> {
     let mint = Keypair::new();
@@ -492,7 +530,7 @@ fn load_keypair() -> Result<Keypair> {
 }
 ```
 
-```toml !! title="Cargo.toml"
+```toml Cargo.toml
 [package]
 name = "confidential-transfer"
 version = "0.1.0"
@@ -524,14 +562,13 @@ dirs = "6.0.0"
 serde_json = "1.0"
 ```
 
-</CodeTabs>
+</CodeGroup>
 
 ### Typescript
 
-<CodeTabs>
+<CodeGroup>
 
-```ts !! title="index.ts"
-// !collapse(1:21) collapsed
+```ts index.ts expandable
 // Imports: dependencies used by this example.
 import {
   deriveAeKeyForOwnerMint,
@@ -608,7 +645,6 @@ console.log(
   `Enabled Confidential Balances on token account ${tokenAccount}: ${result.context.signature}`
 );
 
-// !collapse(1:1000) collapsed
 // Setup: helper function to create the confidential mint.
 async function createConfidentialMint(
   kitClient: typeof client,
@@ -643,7 +679,7 @@ async function createConfidentialMint(
 }
 ```
 
-```json !! title="package.json"
+```json package.json
 {
   "name": "confidential-account",
   "version": "0.1.0",
@@ -663,9 +699,9 @@ async function createConfidentialMint(
 }
 ```
 
-</CodeTabs>
+</CodeGroup>
 
-<Callout type="info">
+<Info>
   Les utilitaires TypeScript se trouvent dans le sous-chemin
   `@solana-program/token-2022/confidential` et s'appuient sur `@solana/zk-sdk`
   pour les primitives de chiffrement. `owner` et `client` proviennent de votre
@@ -673,4 +709,4 @@ async function createConfidentialMint(
   la prise en charge des plans d'instructions de `@solana/kit`, qui répartit le
   travail sur plusieurs transactions lorsque les preuves sont trop volumineuses
   pour une seule.
-</Callout>
+</Info>

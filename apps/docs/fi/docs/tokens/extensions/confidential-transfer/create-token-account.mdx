@@ -13,7 +13,7 @@ tarvittava laajennus on käytössä.
 Seuraava kaavio näyttää vaiheet, joita tarvitaan token account -tilin luomiseen
 Confidential Balances käytössä:
 
-```mermaid title="Create Token Account with Confidential Balances"
+```mermaid
 sequenceDiagram
     participant Payer as Wallet
     participant ATA as Associated Token Program
@@ -48,6 +48,46 @@ sequenceDiagram
     Token22-->>TokenAccount: Configure Confidential Balances
     deactivate Token22
 ```
+
+<div className="nojs-only" data-fallback="mermaid">
+  ```text Mermaid
+  sequenceDiagram
+      participant Payer as Wallet
+      participant ATA as Associated Token Program
+      participant Token22 as Token Extensions Program
+      participant ZK as ZK ElGamal Proof Program
+      participant TokenAccount as Token Account
+
+      Payer->>ATA: create_associated_token_account()
+      activate ATA
+      ATA->>Token22: Create token account at deterministic address
+      deactivate ATA
+      activate Token22
+      Token22-->>TokenAccount: Initialize Token Account
+      deactivate Token22
+
+      Payer->>Token22: reallocate() for ConfidentialTransferAccount extension
+      activate Token22
+      Token22-->>TokenAccount: Add space for extension data
+      deactivate Token22
+
+      Payer->>Payer: Derive ElGamal keypair and AES key
+      Payer->>Payer: Generate pubkey validity proof
+      Payer->>Payer: Encrypt initial balance (0) with AES key
+
+      Payer->>ZK: VerifyPubkeyValidity into context state account
+      activate ZK
+      ZK-->>ZK: Verify proof and store result in context state account
+      deactivate ZK
+
+      Payer->>Token22: configure_account() referencing the proof context account
+      activate Token22
+      Token22-->>TokenAccount: Configure Confidential Balances
+      deactivate Token22
+  ```
+</div>
+
+<p className="sol-caption">Create Token Account with Confidential Balances</p>
 
 ### Confidential Balances Token Account -tila
 
@@ -105,7 +145,7 @@ pub struct ConfidentialTransferAccount {
 }
 ```
 
-_rs`ConfidentialTransferAccount`_ sisältää useita kenttiä, jotka hallitsevat
+`ConfidentialTransferAccount` sisältää useita kenttiä, jotka hallitsevat
 Confidential Balances -ominaisuutta:
 
 - **approved**: Tilin hyväksymistila Confidential Balances -ominaisuudelle. Jos
@@ -137,18 +177,18 @@ Confidential Balances -ominaisuutta:
   talletus- ja siirto-ohjeista.
 
 - **maximum_pending_balance_credit_counter**: Odottavien hyvitysten
-  enimmäismäärä ennen kuin vaaditaan _rs`ApplyPendingBalance`_ -ohje odottavan
+  enimmäismäärä ennen kuin vaaditaan `ApplyPendingBalance` -ohje odottavan
   saldon muuntamiseksi käytettävissä olevaksi saldoksi.
 
 - **expected_pending_balance_credit_counter**: Asiakkaan instruction data
   -kentässä viimeksi toimittama `pending_balance_credit_counter` -arvo, kun
-  _rs`ApplyPendingBalance`_ -ohje viimeksi käsiteltiin.
+  `ApplyPendingBalance` -ohje viimeksi käsiteltiin.
 
 - **actual_pending_balance_credit_counter**:
   `pending_balance_credit_counter`-arvo token account -tilillä sillä hetkellä,
-  kun viimeisin _rs`ApplyPendingBalance`_-instruktio käsiteltiin.
+  kun viimeisin `ApplyPendingBalance`-instruktio käsiteltiin.
 
-<Callout type="info">
+<Info>
   **Odottava vs. käytettävissä oleva saldo**
 
 Luottamukselliset saldot on jaettu odottaviin ja käytettävissä oleviin saldoihin
@@ -159,29 +199,29 @@ siirtämään tokeneita, koska salattu saldo muuttuisi siinä välillä, kun tap
 lähetetään ja kun se käsitellään, mikä johtaisi epäonnistuneeseen tapahtumaan.
 
 Kaikki talletukset ja siirtosummat lisätään aluksi odottavaan saldoon. Token
-account -tilin omistajien on käytettävä _rs`ApplyPendingBalance`_-instruktiota
+account -tilin omistajien on käytettävä `ApplyPendingBalance`-instruktiota
 muuntaakseen odottavan saldon käytettävissä olevaksi saldoksi. Saapuvat siirrot
 tai talletukset eivät vaikuta token account -tilin käytettävissä olevaan
 saldoon.
 
-</Callout>
+</Info>
 
-<Callout type="info">
+<Info>
   **Odottavan saldon korkea/matala jako**
 
 Luottamuksellinen odottava saldo on jaettu `pending_balance_lo`- ja
 `pending_balance_hi`-osiin, koska ElGamal-salauksen purku vaatii enemmän
 laskentaa suuremmille luvuille. Salauslaskutoimituksen toteutuksen löydät
 [täältä](https://github.com/solana-program/token-2022/blob/efd0c957fefbd79882d77df5fb2dac88c001249c/confidential-transfer/ciphertext-arithmetic/src/lib.rs#L54),
-jota käytetään _rs`ApplyPendingBalance`_-instruktiossa
+jota käytetään `ApplyPendingBalance`-instruktiossa
 [täällä](https://github.com/solana-program/token-2022/blob/efd0c957fefbd79882d77df5fb2dac88c001249c/program/src/extension/confidential_transfer/processor.rs#L1180-L1184).
 
-</Callout>
+</Info>
 
-<Callout type="info">
+<Info>
   **Odottavan saldon krediittilaskurit**
 
-Kutsuttaessa _rs`ApplyPendingBalance`_-instruktiota odottavan saldon
+Kutsuttaessa `ApplyPendingBalance`-instruktiota odottavan saldon
 muuntamiseksi käytettävissä olevaksi saldoksi:
 
 1. Asiakas hakee nykyiset odottavat ja käytettävissä olevat saldot, salaa summan
@@ -189,14 +229,14 @@ muuntamiseksi käytettävissä olevaksi saldoksi:
    -tilin omistajan AES-avaimella.
 
 2. Odotetut ja toteutuneet odottavat krediittilaskurit seuraavat laskuriarvon
-   muutoksia siinä välillä, kun _rs`ApplyPendingBalance`_-instruktio luodaan ja
+   muutoksia siinä välillä, kun `ApplyPendingBalance`-instruktio luodaan ja
    käsitellään:
    - `expected_pending_balance_credit_counter`:
      `pending_balance_credit_counter`-arvo sillä hetkellä, kun asiakas luo
-     _rs`ApplyPendingBalance`_-instruktion
+     `ApplyPendingBalance`-instruktion
    - `actual_pending_balance_credit_counter`:
      `pending_balance_credit_counter`-arvo token account -tilillä sillä
-     hetkellä, kun _rs`ApplyPendingBalance`_-instruktio käsitellään
+     hetkellä, kun `ApplyPendingBalance`-instruktio käsitellään
 
 Yhteensopivat odotettu/todellinen-laskurit osoittavat, että
 `decryptable_available_balance` vastaa `available_balance`.
@@ -217,7 +257,7 @@ näitä vaiheita `decryptable_available_balance`-arvon täsmäyttämiseksi:
    - Lisää julkiset summat talletusinstruktioista
    - Pura salaus ja lisää kohdesalakielitekstin summat siirtoinstruktioista
 
-</Callout>
+</Info>
 
 ### Vaaditut instruktiot
 
@@ -225,37 +265,37 @@ Token account -tilin luominen ja määrittäminen Confidential Balances -ominais
 käyttää seuraavia ohjeita, jotka kaikki mahtuvat yhteen transaktioon:
 
 1. **Luo token account**: Kutsu Associated Token Program -ohjelman
-   _rs`AssociatedTokenAccountInstruction::Create`_-instruktioita luodaksesi
+   `AssociatedTokenAccountInstruction::Create`-instruktioita luodaksesi
    token account -tilin sen deterministiseen osoitteeseen.
 
 2. **Uudelleenallokoi tilatila**: Kutsu Token Extension Program -ohjelman
-   _rs`TokenInstruction::Reallocate`_-instruktioita lisätäksesi tilaa
-   _rs`ConfidentialTransferAccount`_-tilalle.
+   `TokenInstruction::Reallocate`-instruktioita lisätäksesi tilaa
+   `ConfidentialTransferAccount`-tilalle.
 
 3. **Tarkista pubkey-voimassaolotodiste**: Luo ZK ElGamal Proof -ohjelman
-   omistama tili, ja kutsu sitten sen _rs`VerifyPubkeyValidity`_-instruktioita
+   omistama tili, ja kutsu sitten sen `VerifyPubkeyValidity`-instruktioita
    todisteen vahvistamiseksi ja vahvistetun tuloksen tallentamiseksi kyseiselle
    kontekstitilatilille.
 
 4. **Määritä Confidential Balances**: Kutsu Token Extensions Program -ohjelman
    [ConfidentialTransferInstruction::ConfigureAccount](https://github.com/solana-program/token-2022/blob/efd0c957fefbd79882d77df5fb2dac88c001249c/program/src/extension/confidential_transfer/processor.rs#L201)-käskyä,
    viitaten todistuksen kontekstitila-tiliin
-   _rs`ProofLocation::ContextStateAccount`_:n kautta, alustamaan
-   _rs`ConfidentialTransferAccount`_-tila.
+   `ProofLocation::ContextStateAccount`:n kautta, alustamaan
+   `ConfidentialTransferAccount`-tila.
 
-<Callout type="info">
+<Info>
 
 **Ainoastaan token account -tilin omistaja voi ottaa Confidential Balances -ominaisuuden käyttöön token account -tilillä**.
 
-_rs`ConfigureAccount`_-käsky vaatii asiakaspuolen salausavainten ja todistuksen luomisen, jonka voi luoda vain token account -tilin omistaja.
+`ConfigureAccount`-käsky vaatii asiakaspuolen salausavainten ja todistuksen luomisen, jonka voi luoda vain token account -tilin omistaja.
 
-Pubkey-validiteettitodistus varmistaa, että tilin ElGamal-pubkey on kelvollinen. Se luodaan _rs`build_pubkey_validity_proof_data`_:llä, varmennetaan ketjussa ZK ElGamal Proof -ohjelman toimesta kontekstitila-tilille, ja viitataan sitten _rs`ConfigureAccount`_:sta
-_rs`ProofLocation::ContextStateAccount`_:n kautta, joten token-käskyssä itsessään ei kulje lainkaan todistusbittejä. Toteutuksen yksityiskohtia varten katso:
+Pubkey-validiteettitodistus varmistaa, että tilin ElGamal-pubkey on kelvollinen. Se luodaan `build_pubkey_validity_proof_data`:llä, varmennetaan ketjussa ZK ElGamal Proof -ohjelman toimesta kontekstitila-tilille, ja viitataan sitten `ConfigureAccount`:sta
+`ProofLocation::ContextStateAccount`:n kautta, joten token-käskyssä itsessään ei kulje lainkaan todistusbittejä. Toteutuksen yksityiskohtia varten katso:
 
 - [PubkeyValidityProofData](https://github.com/anza-xyz/agave/blob/b39a9764005ac8596b7e14e61d381305ce57ecaa/zk-sdk/src/zk_elgamal_proof_program/proof_data/pubkey_validity.rs#L58)
 - [PubkeyValidityProof](https://github.com/anza-xyz/agave/blob/b39a9764005ac8596b7e14e61d381305ce57ecaa/zk-sdk/src/sigma_proofs/pubkey_validity.rs#L65)
 
-</Callout>
+</Info>
 
 ## Esimerkkikoodi
 
@@ -270,10 +310,9 @@ ja korvaa mint-paikanpitäjä mintillä, joka on luotu ohjeen [Create a Mint](/d
 
 ### Rust
 
-<CodeTabs>
+<CodeGroup>
 
-```rust !! title="main.rs"
-// !collapse(1:36) collapsed
+```rust main.rs expandable
 // Imports: dependencies used by this example.
 use anyhow::{Context, Result};
 use solana_address::Address;
@@ -431,7 +470,6 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-// !collapse(1:1000) collapsed
 // Setup: helper function to create the confidential mint.
 fn create_confidential_mint(rpc_client: &RpcClient, payer: &Keypair, decimals: u8) -> Result<Pubkey> {
     let mint = Keypair::new();
@@ -499,7 +537,7 @@ fn load_keypair() -> Result<Keypair> {
 }
 ```
 
-```toml !! title="Cargo.toml"
+```toml Cargo.toml
 [package]
 name = "confidential-transfer"
 version = "0.1.0"
@@ -531,14 +569,13 @@ dirs = "6.0.0"
 serde_json = "1.0"
 ```
 
-</CodeTabs>
+</CodeGroup>
 
 ### Typescript
 
-<CodeTabs>
+<CodeGroup>
 
-```ts !! title="index.ts"
-// !collapse(1:21) collapsed
+```ts index.ts expandable
 // Imports: dependencies used by this example.
 import {
   deriveAeKeyForOwnerMint,
@@ -615,7 +652,6 @@ console.log(
   `Enabled Confidential Balances on token account ${tokenAccount}: ${result.context.signature}`
 );
 
-// !collapse(1:1000) collapsed
 // Setup: helper function to create the confidential mint.
 async function createConfidentialMint(
   kitClient: typeof client,
@@ -650,7 +686,7 @@ async function createConfidentialMint(
 }
 ```
 
-```json !! title="package.json"
+```json package.json
 {
   "name": "confidential-account",
   "version": "0.1.0",
@@ -670,13 +706,13 @@ async function createConfidentialMint(
 }
 ```
 
-</CodeTabs>
+</CodeGroup>
 
-<Callout type="info">
+<Info>
   TypeScript-apufunktiot sijaitsevat
   `@solana-program/token-2022/confidential`-alipolussa ja rakentuvat
   `@solana/zk-sdk`:n salausprimitiivien päälle. `owner` ja `client` tulevat
   `@solana/kit`-asetuksestasi; palautettu ohjesuunnitelma lähetetään
   `@solana/kit`:n ohjesuunnitelmatuen avulla, joka jakaa työn useisiin
   transaktioihin, kun todisteet ovat liian suuria yhdelle.
-</Callout>
+</Info>

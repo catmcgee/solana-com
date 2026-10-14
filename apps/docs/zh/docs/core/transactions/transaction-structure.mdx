@@ -2,7 +2,6 @@
 title: 交易结构
 description:
   Solana 交易的结构，包括签名、消息格式、头部、账户地址、区块哈希、已编译指令、二进制编码和大小预算。
-url: /docs/core/transactions/transaction-structure
 type: conceptual
 prerequisites:
   - /docs/core/transactions
@@ -16,45 +15,47 @@ related:
 
 {/* TOC: Signatures, Message (Header, Account addresses, Recent blockhash, Instructions), Transaction binary format, SOL transfer example */}
 
-<Callout type="info" title="摘要">
+<Info>
+  **摘要**
+
   一笔交易包含签名和消息。消息由头部、账户地址、最近区块哈希以及已编译的指令组成。最大序列化大小：1,232 字节（即将推出的 v1 格式为 4,096 字节）。
-</Callout>
+</Info>
 
 一个
 [`Transaction`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/transaction/src/lib.rs#L193)
 有两个顶层字段：
 
-<WithMentions>
+- `signatures`：签名数组
+- `message`：交易信息，包括待处理的指令列表
 
-- [`signatures`](mention:signatures)：签名数组
-- [`message`](mention:message)：交易信息，包括待处理的指令列表
-
-```rust title="Transaction"
+```rust Transaction
 pub struct Transaction {
-    // !mention signatures
     pub signatures: Vec<Signature>,
-    // !mention message
     pub message: Message,
 }
 ```
 
-</WithMentions>
-
-![展示交易两部分的示意图](/assets/docs/core/transactions/tx_format.png)
+<Frame caption="展示交易两部分的示意图">
+  ![展示交易两部分的示意图](/docs-assets/assets/docs/core/transactions/tx_format.png)
+</Frame>
 
 交易的总序列化大小不得超过
 [`PACKET_DATA_SIZE`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/packet/src/lib.rs#L32)
 （1,232 字节）。该限制等于 1,280 字节（IPv6 最小 MTU）减去 48 字节的网络头部（40 字节 IPv6 +
-8 字节分片头）。1,232 字节包括 [`signatures`](#signatures) 数组和
-[`message`](#message) 结构体。
+8 字节分片头）。1,232 字节包括 [`signatures`](#签名) 数组和
+[`message`](#消息) 结构体。
 
-<Callout type="info" title="v1 交易将上限提高至 4,096 字节">
+<Info>
+  **v1 交易将上限提高至 4,096 字节**
+
   本页介绍的是旧版交易格式，v0 格式除版本前缀和地址查找表外也遵循相同结构。即将推出的
   [v1 格式](/docs/core/transactions/versioned-transactions#v1-message-format)
   将大小限制提高至 4,096 字节，并采用不同的线路布局。
-</Callout>
+</Info>
 
-![展示交易格式和大小限制的示意图](/assets/docs/core/transactions/issues_with_legacy_txs.png)
+<Frame caption="展示交易格式和大小限制的示意图">
+  ![展示交易格式和大小限制的示意图](/docs-assets/assets/docs/core/transactions/issues_with_legacy_txs.png)
+</Frame>
 
 ## 签名
 
@@ -62,7 +63,7 @@ pub struct Transaction {
 [`Signature`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/signature/src/lib.rs#L34)
 值数组。每个 `Signature` 都是对序列化的 `Message`
 进行 Ed25519 算法签名（64 字节），由签名账户的私钥签署。每个交易指令中引用的
-[签名账户](#account-addresses) 都需要一个签名。
+[签名账户](#账户地址) 都需要一个签名。
 
 每个签名由一个私钥生成。该密钥的存储位置——本地 keypair、云端 HSM 或 KMS，还是托管钱包服务——属于生产环境的设计决策。请参阅
 [生产环境中的签名](/docs/core/transactions/signing-in-production)。
@@ -78,7 +79,7 @@ pub struct Transaction {
   [`validate_fee_payer`](https://github.com/anza-xyz/agave/blob/v3.1.8/svm/src/account_loader.rs#L369-L417)
   验证）。
 - 必须持有足够的 lamport 以覆盖 `rent_exempt_minimum + total_fee`；否则交易将以
-  _rs`InsufficientFundsForFee`_ 失败。
+  `InsufficientFundsForFee` 失败。
 
 ## 消息
 
@@ -86,80 +87,69 @@ pub struct Transaction {
 [`Message`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/message/src/legacy.rs#L161)
 结构体，包含交易的有效载荷：
 
-<WithMentions>
+- `header`：消息[头部](#头部)
+- `account_keys`：交易指令所需的
+  [账户地址](#账户地址)数组
+- `recent_blockhash`：充当交易时间戳的
+  [区块哈希](#最近区块哈希)
+- `instructions`：[指令](#指令)数组
 
-- [`header`](mention:message-header)：消息[头部](#header)
-- [`account_keys`](mention:account-addresses)：交易指令所需的
-  [账户地址](#account-addresses)数组
-- [`recent_blockhash`](mention:recent-blockhash)：充当交易时间戳的
-  [区块哈希](#recent-blockhash)
-- [`instructions`](mention:instructions)：[指令](#instructions)数组
-
-```rust title="Message"
+```rust Message
 pub struct Message {
     /// The message header, identifying signed and read-only `account_keys`.
-    // !mention message-header
     pub header: MessageHeader,
 
     /// All the account keys used by this transaction.
     #[serde(with = "short_vec")]
-    // !mention account-addresses
     pub account_keys: Vec<Pubkey>,
 
     /// The id of a recent ledger entry.
-    // !mention recent-blockhash
     pub recent_blockhash: Hash,
 
     /// Programs that will be executed in sequence and committed in
     /// one atomic transaction if all succeed.
     #[serde(with = "short_vec")]
-    // !mention instructions
     pub instructions: Vec<CompiledInstruction>,
 }
 ```
 
-</WithMentions>
-
 ### 头部
-
-<WithMentions>
 
 `header` 字段是一个
 [`MessageHeader`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/message/src/lib.rs#L109)
 结构体，包含三个 `u8` 字段，将 `account_keys` 数组划分为不同的权限组：
 
-- [`num_required_signatures`](mention:num_required_signatures)：交易所需签名的总数。
-- [`num_readonly_signed_accounts`](mention:num_readonly_signed_accounts)：只读的已签名账户数量。
-- [`num_readonly_unsigned_accounts`](mention:num_readonly_unsigned_accounts)：只读的未签名账户数量。
+- `num_required_signatures`：交易所需签名的总数。
+- `num_readonly_signed_accounts`：只读的已签名账户数量。
+- `num_readonly_unsigned_accounts`：只读的未签名账户数量。
 
-```rust title="MessageHeader"
+```rust MessageHeader
 pub struct MessageHeader {
     /// The number of signatures required for this message to be considered
     /// valid. The signers of those signatures must match the first
     /// `num_required_signatures` of [`Message::account_keys`].
-    // !mention num_required_signatures
     pub num_required_signatures: u8,
 
     /// The last `num_readonly_signed_accounts` of the signed keys are read-only
     /// accounts.
-    // !mention num_readonly_signed_accounts
     pub num_readonly_signed_accounts: u8,
 
     /// The last `num_readonly_unsigned_accounts` of the unsigned keys are
     /// read-only accounts.
-    // !mention num_readonly_unsigned_accounts
     pub num_readonly_unsigned_accounts: u8,
 }
 ```
 
-</WithMentions>
+<Info>
+  **旧版和版本化消息前缀**
 
-<Callout type="info" title="旧版和版本化消息前缀">
   在旧版交易消息中，消息的第一个字节为 `num_required_signatures`，其后是另外两个 `MessageHeader` 字节。在版本化交易消息中，第一个字节为版本前缀；三字节的 `MessageHeader` 紧随该前缀之后。完整的 v0 和 v1 消息布局请参阅
   [版本化交易](/docs/core/transactions/versioned-transactions)。
-</Callout>
+</Info>
 
-![展示消息头三个部分的示意图](/assets/docs/core/transactions/message_header.png)
+<Frame caption="展示消息头三个部分的示意图">
+  ![展示消息头三个部分的示意图](/docs-assets/assets/docs/core/transactions/message_header.png)
+</Frame>
 
 ### 账户地址
 
@@ -171,12 +161,14 @@ pub struct MessageHeader {
 3. 非签名者 + 可写
 4. 非签名者 + 只读
 
-<Callout>
-  这种严格的排序方式允许将 `account_keys` 数组与消息 [`header`](#header)
+<Note>
+  这种严格的排序方式允许将 `account_keys` 数组与消息 [`header`](#头部)
   中的三个计数组合使用，从而无需存储每个账户的元数据标志即可确定各账户的权限。头部计数将数组划分为上述四个权限组。
-</Callout>
+</Note>
 
-![展示账户地址数组顺序的示意图](/assets/docs/core/transactions/compat_array_of_account_addresses.png)
+<Frame caption="展示账户地址数组顺序的示意图">
+  ![展示账户地址数组顺序的示意图](/docs-assets/assets/docs/core/transactions/compat_array_of_account_addresses.png)
+</Frame>
 
 ### 最近区块哈希
 
@@ -186,49 +178,44 @@ pub struct MessageHeader {
 2. **去重**：防止同一笔交易被重复处理。
 
 区块哈希在 150 个 slot 后过期。如果交易到达时区块哈希已不再有效，该交易将以
-_rs`BlockhashNotFound`_
+`BlockhashNotFound`
 被拒绝，除非它是有效的[持久 nonce 交易](/docs/core/transactions/durable-nonces)。
 
-<Callout>
+<Note>
   [`getLatestBlockhash`](/docs/rpc/http/getlatestblockhash) RPC 方法
   允许您获取当前区块哈希及该区块哈希有效的最后区块高度。
-</Callout>
+</Note>
 
 ### 指令
 
 [`instructions`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/message/src/legacy.rs#L176)
 字段是一个紧凑编码的
 [`CompiledInstruction`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/message/src/compiled_instruction.rs#L21)
-结构体数组。每个 _rs`CompiledInstruction`_ 通过索引引用 `account_keys`
+结构体数组。每个 `CompiledInstruction` 通过索引引用 `account_keys`
 数组中的账户，而非使用完整公钥。它包含：
 
-<WithMentions>
-
-1. [`program_id_index`](mention:program-id-index)：`account_keys`
+1. `program_id_index`：`account_keys`
    中的索引，用于标识要调用的程序。
-2. [`accounts`](mention:account-indexes)：`account_keys`
+2. `accounts`：`account_keys`
    中的索引数组，用于指定传递给程序的账户。
-3. [`data`](mention:instruction-data)：字节数组，包含指令鉴别器和序列化参数。
+3. `data`：字节数组，包含指令鉴别器和序列化参数。
 
-```rust title="CompiledInstruction"
+```rust CompiledInstruction
 pub struct CompiledInstruction {
     /// Index into the transaction keys array indicating the program account that executes this instruction.
-    // !mention program-id-index
     pub program_id_index: u8,
     /// Ordered indices into the transaction keys array indicating which accounts to pass to the program.
     #[serde(with = "short_vec")]
-    // !mention account-indexes
     pub accounts: Vec<u8>,
     /// The program input data.
     #[serde(with = "short_vec")]
-    // !mention instruction-data
     pub data: Vec<u8>,
 }
 ```
 
-</WithMentions>
-
-![指令紧凑数组](/assets/docs/core/transactions/compact_array_of_ixs.png)
+<Frame caption="指令紧凑数组">
+  ![指令紧凑数组](/docs-assets/assets/docs/core/transactions/compact_array_of_ixs.png)
+</Frame>
 
 ## 交易二进制格式
 
@@ -236,18 +223,18 @@ pub struct CompiledInstruction {
 
 **旧版交易布局**（传输格式）：
 
-| 字段                     | 大小                          | 描述                                     |
-| ------------------------- | ----------------------------- | ----------------------------------------------- |
-| `num_signatures`          | 1-3 字节 (compact-u16)       | 签名数量                            |
-| `signatures`              | `num_signatures` x 64 字节   | Ed25519 签名                              |
-| `num_required_signatures` | 1 字节                        | `MessageHeader` 字段 1                         |
-| `num_readonly_signed`     | 1 字节                        | `MessageHeader` 字段 2                         |
-| `num_readonly_unsigned`   | 1 字节                        | `MessageHeader` 字段 3                         |
-| `num_account_keys`        | 1-3 字节 (compact-u16)       | 静态账户密钥数量                   |
-| `account_keys`            | `num_account_keys` x 32 字节 | 公钥                                     |
-| `recent_blockhash`        | 32 字节                      | 区块哈希                                       |
-| `num_instructions`        | 1-3 字节 (compact-u16)       | 指令数量                          |
-| `instructions`            | 可变                      | [已编译指令](#instructions)数组 |
+| 字段                        | 大小                         | 描述                   |
+| ------------------------- | -------------------------- | -------------------- |
+| `num_signatures`          | 1-3 字节 (compact-u16)       | 签名数量                 |
+| `signatures`              | `num_signatures` x 64 字节   | Ed25519 签名           |
+| `num_required_signatures` | 1 字节                       | `MessageHeader` 字段 1 |
+| `num_readonly_signed`     | 1 字节                       | `MessageHeader` 字段 2 |
+| `num_readonly_unsigned`   | 1 字节                       | `MessageHeader` 字段 3 |
+| `num_account_keys`        | 1-3 字节 (compact-u16)       | 静态账户密钥数量             |
+| `account_keys`            | `num_account_keys` x 32 字节 | 公钥                   |
+| `recent_blockhash`        | 32 字节                      | 区块哈希                 |
+| `num_instructions`        | 1-3 字节 (compact-u16)       | 指令数量                 |
+| `instructions`            | 可变                         | [已编译指令](#指令)数组       |
 
 每条已编译指令的序列化格式如下：
 
@@ -261,7 +248,7 @@ pub struct CompiledInstruction {
 
 ### 大小计算
 
-已知 _rs`PACKET_DATA_SIZE`_ = 1,232 字节，可用空间可按如下方式计算：
+已知 `PACKET_DATA_SIZE` = 1,232 字节，可用空间可按如下方式计算：
 
 ```
 Total = 1232 bytes
@@ -284,13 +271,23 @@ Total = 1232 bytes
 表明该账户必须为交易签名。这允许 System
 Program 从中扣除 lamport。发送方和接收方账户均须设为可写，以便其 lamport 余额发生变化。为执行此指令，发送方钱包将包含其签名及含有 SOL 转账指令的消息的交易发送出去。
 
-![SOL 转账示意图](/assets/docs/core/transactions/sol-transfer.svg)
+<Frame caption="SOL 转账示意图">
+  <img className="block dark:hidden" src="/docs-assets/assets/docs/core/transactions/sol-transfer-light.svg" alt="SOL 转账示意图" />
+
+  <img className="hidden dark:block" src="/docs-assets/assets/docs/core/transactions/sol-transfer.svg" alt="SOL 转账示意图" />
+</Frame>
 
 交易发送后，System Program 处理转账指令并更新两个账户的 lamport 余额。
 
-![SOL 转账流程示意图](/assets/docs/core/transactions/sol-transfer-process.svg)
+<Frame caption="SOL 转账流程示意图">
+  <img className="block dark:hidden" src="/docs-assets/assets/docs/core/transactions/sol-transfer-process-light.svg" alt="SOL 转账流程示意图" />
 
-<Callout type="warn" title="发送 SOL 前请验证接收方">
+  <img className="hidden dark:block" src="/docs-assets/assets/docs/core/transactions/sol-transfer-process.svg" alt="SOL 转账流程示意图" />
+</Frame>
+
+<Warning>
+
+**发送 SOL 前请验证接收方**
 
 System
 Program 转账会向**任意**账户添加 lamport，协议层面不会检查接收方是否能将 SOL 转回。lamport 只能由账户的所属程序转出，因此将 SOL 发送至您不控制的
@@ -304,14 +301,14 @@ Program 会拒绝该转账。原生 **SOL**
 转账则没有此类保护，因此发送方在签名前必须验证接收方。完整的分类逻辑请参阅
 [验证地址](/docs/payments/send-payments/verify-address)。
 
-</Callout>
+</Warning>
 
 下方示例展示了与上述图表相关的代码。请参阅 System Program 的
 [`transfer` 函数](https://github.com/anza-xyz/agave/blob/v3.1.8/programs/system/src/system_processor.rs#L210)。
 
-<CodeTabs storage="sol-transfer" flags="r">
+<CodeGroup>
 
-```ts !! title="Kit"
+```ts Kit highlight={32-37}
 import { createClient, generateKeyPairSigner, lamports } from "@solana/kit";
 import { solanaRpc, rpcAirdrop } from "@solana/kit-plugin-rpc";
 import { generatedPayer, airdropPayer } from "@solana/kit-plugin-signer";
@@ -343,7 +340,6 @@ const { value: preBalance2 } = await client.rpc
   .getBalance(recipient.address)
   .send();
 
-// !mark(1:6)
 // Create a transfer instruction for transferring SOL from sender to recipient
 const transferInstruction = client.system.instructions.transferSol({
   source: sender,
@@ -382,7 +378,7 @@ console.log(
 console.log("Transaction Signature:", transactionSignature.context.signature);
 ```
 
-```ts !! title="Legacy"
+```ts Legacy highlight={31-36}
 import {
   LAMPORTS_PER_SOL,
   SystemProgram,
@@ -413,7 +409,6 @@ const preBalance2 = await connection.getBalance(recipient.publicKey);
 // Define the amount to transfer
 const transferAmount = 0.01; // 0.01 SOL
 
-// !mark(1:6)
 // Create a transfer instruction for transferring SOL from sender to recipient
 const transferInstruction = SystemProgram.transfer({
   fromPubkey: sender.publicKey,
@@ -442,7 +437,7 @@ console.log("Recipient postbalance:", postBalance2 / LAMPORTS_PER_SOL);
 console.log("Transaction Signature:", transactionSignature);
 ```
 
-```rs !! title="Rust"
+```rs Rust
 use anyhow::Result;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_commitment_config::CommitmentConfig;
@@ -522,13 +517,13 @@ async fn main() -> Result<()> {
 }
 ```
 
-</CodeTabs>
+</CodeGroup>
 
 以下示例展示了包含单条 SOL 转账指令的交易结构。
 
-<CodeTabs storage="sol-transfer" flags="r">
+<CodeGroup>
 
-```ts !! title="Kit"
+```ts Kit
 import {
   createClient,
   generateKeyPairSigner,
@@ -591,7 +586,7 @@ const compiledTransactionMessage =
 console.log(JSON.stringify(compiledTransactionMessage, null, 2));
 ```
 
-```ts !! title="Legacy"
+```ts Legacy
 import {
   LAMPORTS_PER_SOL,
   SystemProgram,
@@ -629,7 +624,7 @@ const compiledMessage = transaction.compileMessage();
 console.log(JSON.stringify(compiledMessage, null, 2));
 ```
 
-```rs !! title="Rust"
+```rs Rust
 use anyhow::Result;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_commitment_config::CommitmentConfig;
@@ -670,33 +665,28 @@ async fn main() -> Result<()> {
 }
 ```
 
-</CodeTabs>
+</CodeGroup>
 
-<WithMentions>
 以下代码展示了前述代码片段的输出结果。
 不同 SDK 的格式有所差异，
 但请注意每条指令均包含相同的必要信息。
 
-<CodeTabs storage="sol-transfer">
+<CodeGroup>
 
-```json !! title="Kit"
+```json Kit
 {
   "version": 0,
-  // !mention header
   "header": {
     "numSignerAccounts": 1,
     "numReadonlySignerAccounts": 0,
     "numReadonlyNonSignerAccounts": 1
   },
-  // !mention account_keys
   "staticAccounts": [
     "HoCy8p5xxDDYTYWEbQZasEjVNM5rxvidx8AfyqA4ywBa",
     "5T388jBjovy7d8mQ3emHxMDTbUF8b7nWvAnSiP3EAdFL",
     "11111111111111111111111111111111"
   ],
-  // !mention recent_blockhash
   "lifetimeToken": "EGCWPUEXhqHJWYBfDirq3mHZb4qDpATmYqBZMBy9TBC1",
-  // !mention instructions
   "instructions": [
     {
       "programAddressIndex": 2,
@@ -720,22 +710,19 @@ async fn main() -> Result<()> {
 }
 ```
 
-```json !! title="Legacy"
+```json Legacy
 {
-  // !mention header
   "header": {
     "numRequiredSignatures": 1,
     "numReadonlySignedAccounts": 0,
     "numReadonlyUnsignedAccounts": 1
   },
-  // !mention account_keys
   "accountKeys": [
     "EPLUagqZZAuAtJ5LSbK7eeXjqeTdesd4q8WhoqVrfG3g",
     "9Txf5pi5jzm7FydFAsQafk7xn5wY9yN2UNm5LW15qvcK",
     "11111111111111111111111111111111"
   ],
   "recentBlockhash": "2qYPgehzMKXcMt4Ku1tKAk9DACKUbtYEY9EUEN42cseT",
-  // !mention instructions
   "instructions": [
     {
       "programIdIndex": 2,
@@ -747,13 +734,12 @@ async fn main() -> Result<()> {
 }
 ```
 
-```json !! title="Rust"
+```json Rust
 {
   "signatures": [
     "2fPXZtQGWWj6suxfc55FBQiexS8hEhNELqasSL5DRYa1RB1GChHz86Cyy8ukiVwA6qbq91P4cY1FuvTuYtmTHmJP"
   ],
   "message": {
-    // !mention header
     "header": {
       "num_required_signatures": 1,
       "num_readonly_signed_accounts": 0,
@@ -765,7 +751,6 @@ async fn main() -> Result<()> {
       "11111111111111111111111111111111"
     ],
     "recent_blockhash": "3P7CVQ9nwXx4B37MvBzghzbcM9K9p5xo7ivDE8W78dCi",
-    // !mention instructions
     "instructions": [
       {
         "program_id_index": 2,
@@ -777,8 +762,7 @@ async fn main() -> Result<()> {
 }
 ```
 
-</CodeTabs>
-</WithMentions>
+</CodeGroup>
 
 ### 转账前验证收款方
 
@@ -787,9 +771,7 @@ Program 钱包（或未充值的
 [链上曲线地址](/docs/payments/send-payments/verify-address#on-curve-addresses)）发送；拒绝向铸币账户、token
 account、程序及您不控制的 PDA 发送。
 
-<CodeTabs flags="r">
-
-```ts !! title="Kit"
+```ts Kit
 import {
   type Address,
   createSolanaRpc,
@@ -839,22 +821,20 @@ await assertSafeSolRecipient(
 );
 ```
 
-</CodeTabs>
-
-<Callout>
+<Note>
   此代码片段用于检查原生 SOL 收款方。如需完整的地址分类（同时支持 SPL
   代币发送，包括 token account、ATA 及 Token-2022），请参阅
   [验证地址](/docs/payments/send-payments/verify-address)。
-</Callout>
+</Note>
 
 ## 获取交易详情
 
 提交后，使用交易签名和 [getTransaction](/docs/rpc/http/gettransaction)
 RPC 方法检索交易详情。
 
-<Callout>
+<Note>
   您也可以使用 [Solana Explorer](https://explorer.solana.com) 查找该交易。
-</Callout>
+</Note>
 
 ```json title="Transaction Data"
 {

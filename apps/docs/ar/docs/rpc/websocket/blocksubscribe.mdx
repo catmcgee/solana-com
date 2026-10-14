@@ -1,136 +1,120 @@
 ---
-title: blockSubscribe
-hideTableOfContents: true
-h1: طريقة RPC لـ blockSubscribe
+title: طريقة RPC لـ blockSubscribe
+sidebarTitle: blockSubscribe
 ---
 
 اشترك لتلقي إشعار في أي وقت يتم فيه `confirmed` كتلة جديدة أو `finalized`.
 
-<Callout type="warn" title={"طريقة غير مستقرة"}>
+<Warning>
+  **طريقة غير مستقرة**
+
   يعتبر هذا الاشتراك **غير مستقر** وهو متاح فقط إذا تم تشغيل الـ validator
   باستخدام علامة `--rpc-pubsub-enable-block-subscription`. قد يتغير تنسيق هذا
   الاشتراك في المستقبل.
-</Callout>
+</Warning>
 
-<APIMethod>
+<RequestExample>
+  ```json WebSocket
+  {
+    "jsonrpc": "2.0",
+    "id": "1",
+    "method": "blockSubscribe",
+    "params": [
+      {
+        "mentionsAccountOrProgram": "LieKvPRE8XeX3Y2xVNHjKlpAScD12lYySBVQ4HqoJ5op"
+      },
+      {
+        "commitment": "confirmed",
+        "encoding": "base64",
+        "transactionDetails": "full",
+        "maxSupportedTransactionVersion": 0,
+        "showRewards": true
+      }
+    ]
+  }
+  ```
+</RequestExample>
 
-```jsonc !!request
-{
-  "jsonrpc": "2.0",
-  "id": "1",
-  "method": "blockSubscribe",
-  "params": [
-    // !hover(1:3) 0
-    {
-      "mentionsAccountOrProgram": "LieKvPRE8XeX3Y2xVNHjKlpAScD12lYySBVQ4HqoJ5op"
-    },
-    // !hover(1:6) 1
-    {
-      // !hover commitment
-      "commitment": "confirmed",
-      // !hover encoding
-      "encoding": "base64",
-      // !hover transactionDetails
-      "transactionDetails": "full",
-      // !hover maxSupportedTransactionVersion
-      "maxSupportedTransactionVersion": 0,
-      // !hover showRewards
-      "showRewards": true
-    }
-  ]
-}
-```
+<ResponseExample>
+  ```json Response
+  {
+    "jsonrpc": "2.0",
+    "result": 0,
+    "id": 1
+  }
+  ```
+</ResponseExample>
 
-### !params
+### Parameters
 
-#### !! 0
+<ParamField body="0" type="string | object" required>
+  معايير التصفية للسجلات لتلقي النتائج حسب نوع الحساب؛ المدعوم حاليًا:
 
-!type string | object  
-!required
+  - `all` - تضمين جميع المعاملات في الكتلة
+  - كائن JSON يحتوي على الحقل التالي:
+    - `mentionsAccountOrProgram: <string>` - إرجاع المعاملات التي تذكر المفتاح
+      العام المقدم فقط (كسلسلة مشفرة بنظام base-58). إذا لم تكن هناك إشارات في
+      كتلة معينة، فلن يتم إرسال أي إشعار.
+</ParamField>
 
-معايير التصفية للسجلات لتلقي النتائج حسب نوع الحساب؛ المدعوم حاليًا:
+<ParamField body="1" type="object">
+  كائن التكوين الذي يحتوي على الحقول التالية:
 
-- `all` - تضمين جميع المعاملات في الكتلة
-- كائن JSON يحتوي على الحقل التالي:
-  - `mentionsAccountOrProgram: <string>` - إرجاع المعاملات التي تذكر المفتاح
-    العام المقدم فقط (كسلسلة مشفرة بنظام base-58). إذا لم تكن هناك إشارات في
-    كتلة معينة، فلن يتم إرسال أي إشعار.
+  <Expandable title="properties" defaultOpen>
+    <ParamField body="commitment" type="string" default="finalized">
+      Values: `confirmed`, `finalized`
 
-#### !! 1
+      يصف الـ commitment مدى اكتمال الكتلة في تلك النقطة الزمنية. انظر
+      [تكوين التزام الحالة](/docs/rpc#configuring-state-commitment).
 
-!type object
+      - `processed` غير مدعوم.
+    </ParamField>
 
-كائن التكوين الذي يحتوي على الحقول التالية:
+    <ParamField body="encoding" type="string" default="json">
+      Values: `json`, `jsonParsed`, `base58`, `base64`
 
-##### !! commitment
+      تنسيق الترميز لكل معاملة يتم إرجاعها
 
-!type string !values confirmed finalized !default finalized
+      - `jsonParsed` يحاول استخدام محللات التعليمات الخاصة بالبرنامج لإرجاع بيانات
+        أكثر قابلية للقراءة وأكثر وضوحًا في قائمة `transaction.message.instructions`.
+      - إذا تم طلب `jsonParsed` ولكن لم يتم العثور على محلل، فإن التعليمات ترجع إلى
+        ترميز JSON العادي (حقول `accounts`، و`data`، و`programIdIndex`).
+    </ParamField>
 
-يصف الـ commitment مدى اكتمال الكتلة في تلك النقطة الزمنية. انظر
-[تكوين التزام الحالة](/docs/rpc#configuring-state-commitment).
+    <ParamField body="transactionDetails" type="string" default="full">
+      Values: `full`, `accounts`, `signatures`, `none`
 
-- `processed` غير مدعوم.
+      مستوى تفاصيل المعاملة المراد إرجاعها
 
-##### !! encoding
+      - إذا تم طلب `accounts`، فإن تفاصيل المعاملة تتضمن فقط التوقيعات و قائمة مشروحة
+        للحسابات في كل معاملة.
+      - بيانات المعاملة تقتصر فقط على: الرسوم، الخطأ، الأرصدة*السابقة،
+        الأرصدة*اللاحقة، أرصدة*الرموز*السابقة، وأرصدة*الرموز*اللاحقة.
+    </ParamField>
 
-!type string  
-!values json jsonParsed base58 base64  
-!default json
+    <ParamField body="maxSupportedTransactionVersion" type="number" default="0">
+      Values: `0`
 
-تنسيق الترميز لكل معاملة يتم إرجاعها
+      حاليًا، القيمة الصالحة الوحيدة لهذا المعامل هي `0`. ضبطها على `0` يسمح لك بجلب
+      جميع المعاملات، بما في ذلك المعاملات ذات الإصدار والمعاملات القديمة.
 
-- `jsonParsed` يحاول استخدام محللات التعليمات الخاصة بالبرنامج لإرجاع بيانات
-  أكثر قابلية للقراءة وأكثر وضوحًا في قائمة `transaction.message.instructions`.
-- إذا تم طلب `jsonParsed` ولكن لم يتم العثور على محلل، فإن التعليمات ترجع إلى
-  ترميز JSON العادي (حقول `accounts`، و`data`، و`programIdIndex`).
+      يحدد هذا المعامل الحد الأقصى لإصدار المعاملة الذي سيتم إرجاعه في الاستجابة. إذا
+      طلبت معاملة بإصدار أعلى من هذه القيمة، سيتم إرجاع خطأ. إذا أغفلت هذا المعامل،
+      فسيتم إرجاع المعاملات القديمة فقط - وستؤدي أي معاملة ذات إصدار إلى خطأ.
+    </ParamField>
 
-##### !! transactionDetails
+    <ParamField body="showRewards" type="bool">
+      ما إذا كان سيتم ملء مصفوفة `rewards`. إذا لم يتم توفير المعامل، فإن الإعداد
+      الافتراضي يتضمن المكافآت.
+    </ParamField>
+  </Expandable>
+</ParamField>
 
-!type string  
-!values full accounts signatures none  
-!default full
+### Result
 
-مستوى تفاصيل المعاملة المراد إرجاعها
-
-- إذا تم طلب `accounts`، فإن تفاصيل المعاملة تتضمن فقط التوقيعات و قائمة مشروحة
-  للحسابات في كل معاملة.
-- بيانات المعاملة تقتصر فقط على: الرسوم، الخطأ، الأرصدة*السابقة،
-  الأرصدة*اللاحقة، أرصدة*الرموز*السابقة، وأرصدة*الرموز*اللاحقة.
-
-##### !! maxSupportedTransactionVersion
-
-!type number !values 0 !default 0
-
-حاليًا، القيمة الصالحة الوحيدة لهذا المعامل هي `0`. ضبطها على `0` يسمح لك بجلب
-جميع المعاملات، بما في ذلك المعاملات ذات الإصدار والمعاملات القديمة.
-
-يحدد هذا المعامل الحد الأقصى لإصدار المعاملة الذي سيتم إرجاعه في الاستجابة. إذا
-طلبت معاملة بإصدار أعلى من هذه القيمة، سيتم إرجاع خطأ. إذا أغفلت هذا المعامل،
-فسيتم إرجاع المعاملات القديمة فقط - وستؤدي أي معاملة ذات إصدار إلى خطأ.
-
-##### !! showRewards
-
-!type bool
-
-ما إذا كان سيتم ملء مصفوفة `rewards`. إذا لم يتم توفير المعامل، فإن الإعداد
-الافتراضي يتضمن المكافآت.
-
-### !!result
-
-```jsonc !response
-{
-  "jsonrpc": "2.0",
-  // !hover result
-  "result": 0,
-  "id": 1
-}
-```
-
-!type integer
-
-معرف الاشتراك (مطلوب لإلغاء الاشتراك)
-
-</APIMethod>
+<ResponseField name="result" type="integer">
+  معرف الاشتراك (مطلوب لإلغاء الاشتراك)
+</ResponseField>
 
 #### تنسيق الإشعار:
 

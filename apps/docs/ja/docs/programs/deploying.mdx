@@ -37,39 +37,36 @@ CLIを使用してSolanaプログラムをデプロイする基本的なプロ�
 
 ## 前提条件
 
-<Steps>
+<Steps titleSize="h3">
 
-<Step>
-
-### Solana CLIのインストール
+<Step title="Solana CLIのインストール">
 
 まず、[Solana CLIをインストール](/docs/intro/installation)します。
 
 </Step>
 
-<Step>
-
-### ウォレットの設定
+<Step title="ウォレットの設定">
 
 インストール後、ローカルのkeypairウォレットを作成します。このウォレットのアドレスは、プログラムをデプロイする際のデフォルトのプログラム権限として設定されます：
 
-```terminal
-$ solana-keygen new
+```bash Terminal
+solana-keygen new
 ```
 
 これにより、デフォルトで `~/.config/solana/id.json` にkeypairが作成されます。
 
 </Step>
 
-<Step>
-
-### クラスターの設定
+<Step title="クラスターの設定">
 
 デプロイ先のSolanaクラスターを選択します。`solana config get`
 コマンドを使用して現在の設定を確認します:
 
-```terminal
-$ solana config get
+```bash Terminal
+solana config get
+```
+
+```text Output
 Config File: ~/.config/solana/cli/config.yml
 RPC URL: http://localhost:8899
 WebSocket URL: ws://localhost:8900/ (computed)
@@ -79,27 +76,28 @@ Commitment: confirmed
 
 必要に応じてクラスターを切り替えます：
 
-```terminal
-$ solana config set --url mainnet-beta
-$ solana config set --url devnet
-$ solana config set --url localhost
-$ solana config set --url testnet
-$ solana config set --url "https://your-rpc-url.com"
+```bash Terminal
+solana config set --url mainnet-beta
+solana config set --url devnet
+solana config set --url localhost
+solana config set --url testnet
+solana config set --url "https://your-rpc-url.com"
 ```
 
 </Step>
 
-<Step>
-
-### ウォレットへの資金提供
+<Step title="ウォレットへの資金提供">
 
 プログラムのデプロイには SOL が必要です。必要な量はプログラムのサイズによって異なります。
 
 devnetまたはlocalhostの場合、`solana airdrop`
 コマンドを使用してウォレットに資金を供給します:
 
-```terminal
-$ solana airdrop 2
+```bash Terminal
+solana airdrop 2
+```
+
+```text Output
 Requesting airdrop of 2 SOL
 Signature: 5zQKxvRdgJDA8fRGPdKfGxRLnLpwmNnMXGYxfBqFSUPqc5BTmFPrTG8vnC4HvKDVY8zQ8aQxZxcEE7WFpGhZGVAA
 2 SOL
@@ -107,8 +105,11 @@ Signature: 5zQKxvRdgJDA8fRGPdKfGxRLnLpwmNnMXGYxfBqFSUPqc5BTmFPrTG8vnC4HvKDVY8zQ8
 
 ウォレットの残高を確認します：
 
-```terminal
-$ solana balance
+```bash Terminal
+solana balance
+```
+
+```text Output
 2 SOL
 ```
 
@@ -122,75 +123,71 @@ $ solana balance
 
 プログラムをビルドするには、`cargo build-sbf` コマンドを使用します:
 
-```terminal
-$ cargo build-sbf
+```bash Terminal
+cargo build-sbf
 ```
 
-<ScrollyCoding>
+<Steps>
+  <Step title="サンプルプログラム">
+    これは「Hello, Solana!」をプログラムログに出力する最小限のSolanaプログラムです。
 
-## !!steps サンプルプログラム
+    ```rs src/lib.rs
+    use solana_program::{
+        account_info::AccountInfo, entrypoint, entrypoint::ProgramResult, msg, pubkey::Pubkey,
+    };
 
-これは「Hello, Solana!」をプログラムログに出力する最小限のSolanaプログラムです。
+    entrypoint!(process_instruction);
 
-<CodePlaceholder title="src/lib.rs" />
+    pub fn process_instruction(
+        _program_id: &Pubkey,
+        _accounts: &[AccountInfo],
+        _instruction_data: &[u8],
+    ) -> ProgramResult {
+        msg!("Hello, Solana!");
+        Ok(())
+    }
+    ```
 
-```rs !! title="src/lib.rs"
-use solana_program::{
-    account_info::AccountInfo, entrypoint, entrypoint::ProgramResult, msg, pubkey::Pubkey,
-};
+    ```toml Cargo.toml
+    [package]
+    name = "hello_world"
+    version = "0.1.0"
+    edition = "2021"
 
-entrypoint!(process_instruction);
+    [lib]
+    crate-type = ["cdylib", "lib"]
 
-pub fn process_instruction(
-    _program_id: &Pubkey,
-    _accounts: &[AccountInfo],
-    _instruction_data: &[u8],
-) -> ProgramResult {
-    msg!("Hello, Solana!");
-    Ok(())
-}
-```
+    [dependencies]
+    solana-program = "2.2.0"
+    ```
+  </Step>
 
-```toml !! title="Cargo.toml"
-[package]
-name = "hello_world"
-version = "0.1.0"
-edition = "2021"
+  <Step title="ビルド出力">
+    `cargo build-sbf` コマンドを使用してプログラムをビルドします:
 
-[lib]
-crate-type = ["cdylib", "lib"]
+    ```bash Terminal
+    cargo build-sbf
+    ```
 
-[dependencies]
-solana-program = "2.2.0"
-```
+    これにより、`target/deploy/` に2つの重要なファイルが作成されます:
 
-## !!steps ビルド出力
+    1. `hello_world-keypair.json`: 公開鍵がプログラムIDとして使用されるkeypairファイル
+    2. `hello_world.so`: コンパイルされたプログラム実行ファイル
 
-`cargo build-sbf` コマンドを使用してプログラムをビルドします:
+    ```json target/deploy/hello_world-keypair.json
+    [
+      203, 253, 43, 62, 165, 111, 94, 222, 105, 225, 218, 85, 143, 9, 114, 96, 243,
+      181, 114, 89, 72, 230, 124, 85, 59, 165, 198, 23, 240, 212, 23, 154, 229, 241,
+      153, 61, 153, 105, 79, 204, 193, 163, 33, 65, 82, 183, 49, 240, 224, 137, 248,
+      24, 128, 25, 192, 197, 118, 235, 239, 67, 85, 156, 219, 231
+    ]
+    ```
 
-```terminal
-$ cargo build-sbf
-```
-
-これにより、`target/deploy/` に2つの重要なファイルが作成されます:
-
-1. `hello_world-keypair.json`: 公開鍵がプログラムIDとして使用されるkeypairファイル
-2. `hello_world.so`: コンパイルされたプログラム実行ファイル
-
-```json !! title="target/deploy/hello_world-keypair.json"
-[
-  203, 253, 43, 62, 165, 111, 94, 222, 105, 225, 218, 85, 143, 9, 114, 96, 243,
-  181, 114, 89, 72, 230, 124, 85, 59, 165, 198, 23, 240, 212, 23, 154, 229, 241,
-  153, 61, 153, 105, 79, 204, 193, 163, 33, 65, 82, 183, 49, 240, 224, 137, 248,
-  24, 128, 25, 192, 197, 118, 235, 239, 67, 85, 156, 219, 231
-]
-```
-
-```txt !! title="target/deploy/hello_world.so"
-[binary executable file]
-```
-
-</ScrollyCoding>
+    ```txt target/deploy/hello_world.so
+    [binary executable file]
+    ```
+  </Step>
+</Steps>
 
 ### プログラムサイズとコストの確認
 
@@ -198,49 +195,58 @@ $ cargo build-sbf
 
 プログラムのサイズを確認します：
 
-```terminal
-$ wc -c < ./target/deploy/hello_world.so
+```bash Terminal
+wc -c < ./target/deploy/hello_world.so
+```
+
+```text Output
 18504
 ```
 
 このサイズ（バイト）に必要なSOLを計算します：
 
-```terminal
-$ solana rent 18504
+```bash Terminal
+solana rent 18504
+```
+
+```text Output
 Rent-exempt minimum: 0.12967872 SOL
 ```
 
-<Callout type="info">
+<Info>
   デプロイトランザクション手数料をカバーするために、表示されている金額よりも少し多めのSOLが必要です。
-</Callout>
+</Info>
 
 ### プログラムのデプロイ
 
 `solana program deploy` コマンドを使用してプログラムをデプロイします:
 
-```terminal
-$ solana program deploy ./target/deploy/hello_world.so
+```bash Terminal
+solana program deploy ./target/deploy/hello_world.so
+```
+
+```text Output
 Program Id: 7NxQjW8H8hVcqBKgXbVDWqGQCovHbqDW9p1SJJwUyTpE
 Signature: 2BYwsqRP7ZwBNQvJp3S8bphTJ4zKW5JBPVMqCTE5KyLkP8xHzAyUEeC4LdTgjJdGBKHWNCkRF8Mf1T1WkLFyEu8W
 ```
 
 表示される**プログラムID**は、ネットワーク上のプログラムの永続的なアドレスです。
 
-<Callout>
+<Note>
 
 （自動生成されたものではなく）特定のプログラムIDでデプロイするには、次のようにします：
 
-```terminal
-$ solana program deploy ./target/deploy/hello_world.so --program-id ./custom-keypair.json
+```bash Terminal
+solana program deploy ./target/deploy/hello_world.so --program-id ./custom-keypair.json
 ```
 
 `solana-keygen` コマンドを使用して新しいkeypairを生成できます:
 
-```terminal
-$ solana-keygen new -o ./custom-keypair.json
+```bash Terminal
+solana-keygen new -o ./custom-keypair.json
 ```
 
-</Callout>
+</Note>
 
 ### プログラムの更新
 
@@ -250,24 +256,30 @@ $ solana-keygen new -o ./custom-keypair.json
 2. プログラムを再ビルドする: `cargo build-sbf`
 3. 更新をデプロイする:
 
-```terminal
-$ solana program deploy ./target/deploy/hello_world.so
+```bash Terminal
+solana program deploy ./target/deploy/hello_world.so
+```
+
+```text Output
 Program Id: 7NxQjW8H8hVcqBKgXbVDWqGQCovHbqDW9p1SJJwUyTpE
 Signature: 3zKnXDfEm1R8hVcEmTnNFYUaFjVVbLJrKdFj5hBMXoBRfz8xGyDhCYgKr9YY5KxKYPEUQQVfwEPNz9hQGvYhLNBJ
 ```
 
-<Callout type="info">
+<Info>
 
 更新したプログラムが現在割り当てられているよりも多くのスペース（バイト）を必要とする場合、デプロイメントは自動的にプログラムアカウントを拡張します。これは新しいプログラムが前のバージョンより大きい場合に発生します。プログラムアカウントは新しいプログラムを格納するために追加のバイトが必要です。CLIは必要なSOLを計算し、自動的にあなたのウォレットから差し引きます。
 
 手動でプログラムを拡張してより多くのバイトを割り当てることもできます：
 
-```terminal
-$ solana program extend 7NxQjW8H8hVcqBKgXbVDWqGQCovHbqDW9p1SJJwUyTpE 1000
+```bash Terminal
+solana program extend 7NxQjW8H8hVcqBKgXbVDWqGQCovHbqDW9p1SJJwUyTpE 1000
+```
+
+```text Output
 Extended Program Id 7NxQjW8H8hVcqBKgXbVDWqGQCovHbqDW9p1SJJwUyTpE by 1000 bytes
 ```
 
-</Callout>
+</Info>
 
 ## プログラム管理
 
@@ -278,106 +290,103 @@ Extended Program Id 7NxQjW8H8hVcqBKgXbVDWqGQCovHbqDW9p1SJJwUyTpE by 1000 bytes
 プログラムのメタデータを確認するには、`solana program show`
 コマンドを使用します:
 
-```terminal
-$ solana program show 7NxQjW8H8hVcqBKgXbVDWqGQCovHbqDW9p1SJJwUyTpE
+```bash Terminal
+solana program show 7NxQjW8H8hVcqBKgXbVDWqGQCovHbqDW9p1SJJwUyTpE
 ```
-
-<WithNotes>
 
 出力例：
 
 ```txt
 $ solana program show 7283x8k8fyBcfaFLyPsxbd2VV1AMmZFP7FNoyTXVKJw7
-# !tooltip[/Program Id/] program-id
 Program Id: 7283x8k8fyBcfaFLyPsxbd2VV1AMmZFP7FNoyTXVKJw7
-# !tooltip[/Owner/] owner
 Owner: BPFLoaderUpgradeab1e11111111111111111111111
-# !tooltip[/ProgramData Address/] program-data-address
 ProgramData Address: Gqn7YQVCP8NtYV1qkEqR4Udhj8EJ3fkikvS7HskCNQ7c
-# !tooltip[/Authority/] authority
 Authority: 5kh6HxYZiAebF8HWLsUWod2EaQQ6iWHpHYCz8UcmFbM1
-# !tooltip[/Last Deployed In Slot/] last-deployed-in-slot
 Last Deployed In Slot: 6573
-# !tooltip[/Data Length/] data-length
 Data Length: 18504 (0x4848) bytes
-# !tooltip[/Balance/] balance
 Balance: 0.12999192 SOL
 ```
 
-### !program-id
+<Note>
+  **`Program Id`**
 
-プログラムIDは、program
-accountのオンチェーンアドレスです。ユーザーや他のプログラムは、トランザクション内でこのIDを参照してプログラムを呼び出します。
+  プログラムIDは、program
+  accountのオンチェーンアドレスです。ユーザーや他のプログラムは、トランザクション内でこのIDを参照してプログラムを呼び出します。
 
-### !owner
+  **`Owner`**
 
-オーナーは、このプログラムのデプロイに使用されたローダーを識別します。ほとんどのプログラムでは、これはBPFアップグレード可能ローダーになります。
+  オーナーは、このプログラムのデプロイに使用されたローダーを識別します。ほとんどのプログラムでは、これはBPFアップグレード可能ローダーになります。
 
-### !program-data-address
+  **`ProgramData Address`**
 
-プログラムデータアドレスは、プログラムの実行可能コードを格納する別のアカウントを指します。
+  プログラムデータアドレスは、プログラムの実行可能コードを格納する別のアカウントを指します。
 
-### !authority
+  **`Authority`**
 
-Authorityは、このプログラムをアップグレードまたはクローズする権限を持つアカウントです。Authorityのみがプログラムの更新をデプロイしたり、プログラムをクローズしてプログラムに割り当てられたSOLを回収したりできます。
+  Authorityは、このプログラムをアップグレードまたはクローズする権限を持つアカウントです。Authorityのみがプログラムの更新をデプロイしたり、プログラムをクローズしてプログラムに割り当てられたSOLを回収したりできます。
 
-### !last-deployed-in-slot
+  **`Last Deployed In Slot`**
 
-Last Deployed In Slotは、このプログラムが最後に更新されたタイミングを示します。
+  Last Deployed In Slotは、このプログラムが最後に更新されたタイミングを示します。
 
-### !data-length
+  **`Data Length`**
 
-Data
-Lengthは、このプログラムに割り当てられた合計バイト数を示します。このスペースは、現在のプログラムサイズよりも大きい将来の更新に対応できます。
+  Data
+  Lengthは、このプログラムに割り当てられた合計バイト数を示します。このスペースは、現在のプログラムサイズよりも大きい将来の更新に対応できます。
 
-### !balance
+  **`Balance`**
 
-Balanceは、プログラムアカウントにデータを保存するために割り当てられたSOLを表示します。
-
-</WithNotes>
+  Balanceは、プログラムアカウントにデータを保存するために割り当てられたSOLを表示します。
+</Note>
 
 ### プログラム権限の移譲
 
 プログラムの権限を別のアカウントに移転するには、
 `solana program set-upgrade-authority` コマンドを使用します:
 
-```terminal
-$ solana program set-upgrade-authority 7NxQjW8H8hVcqBKgXbVDWqGQCovHbqDW9p1SJJwUyTpE --new-upgrade-authority ./new-authority-keypair.json
+```bash Terminal
+solana program set-upgrade-authority 7NxQjW8H8hVcqBKgXbVDWqGQCovHbqDW9p1SJJwUyTpE --new-upgrade-authority ./new-authority-keypair.json
 ```
 
-<Callout type="warn">
+<Warning>
   プログラム権限を移譲した後は、新しい権限のキーペアにアクセスできない限り、プログラムを更新することはできなくなります。
-</Callout>
+</Warning>
 
 ### プログラムを不変にする
 
 プログラムを不変にするには、`solana program set-upgrade-authority` コマンドに
 `--final` フラグを付けて、プログラムの権限を削除します:
 
-```terminal
-$ solana program set-upgrade-authority 7NxQjW8H8hVcqBKgXbVDWqGQCovHbqDW9p1SJJwUyTpE --final
+```bash Terminal
+solana program set-upgrade-authority 7NxQjW8H8hVcqBKgXbVDWqGQCovHbqDW9p1SJJwUyTpE --final
+```
+
+```text Output
 Account Type: Program
 Authority: none
 ```
 
-<Callout type="warn">
+<Warning>
   プログラムが不変になると、二度と更新やクローズができなくなります。
-</Callout>
+</Warning>
 
 ### プログラムをクローズする
 
 プログラムを閉じて、program accountに割り当てられたSOLを回収するには、
 `solana program close` コマンドを使用します:
 
-```terminal
-$ solana program close 7NxQjW8H8hVcqBKgXbVDWqGQCovHbqDW9p1SJJwUyTpE --bypass-warning
+```bash Terminal
+solana program close 7NxQjW8H8hVcqBKgXbVDWqGQCovHbqDW9p1SJJwUyTpE --bypass-warning
+```
+
+```text Output
 Closed Program Id 7NxQjW8H8hVcqBKgXbVDWqGQCovHbqDW9p1SJJwUyTpE, 0.12999192 SOL reclaimed
 ```
 
-<Callout type="warn">
+<Warning>
   クローズすると、Program
   IDは再利用できなくなります。同じアドレスに新しいプログラムをデプロイすることはできません。
-</Callout>
+</Warning>
 
 ## ユーティリティコマンド
 
@@ -385,8 +394,8 @@ Closed Program Id 7NxQjW8H8hVcqBKgXbVDWqGQCovHbqDW9p1SJJwUyTpE, 0.12999192 SOL r
 
 現在のウォレットが権限を持つすべてのプログラムを表示します：
 
-```terminal
-$ solana program show --programs
+```bash Terminal
+solana program show --programs
 ```
 
 出力例:
@@ -403,8 +412,11 @@ Program Id                                       | Slot       | Authority       
 デプロイされたプログラムをダウンロードするには、`solana program dump`
 コマンドを使用します:
 
-```terminal
-$ solana program dump 7NxQjW8H8hVcqBKgXbVDWqGQCovHbqDW9p1SJJwUyTpE ./downloaded_program.so
+```bash Terminal
+solana program dump 7NxQjW8H8hVcqBKgXbVDWqGQCovHbqDW9p1SJJwUyTpE ./downloaded_program.so
+```
+
+```text Output
 Wrote program to ./downloaded_program.so
 ```
 
@@ -416,8 +428,8 @@ Solanaネットワークが混雑している場合、これらのフラグを�
 
 使用例:
 
-```terminal
-$ solana program deploy ./target/deploy/hello_world.so \
+```bash Terminal
+solana program deploy ./target/deploy/hello_world.so \
     --with-compute-unit-price 10000 \
     --max-sign-attempts 10 \
     --use-rpc

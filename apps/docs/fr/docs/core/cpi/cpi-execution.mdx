@@ -4,7 +4,6 @@ description:
   Le flux d'exécution CPI en 11 étapes à travers le runtime Solana, les règles
   d'extension de privilèges, les restrictions de réentrance et les vérifications
   de programmes autorisés.
-url: /docs/core/cpi/cpi-execution
 type: reference
 prerequisites:
   - /docs/core/cpi
@@ -18,12 +17,14 @@ related:
 
 {/* TOC: CPI execution flow, Privilege rules */}
 
-<Callout type="info" title="Résumé">
+<Info>
+  **Résumé**
+
   Les CPI passent par 11 étapes du runtime incluant la vérification des
   privilèges, la traduction des comptes et la synchronisation des données.
   Profondeur d'appel maximale : 5 (9 avec SIMD-0268). Les règles de privilèges
   empêchent l'appelé d'escalader au-delà de ce que l'appelant a accordé.
-</Callout>
+</Info>
 
 ## Règles de privilèges
 
@@ -54,7 +55,7 @@ Les règles de privilège peuvent être résumées comme suit :
 2. **Le privilège de signataire nécessite une autorisation.** Un compte peut
    être un signataire dans l'appelé uniquement si (a) il était déjà un
    signataire dans l'appelant, OU (b) il s'agit d'un PDA dérivé des seeds du
-   programme appelant via _rs`invoke_signed`_.
+   programme appelant via `invoke_signed`.
 3. **La réduction de privilège est toujours autorisée.** L'appelé peut utiliser
    moins de privilèges que ceux accordés par l'appelant.
 
@@ -65,7 +66,7 @@ pipeline complet depuis l'appel SDK du programme à travers la limite syscall
 jusqu'au runtime et retour. Chaque étape fait référence au fichier source qui
 l'implémente.
 
-<Callout>
+<Note>
   La hauteur maximale de l'invocation d'instruction de programme est appelée
   [`max_instruction_stack_depth`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/execution_budget.rs#L66)
   et est définie à la
@@ -77,7 +78,7 @@ CPI incrémente la hauteur de 1. Un maximum de 5 signifie qu'un programme peut
 effectuer des CPI jusqu'à 4 niveaux de profondeur (8 niveaux de profondeur avec
 SIMD-0268).
 
-</Callout>
+</Note>
 
 ### Étape 1 : le programme appelle `invoke` ou `invoke_signed`
 
@@ -85,9 +86,9 @@ Le programme appelle
 [`invoke`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/program/src/program.rs#L26)
 ou
 [`invoke_signed`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/program/src/program.rs#L51).
-_rs`invoke`_ est un wrapper léger qui appelle _rs`invoke_signed`_ avec un
+`invoke` est un wrapper léger qui appelle `invoke_signed` avec un
 tableau de seeds de signataire vide. La fonction SDK sérialise
-l'_rs`Instruction`_, le slice _rs`AccountInfo`_ et les seeds de signataire dans
+l'`Instruction`, le slice `AccountInfo` et les seeds de signataire dans
 la mémoire VM, puis déclenche le syscall.
 
 ### Étape 2 : entrée syscall
@@ -99,7 +100,7 @@ qui appelle le point d'entrée partagé :
 
 ### Étape 3 : consommer le coût d'invocation
 
-La première action à l'intérieur de _rs`cpi_common`_ consiste à
+La première action à l'intérieur de `cpi_common` consiste à
 [facturer le coût d'invocation fixe](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/cpi.rs#L815-L818)
 à partir du compteur de calcul partagé :
 [`invoke_units`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/execution_budget.rs#L108)
@@ -110,7 +111,7 @@ La première action à l'intérieur de _rs`cpi_common`_ consiste à
 Le gestionnaire de syscall traduit l'instruction depuis l'espace d'adressage de
 la VM du programme vers les types Rust côté hôte via
 [`translate_instruction_rust`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/cpi.rs#L529-L590),
-qui lit une structure _rs`StableInstruction`_, valide la longueur des données
+qui lit une structure `StableInstruction`, valide la longueur des données
 par rapport à
 [`MAX_INSTRUCTION_DATA_LEN`](https://github.com/anza-xyz/agave/blob/v3.1.8/transaction-context/src/lib.rs#L33)
 (10 240 octets), puis facture le
@@ -159,8 +160,8 @@ Une violation renvoie
 
 Le runtime appelle
 [`prepare_next_instruction`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/invoke_context.rs#L293-L432)
-qui construit la liste _rs`InstructionAccount`_ de l'appelé et applique les
-règles de privilèges. Voir [Règles de privilèges](#privilege-rules) ci-dessous
+qui construit la liste `InstructionAccount` de l'appelé et applique les
+règles de privilèges. Voir [Règles de privilèges](#règles-de-privilèges) ci-dessous
 pour la table de décision complète.
 
 ### Étape 8 : traduire les informations de compte
@@ -168,7 +169,7 @@ pour la table de décision complète.
 Le gestionnaire appelle `translate_accounts` qui :
 
 1. [Valide le nombre d'informations de compte](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/cpi.rs#L164-L190)
-   par rapport à _rs`MAX_CPI_ACCOUNT_INFOS`_ (128, ou 255 avec SIMD-0339).
+   par rapport à `MAX_CPI_ACCOUNT_INFOS` (128, ou 255 avec SIMD-0339).
 2. [Facture le coût de traduction des informations de compte](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/cpi.rs#L969-L981)
    (SIMD-0339 uniquement) : `(num_account_infos * 80) / 250` CU.
 3. Pour chaque compte non exécutable et non dupliqué, construit un
@@ -196,12 +197,12 @@ qui :
 
 1. Appelle
    [`push()`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/invoke_context.rs#L233-L265)
-   pour ajouter une nouvelle frame à la pile d'instructions. _rs`push()`_
+   pour ajouter une nouvelle frame à la pile d'instructions. `push()`
    applique la
    [règle de réentrance](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/invoke_context.rs#L243-L259)
    : un programme ne peut s'appeler lui-même que s'il est l'appelant direct
    (c'est-à-dire que le programme A peut appeler A, mais A ne peut pas appeler B
-   qui appelle A). Une violation retourne _rs`ReentrancyNotAllowed`_.
+   qui appelle A). Une violation retourne `ReentrancyNotAllowed`.
 2. Appelle
    [`process_executable_chain`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/invoke_context.rs#L507-L602)
    qui résout le point d'entrée du programme appelé et l'invoque. L'appelé
@@ -210,7 +211,7 @@ qui :
 3. Appelle
    [`pop()`](https://github.com/anza-xyz/agave/blob/v3.1.8/transaction-context/src/lib.rs#L366-L398)
    pour retirer la frame de l'appelé et vérifier que les soldes de lamports sont
-   inchangés (_rs`UnbalancedInstruction`_ sinon).
+   inchangés (`UnbalancedInstruction` sinon).
 
 ### Étape 11 : synchronisation post-CPI des comptes (appelé vers appelant)
 

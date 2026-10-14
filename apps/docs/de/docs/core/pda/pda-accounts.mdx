@@ -4,7 +4,6 @@ description:
   Erstellen Sie Onchain-Konten an Solana-PDA-Adressen mit invoke_signed und
   Anchors init-Constraint. Verifizierungsablauf von invoke_signed und
   Anchor-PDA-Erstellungsmuster mit Codebeispielen.
-url: /docs/core/pda/pda-accounts
 type: tutorial
 prerequisites:
   - /docs/core/pda
@@ -18,16 +17,18 @@ related:
 
 {/* TOC: PDA Signing via invoke_signed, Create a PDA Account */}
 
-<Callout type="info" title="Zusammenfassung">
-  Erstellen Sie PDA-Konten über _rs`invoke_signed`_ mit den Seeds der PDA. Nur
+<Info>
+  **Zusammenfassung**
+
+  Erstellen Sie PDA-Konten über `invoke_signed` mit den Seeds der PDA. Nur
   das besitzende Programm kann für eine PDA signieren. Anchors
-  _rs`init`_-Constraint automatisiert die PDA-Konten-Erstellung.
-</Callout>
+`init`-Constraint automatisiert die PDA-Konten-Erstellung.
+</Info>
 
 ## PDA-Signierung über `invoke_signed`
 
 Wenn ein Programm im Namen einer PDA während eines CPI signieren muss, verwendet
-es _rs`invoke_signed`_ mit den Seeds der PDA. Die Runtime verifiziert, dass die
+es `invoke_signed` mit den Seeds der PDA. Die Runtime verifiziert, dass die
 Seeds die erwartete PDA unter Verwendung der **ID des aufrufenden Programms**
 ableiten, wodurch sichergestellt wird, dass nur das besitzende Programm
 signieren kann. Für den vollständigen Verifizierungsablauf siehe
@@ -40,20 +41,18 @@ Vorgänge. Sie müssen das Konto explizit erstellen, nachdem Sie die Adresse
 abgeleitet haben.
 
 Um ein Konto an einer PDA zu erstellen, ruft das ableitende Programm die
-_rs`create_account`_-Anweisung des System Program über
+`create_account`-Anweisung des System Program über
 [`invoke_signed`](/docs/core/cpi) auf und übergibt die Seeds der PDA, damit die
 Runtime die Berechtigung des Programms über diese Adresse verifizieren kann.
-
-<WithMentions>
 
 Das folgende Beispiel verwendet das
 [Anchor-Framework](https://www.anchor-lang.com/docs), um ein neues Konto mit
 einer programmabgeleiteten Adresse zu erstellen. Das Programm enthält eine
-einzige [`initialize`](mention:initialize)-Anweisung zum Erstellen des neuen
-Kontos, welches die [Benutzeradresse](mention:user-address) und den
-[bump seed](mention:bump) speichert, die zur Ableitung der PDA verwendet wurden.
+einzige `initialize`-Anweisung zum Erstellen des neuen
+Kontos, welches die Benutzeradresse und den
+bump seed speichert, die zur Ableitung der PDA verwendet wurden.
 
-```rs title="Program"
+```rs Program highlight={12,14,27,29,40-41}
 use anchor_lang::prelude::*;
 
 declare_id!("75GJVCJNhaukaa2vCCqhreY31gaphv7XTScBChmr1ueR");
@@ -62,16 +61,11 @@ declare_id!("75GJVCJNhaukaa2vCCqhreY31gaphv7XTScBChmr1ueR");
 pub mod pda_account {
     use super::*;
 
-    // !mention initialize
     pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
         let account_data = &mut ctx.accounts.pda_account;
         // store the address of the `user`
-        // !mark
-        // !mention user-address
         account_data.user = *ctx.accounts.user.key;
         // store the canonical bump
-        // !mark
-        // !mention bump
         account_data.bump = ctx.bumps.pda_account;
         Ok(())
     }
@@ -80,18 +74,13 @@ pub mod pda_account {
 #[derive(Accounts)]
 pub struct Initialize<'info> {
     #[account(mut)]
-    // !mention user-address
     pub user: Signer<'info>,
 
     #[account(
         init,
         // define the seeds to derive the PDA
-        // !mark
-        // !mention user-address
         seeds = [b"data", user.key().as_ref()],
         // use the canonical bump
-        // !mark
-        // !mention bump
         bump,
         payer = user,
         space = 8 + DataAccount::INIT_SPACE // 8 bytes for Anchor account discriminator
@@ -103,39 +92,28 @@ pub struct Initialize<'info> {
 #[account]
 #[derive(InitSpace)]
 pub struct DataAccount {
-    // !mark
-    // !mention user-address
     pub user: Pubkey,
-    // !mark
-    // !mention bump
     pub bump: u8,
 }
 ```
 
-</WithMentions>
-
-<WithMentions>
-
-Das [`init`](mention:init)-Constraint weist Anchor an,
+Das `init`-Constraint weist Anchor an,
 [das System Program aufzurufen](/docs/core/programs/builtin-programs#the-system-program),
 um ein neues Konto mit der PDA als Adresse zu erstellen. Die
-[Seeds](mention:seeds), die zur Erstellung der PDA verwendet werden, sind:
+Seeds, die zur Erstellung der PDA verwendet werden, sind:
 
 - Die feste Zeichenkette: "data"
 - Die Adresse des Benutzerkontos, die in der Anweisung bereitgestellt wurde
-- Der kanonische [bump seed](mention:bump)
+- Der kanonische bump seed
 
 In diesem Beispiel wird der bump-Constraint keinem Wert zugewiesen, sodass
-Anchor _rs`find_program_address`_ verwendet, um die PDA abzuleiten und den bump
+Anchor `find_program_address` verwendet, um die PDA abzuleiten und den bump
 zu finden.
 
-```rust title="pda_account"
+```rust pda_account
 #[account(
-    // !mention init
     init,
-    // !mention seeds
     seeds = [b"data", user.key().as_ref()],
-    // !mention bump
     bump,
     payer = user,
     space = 8 + DataAccount::INIT_SPACE // 8 bytes for Anchor account discriminator
@@ -143,19 +121,15 @@ zu finden.
 pub pda_account: Account<'info, DataAccount>,
 ```
 
-</WithMentions>
-
-<WithMentions>
-
 Die untenstehende Testdatei enthält eine Transaktion, die die
-[`initialize`](mention:initialize)-Anweisung aufruft, um ein neues Konto mit
+`initialize`-Anweisung aufruft, um ein neues Konto mit
 einer programmabgeleiteten Adresse zu erstellen. Die Datei enthält Code zum
-[Ableiten der PDA](mention:pda).
+Ableiten der PDA.
 
 Das Beispiel zeigt auch, wie das neue Konto, das erstellt wird,
-[abgerufen](mention:fetch) werden kann.
+abgerufen werden kann.
 
-```ts title="Test"
+```ts Test
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { PdaAccount } from "../target/types/pda_account";
@@ -168,7 +142,6 @@ describe("pda-account", () => {
   const program = anchor.workspace.PdaAccount as Program<PdaAccount>;
   const user = provider.wallet as anchor.Wallet;
 
-  // !mention(1:5) pda
   // Derive the PDA address using the seeds specified on the program
   const [PDA] = PublicKey.findProgramAddressSync(
     [Buffer.from("data"), user.publicKey.toBuffer()],
@@ -177,7 +150,6 @@ describe("pda-account", () => {
 
   it("Is initialized!", async () => {
     const transactionSignature = await program.methods
-      // !mention initialize
       .initialize()
       .accounts({
         user: user.publicKey
@@ -188,17 +160,14 @@ describe("pda-account", () => {
   });
 
   it("Fetch Account", async () => {
-    // !mention fetch
     const pdaAccount = await program.account.dataAccount.fetch(PDA);
     console.log(JSON.stringify(pdaAccount, null, 2));
   });
 });
 ```
 
-</WithMentions>
-
-<Callout type="warn">
+<Warning>
   Wenn Sie die `initialize`-Anweisung erneut mit demselben `user`-Adress-Seed
   aufrufen, schlägt die Transaktion fehl. Dies geschieht, weil bereits ein Konto
   unter der abgeleiteten Adresse existiert.
-</Callout>
+</Warning>

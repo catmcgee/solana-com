@@ -3,7 +3,6 @@ title: 계정 런타임
 description:
   Solana 런타임이 실행 전에 계정을 로드하고 검증하는 방법, 그리고 프로그램에
   계정 데이터를 전달하는 데 사용되는 직렬화 형식입니다.
-url: /docs/core/accounts/account-runtime
 type: reference
 prerequisites:
   - /docs/core/accounts
@@ -15,17 +14,19 @@ related:
   - /docs/core/constants-reference
 ---
 
-<Callout type="info" title="요약">
+<Info>
+  **요약**
+
   실행 전에 런타임은 계정을 로드하고, 수수료 지불자를 검증하며, 렌트 면제를
   확인하고, 프로그램이 접근할 수 있는 메모리 레이아웃으로 계정 데이터를
   직렬화합니다.
-</Callout>
+</Info>
 
-<Callout>
+<Note>
   이 페이지는 런타임 내부 구조를 다룹니다. 대부분의 개발자는 프로그램 구축을
   위해 이 정보가 필요하지 않습니다. 개발자 관점의 내용은 [계정
   구조](/docs/core/accounts/account-structure)를 참조하세요.
-</Callout>
+</Note>
 
 ## 계정 로딩
 
@@ -41,23 +42,23 @@ related:
    합니다. 0과 렌트 면제 최소값 사이의 값으로 끝날 수 없습니다. 논스 계정은 항상
    렌트 면제를 유지하기에 충분한 램포트를 보유해야 합니다. 지불자가 시스템
    계정도 논스 계정도 아닌 경우, 트랜잭션은
-   _rs`TransactionError::InvalidAccountForFee`_ 오류로 실패합니다.
+   `TransactionError::InvalidAccountForFee` 오류로 실패합니다.
 
 2. **로드된 데이터 크기 제한**: 로드된 모든 계정의 총 크기(계정당
    [`TRANSACTION_ACCOUNT_BASE_SIZE`](https://github.com/anza-xyz/agave/blob/v3.1.8/svm/src/account_loader.rs#L45)
    64바이트 포함)는
    [`MAX_LOADED_ACCOUNTS_DATA_SIZE_BYTES`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/execution_budget.rs#L53)(64
    MiB)를 초과할 수 없습니다. 이 제한을 초과하면
-   _rs`TransactionError::MaxLoadedAccountsDataSizeExceeded`_ 오류가 발생합니다.
+   `TransactionError::MaxLoadedAccountsDataSizeExceeded` 오류가 발생합니다.
 
 3. **프로그램 계정 검증**: 인스트럭션에 의해 호출되는 모든 프로그램은 반드시
    존재해야 하며, 유효한
    로더([`PROGRAM_OWNERS`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/account/src/lib.rs#L802)
    중 하나: BPF Loader Upgradeable, BPF Loader, BPF Loader Deprecated, Loader V4
    또는 네이티브 로더)가 소유해야 합니다. 프로그램 계정이 존재하지 않으면
-   트랜잭션은 _rs`TransactionError::ProgramAccountNotFound`_ 오류로 실패합니다.
+   트랜잭션은 `TransactionError::ProgramAccountNotFound` 오류로 실패합니다.
    존재하지만 유효하지 않은 소유자를 가진 경우, 트랜잭션은
-   _rs`TransactionError::InvalidProgramForExecution`_ 오류로 실패합니다.
+   `TransactionError::InvalidProgramForExecution` 오류로 실패합니다.
 
 4. **존재하지 않는 계정**: 온체인에 존재하지 않는 계정은 기본 계정(0 lamport, 빈
    데이터, System Program 소유)으로 로드되며 `rent_epoch`는 `u64::MAX`로
@@ -120,14 +121,14 @@ related:
 - 그렇지 않으면 `Some(first_index)`를 반환하며, 여기서 `first_index`는 첫 번째
   발생의 인덱스입니다.
 
-동일한 계정에 대한 모든 참조는 동일한 기본 _rs`AccountSharedData`_ 를
+동일한 계정에 대한 모든 참조는 동일한 기본 `AccountSharedData` 를
 공유하므로, 어떤 참조를 통한 수정이든 다른 모든 참조를 통해 즉시 표시됩니다.
 그러나 한 번에 하나의 가변 차용만 보유할 수 있습니다. 두 개의 서로 다른 명령어
 계정 인덱스를 통해 동일한 계정을 동시에 가변적으로 차용하려고 시도하면
-_rs`InstructionError::AccountBorrowFailed`_ 를 반환합니다. 프로그램은 동일한
+`InstructionError::AccountBorrowFailed` 를 반환합니다. 프로그램은 동일한
 기본 계정에서 다른 차용을 획득하기 전에 하나의 차용을 해제해야 합니다.
 
 프로그램이 실행된 후, 런타임은 버퍼를
 역직렬화하고([`deserialize_parameters_aligned()`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/serialization.rs#L580-L667))
-`lamports`, `data`(_rs`MAX_PERMITTED_DATA_INCREASE`_ 까지의 길이 변경 포함),
+`lamports`, `data`(`MAX_PERMITTED_DATA_INCREASE` 까지의 길이 변경 포함),
 `owner`에 대한 모든 변경 사항을 적용합니다.

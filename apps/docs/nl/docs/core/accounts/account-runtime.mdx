@@ -4,7 +4,6 @@ description:
   Hoe de Solana runtime accounts laadt en valideert vóór uitvoering, en het
   serialisatieformaat dat wordt gebruikt om accountgegevens door te geven aan
   programma's.
-url: /docs/core/accounts/account-runtime
 type: reference
 prerequisites:
   - /docs/core/accounts
@@ -16,18 +15,20 @@ related:
   - /docs/core/constants-reference
 ---
 
-<Callout type="info" title="Samenvatting">
+<Info>
+  **Samenvatting**
+
   Vóór uitvoering laadt de runtime accounts, valideert de betaler van de kosten,
   controleert huurvrijstelling en serialiseert accountgegevens naar een
   geheugenindeling die programma's kunnen benaderen.
-</Callout>
+</Info>
 
-<Callout>
+<Note>
   Deze pagina behandelt runtime-interne werking. De meeste ontwikkelaars hebben
   deze informatie niet nodig voor het bouwen van programma's. Zie
   [accountstructuur](/docs/core/accounts/account-structure) voor het
   ontwikkelaarsperspectief.
-</Callout>
+</Note>
 
 ## Account laden
 
@@ -44,7 +45,7 @@ Dit proces voert verschillende validaties uit:
    precies naar 0 lamports gaan. Het kan niet eindigen tussen 0 en het huurvrije
    minimum. Nonce-accounts moeten altijd voldoende lamports behouden om huurvrij
    te blijven. Als de betaler geen systeemaccount of nonce-account is, mislukt
-   de transactie met _rs`TransactionError::InvalidAccountForFee`_.
+   de transactie met `TransactionError::InvalidAccountForFee`.
 
 2. **Limiet voor geladen gegevensgrootte**: De totale grootte van alle geladen
    accounts (inclusief een
@@ -52,7 +53,7 @@ Dit proces voert verschillende validaties uit:
    van 64 bytes per account) mag niet groter zijn dan
    [`MAX_LOADED_ACCOUNTS_DATA_SIZE_BYTES`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/execution_budget.rs#L53)
    (64 MiB). Het overschrijden van deze limiet levert
-   _rs`TransactionError::MaxLoadedAccountsDataSizeExceeded`_ op.
+   `TransactionError::MaxLoadedAccountsDataSizeExceeded` op.
 
 3. **Validatie van programma-account**: Elk programma dat door een instructie
    wordt aangeroepen moet bestaan en eigendom zijn van een geldige loader: een
@@ -60,9 +61,9 @@ Dit proces voert verschillende validaties uit:
    [`PROGRAM_OWNERS`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/account/src/lib.rs#L802)
    (BPF Loader Upgradeable, BPF Loader, BPF Loader Deprecated, Loader V4) of de
    native loader. Als het programma-account niet bestaat, mislukt de transactie
-   met _rs`TransactionError::ProgramAccountNotFound`_. Als het wel bestaat maar
+   met `TransactionError::ProgramAccountNotFound`. Als het wel bestaat maar
    een ongeldige eigenaar heeft, mislukt de transactie met
-   _rs`TransactionError::InvalidProgramForExecution`_.
+   `TransactionError::InvalidProgramForExecution`.
 
 4. **Niet-bestaande accounts**: Accounts die niet onchain bestaan, worden
    geladen als standaard accounts (0 lamport, lege data, eigendom van System
@@ -127,15 +128,15 @@ index op instructieniveau te vinden die ernaar verwijst:
   van het eerste voorkomen.
 
 Omdat alle verwijzingen naar hetzelfde account dezelfde onderliggende
-_rs`AccountSharedData`_ delen, zijn wijzigingen via elke verwijzing onmiddellijk
+`AccountSharedData` delen, zijn wijzigingen via elke verwijzing onmiddellijk
 zichtbaar via alle andere verwijzingen. Er kan echter slechts één muteerbare
 borrow tegelijk worden vastgehouden. Een poging om hetzelfde account muteerbaar
 te lenen via twee verschillende instructie-accountindexen tegelijkertijd
-retourneert _rs`InstructionError::AccountBorrowFailed`_. Programma's moeten één
+retourneert `InstructionError::AccountBorrowFailed`. Programma's moeten één
 borrow loslaten voordat ze een andere op hetzelfde onderliggende account
 verkrijgen.
 
 Nadat het programma is uitgevoerd, deserialiseert de runtime de buffer terug
 ([`deserialize_parameters_aligned()`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/serialization.rs#L580-L667))
 en past eventuele wijzigingen toe op `lamports`, `data` (inclusief
-lengtewijzigingen tot _rs`MAX_PERMITTED_DATA_INCREASE`_), en `owner`.
+lengtewijzigingen tot `MAX_PERMITTED_DATA_INCREASE`), en `owner`.

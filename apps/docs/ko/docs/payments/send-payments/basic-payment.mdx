@@ -13,124 +13,110 @@ Solana는 $0.001 미만의 수수료로 즉각적인 글로벌 토큰 전송을 
 이동시킵니다. 수신자가 이 토큰을 처음 받는 경우, 해당 token account는 동일한
 트랜잭션의 일부로 생성될 수 있습니다.
 
-<Callout>
+<Note>
   핵심 결제 개념은 [Solana에서 결제가 작동하는
   방식](/docs/payments/how-payments-work)을 참조하세요.
-</Callout>
+</Note>
 
 `@solana-program/token-2022`의 `token2022Program()` 플러그인은
 [`@solana/kit`](/docs/frontend/client) 클라이언트를 `client.token2022` 헬퍼로
 확장합니다. `transferToATA` 메서드는 ATA 도출 및 트랜잭션 빌드를 자동으로
 처리하므로, 단일 결제 전송에 이상적입니다.
 
-아래 단계는 핵심 흐름을 보여줍니다. 완전히 실행 가능한 코드는 [데모](#demo)를
+아래 단계는 핵심 흐름을 보여줍니다. 완전히 실행 가능한 코드는 [데모](#데모)를
 참조하세요.
 
-<ScrollyCoding>
+<Steps>
+  <Step title="토큰 헬퍼 생성">
+    `.use(token2022Program())`를 사용하여 클라이언트에 `token2022Program()`
+    플러그인을 추가하세요. 이를 통해 `client.token2022`가 노출되며, `instructions`는
+    일반적인 토큰 작업을 위한 메서드를 제공합니다.
 
-## !!steps 토큰 헬퍼 생성
+    Token-2022 프로그램이 소유한 민트에는 `token2022Program()`를 사용하고, 기존
+    Token program이 소유한 민트에는 `@solana-program/token`의 `tokenProgram()`를
+    사용하세요.
 
-`.use(token2022Program())`를 사용하여 클라이언트에 `token2022Program()`
-플러그인을 추가하세요. 이를 통해 `client.token2022`가 노출되며, `instructions`는
-일반적인 토큰 작업을 위한 메서드를 제공합니다.
+    ```ts title="기본 결제" focus={1-4}
+    const client = createClient()
+      .use(signer(sender))
+      .use(solanaLocalRpc())
+      .use(token2022Program());
+    ```
+  </Step>
 
-Token-2022 프로그램이 소유한 민트에는 `token2022Program()`를 사용하고, 기존
-Token program이 소유한 민트에는 `@solana-program/token`의 `tokenProgram()`를
-사용하세요.
+  <Step title="결제 전송">
+    `transferToATA()`를 사용하여 지갑 간에 토큰을 전송하세요. 이 메서드는 다음을
+    처리합니다:
 
-<CodePlaceholder title="기본 결제" />
+    - **ATA 확인**: 송신자와 수신자의 Associated Token Accounts(ATAs)를 자동으로
+      도출합니다. 수신자의 ATA가 존재하지 않는 경우, 계정 생성 명령이 동일한
+      트랜잭션에 자동으로 추가됩니다.
+    - **확인된 금액**: 민트의 `decimals`와 함께 기본 단위의 `amount`를 전달하세요.
+      전송은 온체인에서 민트의 소수점 자리수에 대해 검증됩니다 (예: 민트의 소수점이
+      6자리인 경우, 250000 기본 단위 -> 0.25 토큰).
+    - **트랜잭션 빌드**: `sendTransaction()`는 트랜잭션을 빌드, 서명 및 전송하며,
+      `context.signature`에 트랜잭션 서명이 담긴 결과를 반환합니다.
 
-```ts !! title="Basic Payment"
-// !focus(1:4)
-const client = createClient()
-  .use(signer(sender))
-  .use(solanaLocalRpc())
-  .use(token2022Program());
-```
+    ```ts title="Basic Payment" focus={6-14}
+    const client = createClient()
+      .use(signer(sender))
+      .use(solanaLocalRpc())
+      .use(token2022Program());
 
-## !!steps 결제 전송
+    const result = await client.token2022.instructions
+      .transferToATA({
+        mint: mint.address,
+        authority: sender,
+        recipient: recipient.address,
+        amount: 250_000n,
+        decimals: 6
+      })
+      .sendTransaction();
+    ```
+  </Step>
 
-`transferToATA()`를 사용하여 지갑 간에 토큰을 전송하세요. 이 메서드는 다음을
-처리합니다:
+  <Step title="잔액 확인">
+    전송이 완료된 후, RPC에서 토큰 잔액을 읽어오세요. `findAssociatedTokenPda()`로
+    각 지갑의 ATA를 도출한 다음, `getTokenAccountBalance()`를 호출하여 해당 계정의
+    잔액을 가져오세요.
 
-- **ATA 확인**: 송신자와 수신자의 Associated Token Accounts(ATAs)를 자동으로
-  도출합니다. 수신자의 ATA가 존재하지 않는 경우, 계정 생성 명령이 동일한
-  트랜잭션에 자동으로 추가됩니다.
-- **확인된 금액**: 민트의 `decimals`와 함께 기본 단위의 `amount`를 전달하세요.
-  전송은 온체인에서 민트의 소수점 자리수에 대해 검증됩니다 (예: 민트의 소수점이
-  6자리인 경우, 250000 기본 단위 -> 0.25 토큰).
-- **트랜잭션 빌드**: `sendTransaction()`는 트랜잭션을 빌드, 서명 및 전송하며,
-  `context.signature`에 트랜잭션 서명이 담긴 결과를 반환합니다.
+    ```ts title="Basic Payment" focus={16-29}
+    const client = createClient()
+      .use(signer(sender))
+      .use(solanaLocalRpc())
+      .use(token2022Program());
 
-<CodePlaceholder title="Basic Payment" />
+    const result = await client.token2022.instructions
+      .transferToATA({
+        mint: mint.address,
+        authority: sender,
+        recipient: recipient.address,
+        amount: 250_000n,
+        decimals: 6
+      })
+      .sendTransaction();
 
-```ts !! title="Basic Payment"
-const client = createClient()
-  .use(signer(sender))
-  .use(solanaLocalRpc())
-  .use(token2022Program());
-
-// !focus(1:9)
-const result = await client.token2022.instructions
-  .transferToATA({
-    mint: mint.address,
-    authority: sender,
-    recipient: recipient.address,
-    amount: 250_000n,
-    decimals: 6
-  })
-  .sendTransaction();
-```
-
-## !!steps 잔액 확인
-
-전송이 완료된 후, RPC에서 토큰 잔액을 읽어오세요. `findAssociatedTokenPda()`로
-각 지갑의 ATA를 도출한 다음, `getTokenAccountBalance()`를 호출하여 해당 계정의
-잔액을 가져오세요.
-
-<CodePlaceholder title="Basic Payment" />
-
-```ts !! title="Basic Payment"
-const client = createClient()
-  .use(signer(sender))
-  .use(solanaLocalRpc())
-  .use(token2022Program());
-
-const result = await client.token2022.instructions
-  .transferToATA({
-    mint: mint.address,
-    authority: sender,
-    recipient: recipient.address,
-    amount: 250_000n,
-    decimals: 6
-  })
-  .sendTransaction();
-
-// !focus(1:14)
-const [senderAta] = await findAssociatedTokenPda({
-  mint: mint.address,
-  owner: sender.address,
-  tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
-});
-const [recipientAta] = await findAssociatedTokenPda({
-  mint: mint.address,
-  owner: recipient.address,
-  tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
-});
-const senderBalance = await client.rpc.getTokenAccountBalance(senderAta).send();
-const recipientBalance = await client.rpc
-  .getTokenAccountBalance(recipientAta)
-  .send();
-```
-
-</ScrollyCoding>
+    const [senderAta] = await findAssociatedTokenPda({
+      mint: mint.address,
+      owner: sender.address,
+      tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
+    });
+    const [recipientAta] = await findAssociatedTokenPda({
+      mint: mint.address,
+      owner: recipient.address,
+      tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
+    });
+    const senderBalance = await client.rpc.getTokenAccountBalance(senderAta).send();
+    const recipientBalance = await client.rpc
+      .getTokenAccountBalance(recipientAta)
+      .send();
+    ```
+  </Step>
+</Steps>
 
 ### 데모
 
-<CodeTabs flags="r">
-
-```ts !! title="Demo"
-// !collapse(1:14) collapsed
+```ts Demo highlight={34-42} expandable
 // Click ">" icon on left to expand demo imports
 import {
   createClient,
@@ -164,7 +150,6 @@ console.log("\nMint Address:", mint.address);
 
 // Transfer tokens from sender to recipient. The source and destination ATAs are
 // derived automatically, and the recipient's ATA is created if it does not exist.
-// !mark(1:9)
 const result = await client.token2022.instructions
   .transferToATA({
     mint: mint.address,
@@ -207,7 +192,6 @@ console.log(
 // =============================================================================
 // Demo Setup Helper Function
 // =============================================================================
-// !collapse(1:1000) collapsed
 
 /**
  * Sets up for a token transfer demo:
@@ -261,5 +245,3 @@ async function demoSetup(sender: TransactionSigner) {
   };
 }
 ```
-
-</CodeTabs>

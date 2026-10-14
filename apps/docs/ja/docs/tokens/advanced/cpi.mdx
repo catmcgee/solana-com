@@ -3,7 +3,6 @@ title: CPIによるToken Programの呼び出し
 description:
   Cross Program Invocation (CPI)を使用して、オンチェーンプログラムからToken
   Programを呼び出します。トークンの転送、ミント、バーン、PDAオーソリティによる署名、複数のトークンinstructionsを単一のCPIにまとめる方法を解説します。
-url: /docs/tokens/advanced/cpi
 type: tutorial
 related:
   - /docs/core/cpi
@@ -14,20 +13,20 @@ related:
 
 オンチェーンプログラムは、Token
 Programへの[Cross Program Invocation (CPI)](/docs/core/cpi)を発行することでトークンを移動します。プログラムはToken
-Programのinstructionを構築し、必要なアカウントを提供して、_rs`invoke`_（またはProgram
-Derived Addressが署名する場合は*rs`invoke_signed`*）を呼び出します。Token
+Programのinstructionを構築し、必要なアカウントを提供して、`invoke`（またはProgram
+Derived Addressが署名する場合は`invoke_signed`）を呼び出します。Token
 Programはその後、プログラムが付与した権限を使用してinstructionを実行します。
 
-このページでは、そのフローのトークン固有の側面について説明します。CPIのメカニズム自体——*rs`invoke`*と*rs`invoke_signed`*の動作、署名と書き込み権限の伝播、および[CPIあたりのコストモデル](/docs/core/cpi/cpi-cost-model)——については、[Cross Program Invocation](/docs/core/cpi)を参照してください。
+このページでは、そのフローのトークン固有の側面について説明します。CPIのメカニズム自体——`invoke`と`invoke_signed`の動作、署名と書き込み権限の伝播、および[CPIあたりのコストモデル](/docs/core/cpi/cpi-cost-model)——については、[Cross Program Invocation](/docs/core/cpi)を参照してください。
 
 ## 一般的なパターン
 
 ほとんどのトークンCPIは同じ形式に従います：instructionを構築し、token
-accountとオーソリティを渡して呼び出します。以下の例では、*rs`TransferChecked`*を使用してトークンを転送します。これは転送の一部としてミントとデシマルを検証します。
+accountとオーソリティを渡して呼び出します。以下の例では、`TransferChecked`を使用してトークンを転送します。これは転送の一部としてミントとデシマルを検証します。
 
-<CodeTabs>
+<CodeGroup>
 
-```rust !! title="Anchor"
+```rust Anchor
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface::{transfer_checked, Mint, TokenAccount, TokenInterface, TransferChecked};
 
@@ -66,7 +65,7 @@ pub struct TokenTransfer<'info> {
 }
 ```
 
-```rust !! title="Native (Pinocchio)"
+```rust title="Native (Pinocchio)"
 use pinocchio::{account::AccountView, error::ProgramError, ProgramResult};
 use pinocchio_token::instructions::TransferChecked;
 
@@ -98,50 +97,50 @@ pub fn process(accounts: &[AccountView], data: &[u8]) -> ProgramResult {
 }
 ```
 
-</CodeTabs>
+</CodeGroup>
 
-ミント、バーン、アカウントのクローズも同じパターンに従い、instructionが異なります——Anchorの[`anchor_spl::token`](https://docs.rs/anchor-spl/latest/anchor_spl/token/index.html)モジュールの*rs`MintTo`*、_rs`Burn`_、_rs`CloseAccount`_、または[`pinocchio-token`](https://crates.io/crates/pinocchio-token)の対応するビルダーを使用します。AnchorおよびネイティブRustでToken
+ミント、バーン、アカウントのクローズも同じパターンに従い、instructionが異なります——Anchorの[`anchor_spl::token`](https://docs.rs/anchor-spl/latest/anchor_spl/token/index.html)モジュールの`MintTo`、`Burn`、`CloseAccount`、または[`pinocchio-token`](https://crates.io/crates/pinocchio-token)の対応するビルダーを使用します。AnchorおよびネイティブRustでToken
 Programへのチェーンプログラムを使用した完全な実行可能プログラムについては、[token programの例](/docs/programs/examples#tokens)——特に「Transfer
 Tokens」の例を参照してください。
 
 ## PDAオーソリティによる署名
 
 token
-accountのオーソリティがプログラムの所有する[Program Derived Address](/docs/core/pda)である場合、プログラムはPDAシードを署名シードとして渡しながら、*rs`invoke_signed`*を使用してCPI自体に署名します。Anchorでは、*rs`CpiContext::new`*の代わりにシードとともに*rs`CpiContext::new_with_signer`*を使用します。instructionはそれ以外は上記の例と同じです。詳細なメカニズムについては、[PDA署名者を使用したCPI](/docs/core/cpi/cpi-with-pda)を参照してください。
+accountのオーソリティがプログラムの所有する[Program Derived Address](/docs/core/pda)である場合、プログラムはPDAシードを署名シードとして渡しながら、`invoke_signed`を使用してCPI自体に署名します。Anchorでは、`CpiContext::new`の代わりにシードとともに`CpiContext::new_with_signer`を使用します。instructionはそれ以外は上記の例と同じです。詳細なメカニズムについては、[PDA署名者を使用したCPI](/docs/core/cpi/cpi-with-pda)を参照してください。
 
 ## バッチ処理
 
-_rs`Batch`_ instructionは、単一のプログラム呼び出し内で複数のToken Program
+`Batch` instructionは、単一のプログラム呼び出し内で複数のToken Program
 instructionsを実行します。各CPIには固定のコンピュートコストが発生するため、1つのバッチCPIで複数のトークン操作を実行すると、操作ごとに個別のCPIを発行するよりも使用する[コンピュートユニット](/docs/core/fees/compute-budget)が少なくなります。CPIごとのコストの合計については、[CPIコストモデル](/docs/core/cpi/cpi-cost-model)を参照してください。
 
 コンピュート使用量を削減することで、トランザクションがコンピュートユニットごとに支払う[優先手数料](/docs/core/fees)が下がり、着地の可能性が高まります。これは、単一のinstructionで多くのトークン操作を行うプログラムにとって特に重要です。一般的な用途としては、多数の受取人へのトランスファーのファンアウトや、単一のCPI内でのマルチステップトークンフロー（例：同期、トランスファー、クローズ）の実行などが挙げられます。
 
-<Callout type="info">
+<Info>
 
-_rs`Batch`_ は子要素としてToken Program
+`Batch` は子要素としてToken Program
 instructionsのみを受け付け、バッチの中に別のバッチを含めることはできません。トークンを移動する操作（トランスファー、ミント、バーンなど）については、プログラムは実行前に対象アカウントがToken
 Programによって所有されていることを検証します。
 
-</Callout>
+</Info>
 
 ### ソースリファレンス
 
-| 項目                | 説明                                           | ソース                                                                                               |
-| ------------------- | ---------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| _rs`Batch`_         | Batch instruction（ディスクリミネーター255）。 | [ソース](https://github.com/solana-program/token/blob/main/pinocchio/interface/src/instruction.rs)   |
-| _rs`process_batch`_ | バッチプロセッサーロジック。                   | [ソース](https://github.com/solana-program/token/blob/main/pinocchio/program/src/processor/batch.rs) |
+| 項目              | 説明                                | ソース                                                                                               |
+| --------------- | --------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `Batch`         | Batch instruction（ディスクリミネーター255）。 | [ソース](https://github.com/solana-program/token/blob/main/pinocchio/interface/src/instruction.rs)   |
+| `process_batch` | バッチプロセッサーロジック。                    | [ソース](https://github.com/solana-program/token/blob/main/pinocchio/program/src/processor/batch.rs) |
 
 ### CPIを介したBatchの呼び出し
 
 [`pinocchio-token`](https://crates.io/crates/pinocchio-token)
-クレートは、_rs`pinocchio_token::instructions::Batch`_ 以下に _rs`Batch`_
-ビルダーを公開しています。各子instructionをバッチのバッファにステージングし、_rs`invoke`_
+クレートは、`pinocchio_token::instructions::Batch` 以下に `Batch`
+ビルダーを公開しています。各子instructionをバッチのバッファにステージングし、`invoke`
 で単一のCPIを発行します。
 
-_rs`Batch`_
+`Batch`
 は、呼び出し元が提供する3つのバッファによって支えられています。1つはシリアライズされたinstruction
 data用、1つは子instructionごとのアカウントメタ用、もう1つはCPIに渡されるアカウントビュー用です。これらを
-_rs`MaybeUninit`_ スライスとして構築し、_rs`Batch::new`_
+`MaybeUninit` スライスとして構築し、`Batch::new`
 に渡して子要素を追加した後、以下のように呼び出します：
 
 ```rust title="Batch two transfers in one CPI"
@@ -206,31 +205,31 @@ pub fn process(accounts: &[AccountView], data: &[u8]) -> ProgramResult {
 }
 ```
 
-_rs`Batch::new`_
+`Batch::new`
 はバッチの識別子をデータバッファの先頭バイトに書き込み、各バッファのどれだけが使用されたかを追跡する
-_rs`Batch`_ を返します。すべての Token
-Program の instructions ビルダー（_rs`Transfer`_、_rs`TransferChecked`_、_rs`MintTo`_、_rs`Burn`_
-など）は _rs`IntoBatch`_ トレイトを実装しているため、_rs`into_batch`_
+`Batch` を返します。すべての Token
+Program の instructions ビルダー（`Transfer`、`TransferChecked`、`MintTo`、`Burn`
+など）は `IntoBatch` トレイトを実装しているため、`into_batch`
 はその instruction の instruction
-data、アカウントメタ、アカウントビューをバッチに追加します。_rs`invoke`_
+data、アカウントメタ、アカウントビューをバッチに追加します。`invoke`
 を呼び出すと、組み立てられたバッチが Token
 Program への1つのCPIとして発行されます。
 
 バッファはバッチの容量を制限します。データバッファのサイズは
 `1 + Σ(2 + child_data_len)`
-バイト（識別子、2バイトのヘッダー、および各子の直列化されたデータ）に設定し、各アカウントバッファはすべての子のアカウント総数に設定します。子が収まらない場合、_rs`into_batch`_
-は _rs`ProgramError::InvalidArgument`_
-を返します。参考として、_rs`Batch::MAX_DATA_LEN`_ は10
-KiBで、_rs`Batch::MAX_ACCOUNTS_LEN`_
+バイト（識別子、2バイトのヘッダー、および各子の直列化されたデータ）に設定し、各アカウントバッファはすべての子のアカウント総数に設定します。子が収まらない場合、`into_batch`
+は `ProgramError::InvalidArgument`
+を返します。参考として、`Batch::MAX_DATA_LEN` は10
+KiBで、`Batch::MAX_ACCOUNTS_LEN`
 はランタイムの最大CPIアカウント数と等しくなります。
 
 サイズが実行時にのみ判明するバッチの場合は、クレートの `alloc`
-フィーチャーを有効にし、_rs`BatchState::new(accounts_len, data_len)`_
-を使用してヒープ上にバッファを確保してから、_rs`as_batch`_ を呼び出して
-_rs`Batch`_ を取得します。
+フィーチャーを有効にし、`BatchState::new(accounts_len, data_len)`
+を使用してヒープ上にバッファを確保してから、`as_batch` を呼び出して
+`Batch` を取得します。
 
-子 instruction の権限がプログラムに所有されるPDAである場合は、_rs`invoke`_
-の代わりに _rs`invoke_signed`_ を使用してCPIに署名し、PDAシードを _rs`Signer`_
+子 instruction の権限がプログラムに所有されるPDAである場合は、`invoke`
+の代わりに `invoke_signed` を使用してCPIに署名し、PDAシードを `Signer`
 エントリとして渡します。
 
 ### instruction data のレイアウト
@@ -248,12 +247,12 @@ _rs`Batch`_ を取得します。
 //   [data: u8; data_len]// the instruction data (begins with its own discriminator)
 ```
 
-<Callout type="warn">
+<Warning>
 
-バッチの容量は _rs`Batch::new`_
+バッチの容量は `Batch::new`
 に渡されるバッファによって制限されます：データバッファは識別子に加えてすべての子のヘッダーとデータを保持する必要があり、アカウントバッファはすべての子のアカウントを保持する必要があります。構築する最大バッチに合わせてサイズを設定するか、実行時にサイズを決定するために（`alloc`
-フィーチャーを使用して）_rs`BatchState`_
+フィーチャーを使用して）`BatchState`
 を使用してください。結合されたCPIはトランザクションのアカウント数とサイズ制限の影響を受けるため、非常に大きなファンアウトの場合は、より多くのアカウントを収めるためにAddress
 Lookup Tablesを使用してください。
 
-</Callout>
+</Warning>

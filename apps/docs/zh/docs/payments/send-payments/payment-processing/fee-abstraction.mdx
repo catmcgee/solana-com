@@ -20,81 +20,67 @@ Solana 交易有一个指定的手续费支付者——即负责支付网络手�
 - **发送方** 签名以授权其代币的转账
 - **赞助者** 签名以授权支付网络手续费
 
-<Callout>
+<Note>
   参见 [Solana 支付原理](/docs/payments/how-payments-work) 了解核心支付概念。
-</Callout>
+</Note>
 
-以下步骤展示了核心流程。完整可运行代码请参见 [演示](#demo)。
+以下步骤展示了核心流程。完整可运行代码请参见 [演示](#演示)。
 
-<ScrollyCoding>
+<Steps>
+  <Step title="创建赞助者账户">
+    为将要支付交易手续费的赞助者生成一个独立的 keypair。赞助者需要持有用于支付手续费的 SOL，但无需持有被转账的代币。
 
-## !!steps 创建赞助者账户
+    ```ts title="Sponsor Transaction Fee"
+    const sponsor = await generateKeyPairSigner();
+    ```
+  </Step>
 
-为将要支付交易手续费的赞助者生成一个独立的 keypair。赞助者需要持有用于支付手续费的 SOL，但无需持有被转账的代币。
+  <Step title="创建转账指令">
+    创建以发送方为授权人的代币转账指令。发送方拥有代币，必须对转账进行签名。
 
-<CodePlaceholder title="Sponsor Transaction Fee" />
+    ```ts title="Sponsor Transaction Fee" focus={3-10}
+    const sponsor = await generateKeyPairSigner();
 
-```ts !! title="Sponsor Transaction Fee"
-const sponsor = await generateKeyPairSigner();
-```
+    const transferInstruction = getTransferCheckedInstruction({
+      source: senderAta,
+      mint: mint.address,
+      destination: recipientAta,
+      authority: sender, // Sender signs for the transfer
+      amount: 250_000n, // adjusted for the mint's decimals
+      decimals: 6
+    });
+    ```
+  </Step>
 
-## !!steps 创建转账指令
+  <Step title="由赞助方作为手续费支付者进行发送">
+    通过 `payer(sponsor)` 将赞助商设置为手续费支付方来创建客户端，然后调用
+    `client.sendTransaction`。赞助商签名以支付网络费用，而发送方签名以授权转账——`sendTransaction`
+    会自动收集所有被引用的签名者。
 
-创建以发送方为授权人的代币转账指令。发送方拥有代币，必须对转账进行签名。
+    ```ts title="Sponsor Transaction Fee" highlight={13} focus={12-16}
+    const sponsor = await generateKeyPairSigner();
 
-<CodePlaceholder title="Sponsor Transaction Fee" />
+    const transferInstruction = getTransferCheckedInstruction({
+      source: senderAta,
+      mint: mint.address,
+      destination: recipientAta,
+      authority: sender,
+      amount: 250_000n,
+      decimals: 6
+    });
 
-```ts !! title="Sponsor Transaction Fee"
-const sponsor = await generateKeyPairSigner();
+    const client = createClient()
+      .use(payer(sponsor)) // Sponsor pays the transaction fees
+      .use(solanaLocalRpc());
 
-// !focus(1:8)
-const transferInstruction = getTransferCheckedInstruction({
-  source: senderAta,
-  mint: mint.address,
-  destination: recipientAta,
-  authority: sender, // Sender signs for the transfer
-  amount: 250_000n, // adjusted for the mint's decimals
-  decimals: 6
-});
-```
-
-## !!steps 由赞助方作为手续费支付者进行发送
-
-通过 `payer(sponsor)` 将赞助商设置为手续费支付方来创建客户端，然后调用
-`client.sendTransaction`。赞助商签名以支付网络费用，而发送方签名以授权转账——`sendTransaction`
-会自动收集所有被引用的签名者。
-
-<CodePlaceholder title="Sponsor Transaction Fee" />
-
-```ts !! title="Sponsor Transaction Fee"
-const sponsor = await generateKeyPairSigner();
-
-const transferInstruction = getTransferCheckedInstruction({
-  source: senderAta,
-  mint: mint.address,
-  destination: recipientAta,
-  authority: sender,
-  amount: 250_000n,
-  decimals: 6
-});
-
-// !focus(1:5)
-const client = createClient()
-  // !mark
-  .use(payer(sponsor)) // Sponsor pays the transaction fees
-  .use(solanaLocalRpc());
-
-const { context } = await client.sendTransaction([transferInstruction]);
-```
-
-</ScrollyCoding>
+    const { context } = await client.sendTransaction([transferInstruction]);
+    ```
+  </Step>
+</Steps>
 
 ### 演示
 
-<CodeTabs flags="r">
-
-```ts !! title="Demo"
-// !collapse(1:15) collapsed
+```ts Demo highlight={20,64} expandable
 // Click ">" icon on left to expand demo imports
 import { createClient, generateKeyPairSigner, lamports } from "@solana/kit";
 import type { KeyPairSigner } from "@solana/kit";
@@ -114,7 +100,6 @@ import {
 // Generate keypairs for sender, recipient, and sponsor (fee payer)
 const sender = await generateKeyPairSigner();
 const recipient = await generateKeyPairSigner();
-// !mark
 const sponsor = await generateKeyPairSigner();
 
 console.log("Sender Address:", sender.address);
@@ -159,7 +144,6 @@ const transferInstruction = getTransferCheckedInstruction({
 
 // Send transaction with sponsor as fee payer using @solana/kit
 // The sponsor (client.payer) pays fees; the sender signs for the transfer
-// !mark
 const { context } = await client.sendTransaction([transferInstruction]);
 const signature = context.signature;
 
@@ -193,7 +177,6 @@ console.log("Fee Payer Address:", feePayer);
 // =============================================================================
 // Demo Setup Helper Function
 // =============================================================================
-// !collapse(1:1000) collapsed
 
 /**
  * Sets up for a sponsored token transfer demo:
@@ -299,12 +282,10 @@ async function demoSetup(
 }
 ```
 
-</CodeTabs>
-
-<Callout type="caution">
+<Danger>
   当你为终端用户创建 token account 时，他们可以关闭该账户并取回用于 rent 的
   SOL。建议向用户收取账户创建费用（如以稳定币结算），或将此成本计入你的产品经济模型中。
-</Callout>
+</Danger>
 
 ## 使用 Kora 实现大规模手续费抽象
 
@@ -348,7 +329,7 @@ console.log("Signature:", context.signature);
 
 ### Kora 资源
 
-<Cards>
+<Columns cols={2}>
   <Card
     title="Kora 快速入门"
     href="/docs/tools/kora/getting-started/quick-start"
@@ -364,4 +345,4 @@ console.log("Signature:", context.signature);
   <Card title="节点运营商指南" href="/docs/tools/kora/operators">
     部署和配置您自己的 Kora 实例。
   </Card>
-</Cards>
+</Columns>

@@ -10,7 +10,7 @@ Tämä opas käynnistää Koran viiteimplementaatiofasilitaattorin Solana Devnet
 
 ## Arkkitehtuuri
 
-```mermaid title="x402 with Kora"
+```mermaid
 sequenceDiagram
     participant Client
     participant API as Resource server
@@ -34,6 +34,34 @@ sequenceDiagram
     API-->>Client: 200 + resource + PAYMENT-RESPONSE
 ```
 
+<div className="nojs-only" data-fallback="mermaid">
+  ```text Mermaid
+  sequenceDiagram
+      participant Client
+      participant API as Resource server
+      participant Facilitator
+      participant Kora
+      participant Solana
+      Client->>API: GET /protected
+      API-->>Client: 402 + PAYMENT-REQUIRED
+      Client->>API: GET /protected + PAYMENT-SIGNATURE
+      API->>Facilitator: POST /verify
+      Facilitator->>Kora: signTransaction
+      Kora->>Kora: Enforce transaction policy
+      Kora-->>Facilitator: Validated transaction
+      Facilitator-->>API: Payment is valid
+      API->>Facilitator: POST /settle
+      Facilitator->>Kora: signAndSendTransaction
+      Kora->>Solana: Sign as fee payer and submit
+      Solana-->>Kora: Transaction signature
+      Kora-->>Facilitator: Transaction signature
+      Facilitator-->>API: Settlement result
+      API-->>Client: 200 + resource + PAYMENT-RESPONSE
+  ```
+</div>
+
+<p className="sol-caption">x402 with Kora</p>
+
 Neljä sovellusroolia pysyvät erillään:
 
 - **Asiakas** valitsee maksuvaateen ja allekirjoittaa maksuvaltuutuksen.
@@ -55,9 +83,11 @@ cp .env.example .env
 
 Aseta `KORA_PRIVATE_KEY` `.env`-tiedostossa kertakäyttöiseen Devnet-keypair-arvoon. Demon allekirjoittajakonfiguraatio hyväksyy base58-salaisuuden, tavu-taulukkomuotoisen keypair-arvon tai polun JSON-keypair-tiedostoon. Rahoita julkinen osoite Devnet SOL:lla, jotta se voi sponsoroida transaktiomaksuja.
 
-<Callout type="caution" title="Käytä kertakäyttöistä Devnet-allekirjoittajaa">
+<Danger>
+  **Käytä kertakäyttöistä Devnet-allekirjoittajaa**
+
   Docker-demo lataa Kora-allekirjoittajan ympäristömuuttujasta. Älä laita tuotannon allekirjoitusavainta tähän demoon äläkä tallenna `.env`-tiedostoa versionhallintaan.
-</Callout>
+</Danger>
 
 Käynnistä Kora ja fasilitaattori:
 

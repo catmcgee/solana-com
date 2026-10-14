@@ -20,7 +20,13 @@ keywords:
   - compliance
 ---
 
-<Embed url="https://www.youtube.com/embed/dRCiYa1rkrY" />
+<Frame>
+  <iframe src="https://www.youtube-nocookie.com/embed/dRCiYa1rkrY" title="YouTube video player" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerPolicy="strict-origin-when-cross-origin" allowFullScreen className="w-full aspect-video" />
+</Frame>
+
+<div className="nojs-only">
+  [https://www.youtube.com/watch?v=dRCiYa1rkrY](https://www.youtube.com/watch?v=dRCiYa1rkrY)
+</div>
 
 Delivery vs Payment (DvP) to metoda rozliczania papierów wartościowych, która zapewnia, że przekazanie papierów wartościowych następuje jednocześnie z przekazaniem płatności. Eliminuje to ryzyko kontrahenta, gwarantując, że obie nogi transakcji wykonują się atomowo — albo obie się kończą, albo żadna z nich.
 
@@ -53,7 +59,9 @@ Jeśli te zdarzenia zachodzą oddzielnie, pojawia się ryzyko — co jeśli zap�
 
 Ten przewodnik pokazuje, jak zaimplementować kompletny przepływ pracy DvP na Solanie, używając rozszerzeń SPL Token 2022 do emisji zgodnych z przepisami obligacji oraz standardowego USDC do rozliczeń — bez pisania własnych programów w Rust.
 
-<Callout type="info" title="Referencyjna implementacja edukacyjna">
+<Info>
+
+**Referencyjna implementacja edukacyjna**
 
 Możesz skorzystać z [kodu źródłowego](https://github.com/Woody4618/dvp) tej implementacji, aby wypróbować DvP lokalnie.
 
@@ -65,7 +73,7 @@ Ten przewodnik dostarcza referencyjnej implementacji wyłącznie do celów ekspl
 - Konsultacji prawnych
 - Rozległych testów i modyfikacji
 
-</Callout>
+</Info>
 
 ## Dlaczego Solana do DvP?
 
@@ -152,11 +160,11 @@ SPL Token 2022 dostarcza zaawansowane rozszerzenia umożliwiające emisję zgodn
 - **Uprawnienie do zamrażania**: Agent rozliczeniowy (zarządza białą listą)
 - **Uprawnienie do aktualizacji**: Agent rozliczeniowy (może aktualizować metadane)
 
-<Callout type="info">
+<Info>
 
 Domyślny stan zamrożenia jest kluczowy dla zgodności z przepisami. Zapewnia, że tylko jawnie umieszczone na białej liście adresy mogą odbierać i posiadać papiery wartościowe, spełniając wymogi KYC/AML.
 
-</Callout>
+</Info>
 
 ## Kompletna implementacja DvP
 
@@ -791,9 +799,9 @@ runDvPExample().catch(console.error);
 
 Agent rozliczeniowy (posiadający uprawnienie do aktualizacji) może aktualizować pola metadanych:
 
-<Tabs items={["Helper Function", "Usage Example"]}>
+<Tabs>
 
-<Tab value="Helper Function">
+<Tab title="Helper Function">
 
 ```typescript
 import { createUpdateFieldInstruction } from "@solana/spl-token-metadata";
@@ -821,7 +829,7 @@ async function updateBondMetadata(
 
 </Tab>
 
-<Tab value="Usage Example">
+<Tab title="Usage Example">
 
 ```typescript
 // Update coupon rate after rate adjustment
@@ -855,19 +863,21 @@ Usuń możliwość posiadania obligacji przez inwestora, zamrażając jego konto
 await dvp.removeFromWhitelist(bondMint, investorBondAccount);
 ```
 
-<Callout type="caution" title="Zamrażanie a spalanie">
+<Danger>
+
+**Zamrażanie a spalanie**
 
 Zamrożenie konta uniemożliwia transfery, ale zachowuje konto i saldo. W celu całkowitego usunięcia możesz najpierw przenieść obligacje z powrotem do emitenta, a następnie zamrozić konto.
 
-</Callout>
+</Danger>
 
 ### Rozliczenie wielostronne
 
 W przypadku bardziej złożonych scenariuszy obejmujących wiele stron możesz łączyć wiele transferów w jedną atomową transakcję:
 
-<Tabs items={["Function Definition", "Three-Way Swap Example"]}>
+<Tabs>
 
-<Tab value="Function Definition">
+<Tab title="Function Definition">
 
 ```typescript
 import { sendAndConfirmTransaction } from "@solana/web3.js";
@@ -935,7 +945,7 @@ async function executeMultiPartyDvP(
 
 </Tab>
 
-<Tab value="Three-Way Swap Example">
+<Tab title="Three-Way Swap Example">
 
 ```typescript
 // Example: Three-way swap (Bond A → Bond B → Cash)
@@ -974,7 +984,9 @@ const signature = await executeMultiPartyDvP(connection, settlementAgent, [
 
 </Tabs>
 
-<Callout type="info" title="Limity rozmiaru transakcji">
+<Info>
+
+**Limity rozmiaru transakcji**
 
 Transakcje Solana mają limit rozmiaru (~1232 bajty). Każda instrukcja transferu
 dodaje ~200 bajtów. W przypadku bardzo dużych rozliczeń wielostronnych rozważ użycie
@@ -987,7 +999,7 @@ podnosi limit do 4096 bajtów, ale usuwa obsługę Tabel Wyszukiwania Adresów, 
 w formacie v1 zawierają adresy bezpośrednio. W obu przypadkach środowisko uruchomieniowe
 ładuje maksymalnie 64 konta na transakcję.
 
-</Callout>
+</Info>
 
 ## Uwagi dotyczące środowiska produkcyjnego
 
@@ -1000,19 +1012,21 @@ Przed wdrożeniem do środowiska produkcyjnego upewnij się, że uwzględniasz:
 5. **Operacje**: Harmonogramowanie rozliczeń, obsługa nieudanych transakcji, uzgadnianie i obsługa klienta
 6. **Monitorowanie**: Śledzenie w czasie rzeczywistym, alerty i automatyczne raportowanie do organów regulacyjnych
 
-<Callout type="caution" title="Ograniczenie SPL Token">
+<Danger>
+
+**Ograniczenie SPL Token**
 
 Konta SPL Token mogą mieć tylko **jednego delegata w danym momencie**. Oznacza to, że w scenariuszach wielostronnych może być konieczne zaprojektowanie rozwiązania uwzględniającego to ograniczenie poprzez stosowanie wielu kolejnych delegacji lub różnych wzorców architektonicznych.
 
-</Callout>
+</Danger>
 
 ### Inspekcja stanu konta
 
 `DvPEngine` zawiera funkcję pomocniczą do inspekcji stanu token account. Jest ona przydatna do weryfikacji statusu białej listy, potwierdzania zakończenia rozliczenia, debugowania problemów z transferami oraz audytowania stanów kont.
 
-<Tabs items={["Get Account Info", "Pre-Settlement Check"]}>
+<Tabs>
 
-<Tab value="Get Account Info">
+<Tab title="Get Account Info">
 
 ```typescript
 // Get detailed account information
@@ -1031,7 +1045,7 @@ console.log(`  Frozen: ${accountInfo.isFrozen}`);
 
 </Tab>
 
-<Tab value="Pre-Settlement Check">
+<Tab title="Pre-Settlement Check">
 
 ```typescript
 // Check if investor is whitelisted before settlement

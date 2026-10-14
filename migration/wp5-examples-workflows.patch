@@ -1,0 +1,200 @@
+diff -ruN a/.github/workflows/docs-examples-record.yml b/.github/workflows/docs-examples-record.yml
+--- a/.github/workflows/docs-examples-record.yml	1970-01-01 00:00:00.000000000 +0000
++++ b/.github/workflows/docs-examples-record.yml	2026-10-13 20:48:48.638520173 +0000
+@@ -0,0 +1,83 @@
++name: Docs examples (record outputs)
++
++# Re-runs the path examples against Surfpool with RECORD_OUTPUT=1 and rebuilds
++# the docs snippets. It opens NO pull request (project rule): when the
++# recorded output drifted, the job fails and uploads the refreshed files plus
++# a patch as an artifact; a maintainer reviews and commits them by hand.
++# Compare-mode drift in normal CI is caught by docs-examples.yml.
++on:
++  workflow_dispatch:
++  schedule:
++    - cron: "0 7 * * 1"
++
++permissions:
++  contents: read
++
++env:
++  NODE_OPTIONS: --max-old-space-size=8192
++
++jobs:
++  record:
++    runs-on: ubuntu-latest
++    steps:
++      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
++
++      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
++        with:
++          run_install: false
++
++      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
++        with:
++          node-version-file: .node-version
++          cache: "pnpm"
++
++      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
++        with:
++          python-version: "3.12"
++
++      - name: Install solana-py
++        run: pip install "solana==0.40.1" "solders==0.28.0"
++
++      - name: Install Safe Chain
++        run: |
++          npm install --global @aikidosec/safe-chain
++          safe-chain setup-ci
++
++      - name: Install dependencies
++        run: pnpm install --frozen-lockfile
++
++      # Surfpool runs embedded (@solana/surfpool); the global setup writes
++      # the CLI keypair itself when solana-keygen is absent.
++      - name: Record path example outputs
++        env:
++          RECORD_OUTPUT: "1"
++          PYTHON: python
++        run: pnpm --filter @workspace/docs-examples exec vitest run paths
++
++      - name: Rebuild docs snippets
++        run: pnpm --filter @workspace/docs-tooling examples:build
++
++      - name: Collect drift
++        id: drift
++        run: |
++          git diff --binary -- packages/docs-examples apps/docs/snippets/examples > recorded-output.patch
++          if [ -s recorded-output.patch ]; then
++            echo "changed=true" >> "$GITHUB_OUTPUT"
++            git diff --stat -- packages/docs-examples apps/docs/snippets/examples
++          fi
++
++      - name: Upload refreshed output
++        if: steps.drift.outputs.changed == 'true'
++        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
++        with:
++          name: recorded-output
++          path: |
++            recorded-output.patch
++            packages/docs-examples/**/*.output.txt
++            apps/docs/snippets/examples/**
++
++      - name: Fail on drift
++        if: steps.drift.outputs.changed == 'true'
++        run: |
++          echo "::error::Recorded example output changed. Download the recorded-output artifact, review it and commit it (git apply recorded-output.patch)."
++          exit 1
+diff -ruN a/.github/workflows/docs-examples.yml b/.github/workflows/docs-examples.yml
+--- a/.github/workflows/docs-examples.yml	2026-10-13 20:48:48.620878706 +0000
++++ b/.github/workflows/docs-examples.yml	2026-10-13 20:48:48.634835933 +0000
+@@ -2,16 +2,30 @@
+ 
+ on:
+   push:
+-    branches: [main]
++    branches: [main, mintlify-migration]
+     paths:
+       - "packages/docs-examples/**"
+-      - "apps/docs/content/cookbook/**"
++      - "packages/docs-tooling/src/examples/**"
++      - "packages/docs-tooling/src/convert/transforms/codetabs-examples.ts"
++      - "apps/docs/snippets/examples/**"
++      - "apps/docs/run-examples.js"
++      - "apps/docs/styles/run.css"
++      - "apps/docs/docs/**"
++      - "apps/docs/*/docs/**"
++      - "apps/docs/developers/cookbook/**"
+       - ".github/workflows/docs-examples.yml"
+   pull_request:
+-    branches: [main]
++    branches: [main, mintlify-migration]
+     paths:
+       - "packages/docs-examples/**"
+-      - "apps/docs/content/cookbook/**"
++      - "packages/docs-tooling/src/examples/**"
++      - "packages/docs-tooling/src/convert/transforms/codetabs-examples.ts"
++      - "apps/docs/snippets/examples/**"
++      - "apps/docs/run-examples.js"
++      - "apps/docs/styles/run.css"
++      - "apps/docs/docs/**"
++      - "apps/docs/*/docs/**"
++      - "apps/docs/developers/cookbook/**"
+       - ".github/workflows/docs-examples.yml"
+ 
+ permissions:
+@@ -70,6 +84,74 @@
+       - name: Lint
+         run: pnpm --filter @workspace/docs-examples lint
+ 
++  examples-snippets-fresh:
++    name: Example snippets are up to date
++    runs-on: ubuntu-latest
++    steps:
++      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
++
++      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
++        with:
++          run_install: false
++
++      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
++        with:
++          node-version-file: .node-version
++          cache: "pnpm"
++
++      - name: Install Safe Chain
++        run: |
++          npm install --global @aikidosec/safe-chain
++          safe-chain setup-ci
++
++      - name: Install dependencies
++        run: pnpm install --frozen-lockfile
++
++      # blocks.json + sources + recorded .output.txt -> apps/docs/snippets/examples.
++      # Fails when a committed snippet is stale, missing or orphaned.
++      - name: examples:build --check
++        run: pnpm --filter @workspace/docs-tooling examples:build --check
++
++      - name: Examples tooling tests
++        run: pnpm --filter @workspace/docs-tooling exec vitest run src/examples
++
++  examples-python:
++    name: Python path examples
++    runs-on: ubuntu-latest
++    steps:
++      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
++
++      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
++        with:
++          run_install: false
++
++      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
++        with:
++          node-version-file: .node-version
++          cache: "pnpm"
++
++      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
++        with:
++          python-version: "3.12"
++
++      - name: Install solana-py
++        run: pip install "solana==0.40.1" "solders==0.28.0"
++
++      - name: Install Safe Chain
++        run: |
++          npm install --global @aikidosec/safe-chain
++          safe-chain setup-ci
++
++      - name: Install dependencies
++        run: pnpm install --frozen-lockfile
++
++      # The checkout path test runs verify_payment.py when solana-py is
++      # importable (it is skipped in examples-ts, which has no Python).
++      - name: Run path examples with Python
++        env:
++          PYTHON: python
++        run: pnpm --filter @workspace/docs-examples exec vitest run paths
++
+   examples-rust:
+     name: Rust examples
+     runs-on: ubuntu-latest

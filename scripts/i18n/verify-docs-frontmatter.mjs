@@ -5,7 +5,14 @@ import { fileURLToPath } from "node:url";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(scriptDir, "../..");
-const contentDir = path.join(rootDir, "apps/docs/content");
+// The Mintlify project: English collections plus every locale folder.
+const docsDir = path.join(rootDir, "apps/docs");
+const NON_CONTENT = new Set([
+  "snippets",
+  "navigation",
+  "docs-assets",
+  "node_modules",
+]);
 const violations = [];
 
 function visit(directory) {
@@ -13,6 +20,8 @@ function visit(directory) {
     const absolutePath = path.join(directory, entry.name);
 
     if (entry.isDirectory()) {
+      if (entry.name.startsWith(".")) continue;
+      if (directory === docsDir && NON_CONTENT.has(entry.name)) continue;
       visit(absolutePath);
       continue;
     }
@@ -38,7 +47,7 @@ function visit(directory) {
   }
 }
 
-visit(contentDir);
+visit(docsDir);
 
 if (violations.length > 0) {
   console.error(

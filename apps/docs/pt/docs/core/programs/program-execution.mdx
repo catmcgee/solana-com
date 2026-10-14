@@ -2,7 +2,6 @@
 title: Execução de Programas
 description:
   Como a Solana compila e executa programas, incluindo a VM sBPF, o modelo de unidades de computação, o cache de programas e as syscalls.
-url: /docs/core/programs/program-execution
 type: conceptual
 prerequisites:
   - /docs/core/programs
@@ -16,12 +15,14 @@ related:
 
 {/* TOC: Compilation, Write programs, Program execution model, Program cache, Syscalls */}
 
-<Callout type="info" title="Resumo">
+<Info>
+  **Resumo**
+
   Os programas são compilados para sBPF via LLVM e executados numa VM isolada com um
   orçamento de 1,4 M CU por transação. O runtime armazena em cache até 512 programas compilados,
   fornece syscalls para logging, CPI, criptografia e memória, e atrasa novos
   deployments em 1 slot.
-</Callout>
+</Info>
 
 ## Compilação
 
@@ -30,11 +31,11 @@ binários [ELF](https://en.wikipedia.org/wiki/Executable_and_Linkable_Format)
 contendo o Solana Bytecode Format (sBPF). O binário ELF é armazenado onchain numa
 conta executável.
 
-<Callout>
+<Note>
   sBPF é a variante personalizada da Solana do bytecode [eBPF](https://en.wikipedia.org/wiki/EBPF),
   adaptada para o runtime da Solana. Não é eBPF padrão e possui
   modificações específicas da Solana.
-</Callout>
+</Note>
 
 ## Escrever programas
 
@@ -42,7 +43,7 @@ Os programas Solana são escritos principalmente em
 [Rust](https://rust-book.cs.brown.edu/title-page.html) usando uma das três
 abordagens:
 
-<Cards>
+<Columns cols={2}>
   <Card title="Anchor" href="https://www.anchor-lang.com/docs">
     Um framework que utiliza macros Rust para reduzir o código repetitivo. Recomendado para
     a maioria dos desenvolvedores.
@@ -55,7 +56,7 @@ abordagens:
     Rust direto sem frameworks. Oferece controle total, mas requer mais
     implementação manual.
   </Card>
-</Cards>
+</Columns>
 
 Consulte [Cross-Program Invocations](/docs/core/cpi) para conceitos e exemplos de CPI
 que se aplicam a todas essas abordagens.
@@ -76,7 +77,7 @@ Para cada instrução, o runtime:
 2. **Verifica os precompiles.** Se o programa for um
    [precompile](/docs/core/programs/precompiles), o runtime chama
    [`process_precompile()`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/invoke_context.rs#L491),
-   que ainda empurra e retira um frame de pilha (via _rs`push()`_ e _rs`pop()`_)
+   que ainda empurra e retira um frame de pilha (via `push()` e `pop()`)
    mas ignora a VM sBPF e a busca no cache de programas, executando código nativo
    diretamente.
 
@@ -84,7 +85,7 @@ Para cada instrução, o runtime:
    [`InvokeContext::process_instruction()`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/invoke_context.rs#L481)
    e
    [`process_executable_chain()`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/invoke_context.rs#L507),
-   chamados a partir de _rs`process_message()`_.) Chama
+   chamados a partir de `process_message()`.) Chama
    [`push()`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/invoke_context.rs#L233)
    em
    [`InvokeContext`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/invoke_context.rs#L184),
@@ -93,7 +94,7 @@ Para cada instrução, o runtime:
    programa no topo atual da pilha de instruções) for o mesmo programa.
    A autorrecursão profunda (A -> A -> A) é permitida, sujeita aos limites de profundidade de pilha.
    Outros padrões de reentrância (ex.: A chama B que chama A) retornam
-   _rs`InstructionError::ReentrancyNotAllowed`_.
+   `InstructionError::ReentrancyNotAllowed`.
 
 4. **Resolve o programa.** O runtime chama
    [`process_executable_chain()`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/invoke_context.rs#L507)
@@ -114,7 +115,7 @@ Para cada instrução, o runtime:
    - Serializa os dados da conta num buffer de parâmetros plano
    - Cria a VM sBPF com regiões de pilha, heap e memória
    - Executa o código compilado, consumindo unidades de computação durante a execução. Retorna
-     _rs`ComputationalBudgetExceeded`_ se o orçamento for excedido.
+     `ComputationalBudgetExceeded` se o orçamento for excedido.
    - Desserializa os dados da conta do buffer de volta ao estado da conta
 
 6. **Retira o frame de pilha.** Chama
@@ -155,14 +156,14 @@ Programas recém-implantados ou atualizados não entram em vigor imediatamente. 
 constante [`DELAY_VISIBILITY_SLOT_OFFSET`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/loaded_programs.rs#L32)
 é `1`, o que significa que um programa implantado no slot N entra em vigor no slot
 N+1. Durante o slot de implantação, qualquer tentativa de invocar a nova versão retorna
-_rs`DelayVisibility`_, fazendo com que o runtime reporte "Program is not deployed."
+`DelayVisibility`, fazendo com que o runtime reporte "Program is not deployed."
 
 ### Política de evicção
 
 O cache comporta até
 [`MAX_LOADED_ENTRY_COUNT`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/loaded_programs.rs#L31)
 (512) entradas de programas compilados. Quando o limite é atingido, os programas
-menos utilizados são removidos para o estado _rs`Unloaded`_. O uso é rastreado por
+menos utilizados são removidos para o estado `Unloaded`. O uso é rastreado por
 [`tx_usage_counter`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/loaded_programs.rs#L197)
 (incrementado cada vez que uma transação referencia o programa) e
 [`latest_access_slot`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/loaded_programs.rs#L199).
@@ -182,4 +183,4 @@ armazenados numa
 [`TransactionReturnData`](https://github.com/anza-xyz/agave/blob/v3.1.8/transaction-context/src/lib.rs#L499)
 estrutura em nível de transação que contém os bytes de dados e o `program_id` do programa cuja
 instrução chamou a syscall. O tamanho máximo é de 1.024 bytes
-(_rs`MAX_RETURN_DATA`_).
+(`MAX_RETURN_DATA`).

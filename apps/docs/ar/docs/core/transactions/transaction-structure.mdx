@@ -2,7 +2,6 @@
 title: بنية المعاملة
 description:
   تشريح معاملة سولانا بما في ذلك التوقيعات، وتنسيق الرسالة، والرأسية، وعناوين الحسابات، وتجزئة الكتلة، والتعليمات المجمعة، والترميز الثنائي، وحد الحجم.
-url: /docs/core/transactions/transaction-structure
 type: conceptual
 prerequisites:
   - /docs/core/transactions
@@ -16,56 +15,58 @@ related:
 
 {/* TOC: Signatures, Message (Header, Account addresses, Recent blockhash, Instructions), Transaction binary format, SOL transfer example */}
 
-<Callout type="info" title="ملخص">
+<Info>
+  **ملخص**
+
   تحتوي المعاملة على توقيعات ورسالة. تتضمن الرسالة ترويسةً،
   وعناوين حسابات، وبلوك هاش حديث، وتعليمات مُجمَّعة. الحجم الأقصى
   للتسلسل: 1,232 بايت (4,096 بايت للصيغة القادمة v1).
-</Callout>
+</Info>
 
 تحتوي
 [`Transaction`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/transaction/src/lib.rs#L193)
 على حقلين رئيسيين:
 
-<WithMentions>
-
-- [`signatures`](mention:signatures): مصفوفة من التوقيعات
-- [`message`](mention:message): معلومات المعاملة، بما في ذلك قائمة التعليمات
+- `signatures`: مصفوفة من التوقيعات
+- `message`: معلومات المعاملة، بما في ذلك قائمة التعليمات
   المراد معالجتها
 
-```rust title="Transaction"
+```rust Transaction
 pub struct Transaction {
-    // !mention signatures
     pub signatures: Vec<Signature>,
-    // !mention message
     pub message: Message,
 }
 ```
 
-</WithMentions>
-
-![رسم تخطيطي يوضح الجزأين من المعاملة](/assets/docs/core/transactions/tx_format.png)
+<Frame caption="رسم تخطيطي يوضح الجزأين من المعاملة">
+  ![رسم تخطيطي يوضح الجزأين من المعاملة](/docs-assets/assets/docs/core/transactions/tx_format.png)
+</Frame>
 
 يجب ألا يتجاوز الحجم الإجمالي المتسلسل للمعاملة
 [`PACKET_DATA_SIZE`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/packet/src/lib.rs#L32)
 (1,232 بايت). يساوي هذا الحد 1,280 بايت (الحد الأدنى لـ IPv6 MTU) مطروحًا منه 48
 بايت لرؤوس الشبكة (40 بايت IPv6 + 8 بايت رأسية الجزء). تشمل الـ 1,232 بايت كلاً
-من مصفوفة [`signatures`](#signatures) وبنية [`message`](#message).
+من مصفوفة [`signatures`](#التوقيعات) وبنية [`message`](#الرسالة).
 
-<Callout type="info" title="معاملات v1 ترفع الحد إلى 4,096 بايت">
+<Info>
+  **معاملات v1 ترفع الحد إلى 4,096 بايت**
+
   تصف هذه الصفحة صيغة المعاملة القديمة (Legacy)، التي تتبعها صيغة v0 أيضاً
   باستثناء بادئة الإصدار وجداول بحث العناوين. والصيغة القادمة
   [v1](/docs/core/transactions/versioned-transactions#v1-message-format)
   ترفع حد الحجم إلى 4,096 بايت وتستخدم تخطيط إرسال مختلفاً.
-</Callout>
+</Info>
 
-![رسم تخطيطي يوضح تنسيق المعاملة وحدود الحجم](/assets/docs/core/transactions/issues_with_legacy_txs.png)
+<Frame caption="رسم تخطيطي يوضح تنسيق المعاملة وحدود الحجم">
+  ![رسم تخطيطي يوضح تنسيق المعاملة وحدود الحجم](/docs-assets/assets/docs/core/transactions/issues_with_legacy_txs.png)
+</Frame>
 
 ## التوقيعات
 
 حقل `signatures` هو مصفوفة مشفرة بشكل مضغوط من قيم
 [`Signature`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/signature/src/lib.rs#L34).
 كل `Signature` هو توقيع Ed25519 بحجم 64 بايت لـ `Message` المتسلسل، موقع
-بالمفتاح الخاص لحساب الموقع. يلزم توقيع واحد لكل [حساب موقع](#account-addresses)
+بالمفتاح الخاص لحساب الموقع. يلزم توقيع واحد لكل [حساب موقع](#عناوين-الحسابات)
 مشار إليه بواسطة تعليمات المعاملة.
 
 يتم إنتاج كل توقيع بواسطة مفتاح خاص. يُعدّ مكان وجود ذلك المفتاح — سواء أكان
@@ -85,7 +86,7 @@ keypair محليًا، أو وحدة أمان تشفير سحابية (HSM/KMS)�
   بواسطة
   [`validate_fee_payer`](https://github.com/anza-xyz/agave/blob/v3.1.8/svm/src/account_loader.rs#L369-L417)).
 - يجب أن يحتوي على ما يكفي من lamport لتغطية `rent_exempt_minimum + total_fee`؛
-  وإلا فستفشل المعاملة مع _rs`InsufficientFundsForFee`_.
+  وإلا فستفشل المعاملة مع `InsufficientFundsForFee`.
 
 ## الرسالة
 
@@ -93,87 +94,76 @@ keypair محليًا، أو وحدة أمان تشفير سحابية (HSM/KMS)�
 [`Message`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/message/src/legacy.rs#L161)
 بنية تحتوي على حمولة المعاملة:
 
-<WithMentions>
-
-- [`header`](mention:message-header): [ترويسة](#header) الرسالة
-- [`account_keys`](mention:account-addresses): مصفوفة من
-  [عناوين الحسابات](#account-addresses) المطلوبة بواسطة تعليمات المعاملة
-- [`recent_blockhash`](mention:recent-blockhash): [blockhash](#recent-blockhash)
+- `header`: [ترويسة](#الترويسة) الرسالة
+- `account_keys`: مصفوفة من
+  [عناوين الحسابات](#عناوين-الحسابات) المطلوبة بواسطة تعليمات المعاملة
+- `recent_blockhash`: [blockhash](#الـ-blockhash-الأخير)
   يعمل كطابع زمني للمعاملة
-- [`instructions`](mention:instructions): مصفوفة من [التعليمات](#instructions)
+- `instructions`: مصفوفة من [التعليمات](#التعليمات)
 
-```rust title="Message"
+```rust Message
 pub struct Message {
     /// The message header, identifying signed and read-only `account_keys`.
-    // !mention message-header
     pub header: MessageHeader,
 
     /// All the account keys used by this transaction.
     #[serde(with = "short_vec")]
-    // !mention account-addresses
     pub account_keys: Vec<Pubkey>,
 
     /// The id of a recent ledger entry.
-    // !mention recent-blockhash
     pub recent_blockhash: Hash,
 
     /// Programs that will be executed in sequence and committed in
     /// one atomic transaction if all succeed.
     #[serde(with = "short_vec")]
-    // !mention instructions
     pub instructions: Vec<CompiledInstruction>,
 }
 ```
 
-</WithMentions>
-
 ### الترويسة
-
-<WithMentions>
 
 حقل `header` هو
 [`MessageHeader`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/message/src/lib.rs#L109)
 بنية تحتوي على ثلاثة حقول `u8` تقسّم مصفوفة `account_keys` إلى مجموعات صلاحيات:
 
-- [`num_required_signatures`](mention:num_required_signatures): العدد الإجمالي
+- `num_required_signatures`: العدد الإجمالي
   للتوقيعات المطلوبة للمعاملة.
-- [`num_readonly_signed_accounts`](mention:num_readonly_signed_accounts): عدد
+- `num_readonly_signed_accounts`: عدد
   الحسابات الموقَّعة للقراءة فقط.
-- [`num_readonly_unsigned_accounts`](mention:num_readonly_unsigned_accounts):
+- `num_readonly_unsigned_accounts`:
   عدد الحسابات غير الموقَّعة للقراءة فقط.
 
-```rust title="MessageHeader"
+```rust MessageHeader
 pub struct MessageHeader {
     /// The number of signatures required for this message to be considered
     /// valid. The signers of those signatures must match the first
     /// `num_required_signatures` of [`Message::account_keys`].
-    // !mention num_required_signatures
     pub num_required_signatures: u8,
 
     /// The last `num_readonly_signed_accounts` of the signed keys are read-only
     /// accounts.
-    // !mention num_readonly_signed_accounts
     pub num_readonly_signed_accounts: u8,
 
     /// The last `num_readonly_unsigned_accounts` of the unsigned keys are
     /// read-only accounts.
-    // !mention num_readonly_unsigned_accounts
     pub num_readonly_unsigned_accounts: u8,
 }
 ```
 
-</WithMentions>
+<Info>
+  **بادئات رسائل الإصدار القديم والرسائل ذات الإصدار**
 
-<Callout type="info" title="بادئات رسائل الإصدار القديم والرسائل ذات الإصدار">
   في رسالة المعاملة القديمة (Legacy)، يكون البايت الأول من الرسالة هو
   `num_required_signatures`، يليه البايتان الآخران من `MessageHeader`. أما في
   رسالة المعاملة ذات الإصدار، فإن البايت الأول يكون بادئة إصدار بدلاً من ذلك؛
   ويبدأ `MessageHeader` المكوّن من ثلاثة بايتات مباشرةً بعد تلك البادئة. راجع
   [المعاملات ذات الإصدار](/docs/core/transactions/versioned-transactions) للاطلاع
   على تخطيطات رسائل v0 وv1 الكاملة.
-</Callout>
+</Info>
 
-![مخطط يوضح الأجزاء الثلاثة لترويسة الرسالة](/assets/docs/core/transactions/message_header.png)
+<Frame caption="مخطط يوضح الأجزاء الثلاثة لترويسة الرسالة">
+  ![مخطط يوضح الأجزاء الثلاثة لترويسة الرسالة](/docs-assets/assets/docs/core/transactions/message_header.png)
+</Frame>
 
 ### عناوين الحسابات
 
@@ -188,14 +178,16 @@ pub struct MessageHeader {
 3. غير موقّع + قابل للكتابة
 4. غير موقّع + للقراءة فقط
 
-<Callout>
+<Note>
   يتيح هذا الترتيب الصارم دمج مصفوفة `account_keys` مع العدادات الثلاثة في
-  [`header`](#header) الخاص بالرسالة لتحديد الصلاحيات لكل حساب دون الحاجة إلى
+  [`header`](#الترويسة) الخاص بالرسالة لتحديد الصلاحيات لكل حساب دون الحاجة إلى
   تخزين أعلام بيانات وصفية لكل حساب. تُقسّم عدادات الترويسة المصفوفة إلى مجموعات
   الأذونات الأربع المذكورة أعلاه.
-</Callout>
+</Note>
 
-![مخطط يوضح ترتيب مصفوفة عناوين الحسابات](/assets/docs/core/transactions/compat_array_of_account_addresses.png)
+<Frame caption="مخطط يوضح ترتيب مصفوفة عناوين الحسابات">
+  ![مخطط يوضح ترتيب مصفوفة عناوين الحسابات](/docs-assets/assets/docs/core/transactions/compat_array_of_account_addresses.png)
+</Frame>
 
 ### الـ blockhash الأخير
 
@@ -205,14 +197,14 @@ pub struct MessageHeader {
 2. **منع التكرار**: يمنع معالجة المعاملة ذاتها مرتين.
 
 تنتهي صلاحية الـ blockhash بعد 150 slot. إذا لم يعد الـ blockhash صالحاً عند
-وصول المعاملة، فسيتم رفضها بالخطأ _rs`BlockhashNotFound`_، ما لم تكن
+وصول المعاملة، فسيتم رفضها بالخطأ `BlockhashNotFound`، ما لم تكن
 [معاملة nonce دائمة](/docs/core/transactions/durable-nonces) صالحة.
 
-<Callout>
+<Note>
   تتيح لك طريقة RPC [`getLatestBlockhash`](/docs/rpc/http/getlatestblockhash)
   الحصول على الـ blockhash الحالي وآخر ارتفاع للكتلة الذي سيكون فيه الـ
   blockhash صالحاً.
-</Callout>
+</Note>
 
 ### التعليمات
 
@@ -220,37 +212,32 @@ pub struct MessageHeader {
 [`instructions`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/message/src/legacy.rs#L176)
 هو مصفوفة مشفرة بصيغة مضغوطة من هياكل
 [`CompiledInstruction`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/message/src/compiled_instruction.rs#L21).
-كل _rs`CompiledInstruction`_ يُشير إلى الحسابات عبر الفهرس في مصفوفة
+كل `CompiledInstruction` يُشير إلى الحسابات عبر الفهرس في مصفوفة
 `account_keys` بدلاً من استخدام المفتاح العام الكامل. ويحتوي على:
 
-<WithMentions>
-
-1. [`program_id_index`](mention:program-id-index): فهرس في `account_keys` يُحدد
+1. `program_id_index`: فهرس في `account_keys` يُحدد
    البرنامج المراد استدعاؤه.
-2. [`accounts`](mention:account-indexes): مصفوفة من المؤشرات في `account_keys`
+2. `accounts`: مصفوفة من المؤشرات في `account_keys`
    تُحدد الحسابات التي سيتم تمريرها إلى البرنامج.
-3. [`data`](mention:instruction-data): مصفوفة بايت تحتوي على instruction data
+3. `data`: مصفوفة بايت تحتوي على instruction data
    ومحدد التعليمة والوسيطات المُسلسَلة.
 
-```rust title="CompiledInstruction"
+```rust CompiledInstruction
 pub struct CompiledInstruction {
     /// Index into the transaction keys array indicating the program account that executes this instruction.
-    // !mention program-id-index
     pub program_id_index: u8,
     /// Ordered indices into the transaction keys array indicating which accounts to pass to the program.
     #[serde(with = "short_vec")]
-    // !mention account-indexes
     pub accounts: Vec<u8>,
     /// The program input data.
     #[serde(with = "short_vec")]
-    // !mention instruction-data
     pub data: Vec<u8>,
 }
 ```
 
-</WithMentions>
-
-![مصفوفة مضغوطة من التعليمات](/assets/docs/core/transactions/compact_array_of_ixs.png)
+<Frame caption="مصفوفة مضغوطة من التعليمات">
+  ![مصفوفة مضغوطة من التعليمات](/docs-assets/assets/docs/core/transactions/compact_array_of_ixs.png)
+</Frame>
 
 ## تنسيق المعاملة الثنائي
 
@@ -261,18 +248,18 @@ pub struct CompiledInstruction {
 
 **تخطيط المعاملة القديمة** (على الشبكة):
 
-| الحقل                     | الحجم                          | الوصف                                     |
-| ------------------------- | ----------------------------- | ----------------------------------------------- |
-| `num_signatures`          | 1-3 بايت (compact-u16)       | عدد التواقيع                            |
-| `signatures`              | `num_signatures` × 64 بايت   | تواقيع Ed25519                              |
-| `num_required_signatures` | 1 بايت                        | الحقل 1 في `MessageHeader`                         |
-| `num_readonly_signed`     | 1 بايت                        | الحقل 2 في `MessageHeader`                         |
-| `num_readonly_unsigned`   | 1 بايت                        | الحقل 3 في `MessageHeader`                         |
-| `num_account_keys`        | 1-3 بايت (compact-u16)       | عدد مفاتيح الحسابات الثابتة                   |
-| `account_keys`            | `num_account_keys` × 32 بايت | pubkey                                     |
-| `recent_blockhash`        | 32 بايت                      | تجزئة الكتلة                                       |
-| `num_instructions`        | 1-3 بايت (compact-u16)       | عدد التعليمات                          |
-| `instructions`            | متغير                      | مصفوفة من [التعليمات المُجمَّعة](#instructions) |
+| الحقل                     | الحجم                        | الوصف                                        |
+| ------------------------- | ---------------------------- | -------------------------------------------- |
+| `num_signatures`          | 1-3 بايت (compact-u16)       | عدد التواقيع                                 |
+| `signatures`              | `num_signatures` × 64 بايت   | تواقيع Ed25519                               |
+| `num_required_signatures` | 1 بايت                       | الحقل 1 في `MessageHeader`                   |
+| `num_readonly_signed`     | 1 بايت                       | الحقل 2 في `MessageHeader`                   |
+| `num_readonly_unsigned`   | 1 بايت                       | الحقل 3 في `MessageHeader`                   |
+| `num_account_keys`        | 1-3 بايت (compact-u16)       | عدد مفاتيح الحسابات الثابتة                  |
+| `account_keys`            | `num_account_keys` × 32 بايت | pubkey                                       |
+| `recent_blockhash`        | 32 بايت                      | تجزئة الكتلة                                 |
+| `num_instructions`        | 1-3 بايت (compact-u16)       | عدد التعليمات                                |
+| `instructions`            | متغير                        | مصفوفة من [التعليمات المُجمَّعة](#التعليمات) |
 
 تُسلسَل كل تعليمة مُجمَّعة على النحو التالي:
 
@@ -286,7 +273,7 @@ pub struct CompiledInstruction {
 
 ### حساب الحجم
 
-بافتراض أن _rs`PACKET_DATA_SIZE`_ = 1,232 بايت، يمكن حساب المساحة المتاحة على
+بافتراض أن `PACKET_DATA_SIZE` = 1,232 بايت، يمكن حساب المساحة المتاحة على
 النحو التالي:
 
 ```
@@ -313,14 +300,24 @@ lamport. يجب أن يكون كلٌّ من حساب المُرسِل والمس
 تغيير رصيد lamport الخاص بهما. لتنفيذ هذه التعليمة، يُرسل محفظة المُرسِل
 المعاملةَ التي تحتوي على توقيعه والرسالةَ التي تتضمن تعليمة تحويل SOL.
 
-![مخطط تحويل SOL](/assets/docs/core/transactions/sol-transfer.svg)
+<Frame caption="مخطط تحويل SOL">
+  <img className="block dark:hidden" src="/docs-assets/assets/docs/core/transactions/sol-transfer-light.svg" alt="مخطط تحويل SOL" />
+
+  <img className="hidden dark:block" src="/docs-assets/assets/docs/core/transactions/sol-transfer.svg" alt="مخطط تحويل SOL" />
+</Frame>
 
 بعد إرسال المعاملة، تعالج System Program تعليمة التحويل وتُحدّث رصيد lamport
 لكلا الحسابين.
 
-![مخطط عملية تحويل SOL](/assets/docs/core/transactions/sol-transfer-process.svg)
+<Frame caption="مخطط عملية تحويل SOL">
+  <img className="block dark:hidden" src="/docs-assets/assets/docs/core/transactions/sol-transfer-process-light.svg" alt="مخطط عملية تحويل SOL" />
 
-<Callout type="warn" title="تحقق من المستلم قبل إرسال SOL">
+  <img className="hidden dark:block" src="/docs-assets/assets/docs/core/transactions/sol-transfer-process.svg" alt="مخطط عملية تحويل SOL" />
+</Frame>
+
+<Warning>
+
+**تحقق من المستلم قبل إرسال SOL**
 
 يُضيف تحويل System Program lamport إلى **أي** حساب. لا يوجد فحص على مستوى
 البروتوكول للتحقق من أن المستلم يستطيع إعادة إخراج SOL. لا يمكن إخراج lamport
@@ -337,15 +334,15 @@ lamport. يجب أن يكون كلٌّ من حساب المُرسِل والمس
 [التحقق من العنوان](/docs/payments/send-payments/verify-address) للاطلاع على
 منطق التصنيف الكامل.
 
-</Callout>
+</Warning>
 
 يوضح المثال أدناه الكود المتعلق بالمخططات أعلاه. راجع
 [دالة `transfer`](https://github.com/anza-xyz/agave/blob/v3.1.8/programs/system/src/system_processor.rs#L210)
 الخاصة بـ System Program.
 
-<CodeTabs storage="sol-transfer" flags="r">
+<CodeGroup>
 
-```ts !! title="Kit"
+```ts Kit highlight={32-37}
 import { createClient, generateKeyPairSigner, lamports } from "@solana/kit";
 import { solanaRpc, rpcAirdrop } from "@solana/kit-plugin-rpc";
 import { generatedPayer, airdropPayer } from "@solana/kit-plugin-signer";
@@ -377,7 +374,6 @@ const { value: preBalance2 } = await client.rpc
   .getBalance(recipient.address)
   .send();
 
-// !mark(1:6)
 // Create a transfer instruction for transferring SOL from sender to recipient
 const transferInstruction = client.system.instructions.transferSol({
   source: sender,
@@ -416,7 +412,7 @@ console.log(
 console.log("Transaction Signature:", transactionSignature.context.signature);
 ```
 
-```ts !! title="Legacy"
+```ts Legacy highlight={31-36}
 import {
   LAMPORTS_PER_SOL,
   SystemProgram,
@@ -447,7 +443,6 @@ const preBalance2 = await connection.getBalance(recipient.publicKey);
 // Define the amount to transfer
 const transferAmount = 0.01; // 0.01 SOL
 
-// !mark(1:6)
 // Create a transfer instruction for transferring SOL from sender to recipient
 const transferInstruction = SystemProgram.transfer({
   fromPubkey: sender.publicKey,
@@ -476,7 +471,7 @@ console.log("Recipient postbalance:", postBalance2 / LAMPORTS_PER_SOL);
 console.log("Transaction Signature:", transactionSignature);
 ```
 
-```rs !! title="Rust"
+```rs Rust
 use anyhow::Result;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_commitment_config::CommitmentConfig;
@@ -556,13 +551,13 @@ async fn main() -> Result<()> {
 }
 ```
 
-</CodeTabs>
+</CodeGroup>
 
 يوضح المثال التالي بنية معاملة تحتوي على تعليمات تحويل SOL واحدة.
 
-<CodeTabs storage="sol-transfer" flags="r">
+<CodeGroup>
 
-```ts !! title="Kit"
+```ts Kit
 import {
   createClient,
   generateKeyPairSigner,
@@ -625,7 +620,7 @@ const compiledTransactionMessage =
 console.log(JSON.stringify(compiledTransactionMessage, null, 2));
 ```
 
-```ts !! title="Legacy"
+```ts Legacy
 import {
   LAMPORTS_PER_SOL,
   SystemProgram,
@@ -663,7 +658,7 @@ const compiledMessage = transaction.compileMessage();
 console.log(JSON.stringify(compiledMessage, null, 2));
 ```
 
-```rs !! title="Rust"
+```rs Rust
 use anyhow::Result;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_commitment_config::CommitmentConfig;
@@ -704,33 +699,28 @@ async fn main() -> Result<()> {
 }
 ```
 
-</CodeTabs>
+</CodeGroup>
 
-<WithMentions>
 يوضح الكود أدناه المخرجات من مقتطفات الكود السابقة.
 يختلف التنسيق بين حزم SDK،
 لكن لاحظ أن كل تعليمة تحتوي على نفس المعلومات المطلوبة.
 
-<CodeTabs storage="sol-transfer">
+<CodeGroup>
 
-```json !! title="Kit"
+```json Kit
 {
   "version": 0,
-  // !mention header
   "header": {
     "numSignerAccounts": 1,
     "numReadonlySignerAccounts": 0,
     "numReadonlyNonSignerAccounts": 1
   },
-  // !mention account_keys
   "staticAccounts": [
     "HoCy8p5xxDDYTYWEbQZasEjVNM5rxvidx8AfyqA4ywBa",
     "5T388jBjovy7d8mQ3emHxMDTbUF8b7nWvAnSiP3EAdFL",
     "11111111111111111111111111111111"
   ],
-  // !mention recent_blockhash
   "lifetimeToken": "EGCWPUEXhqHJWYBfDirq3mHZb4qDpATmYqBZMBy9TBC1",
-  // !mention instructions
   "instructions": [
     {
       "programAddressIndex": 2,
@@ -754,22 +744,19 @@ async fn main() -> Result<()> {
 }
 ```
 
-```json !! title="Legacy"
+```json Legacy
 {
-  // !mention header
   "header": {
     "numRequiredSignatures": 1,
     "numReadonlySignedAccounts": 0,
     "numReadonlyUnsignedAccounts": 1
   },
-  // !mention account_keys
   "accountKeys": [
     "EPLUagqZZAuAtJ5LSbK7eeXjqeTdesd4q8WhoqVrfG3g",
     "9Txf5pi5jzm7FydFAsQafk7xn5wY9yN2UNm5LW15qvcK",
     "11111111111111111111111111111111"
   ],
   "recentBlockhash": "2qYPgehzMKXcMt4Ku1tKAk9DACKUbtYEY9EUEN42cseT",
-  // !mention instructions
   "instructions": [
     {
       "programIdIndex": 2,
@@ -781,13 +768,12 @@ async fn main() -> Result<()> {
 }
 ```
 
-```json !! title="Rust"
+```json Rust
 {
   "signatures": [
     "2fPXZtQGWWj6suxfc55FBQiexS8hEhNELqasSL5DRYa1RB1GChHz86Cyy8ukiVwA6qbq91P4cY1FuvTuYtmTHmJP"
   ],
   "message": {
-    // !mention header
     "header": {
       "num_required_signatures": 1,
       "num_readonly_signed_accounts": 0,
@@ -799,7 +785,6 @@ async fn main() -> Result<()> {
       "11111111111111111111111111111111"
     ],
     "recent_blockhash": "3P7CVQ9nwXx4B37MvBzghzbcM9K9p5xo7ivDE8W78dCi",
-    // !mention instructions
     "instructions": [
       {
         "program_id_index": 2,
@@ -811,8 +796,7 @@ async fn main() -> Result<()> {
 }
 ```
 
-</CodeTabs>
-</WithMentions>
+</CodeGroup>
 
 ### التحقق من المستلم قبل التحويل
 
@@ -822,9 +806,7 @@ async fn main() -> Result<()> {
 غير ممول)؛ ارفض عمليات الإصدار، و token account، والبرامج، وعناوين PDA التي لا
 تتحكم فيها.
 
-<CodeTabs flags="r">
-
-```ts !! title="Kit"
+```ts Kit
 import {
   type Address,
   createSolanaRpc,
@@ -874,23 +856,21 @@ await assertSafeSolRecipient(
 );
 ```
 
-</CodeTabs>
-
-<Callout>
+<Note>
   يتحقق هذا المقتطف من مستلمي SOL الأصليين. للاطلاع على التصنيف الكامل الذي
   يتعامل أيضًا مع إرسال رموز SPL (token account، وATAs، وToken-2022)، راجع
   [التحقق من العنوان](/docs/payments/send-payments/verify-address).
-</Callout>
+</Note>
 
 ## جلب تفاصيل المعاملة
 
 بعد الإرسال، استرجع تفاصيل المعاملة باستخدام توقيع المعاملة وطريقة
 [getTransaction](/docs/rpc/http/gettransaction) RPC.
 
-<Callout>
+<Note>
   يمكنك أيضًا العثور على المعاملة باستخدام [سولانا
   Explorer](https://explorer.solana.com).
-</Callout>
+</Note>
 
 ```json title="Transaction Data"
 {

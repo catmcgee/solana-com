@@ -133,9 +133,9 @@ Algumas opções comuns:
 O cliente `@solana-program/token-2022` inclui helpers para o caminho
 recomendado:
 
-<CodeTabs>
+<CodeGroup>
 
-```ts !! title="JS-derive-keys.ts"
+```ts JS-derive-keys.ts
 import {
   deriveElGamalKeypairForOwnerMint,
   deriveAeKeyForOwnerMint
@@ -154,7 +154,7 @@ const aesKey = await deriveAeKeyForOwnerMint({
 });
 ```
 
-```rust !! title="rust-derive-keys.rs"
+```rust rust-derive-keys.rs
 use solana_zk_sdk::encryption::derivation::derive_confidential_keys;
 
 // `signer` is the account owner; the token account address is the public seed.
@@ -165,22 +165,22 @@ let (elgamal_keypair, aes_key) =
         .expect("Failed to derive confidential keys");
 ```
 
-</CodeTabs>
+</CodeGroup>
 
-<Callout type="warn">
+<Warning>
   Chaves confidenciais são chaves de descriptografia. Trate uma solicitação para
   assinar a mensagem de derivação como se fosse desbloquear uma visualização
   privada dos saldos do usuário. Prefira derivar sob demanda em vez de
   armazená-las; caso precise armazená-las (por exemplo, em um serviço
   custodiante), proteja-as com o mesmo rigor aplicado às chaves de assinatura.
-</Callout>
+</Warning>
 
 Os auxiliares de derivação retornam material de chave serializado. Os auxiliares
 de operação de alto nível (mostrados mais adiante) recebem objetos WASM
 `ElGamalKeypair` e `AeKey`, portanto reconstrua-os a partir dos bytes quando
 precisar deles:
 
-```ts !! title="JS-rebuild-keys.ts"
+```ts JS-rebuild-keys.ts
 import {
   ElGamalKeypair,
   ElGamalSecretKey,
@@ -219,14 +219,14 @@ nem prova no momento da configuração, apenas um pagador para o rent. Este é o
 mecanismo a ser usado quando se deseja provisionar contas confidenciais para
 usuários de forma transparente.
 
-<Callout type="info">
+<Info>
   A configuração do registro está disponível no Rust `spl-token-client`
   (`confidential_transfer_configure_token_account_with_registry`) e no programa
   `spl-elgamal-registry` atualmente. Auxiliares equivalentes no cliente JS
   `@solana-program/token-2022` ainda não estão disponíveis, portanto integrações
   JS que precisam do caminho do registro devem acompanhar os lançamentos desse
   cliente.
-</Callout>
+</Info>
 
 ## Exibindo saldos
 
@@ -239,9 +239,9 @@ usando a chave AES, que é de tempo constante. Descriptografar o ElGamal
 `available_balance` diretamente requer a resolução de um logaritmo discreto e
 deve ser evitado para exibição rotineira.
 
-<CodeTabs>
+<CodeGroup>
 
-```ts !! title="JS-display-balance.ts"
+```ts JS-display-balance.ts
 import { AeCiphertext } from "@solana/zk-sdk/bundler";
 import { fetchToken } from "@solana-program/token-2022";
 import { unwrapOption } from "@solana/kit";
@@ -263,7 +263,7 @@ if (ct) {
 }
 ```
 
-```rust !! title="rust-display-balance.rs"
+```rust rust-display-balance.rs
 // `token` is an spl_token_client `Token`. These helpers decrypt for you.
 let pending = token
     .confidential_transfer_get_pending_balance(&token_account, elgamal_keypair.secret())
@@ -276,7 +276,7 @@ let total = token
     .await?;
 ```
 
-</CodeTabs>
+</CodeGroup>
 
 Quando o usuário não desbloqueou suas chaves, exiba o saldo público e indique
 que existe um saldo confidencial, mas que está bloqueado, em vez de mostrar
@@ -297,9 +297,9 @@ Integrações que mantêm fundos em nome de usuários devem:
 - Aplicar o saldo pendente em nome do usuário em momentos adequados (por
   exemplo, antes de um envio) para que os saldos não fiquem travados.
 
-<CodeTabs>
+<CodeGroup>
 
-```ts !! title="JS-apply-pending.ts"
+```ts JS-apply-pending.ts
 import { getApplyConfidentialPendingBalanceInstructionFromToken } from "@solana-program/token-2022";
 
 // Builds a single instruction; no proofs are needed to apply.
@@ -312,7 +312,7 @@ const instruction = getApplyConfidentialPendingBalanceInstructionFromToken({
 });
 ```
 
-```rust !! title="rust-apply-pending.rs"
+```rust rust-apply-pending.rs
 token
     .confidential_transfer_apply_pending_balance(
         &token_account,
@@ -325,7 +325,7 @@ token
     .await?;
 ```
 
-</CodeTabs>
+</CodeGroup>
 
 Consulte a página
 [Aplicar Saldo Pendente](/docs/tokens/extensions/confidential-transfer/apply-pending-balance)
@@ -356,9 +356,9 @@ simplificará esse fluxo.
 Você não precisa montar as provas manualmente. Ambos os clientes fornecem um
 auxiliar de alto nível que constrói as provas e produz as instruções para envio:
 
-<CodeTabs>
+<CodeGroup>
 
-```ts !! title="JS-transfer.ts"
+```ts JS-transfer.ts
 import { getConfidentialTransferInstructionPlan } from "@solana-program/token-2022";
 
 // Returns an instruction plan covering proof setup, the transfer, and cleanup.
@@ -381,7 +381,7 @@ const plan = await getConfidentialTransferInstructionPlan({
 // Execute the plan with your instruction-plan executor of choice.
 ```
 
-```rust !! title="rust-transfer.rs"
+```rust rust-transfer.rs
 // Verify the three proofs into context state accounts first (see the Transfer
 // Tokens page), then reference them here. Passing None for a proof account
 // inlines that proof instead, which a full transfer cannot fit within today's
@@ -405,7 +405,7 @@ token
     .await?;
 ```
 
-</CodeTabs>
+</CodeGroup>
 
 Se você precisar de um controle mais refinado, os blocos de construção de nível
 mais baixo também estão disponíveis: `@solana/zk-sdk` gera os dados de cada
@@ -459,9 +459,7 @@ exemplo, `parseConfidentialTransferInstruction`) para decodificar contas e
 campos não secretos. Os valores encriptados permanecem como textos cifrados:
 exiba-os como confidenciais em vez de renderizar os bytes como um número.
 
-<CodeTabs>
-
-```ts !! title="JS-parse-instruction.ts"
+```ts JS-parse-instruction.ts
 import {
   identifyToken2022Instruction,
   Token2022Instruction,
@@ -491,8 +489,6 @@ for (const ix of instructions) {
   }
 }
 ```
-
-</CodeTabs>
 
 Limitações de indexação a considerar:
 

@@ -1,9 +1,10 @@
 ---
 title: x402 on Solana
-seoTitle: Build x402 V2 Payments on Solana
 description:
   Build a current x402 V2 client and resource server for payment-gated HTTP APIs
   settled with SPL tokens on Solana.
+"og:title": Build x402 V2 Payments on Solana
+"twitter:title": Build x402 V2 Payments on Solana
 ---
 
 [x402](https://www.x402.org/) is an open payment protocol for internet
@@ -40,7 +41,7 @@ The HTTP transport carries base64-encoded protocol objects in three headers:
 | Client to server | `PAYMENT-SIGNATURE` | A signed `PaymentPayload`              |
 | Server to client | `PAYMENT-RESPONSE`  | The verification and settlement result |
 
-```mermaid title="x402 V2 Flow"
+```mermaid
 sequenceDiagram
     participant Client
     participant API as Resource server
@@ -58,6 +59,29 @@ sequenceDiagram
     Facilitator-->>API: Settlement result
     API-->>Client: 200 + weather + PAYMENT-RESPONSE
 ```
+
+<div className="nojs-only" data-fallback="mermaid">
+  ```text Mermaid
+  sequenceDiagram
+      participant Client
+      participant API as Resource server
+      participant Facilitator
+      participant Solana
+      Client->>API: GET /weather
+      API-->>Client: 402 + PAYMENT-REQUIRED
+      Note over Client: Select requirement and enforce spend controls
+      Client->>API: GET /weather + PAYMENT-SIGNATURE
+      API->>Facilitator: POST /verify
+      Facilitator-->>API: Valid payment authorization
+      API->>Facilitator: POST /settle
+      Facilitator->>Solana: Submit transaction
+      Solana-->>Facilitator: Confirmed transaction
+      Facilitator-->>API: Settlement result
+      API-->>Client: 200 + weather + PAYMENT-RESPONSE
+  ```
+</div>
+
+<p className="sol-caption">x402 V2 Flow</p>
 
 The protocol objects are transport data. Do not parse or assemble the encoded
 headers with string concatenation; use an x402 client or server library.
@@ -106,7 +130,7 @@ pnpm add --save-dev @types/express tsx
 
 Set a Solana recipient and an x402 facilitator URL, then protect one route:
 
-```ts filename=server.ts
+```ts server.ts
 import express from "express";
 import { HTTPFacilitatorClient } from "@x402/core/server";
 import { paymentMiddleware, x402ResourceServer } from "@x402/express";
@@ -183,7 +207,7 @@ pnpm add @scure/base @solana/kit@^6.9.0 @x402/fetch @x402/svm
 The client below accepts only Devnet USDC requirements up to `0.01` USDC
 (`10,000` base units) before registering the Solana scheme:
 
-```ts filename=client.ts
+```ts client.ts
 import { base58 } from "@scure/base";
 import { createKeyPairSignerFromBytes } from "@solana/kit";
 import { x402Client, wrapFetchWithPayment } from "@x402/fetch";
@@ -219,11 +243,13 @@ console.log(await response.json());
 console.log(response.headers.get("PAYMENT-RESPONSE"));
 ```
 
-<Callout type="caution" title="Use a constrained signer in production">
+<Danger>
+  **Use a constrained signer in production**
+
   An environment key is acceptable only for a disposable development account.
   Production agents should receive a signing interface with per-payment and
   cumulative limits, not raw private-key material.
-</Callout>
+</Danger>
 
 ## Verification requirements
 
@@ -245,7 +271,7 @@ partial transaction verifier.
 
 ## Next steps
 
-<Cards>
+<Columns cols={2}>
   <Card
     title="Making an x402 Payment"
     href="/docs/payments/agentic-payments/x402/making-a-payment"
@@ -260,7 +286,7 @@ partial transaction verifier.
     Run a reference facilitator with Solana transaction policy and fee
     sponsorship provided by Kora.
   </Card>
-</Cards>
+</Columns>
 
 ## Protocol references
 

@@ -10,7 +10,7 @@ Kora 可为 [x402 V2 促进器](/docs/tools/x402-facilitator)提供 Solana 签�
 
 ## 架构
 
-```mermaid title="x402 with Kora"
+```mermaid
 sequenceDiagram
     participant Client
     participant API as Resource server
@@ -34,6 +34,34 @@ sequenceDiagram
     API-->>Client: 200 + resource + PAYMENT-RESPONSE
 ```
 
+<div className="nojs-only" data-fallback="mermaid">
+  ```text Mermaid
+  sequenceDiagram
+      participant Client
+      participant API as Resource server
+      participant Facilitator
+      participant Kora
+      participant Solana
+      Client->>API: GET /protected
+      API-->>Client: 402 + PAYMENT-REQUIRED
+      Client->>API: GET /protected + PAYMENT-SIGNATURE
+      API->>Facilitator: POST /verify
+      Facilitator->>Kora: signTransaction
+      Kora->>Kora: Enforce transaction policy
+      Kora-->>Facilitator: Validated transaction
+      Facilitator-->>API: Payment is valid
+      API->>Facilitator: POST /settle
+      Facilitator->>Kora: signAndSendTransaction
+      Kora->>Solana: Sign as fee payer and submit
+      Solana-->>Kora: Transaction signature
+      Kora-->>Facilitator: Transaction signature
+      Facilitator-->>API: Settlement result
+      API-->>Client: 200 + resource + PAYMENT-RESPONSE
+  ```
+</div>
+
+<p className="sol-caption">x402 with Kora</p>
+
 四个应用角色保持独立：
 
 - **客户端**选择支付要求并对支付授权进行签名。
@@ -55,9 +83,11 @@ cp .env.example .env
 
 在 `.env` 中将 `KORA_PRIVATE_KEY` 设置为一个一次性 Devnet keypair。演示的签名方配置接受 base58 密钥、字节数组 keypair 或 JSON keypair 文件路径。为其公共地址充值 Devnet SOL，以便其能够赞助交易费用。
 
-<Callout type="caution" title="使用一次性 Devnet 签名方">
+<Danger>
+  **使用一次性 Devnet 签名方**
+
   Docker 演示从环境变量中加载 Kora 签名方。请勿将生产签名密钥放入此演示，也不要提交 `.env` 文件。
-</Callout>
+</Danger>
 
 启动 Kora 和促进器：
 

@@ -3,7 +3,6 @@ title: Siirtomaksut
 description:
   Luo mint-tili siirtomaksuilla, siirrä pidätetyt maksut token-tileiltä
   mint-tilille ja nosta ne maksujen vastaanottajan token-tilille.
-url: /docs/tokens/extensions/transfer-fees
 type: tutorial
 prerequisites:
   - /docs/tokens/basics/create-mint
@@ -15,7 +14,7 @@ related:
 
 ## Mitä ovat siirtomaksut?
 
-Token Extensions Program -ohjelman _rs`TransferFeeConfig`_ mint-laajennus
+Token Extensions Program -ohjelman `TransferFeeConfig` mint-laajennus
 soveltaa maksua jokaiseen siirtoon kyseiselle mint-tilille.
 
 Siirron yhteydessä:
@@ -26,1427 +25,1392 @@ Siirron yhteydessä:
 - `withdraw_withheld_authority` voi siirtää kerätyt maksut maksujen
   vastaanottajan token-tilille
 
-<Callout type="info" title="Token-tilin laajennukset">
-  Kun token-tili alustetaan mint-tilille, jossa on _rs`TransferFeeConfig`_,
-  token-tili alustetaan _rs`TransferFeeAmount`_ -laajennuksella. Kun token-tili
+<Info>
+  **Token-tilin laajennukset**
+
+  Kun token-tili alustetaan mint-tilille, jossa on `TransferFeeConfig`,
+  token-tili alustetaan `TransferFeeAmount` -laajennuksella. Kun token-tili
   luodaan [Associated Token
   Program](/docs/tokens/basics/create-token-account#how-to-create-an-associated-token-account)
   -ohjelman kautta, vaadittu tilin koko lasketaan ja token-tili luodaan
   vaaditulla koolla ja vuokravapaina lamporteina.
-</Callout>
+</Info>
 
 ## Miten luodaan siirtomaksu-mint
 
 Siirtomaksu-mintin luominen:
 
 1. Laske mint-tilin koko ja tarvittava vuokra mint-tilille ja
-   _rs`TransferFeeConfig`_ -laajennukselle.
-2. Luo mint-tili käyttäen _rs`CreateAccount`_ -komentoa, alusta
-   _rs`TransferFeeConfig`_ ja alusta mint käyttäen _rs`InitializeMint`_
+   `TransferFeeConfig` -laajennukselle.
+2. Luo mint-tili käyttäen `CreateAccount` -komentoa, alusta
+   `TransferFeeConfig` ja alusta mint käyttäen `InitializeMint`
    -komentoa.
-3. Luo token-tilit mint-tilille. _rs`TransferFeeAmount`_ otetaan automaattisesti
+3. Luo token-tilit mint-tilille. `TransferFeeAmount` otetaan automaattisesti
    käyttöön token-tileille.
-4. Käytä _rs`TransferCheckedWithFee`_ -komentoa tokenien siirtämiseen ja
-   odotetun maksun tarkistamiseen. _rs`TransferChecked`_ toimii myös ja pidättää
+4. Käytä `TransferCheckedWithFee` -komentoa tokenien siirtämiseen ja
+   odotetun maksun tarkistamiseen. `TransferChecked` toimii myös ja pidättää
    automaattisesti määritetyn maksun kohteen token-tilillä.
-5. Käytä _rs`WithdrawWithheldTokensFromAccounts`_ -komentoa siirtääksesi
+5. Käytä `WithdrawWithheldTokensFromAccounts` -komentoa siirtääksesi
    pidätetyt maksut suoraan token-tileiltä maksujen vastaanottajan
    token-tilille, allekirjoitettuna mintin `withdraw_withheld_authority`-avaimen
    toimesta.
-6. Käytä lupavapaata _rs`HarvestWithheldTokensToMint`_ -komentoa siirtääksesi
+6. Käytä lupavapaata `HarvestWithheldTokensToMint` -komentoa siirtääksesi
    pidätetyt maksut token-tileiltä mint-tilille, ja käytä sitten
-   _rs`WithdrawWithheldTokensFromMint`_ -komentoa nostaaksesi mint-tilin
+   `WithdrawWithheldTokensFromMint` -komentoa nostaaksesi mint-tilin
    pidätetyt maksut maksujen vastaanottajan token-tilille, allekirjoitettuna
    mintin `withdraw_withheld_authority`-avaimen toimesta.
-7. Käytä _rs`SetTransferFee`_ -komentoa päivittääksesi seuraavan siirtomaksun
+7. Käytä `SetTransferFee` -komentoa päivittääksesi seuraavan siirtomaksun
    asetukset, jotka astuvat voimaan kahden epocin kuluttua.
 
-<ScrollyCoding>
-
-## !!steps Laske tilin koko
-
-Laske mint accountin koko perus-mintille sekä _rs`TransferFeeConfig`_
--laajennukselle. Tämä on koko, jota käytetään _rs`CreateAccount`_ -toiminnossa.
-
-<CodePlaceholder title="Esimerkki" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-
-// !focus(1:14)
-const transferFeeConfigExtension = extension("TransferFeeConfig", {
-  transferFeeConfigAuthority: client.payer.address,
-  withdrawWithheldAuthority: client.payer.address,
-  withheldAmount: 0n,
-  olderTransferFee: {
-    epoch: 0n,
-    maximumFee: 10n,
-    transferFeeBasisPoints: 150
-  },
-  newerTransferFee: {
-    epoch: 0n,
-    maximumFee: 10n,
-    transferFeeBasisPoints: 150
-  }
-});
-
-// !focus(1:1)
-const mintSpace = BigInt(getMintSize([transferFeeConfigExtension]));
-```
-
-## !!steps Laske rent
-
-Laske rent käyttämällä mintille tarvittavaa kokoa sekä _rs`TransferFeeConfig`_
--laajennusta.
-
-<CodePlaceholder title="Esimerkki" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-
-const transferFeeConfigExtension = extension("TransferFeeConfig", {
-  transferFeeConfigAuthority: client.payer.address,
-  withdrawWithheldAuthority: client.payer.address,
-  withheldAmount: 0n,
-  olderTransferFee: {
-    epoch: 0n,
-    maximumFee: 10n,
-    transferFeeBasisPoints: 150
-  },
-  newerTransferFee: {
-    epoch: 0n,
-    maximumFee: 10n,
-    transferFeeBasisPoints: 150
-  }
-});
-
-const mintSpace = BigInt(getMintSize([transferFeeConfigExtension]));
-
-// !focus(1:3)
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
-```
-
-## !!steps Luo mint account
-
-Luo mint account lasketulla tilalla ja lamporteilla.
-
-<CodePlaceholder title="Esimerkki" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-
-const transferFeeConfigExtension = extension("TransferFeeConfig", {
-  transferFeeConfigAuthority: client.payer.address,
-  withdrawWithheldAuthority: client.payer.address,
-  withheldAmount: 0n,
-  olderTransferFee: {
-    epoch: 0n,
-    maximumFee: 10n,
-    transferFeeBasisPoints: 150
-  },
-  newerTransferFee: {
-    epoch: 0n,
-    maximumFee: 10n,
-    transferFeeBasisPoints: 150
-  }
-});
-
-const mintSpace = BigInt(getMintSize([transferFeeConfigExtension]));
-
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
-
-// !focus(1:9)
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  })
-]);
-```
-
-## !!steps Alusta TransferFeeConfig
-
-Alusta _rs`TransferFeeConfig`_ -laajennus mintille.
-
-<CodePlaceholder title="Esimerkki" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-
-const transferFeeConfigExtension = extension("TransferFeeConfig", {
-  transferFeeConfigAuthority: client.payer.address,
-  withdrawWithheldAuthority: client.payer.address,
-  withheldAmount: 0n,
-  olderTransferFee: {
-    epoch: 0n,
-    maximumFee: 10n,
-    transferFeeBasisPoints: 150
-  },
-  newerTransferFee: {
-    epoch: 0n,
-    maximumFee: 10n,
-    transferFeeBasisPoints: 150
-  }
-});
-
-const mintSpace = BigInt(getMintSize([transferFeeConfigExtension]));
-
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
-
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  }),
-  // !focus(1:7)
-  getInitializeTransferFeeConfigInstruction({
-    mint: mint.address,
-    transferFeeConfigAuthority: client.payer.address,
-    withdrawWithheldAuthority: client.payer.address,
-    transferFeeBasisPoints: 150,
-    maximumFee: 10n
-  })
-]);
-```
-
-## !!steps Alusta mint
-
-Alusta mint käyttämällä _rs`InitializeMint`_ -toimintoa samassa transaktiossa.
-
-<CodePlaceholder title="Esimerkki" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-
-const transferFeeConfigExtension = extension("TransferFeeConfig", {
-  transferFeeConfigAuthority: client.payer.address,
-  withdrawWithheldAuthority: client.payer.address,
-  withheldAmount: 0n,
-  olderTransferFee: {
-    epoch: 0n,
-    maximumFee: 10n,
-    transferFeeBasisPoints: 150
-  },
-  newerTransferFee: {
-    epoch: 0n,
-    maximumFee: 10n,
-    transferFeeBasisPoints: 150
-  }
-});
-
-const mintSpace = BigInt(getMintSize([transferFeeConfigExtension]));
-
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
-
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  }),
-  getInitializeTransferFeeConfigInstruction({
-    mint: mint.address,
-    transferFeeConfigAuthority: client.payer.address,
-    withdrawWithheldAuthority: client.payer.address,
-    transferFeeBasisPoints: 150,
-    maximumFee: 10n
-  }),
-  // !focus(1:6)
-  getInitializeMintInstruction({
-    mint: mint.address,
-    decimals: 2,
-    mintAuthority: client.payer.address,
-    freezeAuthority: client.payer.address
-  })
-]);
-```
-
-## !!steps Luo token accountit ja lyö tokeneita
-
-Luo token accountit lähteelle, vastaanottajille ja maksunsaajalle, ja lyö sitten
-tokeneita lähde-token accountille.
-
-<CodePlaceholder title="Esimerkki" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-const recipientA = await generateKeyPairSigner();
-const recipientB = await generateKeyPairSigner();
-const feeReceiver = await generateKeyPairSigner();
-
-const transferFeeConfigExtension = extension("TransferFeeConfig", {
-  transferFeeConfigAuthority: client.payer.address,
-  withdrawWithheldAuthority: client.payer.address,
-  withheldAmount: 0n,
-  olderTransferFee: {
-    epoch: 0n,
-    maximumFee: 10n,
-    transferFeeBasisPoints: 150
-  },
-  newerTransferFee: {
-    epoch: 0n,
-    maximumFee: 10n,
-    transferFeeBasisPoints: 150
-  }
-});
-
-const mintSpace = BigInt(getMintSize([transferFeeConfigExtension]));
-
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
-
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  }),
-  getInitializeTransferFeeConfigInstruction({
-    mint: mint.address,
-    transferFeeConfigAuthority: client.payer.address,
-    withdrawWithheldAuthority: client.payer.address,
-    transferFeeBasisPoints: 150,
-    maximumFee: 10n
-  }),
-  getInitializeMintInstruction({
-    mint: mint.address,
-    decimals: 2,
-    mintAuthority: client.payer.address,
-    freezeAuthority: client.payer.address
-  })
-]);
-
-const [sourceToken] = await findAssociatedTokenPda({
-  mint: mint.address,
-  owner: client.payer.address,
-  tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
-});
-
-const [destinationAToken] = await findAssociatedTokenPda({
-  mint: mint.address,
-  owner: recipientA.address,
-  tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
-});
-
-const [destinationBToken] = await findAssociatedTokenPda({
-  mint: mint.address,
-  owner: recipientB.address,
-  tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
-});
-
-const [feeReceiverToken] = await findAssociatedTokenPda({
-  mint: mint.address,
-  owner: feeReceiver.address,
-  tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
-});
-
-// !focus(1:29)
-await client.sendTransaction([
-  await getCreateAssociatedTokenInstructionAsync({
-    payer: client.payer,
-    mint: mint.address,
-    owner: client.payer.address
-  }),
-  await getCreateAssociatedTokenInstructionAsync({
-    payer: client.payer,
-    mint: mint.address,
-    owner: recipientA.address
-  }),
-  await getCreateAssociatedTokenInstructionAsync({
-    payer: client.payer,
-    mint: mint.address,
-    owner: recipientB.address
-  }),
-  await getCreateAssociatedTokenInstructionAsync({
-    payer: client.payer,
-    mint: mint.address,
-    owner: feeReceiver.address
-  }),
-  getMintToCheckedInstruction({
-    mint: mint.address,
-    token: sourceToken,
-    mintAuthority: client.payer,
-    amount: 1_000n,
-    decimals: 2
-  })
-]);
-```
-
-## !!steps Siirto TransferCheckedWithFee-toiminnolla
-
-Siirrä tokeneita _rs`TransferCheckedWithFee`_-toiminnolla ja varmista odotettu
-maksu.
-
-<CodePlaceholder title="Esimerkki" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-const recipientA = await generateKeyPairSigner();
-const recipientB = await generateKeyPairSigner();
-const feeReceiver = await generateKeyPairSigner();
-
-const transferFeeConfigExtension = extension("TransferFeeConfig", {
-  transferFeeConfigAuthority: client.payer.address,
-  withdrawWithheldAuthority: client.payer.address,
-  withheldAmount: 0n,
-  olderTransferFee: {
-    epoch: 0n,
-    maximumFee: 10n,
-    transferFeeBasisPoints: 150
-  },
-  newerTransferFee: {
-    epoch: 0n,
-    maximumFee: 10n,
-    transferFeeBasisPoints: 150
-  }
-});
-
-const mintSpace = BigInt(getMintSize([transferFeeConfigExtension]));
-
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
-
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  }),
-  getInitializeTransferFeeConfigInstruction({
-    mint: mint.address,
-    transferFeeConfigAuthority: client.payer.address,
-    withdrawWithheldAuthority: client.payer.address,
-    transferFeeBasisPoints: 150,
-    maximumFee: 10n
-  }),
-  getInitializeMintInstruction({
-    mint: mint.address,
-    decimals: 2,
-    mintAuthority: client.payer.address,
-    freezeAuthority: client.payer.address
-  })
-]);
-
-const [sourceToken] = await findAssociatedTokenPda({
-  mint: mint.address,
-  owner: client.payer.address,
-  tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
-});
-
-const [destinationAToken] = await findAssociatedTokenPda({
-  mint: mint.address,
-  owner: recipientA.address,
-  tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
-});
-
-const [destinationBToken] = await findAssociatedTokenPda({
-  mint: mint.address,
-  owner: recipientB.address,
-  tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
-});
-
-const [feeReceiverToken] = await findAssociatedTokenPda({
-  mint: mint.address,
-  owner: feeReceiver.address,
-  tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
-});
-
-await client.sendTransaction([
-  await getCreateAssociatedTokenInstructionAsync({
-    payer: client.payer,
-    mint: mint.address,
-    owner: client.payer.address
-  }),
-  await getCreateAssociatedTokenInstructionAsync({
-    payer: client.payer,
-    mint: mint.address,
-    owner: recipientA.address
-  }),
-  await getCreateAssociatedTokenInstructionAsync({
-    payer: client.payer,
-    mint: mint.address,
-    owner: recipientB.address
-  }),
-  await getCreateAssociatedTokenInstructionAsync({
-    payer: client.payer,
-    mint: mint.address,
-    owner: feeReceiver.address
-  }),
-  getMintToCheckedInstruction({
-    mint: mint.address,
-    token: sourceToken,
-    mintAuthority: client.payer,
-    amount: 1_000n,
-    decimals: 2
-  })
-]);
-
-// !focus(1:11)
-await client.sendTransaction([
-  getTransferCheckedWithFeeInstruction({
-    source: sourceToken,
-    mint: mint.address,
-    destination: destinationAToken,
-    authority: client.payer,
-    amount: 200n,
-    decimals: 2,
-    fee: 3n
-  })
-]);
-```
-
-## !!steps Siirto TransferChecked-toiminnolla
-
-Siirrä tokeneita _rs`TransferChecked`_-toiminnolla. Määritetty maksu pidätetään
-silti kohde-token accountilla.
-
-<CodePlaceholder title="Esimerkki" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-const recipientA = await generateKeyPairSigner();
-const recipientB = await generateKeyPairSigner();
-const feeReceiver = await generateKeyPairSigner();
-
-const transferFeeConfigExtension = extension("TransferFeeConfig", {
-  transferFeeConfigAuthority: client.payer.address,
-  withdrawWithheldAuthority: client.payer.address,
-  withheldAmount: 0n,
-  olderTransferFee: {
-    epoch: 0n,
-    maximumFee: 10n,
-    transferFeeBasisPoints: 150
-  },
-  newerTransferFee: {
-    epoch: 0n,
-    maximumFee: 10n,
-    transferFeeBasisPoints: 150
-  }
-});
-
-const mintSpace = BigInt(getMintSize([transferFeeConfigExtension]));
-
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
-
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  }),
-  getInitializeTransferFeeConfigInstruction({
-    mint: mint.address,
-    transferFeeConfigAuthority: client.payer.address,
-    withdrawWithheldAuthority: client.payer.address,
-    transferFeeBasisPoints: 150,
-    maximumFee: 10n
-  }),
-  getInitializeMintInstruction({
-    mint: mint.address,
-    decimals: 2,
-    mintAuthority: client.payer.address,
-    freezeAuthority: client.payer.address
-  })
-]);
-
-const [sourceToken] = await findAssociatedTokenPda({
-  mint: mint.address,
-  owner: client.payer.address,
-  tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
-});
-
-const [destinationAToken] = await findAssociatedTokenPda({
-  mint: mint.address,
-  owner: recipientA.address,
-  tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
-});
-
-const [destinationBToken] = await findAssociatedTokenPda({
-  mint: mint.address,
-  owner: recipientB.address,
-  tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
-});
-
-const [feeReceiverToken] = await findAssociatedTokenPda({
-  mint: mint.address,
-  owner: feeReceiver.address,
-  tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
-});
-
-await client.sendTransaction([
-  await getCreateAssociatedTokenInstructionAsync({
-    payer: client.payer,
-    mint: mint.address,
-    owner: client.payer.address
-  }),
-  await getCreateAssociatedTokenInstructionAsync({
-    payer: client.payer,
-    mint: mint.address,
-    owner: recipientA.address
-  }),
-  await getCreateAssociatedTokenInstructionAsync({
-    payer: client.payer,
-    mint: mint.address,
-    owner: recipientB.address
-  }),
-  await getCreateAssociatedTokenInstructionAsync({
-    payer: client.payer,
-    mint: mint.address,
-    owner: feeReceiver.address
-  }),
-  getMintToCheckedInstruction({
-    mint: mint.address,
-    token: sourceToken,
-    mintAuthority: client.payer,
-    amount: 1_000n,
-    decimals: 2
-  })
-]);
-
-await client.sendTransaction([
-  getTransferCheckedWithFeeInstruction({
-    source: sourceToken,
-    mint: mint.address,
-    destination: destinationAToken,
-    authority: client.payer,
-    amount: 200n,
-    decimals: 2,
-    fee: 3n
-  })
-]);
-
-// !focus(1:10)
-await client.sendTransaction([
-  getTransferCheckedInstruction({
-    source: sourceToken,
-    mint: mint.address,
-    destination: destinationBToken,
-    authority: client.payer,
-    amount: 200n,
-    decimals: 2
-  })
-]);
-```
-
-## !!steps Pidätettyjen maksujen nosto token accounteista
-
-Käytä _rs`WithdrawWithheldTokensFromAccounts`_-toimintoa siirtääksesi pidätetyt
-maksut suoraan token accounteista maksun vastaanottajan token accountille.
-
-<CodePlaceholder title="Esimerkki" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-const recipientA = await generateKeyPairSigner();
-const recipientB = await generateKeyPairSigner();
-const feeReceiver = await generateKeyPairSigner();
-
-const transferFeeConfigExtension = extension("TransferFeeConfig", {
-  transferFeeConfigAuthority: client.payer.address,
-  withdrawWithheldAuthority: client.payer.address,
-  withheldAmount: 0n,
-  olderTransferFee: {
-    epoch: 0n,
-    maximumFee: 10n,
-    transferFeeBasisPoints: 150
-  },
-  newerTransferFee: {
-    epoch: 0n,
-    maximumFee: 10n,
-    transferFeeBasisPoints: 150
-  }
-});
-
-const mintSpace = BigInt(getMintSize([transferFeeConfigExtension]));
-
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
-
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  }),
-  getInitializeTransferFeeConfigInstruction({
-    mint: mint.address,
-    transferFeeConfigAuthority: client.payer.address,
-    withdrawWithheldAuthority: client.payer.address,
-    transferFeeBasisPoints: 150,
-    maximumFee: 10n
-  }),
-  getInitializeMintInstruction({
-    mint: mint.address,
-    decimals: 2,
-    mintAuthority: client.payer.address,
-    freezeAuthority: client.payer.address
-  })
-]);
-
-const [sourceToken] = await findAssociatedTokenPda({
-  mint: mint.address,
-  owner: client.payer.address,
-  tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
-});
-
-const [destinationAToken] = await findAssociatedTokenPda({
-  mint: mint.address,
-  owner: recipientA.address,
-  tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
-});
-
-const [destinationBToken] = await findAssociatedTokenPda({
-  mint: mint.address,
-  owner: recipientB.address,
-  tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
-});
-
-const [feeReceiverToken] = await findAssociatedTokenPda({
-  mint: mint.address,
-  owner: feeReceiver.address,
-  tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
-});
-
-await client.sendTransaction([
-  await getCreateAssociatedTokenInstructionAsync({
-    payer: client.payer,
-    mint: mint.address,
-    owner: client.payer.address
-  }),
-  await getCreateAssociatedTokenInstructionAsync({
-    payer: client.payer,
-    mint: mint.address,
-    owner: recipientA.address
-  }),
-  await getCreateAssociatedTokenInstructionAsync({
-    payer: client.payer,
-    mint: mint.address,
-    owner: recipientB.address
-  }),
-  await getCreateAssociatedTokenInstructionAsync({
-    payer: client.payer,
-    mint: mint.address,
-    owner: feeReceiver.address
-  }),
-  getMintToCheckedInstruction({
-    mint: mint.address,
-    token: sourceToken,
-    mintAuthority: client.payer,
-    amount: 1_000n,
-    decimals: 2
-  })
-]);
-
-await client.sendTransaction([
-  getTransferCheckedWithFeeInstruction({
-    source: sourceToken,
-    mint: mint.address,
-    destination: destinationAToken,
-    authority: client.payer,
-    amount: 200n,
-    decimals: 2,
-    fee: 3n
-  })
-]);
-
-await client.sendTransaction([
-  getTransferCheckedInstruction({
-    source: sourceToken,
-    mint: mint.address,
-    destination: destinationBToken,
-    authority: client.payer,
-    amount: 200n,
-    decimals: 2
-  })
-]);
-
-// !focus(1:9)
-await client.sendTransaction([
-  getWithdrawWithheldTokensFromAccountsInstruction({
-    mint: mint.address,
-    feeReceiver: feeReceiverToken,
-    withdrawWithheldAuthority: client.payer,
-    numTokenAccounts: 1,
-    sources: [destinationAToken]
-  })
-]);
-```
-
-## !!steps Pidätettyjen maksujen kerääminen mintille
-
-Käytä _rs`HarvestWithheldTokensToMint`_-toimintoa siirtääksesi pidätetyt maksut
-token accounteista mint accountin pidätettyjen maksujen kerääjään.
-
-<CodePlaceholder title="Esimerkki" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-const recipientA = await generateKeyPairSigner();
-const recipientB = await generateKeyPairSigner();
-const feeReceiver = await generateKeyPairSigner();
-
-const transferFeeConfigExtension = extension("TransferFeeConfig", {
-  transferFeeConfigAuthority: client.payer.address,
-  withdrawWithheldAuthority: client.payer.address,
-  withheldAmount: 0n,
-  olderTransferFee: {
-    epoch: 0n,
-    maximumFee: 10n,
-    transferFeeBasisPoints: 150
-  },
-  newerTransferFee: {
-    epoch: 0n,
-    maximumFee: 10n,
-    transferFeeBasisPoints: 150
-  }
-});
-
-const mintSpace = BigInt(getMintSize([transferFeeConfigExtension]));
-
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
-
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  }),
-  getInitializeTransferFeeConfigInstruction({
-    mint: mint.address,
-    transferFeeConfigAuthority: client.payer.address,
-    withdrawWithheldAuthority: client.payer.address,
-    transferFeeBasisPoints: 150,
-    maximumFee: 10n
-  }),
-  getInitializeMintInstruction({
-    mint: mint.address,
-    decimals: 2,
-    mintAuthority: client.payer.address,
-    freezeAuthority: client.payer.address
-  })
-]);
-
-const [sourceToken] = await findAssociatedTokenPda({
-  mint: mint.address,
-  owner: client.payer.address,
-  tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
-});
-
-const [destinationAToken] = await findAssociatedTokenPda({
-  mint: mint.address,
-  owner: recipientA.address,
-  tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
-});
-
-const [destinationBToken] = await findAssociatedTokenPda({
-  mint: mint.address,
-  owner: recipientB.address,
-  tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
-});
-
-const [feeReceiverToken] = await findAssociatedTokenPda({
-  mint: mint.address,
-  owner: feeReceiver.address,
-  tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
-});
-
-await client.sendTransaction([
-  await getCreateAssociatedTokenInstructionAsync({
-    payer: client.payer,
-    mint: mint.address,
-    owner: client.payer.address
-  }),
-  await getCreateAssociatedTokenInstructionAsync({
-    payer: client.payer,
-    mint: mint.address,
-    owner: recipientA.address
-  }),
-  await getCreateAssociatedTokenInstructionAsync({
-    payer: client.payer,
-    mint: mint.address,
-    owner: recipientB.address
-  }),
-  await getCreateAssociatedTokenInstructionAsync({
-    payer: client.payer,
-    mint: mint.address,
-    owner: feeReceiver.address
-  }),
-  getMintToCheckedInstruction({
-    mint: mint.address,
-    token: sourceToken,
-    mintAuthority: client.payer,
-    amount: 1_000n,
-    decimals: 2
-  })
-]);
-
-await client.sendTransaction([
-  getTransferCheckedWithFeeInstruction({
-    source: sourceToken,
-    mint: mint.address,
-    destination: destinationAToken,
-    authority: client.payer,
-    amount: 200n,
-    decimals: 2,
-    fee: 3n
-  })
-]);
-
-await client.sendTransaction([
-  getTransferCheckedInstruction({
-    source: sourceToken,
-    mint: mint.address,
-    destination: destinationBToken,
-    authority: client.payer,
-    amount: 200n,
-    decimals: 2
-  })
-]);
-
-await client.sendTransaction([
-  getWithdrawWithheldTokensFromAccountsInstruction({
-    mint: mint.address,
-    feeReceiver: feeReceiverToken,
-    withdrawWithheldAuthority: client.payer,
-    numTokenAccounts: 1,
-    sources: [destinationAToken]
-  })
-]);
-
-// !focus(1:6)
-await client.sendTransaction([
-  getHarvestWithheldTokensToMintInstruction({
-    mint: mint.address,
-    sources: [destinationBToken]
-  })
-]);
-```
-
-## !!steps Pidätettyjen maksujen nosto mintistä
-
-Käytä _rs`WithdrawWithheldTokensFromMint`_-toimintoa siirtääksesi kerätyt maksut
-mint accountista maksun vastaanottajan token accountille.
-
-<CodePlaceholder title="Esimerkki" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-const recipientA = await generateKeyPairSigner();
-const recipientB = await generateKeyPairSigner();
-const feeReceiver = await generateKeyPairSigner();
-
-const transferFeeConfigExtension = extension("TransferFeeConfig", {
-  transferFeeConfigAuthority: client.payer.address,
-  withdrawWithheldAuthority: client.payer.address,
-  withheldAmount: 0n,
-  olderTransferFee: {
-    epoch: 0n,
-    maximumFee: 10n,
-    transferFeeBasisPoints: 150
-  },
-  newerTransferFee: {
-    epoch: 0n,
-    maximumFee: 10n,
-    transferFeeBasisPoints: 150
-  }
-});
-
-const mintSpace = BigInt(getMintSize([transferFeeConfigExtension]));
-
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
-
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  }),
-  getInitializeTransferFeeConfigInstruction({
-    mint: mint.address,
-    transferFeeConfigAuthority: client.payer.address,
-    withdrawWithheldAuthority: client.payer.address,
-    transferFeeBasisPoints: 150,
-    maximumFee: 10n
-  }),
-  getInitializeMintInstruction({
-    mint: mint.address,
-    decimals: 2,
-    mintAuthority: client.payer.address,
-    freezeAuthority: client.payer.address
-  })
-]);
-
-const [sourceToken] = await findAssociatedTokenPda({
-  mint: mint.address,
-  owner: client.payer.address,
-  tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
-});
-
-const [destinationAToken] = await findAssociatedTokenPda({
-  mint: mint.address,
-  owner: recipientA.address,
-  tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
-});
-
-const [destinationBToken] = await findAssociatedTokenPda({
-  mint: mint.address,
-  owner: recipientB.address,
-  tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
-});
-
-const [feeReceiverToken] = await findAssociatedTokenPda({
-  mint: mint.address,
-  owner: feeReceiver.address,
-  tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
-});
-
-await client.sendTransaction([
-  await getCreateAssociatedTokenInstructionAsync({
-    payer: client.payer,
-    mint: mint.address,
-    owner: client.payer.address
-  }),
-  await getCreateAssociatedTokenInstructionAsync({
-    payer: client.payer,
-    mint: mint.address,
-    owner: recipientA.address
-  }),
-  await getCreateAssociatedTokenInstructionAsync({
-    payer: client.payer,
-    mint: mint.address,
-    owner: recipientB.address
-  }),
-  await getCreateAssociatedTokenInstructionAsync({
-    payer: client.payer,
-    mint: mint.address,
-    owner: feeReceiver.address
-  }),
-  getMintToCheckedInstruction({
-    mint: mint.address,
-    token: sourceToken,
-    mintAuthority: client.payer,
-    amount: 1_000n,
-    decimals: 2
-  })
-]);
-
-await client.sendTransaction([
-  getTransferCheckedWithFeeInstruction({
-    source: sourceToken,
-    mint: mint.address,
-    destination: destinationAToken,
-    authority: client.payer,
-    amount: 200n,
-    decimals: 2,
-    fee: 3n
-  })
-]);
-
-await client.sendTransaction([
-  getTransferCheckedInstruction({
-    source: sourceToken,
-    mint: mint.address,
-    destination: destinationBToken,
-    authority: client.payer,
-    amount: 200n,
-    decimals: 2
-  })
-]);
-
-await client.sendTransaction([
-  getWithdrawWithheldTokensFromAccountsInstruction({
-    mint: mint.address,
-    feeReceiver: feeReceiverToken,
-    withdrawWithheldAuthority: client.payer,
-    numTokenAccounts: 1,
-    sources: [destinationAToken]
-  })
-]);
-
-await client.sendTransaction([
-  getHarvestWithheldTokensToMintInstruction({
-    mint: mint.address,
-    sources: [destinationBToken]
-  })
-]);
-
-// !focus(1:7)
-await client.sendTransaction([
-  getWithdrawWithheldTokensFromMintInstruction({
-    mint: mint.address,
-    feeReceiver: feeReceiverToken,
-    withdrawWithheldAuthority: client.payer
-  })
-]);
-```
-
-## !!steps Seuraavan siirtomaksun päivittäminen
-
-Käytä _rs`SetTransferFee`_-toimintoa päivittääksesi seuraavan siirtomaksun
-asetukset.
-
-<CodePlaceholder title="Esimerkki" />
-
-```ts !! title="Example"
-const client = await createClient()
-  .use(generatedPayer())
-  .use(
-    solanaRpc({
-      rpcUrl: "http://localhost:8899",
-      rpcSubscriptionsUrl: "ws://localhost:8900"
-    })
-  )
-  .use(rpcAirdrop())
-  .use(airdropPayer(lamports(1_000_000_000n)));
-
-const mint = await generateKeyPairSigner();
-const recipientA = await generateKeyPairSigner();
-const recipientB = await generateKeyPairSigner();
-const feeReceiver = await generateKeyPairSigner();
-
-const transferFeeConfigExtension = extension("TransferFeeConfig", {
-  transferFeeConfigAuthority: client.payer.address,
-  withdrawWithheldAuthority: client.payer.address,
-  withheldAmount: 0n,
-  olderTransferFee: {
-    epoch: 0n,
-    maximumFee: 10n,
-    transferFeeBasisPoints: 150
-  },
-  newerTransferFee: {
-    epoch: 0n,
-    maximumFee: 10n,
-    transferFeeBasisPoints: 150
-  }
-});
-
-const mintSpace = BigInt(getMintSize([transferFeeConfigExtension]));
-
-const mintRent = await client.rpc
-  .getMinimumBalanceForRentExemption(mintSpace)
-  .send();
-
-await client.sendTransaction([
-  getCreateAccountInstruction({
-    payer: client.payer,
-    newAccount: mint,
-    lamports: mintRent,
-    space: mintSpace,
-    programAddress: TOKEN_2022_PROGRAM_ADDRESS
-  }),
-  getInitializeTransferFeeConfigInstruction({
-    mint: mint.address,
-    transferFeeConfigAuthority: client.payer.address,
-    withdrawWithheldAuthority: client.payer.address,
-    transferFeeBasisPoints: 150,
-    maximumFee: 10n
-  }),
-  getInitializeMintInstruction({
-    mint: mint.address,
-    decimals: 2,
-    mintAuthority: client.payer.address,
-    freezeAuthority: client.payer.address
-  })
-]);
-
-const [sourceToken] = await findAssociatedTokenPda({
-  mint: mint.address,
-  owner: client.payer.address,
-  tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
-});
-
-const [destinationAToken] = await findAssociatedTokenPda({
-  mint: mint.address,
-  owner: recipientA.address,
-  tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
-});
-
-const [destinationBToken] = await findAssociatedTokenPda({
-  mint: mint.address,
-  owner: recipientB.address,
-  tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
-});
-
-const [feeReceiverToken] = await findAssociatedTokenPda({
-  mint: mint.address,
-  owner: feeReceiver.address,
-  tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
-});
-
-await client.sendTransaction([
-  await getCreateAssociatedTokenInstructionAsync({
-    payer: client.payer,
-    mint: mint.address,
-    owner: client.payer.address
-  }),
-  await getCreateAssociatedTokenInstructionAsync({
-    payer: client.payer,
-    mint: mint.address,
-    owner: recipientA.address
-  }),
-  await getCreateAssociatedTokenInstructionAsync({
-    payer: client.payer,
-    mint: mint.address,
-    owner: recipientB.address
-  }),
-  await getCreateAssociatedTokenInstructionAsync({
-    payer: client.payer,
-    mint: mint.address,
-    owner: feeReceiver.address
-  }),
-  getMintToCheckedInstruction({
-    mint: mint.address,
-    token: sourceToken,
-    mintAuthority: client.payer,
-    amount: 1_000n,
-    decimals: 2
-  })
-]);
-
-await client.sendTransaction([
-  getTransferCheckedWithFeeInstruction({
-    source: sourceToken,
-    mint: mint.address,
-    destination: destinationAToken,
-    authority: client.payer,
-    amount: 200n,
-    decimals: 2,
-    fee: 3n
-  })
-]);
-
-await client.sendTransaction([
-  getTransferCheckedInstruction({
-    source: sourceToken,
-    mint: mint.address,
-    destination: destinationBToken,
-    authority: client.payer,
-    amount: 200n,
-    decimals: 2
-  })
-]);
-
-await client.sendTransaction([
-  getWithdrawWithheldTokensFromAccountsInstruction({
-    mint: mint.address,
-    feeReceiver: feeReceiverToken,
-    withdrawWithheldAuthority: client.payer,
-    numTokenAccounts: 1,
-    sources: [destinationAToken]
-  })
-]);
-
-await client.sendTransaction([
-  getHarvestWithheldTokensToMintInstruction({
-    mint: mint.address,
-    sources: [destinationBToken]
-  })
-]);
-
-await client.sendTransaction([
-  getWithdrawWithheldTokensFromMintInstruction({
-    mint: mint.address,
-    feeReceiver: feeReceiverToken,
-    withdrawWithheldAuthority: client.payer
-  })
-]);
-
-// !focus(1:8)
-await client.sendTransaction([
-  getSetTransferFeeInstruction({
-    mint: mint.address,
-    transferFeeConfigAuthority: client.payer,
-    transferFeeBasisPoints: 250,
-    maximumFee: 25n
-  })
-]);
-```
-
-</ScrollyCoding>
-
-<Callout type="info" title="Käskyjen järjestys">
-  _rs`InitializeTransferFeeConfig`_ on suoritettava ennen _rs`InitializeMint`_.
-  _rs`CreateAccount`_, _rs`InitializeTransferFeeConfig`_ ja _rs`InitializeMint`_
+<Steps>
+  <Step title="Laske tilin koko">
+    Laske mint accountin koko perus-mintille sekä `TransferFeeConfig`
+    -laajennukselle. Tämä on koko, jota käytetään `CreateAccount` -toiminnossa.
+
+    ```ts Esimerkki focus={14-27,30}
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+
+    const transferFeeConfigExtension = extension("TransferFeeConfig", {
+      transferFeeConfigAuthority: client.payer.address,
+      withdrawWithheldAuthority: client.payer.address,
+      withheldAmount: 0n,
+      olderTransferFee: {
+        epoch: 0n,
+        maximumFee: 10n,
+        transferFeeBasisPoints: 150
+      },
+      newerTransferFee: {
+        epoch: 0n,
+        maximumFee: 10n,
+        transferFeeBasisPoints: 150
+      }
+    });
+
+    const mintSpace = BigInt(getMintSize([transferFeeConfigExtension]));
+    ```
+  </Step>
+
+  <Step title="Laske rent">
+    Laske rent käyttämällä mintille tarvittavaa kokoa sekä `TransferFeeConfig`
+    -laajennusta.
+
+    ```ts Esimerkki focus={32-34}
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+
+    const transferFeeConfigExtension = extension("TransferFeeConfig", {
+      transferFeeConfigAuthority: client.payer.address,
+      withdrawWithheldAuthority: client.payer.address,
+      withheldAmount: 0n,
+      olderTransferFee: {
+        epoch: 0n,
+        maximumFee: 10n,
+        transferFeeBasisPoints: 150
+      },
+      newerTransferFee: {
+        epoch: 0n,
+        maximumFee: 10n,
+        transferFeeBasisPoints: 150
+      }
+    });
+
+    const mintSpace = BigInt(getMintSize([transferFeeConfigExtension]));
+
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
+    ```
+  </Step>
+
+  <Step title="Luo mint account">
+    Luo mint account lasketulla tilalla ja lamporteilla.
+
+    ```ts Esimerkki focus={36-44} expandable
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+
+    const transferFeeConfigExtension = extension("TransferFeeConfig", {
+      transferFeeConfigAuthority: client.payer.address,
+      withdrawWithheldAuthority: client.payer.address,
+      withheldAmount: 0n,
+      olderTransferFee: {
+        epoch: 0n,
+        maximumFee: 10n,
+        transferFeeBasisPoints: 150
+      },
+      newerTransferFee: {
+        epoch: 0n,
+        maximumFee: 10n,
+        transferFeeBasisPoints: 150
+      }
+    });
+
+    const mintSpace = BigInt(getMintSize([transferFeeConfigExtension]));
+
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
+
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      })
+    ]);
+    ```
+  </Step>
+
+  <Step title="Alusta TransferFeeConfig">
+    Alusta `TransferFeeConfig` -laajennus mintille.
+
+    ```ts Esimerkki focus={44-50} expandable
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+
+    const transferFeeConfigExtension = extension("TransferFeeConfig", {
+      transferFeeConfigAuthority: client.payer.address,
+      withdrawWithheldAuthority: client.payer.address,
+      withheldAmount: 0n,
+      olderTransferFee: {
+        epoch: 0n,
+        maximumFee: 10n,
+        transferFeeBasisPoints: 150
+      },
+      newerTransferFee: {
+        epoch: 0n,
+        maximumFee: 10n,
+        transferFeeBasisPoints: 150
+      }
+    });
+
+    const mintSpace = BigInt(getMintSize([transferFeeConfigExtension]));
+
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
+
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializeTransferFeeConfigInstruction({
+        mint: mint.address,
+        transferFeeConfigAuthority: client.payer.address,
+        withdrawWithheldAuthority: client.payer.address,
+        transferFeeBasisPoints: 150,
+        maximumFee: 10n
+      })
+    ]);
+    ```
+  </Step>
+
+  <Step title="Alusta mint">
+    Alusta mint käyttämällä `InitializeMint` -toimintoa samassa transaktiossa.
+
+    ```ts Esimerkki focus={51-56} expandable
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+
+    const transferFeeConfigExtension = extension("TransferFeeConfig", {
+      transferFeeConfigAuthority: client.payer.address,
+      withdrawWithheldAuthority: client.payer.address,
+      withheldAmount: 0n,
+      olderTransferFee: {
+        epoch: 0n,
+        maximumFee: 10n,
+        transferFeeBasisPoints: 150
+      },
+      newerTransferFee: {
+        epoch: 0n,
+        maximumFee: 10n,
+        transferFeeBasisPoints: 150
+      }
+    });
+
+    const mintSpace = BigInt(getMintSize([transferFeeConfigExtension]));
+
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
+
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializeTransferFeeConfigInstruction({
+        mint: mint.address,
+        transferFeeConfigAuthority: client.payer.address,
+        withdrawWithheldAuthority: client.payer.address,
+        transferFeeBasisPoints: 150,
+        maximumFee: 10n
+      }),
+      getInitializeMintInstruction({
+        mint: mint.address,
+        decimals: 2,
+        mintAuthority: client.payer.address,
+        freezeAuthority: client.payer.address
+      })
+    ]);
+    ```
+  </Step>
+
+  <Step title="Luo token accountit ja lyö tokeneita">
+    Luo token accountit lähteelle, vastaanottajille ja maksunsaajalle, ja lyö sitten
+    tokeneita lähde-token accountille.
+
+    ```ts Esimerkki focus={86-114} expandable
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+    const recipientA = await generateKeyPairSigner();
+    const recipientB = await generateKeyPairSigner();
+    const feeReceiver = await generateKeyPairSigner();
+
+    const transferFeeConfigExtension = extension("TransferFeeConfig", {
+      transferFeeConfigAuthority: client.payer.address,
+      withdrawWithheldAuthority: client.payer.address,
+      withheldAmount: 0n,
+      olderTransferFee: {
+        epoch: 0n,
+        maximumFee: 10n,
+        transferFeeBasisPoints: 150
+      },
+      newerTransferFee: {
+        epoch: 0n,
+        maximumFee: 10n,
+        transferFeeBasisPoints: 150
+      }
+    });
+
+    const mintSpace = BigInt(getMintSize([transferFeeConfigExtension]));
+
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
+
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializeTransferFeeConfigInstruction({
+        mint: mint.address,
+        transferFeeConfigAuthority: client.payer.address,
+        withdrawWithheldAuthority: client.payer.address,
+        transferFeeBasisPoints: 150,
+        maximumFee: 10n
+      }),
+      getInitializeMintInstruction({
+        mint: mint.address,
+        decimals: 2,
+        mintAuthority: client.payer.address,
+        freezeAuthority: client.payer.address
+      })
+    ]);
+
+    const [sourceToken] = await findAssociatedTokenPda({
+      mint: mint.address,
+      owner: client.payer.address,
+      tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
+    });
+
+    const [destinationAToken] = await findAssociatedTokenPda({
+      mint: mint.address,
+      owner: recipientA.address,
+      tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
+    });
+
+    const [destinationBToken] = await findAssociatedTokenPda({
+      mint: mint.address,
+      owner: recipientB.address,
+      tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
+    });
+
+    const [feeReceiverToken] = await findAssociatedTokenPda({
+      mint: mint.address,
+      owner: feeReceiver.address,
+      tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
+    });
+
+    await client.sendTransaction([
+      await getCreateAssociatedTokenInstructionAsync({
+        payer: client.payer,
+        mint: mint.address,
+        owner: client.payer.address
+      }),
+      await getCreateAssociatedTokenInstructionAsync({
+        payer: client.payer,
+        mint: mint.address,
+        owner: recipientA.address
+      }),
+      await getCreateAssociatedTokenInstructionAsync({
+        payer: client.payer,
+        mint: mint.address,
+        owner: recipientB.address
+      }),
+      await getCreateAssociatedTokenInstructionAsync({
+        payer: client.payer,
+        mint: mint.address,
+        owner: feeReceiver.address
+      }),
+      getMintToCheckedInstruction({
+        mint: mint.address,
+        token: sourceToken,
+        mintAuthority: client.payer,
+        amount: 1_000n,
+        decimals: 2
+      })
+    ]);
+    ```
+  </Step>
+
+  <Step title="Siirto TransferCheckedWithFee-toiminnolla">
+    Siirrä tokeneita `TransferCheckedWithFee`-toiminnolla ja varmista odotettu
+    maksu.
+
+    ```ts Esimerkki focus={116-126} expandable
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+    const recipientA = await generateKeyPairSigner();
+    const recipientB = await generateKeyPairSigner();
+    const feeReceiver = await generateKeyPairSigner();
+
+    const transferFeeConfigExtension = extension("TransferFeeConfig", {
+      transferFeeConfigAuthority: client.payer.address,
+      withdrawWithheldAuthority: client.payer.address,
+      withheldAmount: 0n,
+      olderTransferFee: {
+        epoch: 0n,
+        maximumFee: 10n,
+        transferFeeBasisPoints: 150
+      },
+      newerTransferFee: {
+        epoch: 0n,
+        maximumFee: 10n,
+        transferFeeBasisPoints: 150
+      }
+    });
+
+    const mintSpace = BigInt(getMintSize([transferFeeConfigExtension]));
+
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
+
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializeTransferFeeConfigInstruction({
+        mint: mint.address,
+        transferFeeConfigAuthority: client.payer.address,
+        withdrawWithheldAuthority: client.payer.address,
+        transferFeeBasisPoints: 150,
+        maximumFee: 10n
+      }),
+      getInitializeMintInstruction({
+        mint: mint.address,
+        decimals: 2,
+        mintAuthority: client.payer.address,
+        freezeAuthority: client.payer.address
+      })
+    ]);
+
+    const [sourceToken] = await findAssociatedTokenPda({
+      mint: mint.address,
+      owner: client.payer.address,
+      tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
+    });
+
+    const [destinationAToken] = await findAssociatedTokenPda({
+      mint: mint.address,
+      owner: recipientA.address,
+      tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
+    });
+
+    const [destinationBToken] = await findAssociatedTokenPda({
+      mint: mint.address,
+      owner: recipientB.address,
+      tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
+    });
+
+    const [feeReceiverToken] = await findAssociatedTokenPda({
+      mint: mint.address,
+      owner: feeReceiver.address,
+      tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
+    });
+
+    await client.sendTransaction([
+      await getCreateAssociatedTokenInstructionAsync({
+        payer: client.payer,
+        mint: mint.address,
+        owner: client.payer.address
+      }),
+      await getCreateAssociatedTokenInstructionAsync({
+        payer: client.payer,
+        mint: mint.address,
+        owner: recipientA.address
+      }),
+      await getCreateAssociatedTokenInstructionAsync({
+        payer: client.payer,
+        mint: mint.address,
+        owner: recipientB.address
+      }),
+      await getCreateAssociatedTokenInstructionAsync({
+        payer: client.payer,
+        mint: mint.address,
+        owner: feeReceiver.address
+      }),
+      getMintToCheckedInstruction({
+        mint: mint.address,
+        token: sourceToken,
+        mintAuthority: client.payer,
+        amount: 1_000n,
+        decimals: 2
+      })
+    ]);
+
+    await client.sendTransaction([
+      getTransferCheckedWithFeeInstruction({
+        source: sourceToken,
+        mint: mint.address,
+        destination: destinationAToken,
+        authority: client.payer,
+        amount: 200n,
+        decimals: 2,
+        fee: 3n
+      })
+    ]);
+    ```
+  </Step>
+
+  <Step title="Siirto TransferChecked-toiminnolla">
+    Siirrä tokeneita `TransferChecked`-toiminnolla. Määritetty maksu pidätetään
+    silti kohde-token accountilla.
+
+    ```ts Esimerkki focus={128-137} expandable
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+    const recipientA = await generateKeyPairSigner();
+    const recipientB = await generateKeyPairSigner();
+    const feeReceiver = await generateKeyPairSigner();
+
+    const transferFeeConfigExtension = extension("TransferFeeConfig", {
+      transferFeeConfigAuthority: client.payer.address,
+      withdrawWithheldAuthority: client.payer.address,
+      withheldAmount: 0n,
+      olderTransferFee: {
+        epoch: 0n,
+        maximumFee: 10n,
+        transferFeeBasisPoints: 150
+      },
+      newerTransferFee: {
+        epoch: 0n,
+        maximumFee: 10n,
+        transferFeeBasisPoints: 150
+      }
+    });
+
+    const mintSpace = BigInt(getMintSize([transferFeeConfigExtension]));
+
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
+
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializeTransferFeeConfigInstruction({
+        mint: mint.address,
+        transferFeeConfigAuthority: client.payer.address,
+        withdrawWithheldAuthority: client.payer.address,
+        transferFeeBasisPoints: 150,
+        maximumFee: 10n
+      }),
+      getInitializeMintInstruction({
+        mint: mint.address,
+        decimals: 2,
+        mintAuthority: client.payer.address,
+        freezeAuthority: client.payer.address
+      })
+    ]);
+
+    const [sourceToken] = await findAssociatedTokenPda({
+      mint: mint.address,
+      owner: client.payer.address,
+      tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
+    });
+
+    const [destinationAToken] = await findAssociatedTokenPda({
+      mint: mint.address,
+      owner: recipientA.address,
+      tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
+    });
+
+    const [destinationBToken] = await findAssociatedTokenPda({
+      mint: mint.address,
+      owner: recipientB.address,
+      tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
+    });
+
+    const [feeReceiverToken] = await findAssociatedTokenPda({
+      mint: mint.address,
+      owner: feeReceiver.address,
+      tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
+    });
+
+    await client.sendTransaction([
+      await getCreateAssociatedTokenInstructionAsync({
+        payer: client.payer,
+        mint: mint.address,
+        owner: client.payer.address
+      }),
+      await getCreateAssociatedTokenInstructionAsync({
+        payer: client.payer,
+        mint: mint.address,
+        owner: recipientA.address
+      }),
+      await getCreateAssociatedTokenInstructionAsync({
+        payer: client.payer,
+        mint: mint.address,
+        owner: recipientB.address
+      }),
+      await getCreateAssociatedTokenInstructionAsync({
+        payer: client.payer,
+        mint: mint.address,
+        owner: feeReceiver.address
+      }),
+      getMintToCheckedInstruction({
+        mint: mint.address,
+        token: sourceToken,
+        mintAuthority: client.payer,
+        amount: 1_000n,
+        decimals: 2
+      })
+    ]);
+
+    await client.sendTransaction([
+      getTransferCheckedWithFeeInstruction({
+        source: sourceToken,
+        mint: mint.address,
+        destination: destinationAToken,
+        authority: client.payer,
+        amount: 200n,
+        decimals: 2,
+        fee: 3n
+      })
+    ]);
+
+    await client.sendTransaction([
+      getTransferCheckedInstruction({
+        source: sourceToken,
+        mint: mint.address,
+        destination: destinationBToken,
+        authority: client.payer,
+        amount: 200n,
+        decimals: 2
+      })
+    ]);
+    ```
+  </Step>
+
+  <Step title="Pidätettyjen maksujen nosto token accounteista">
+    Käytä `WithdrawWithheldTokensFromAccounts`-toimintoa siirtääksesi pidätetyt
+    maksut suoraan token accounteista maksun vastaanottajan token accountille.
+
+    ```ts Esimerkki focus={139-147} expandable
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+    const recipientA = await generateKeyPairSigner();
+    const recipientB = await generateKeyPairSigner();
+    const feeReceiver = await generateKeyPairSigner();
+
+    const transferFeeConfigExtension = extension("TransferFeeConfig", {
+      transferFeeConfigAuthority: client.payer.address,
+      withdrawWithheldAuthority: client.payer.address,
+      withheldAmount: 0n,
+      olderTransferFee: {
+        epoch: 0n,
+        maximumFee: 10n,
+        transferFeeBasisPoints: 150
+      },
+      newerTransferFee: {
+        epoch: 0n,
+        maximumFee: 10n,
+        transferFeeBasisPoints: 150
+      }
+    });
+
+    const mintSpace = BigInt(getMintSize([transferFeeConfigExtension]));
+
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
+
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializeTransferFeeConfigInstruction({
+        mint: mint.address,
+        transferFeeConfigAuthority: client.payer.address,
+        withdrawWithheldAuthority: client.payer.address,
+        transferFeeBasisPoints: 150,
+        maximumFee: 10n
+      }),
+      getInitializeMintInstruction({
+        mint: mint.address,
+        decimals: 2,
+        mintAuthority: client.payer.address,
+        freezeAuthority: client.payer.address
+      })
+    ]);
+
+    const [sourceToken] = await findAssociatedTokenPda({
+      mint: mint.address,
+      owner: client.payer.address,
+      tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
+    });
+
+    const [destinationAToken] = await findAssociatedTokenPda({
+      mint: mint.address,
+      owner: recipientA.address,
+      tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
+    });
+
+    const [destinationBToken] = await findAssociatedTokenPda({
+      mint: mint.address,
+      owner: recipientB.address,
+      tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
+    });
+
+    const [feeReceiverToken] = await findAssociatedTokenPda({
+      mint: mint.address,
+      owner: feeReceiver.address,
+      tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
+    });
+
+    await client.sendTransaction([
+      await getCreateAssociatedTokenInstructionAsync({
+        payer: client.payer,
+        mint: mint.address,
+        owner: client.payer.address
+      }),
+      await getCreateAssociatedTokenInstructionAsync({
+        payer: client.payer,
+        mint: mint.address,
+        owner: recipientA.address
+      }),
+      await getCreateAssociatedTokenInstructionAsync({
+        payer: client.payer,
+        mint: mint.address,
+        owner: recipientB.address
+      }),
+      await getCreateAssociatedTokenInstructionAsync({
+        payer: client.payer,
+        mint: mint.address,
+        owner: feeReceiver.address
+      }),
+      getMintToCheckedInstruction({
+        mint: mint.address,
+        token: sourceToken,
+        mintAuthority: client.payer,
+        amount: 1_000n,
+        decimals: 2
+      })
+    ]);
+
+    await client.sendTransaction([
+      getTransferCheckedWithFeeInstruction({
+        source: sourceToken,
+        mint: mint.address,
+        destination: destinationAToken,
+        authority: client.payer,
+        amount: 200n,
+        decimals: 2,
+        fee: 3n
+      })
+    ]);
+
+    await client.sendTransaction([
+      getTransferCheckedInstruction({
+        source: sourceToken,
+        mint: mint.address,
+        destination: destinationBToken,
+        authority: client.payer,
+        amount: 200n,
+        decimals: 2
+      })
+    ]);
+
+    await client.sendTransaction([
+      getWithdrawWithheldTokensFromAccountsInstruction({
+        mint: mint.address,
+        feeReceiver: feeReceiverToken,
+        withdrawWithheldAuthority: client.payer,
+        numTokenAccounts: 1,
+        sources: [destinationAToken]
+      })
+    ]);
+    ```
+  </Step>
+
+  <Step title="Pidätettyjen maksujen kerääminen mintille">
+    Käytä `HarvestWithheldTokensToMint`-toimintoa siirtääksesi pidätetyt maksut
+    token accounteista mint accountin pidätettyjen maksujen kerääjään.
+
+    ```ts Esimerkki focus={149-154} expandable
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+    const recipientA = await generateKeyPairSigner();
+    const recipientB = await generateKeyPairSigner();
+    const feeReceiver = await generateKeyPairSigner();
+
+    const transferFeeConfigExtension = extension("TransferFeeConfig", {
+      transferFeeConfigAuthority: client.payer.address,
+      withdrawWithheldAuthority: client.payer.address,
+      withheldAmount: 0n,
+      olderTransferFee: {
+        epoch: 0n,
+        maximumFee: 10n,
+        transferFeeBasisPoints: 150
+      },
+      newerTransferFee: {
+        epoch: 0n,
+        maximumFee: 10n,
+        transferFeeBasisPoints: 150
+      }
+    });
+
+    const mintSpace = BigInt(getMintSize([transferFeeConfigExtension]));
+
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
+
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializeTransferFeeConfigInstruction({
+        mint: mint.address,
+        transferFeeConfigAuthority: client.payer.address,
+        withdrawWithheldAuthority: client.payer.address,
+        transferFeeBasisPoints: 150,
+        maximumFee: 10n
+      }),
+      getInitializeMintInstruction({
+        mint: mint.address,
+        decimals: 2,
+        mintAuthority: client.payer.address,
+        freezeAuthority: client.payer.address
+      })
+    ]);
+
+    const [sourceToken] = await findAssociatedTokenPda({
+      mint: mint.address,
+      owner: client.payer.address,
+      tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
+    });
+
+    const [destinationAToken] = await findAssociatedTokenPda({
+      mint: mint.address,
+      owner: recipientA.address,
+      tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
+    });
+
+    const [destinationBToken] = await findAssociatedTokenPda({
+      mint: mint.address,
+      owner: recipientB.address,
+      tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
+    });
+
+    const [feeReceiverToken] = await findAssociatedTokenPda({
+      mint: mint.address,
+      owner: feeReceiver.address,
+      tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
+    });
+
+    await client.sendTransaction([
+      await getCreateAssociatedTokenInstructionAsync({
+        payer: client.payer,
+        mint: mint.address,
+        owner: client.payer.address
+      }),
+      await getCreateAssociatedTokenInstructionAsync({
+        payer: client.payer,
+        mint: mint.address,
+        owner: recipientA.address
+      }),
+      await getCreateAssociatedTokenInstructionAsync({
+        payer: client.payer,
+        mint: mint.address,
+        owner: recipientB.address
+      }),
+      await getCreateAssociatedTokenInstructionAsync({
+        payer: client.payer,
+        mint: mint.address,
+        owner: feeReceiver.address
+      }),
+      getMintToCheckedInstruction({
+        mint: mint.address,
+        token: sourceToken,
+        mintAuthority: client.payer,
+        amount: 1_000n,
+        decimals: 2
+      })
+    ]);
+
+    await client.sendTransaction([
+      getTransferCheckedWithFeeInstruction({
+        source: sourceToken,
+        mint: mint.address,
+        destination: destinationAToken,
+        authority: client.payer,
+        amount: 200n,
+        decimals: 2,
+        fee: 3n
+      })
+    ]);
+
+    await client.sendTransaction([
+      getTransferCheckedInstruction({
+        source: sourceToken,
+        mint: mint.address,
+        destination: destinationBToken,
+        authority: client.payer,
+        amount: 200n,
+        decimals: 2
+      })
+    ]);
+
+    await client.sendTransaction([
+      getWithdrawWithheldTokensFromAccountsInstruction({
+        mint: mint.address,
+        feeReceiver: feeReceiverToken,
+        withdrawWithheldAuthority: client.payer,
+        numTokenAccounts: 1,
+        sources: [destinationAToken]
+      })
+    ]);
+
+    await client.sendTransaction([
+      getHarvestWithheldTokensToMintInstruction({
+        mint: mint.address,
+        sources: [destinationBToken]
+      })
+    ]);
+    ```
+  </Step>
+
+  <Step title="Pidätettyjen maksujen nosto mintistä">
+    Käytä `WithdrawWithheldTokensFromMint`-toimintoa siirtääksesi kerätyt maksut
+    mint accountista maksun vastaanottajan token accountille.
+
+    ```ts Esimerkki focus={156-162} expandable
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+    const recipientA = await generateKeyPairSigner();
+    const recipientB = await generateKeyPairSigner();
+    const feeReceiver = await generateKeyPairSigner();
+
+    const transferFeeConfigExtension = extension("TransferFeeConfig", {
+      transferFeeConfigAuthority: client.payer.address,
+      withdrawWithheldAuthority: client.payer.address,
+      withheldAmount: 0n,
+      olderTransferFee: {
+        epoch: 0n,
+        maximumFee: 10n,
+        transferFeeBasisPoints: 150
+      },
+      newerTransferFee: {
+        epoch: 0n,
+        maximumFee: 10n,
+        transferFeeBasisPoints: 150
+      }
+    });
+
+    const mintSpace = BigInt(getMintSize([transferFeeConfigExtension]));
+
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
+
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializeTransferFeeConfigInstruction({
+        mint: mint.address,
+        transferFeeConfigAuthority: client.payer.address,
+        withdrawWithheldAuthority: client.payer.address,
+        transferFeeBasisPoints: 150,
+        maximumFee: 10n
+      }),
+      getInitializeMintInstruction({
+        mint: mint.address,
+        decimals: 2,
+        mintAuthority: client.payer.address,
+        freezeAuthority: client.payer.address
+      })
+    ]);
+
+    const [sourceToken] = await findAssociatedTokenPda({
+      mint: mint.address,
+      owner: client.payer.address,
+      tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
+    });
+
+    const [destinationAToken] = await findAssociatedTokenPda({
+      mint: mint.address,
+      owner: recipientA.address,
+      tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
+    });
+
+    const [destinationBToken] = await findAssociatedTokenPda({
+      mint: mint.address,
+      owner: recipientB.address,
+      tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
+    });
+
+    const [feeReceiverToken] = await findAssociatedTokenPda({
+      mint: mint.address,
+      owner: feeReceiver.address,
+      tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
+    });
+
+    await client.sendTransaction([
+      await getCreateAssociatedTokenInstructionAsync({
+        payer: client.payer,
+        mint: mint.address,
+        owner: client.payer.address
+      }),
+      await getCreateAssociatedTokenInstructionAsync({
+        payer: client.payer,
+        mint: mint.address,
+        owner: recipientA.address
+      }),
+      await getCreateAssociatedTokenInstructionAsync({
+        payer: client.payer,
+        mint: mint.address,
+        owner: recipientB.address
+      }),
+      await getCreateAssociatedTokenInstructionAsync({
+        payer: client.payer,
+        mint: mint.address,
+        owner: feeReceiver.address
+      }),
+      getMintToCheckedInstruction({
+        mint: mint.address,
+        token: sourceToken,
+        mintAuthority: client.payer,
+        amount: 1_000n,
+        decimals: 2
+      })
+    ]);
+
+    await client.sendTransaction([
+      getTransferCheckedWithFeeInstruction({
+        source: sourceToken,
+        mint: mint.address,
+        destination: destinationAToken,
+        authority: client.payer,
+        amount: 200n,
+        decimals: 2,
+        fee: 3n
+      })
+    ]);
+
+    await client.sendTransaction([
+      getTransferCheckedInstruction({
+        source: sourceToken,
+        mint: mint.address,
+        destination: destinationBToken,
+        authority: client.payer,
+        amount: 200n,
+        decimals: 2
+      })
+    ]);
+
+    await client.sendTransaction([
+      getWithdrawWithheldTokensFromAccountsInstruction({
+        mint: mint.address,
+        feeReceiver: feeReceiverToken,
+        withdrawWithheldAuthority: client.payer,
+        numTokenAccounts: 1,
+        sources: [destinationAToken]
+      })
+    ]);
+
+    await client.sendTransaction([
+      getHarvestWithheldTokensToMintInstruction({
+        mint: mint.address,
+        sources: [destinationBToken]
+      })
+    ]);
+
+    await client.sendTransaction([
+      getWithdrawWithheldTokensFromMintInstruction({
+        mint: mint.address,
+        feeReceiver: feeReceiverToken,
+        withdrawWithheldAuthority: client.payer
+      })
+    ]);
+    ```
+  </Step>
+
+  <Step title="Seuraavan siirtomaksun päivittäminen">
+    Käytä `SetTransferFee`-toimintoa päivittääksesi seuraavan siirtomaksun
+    asetukset.
+
+    ```ts Esimerkki focus={164-171} expandable
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+    const recipientA = await generateKeyPairSigner();
+    const recipientB = await generateKeyPairSigner();
+    const feeReceiver = await generateKeyPairSigner();
+
+    const transferFeeConfigExtension = extension("TransferFeeConfig", {
+      transferFeeConfigAuthority: client.payer.address,
+      withdrawWithheldAuthority: client.payer.address,
+      withheldAmount: 0n,
+      olderTransferFee: {
+        epoch: 0n,
+        maximumFee: 10n,
+        transferFeeBasisPoints: 150
+      },
+      newerTransferFee: {
+        epoch: 0n,
+        maximumFee: 10n,
+        transferFeeBasisPoints: 150
+      }
+    });
+
+    const mintSpace = BigInt(getMintSize([transferFeeConfigExtension]));
+
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(mintSpace)
+      .send();
+
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializeTransferFeeConfigInstruction({
+        mint: mint.address,
+        transferFeeConfigAuthority: client.payer.address,
+        withdrawWithheldAuthority: client.payer.address,
+        transferFeeBasisPoints: 150,
+        maximumFee: 10n
+      }),
+      getInitializeMintInstruction({
+        mint: mint.address,
+        decimals: 2,
+        mintAuthority: client.payer.address,
+        freezeAuthority: client.payer.address
+      })
+    ]);
+
+    const [sourceToken] = await findAssociatedTokenPda({
+      mint: mint.address,
+      owner: client.payer.address,
+      tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
+    });
+
+    const [destinationAToken] = await findAssociatedTokenPda({
+      mint: mint.address,
+      owner: recipientA.address,
+      tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
+    });
+
+    const [destinationBToken] = await findAssociatedTokenPda({
+      mint: mint.address,
+      owner: recipientB.address,
+      tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
+    });
+
+    const [feeReceiverToken] = await findAssociatedTokenPda({
+      mint: mint.address,
+      owner: feeReceiver.address,
+      tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
+    });
+
+    await client.sendTransaction([
+      await getCreateAssociatedTokenInstructionAsync({
+        payer: client.payer,
+        mint: mint.address,
+        owner: client.payer.address
+      }),
+      await getCreateAssociatedTokenInstructionAsync({
+        payer: client.payer,
+        mint: mint.address,
+        owner: recipientA.address
+      }),
+      await getCreateAssociatedTokenInstructionAsync({
+        payer: client.payer,
+        mint: mint.address,
+        owner: recipientB.address
+      }),
+      await getCreateAssociatedTokenInstructionAsync({
+        payer: client.payer,
+        mint: mint.address,
+        owner: feeReceiver.address
+      }),
+      getMintToCheckedInstruction({
+        mint: mint.address,
+        token: sourceToken,
+        mintAuthority: client.payer,
+        amount: 1_000n,
+        decimals: 2
+      })
+    ]);
+
+    await client.sendTransaction([
+      getTransferCheckedWithFeeInstruction({
+        source: sourceToken,
+        mint: mint.address,
+        destination: destinationAToken,
+        authority: client.payer,
+        amount: 200n,
+        decimals: 2,
+        fee: 3n
+      })
+    ]);
+
+    await client.sendTransaction([
+      getTransferCheckedInstruction({
+        source: sourceToken,
+        mint: mint.address,
+        destination: destinationBToken,
+        authority: client.payer,
+        amount: 200n,
+        decimals: 2
+      })
+    ]);
+
+    await client.sendTransaction([
+      getWithdrawWithheldTokensFromAccountsInstruction({
+        mint: mint.address,
+        feeReceiver: feeReceiverToken,
+        withdrawWithheldAuthority: client.payer,
+        numTokenAccounts: 1,
+        sources: [destinationAToken]
+      })
+    ]);
+
+    await client.sendTransaction([
+      getHarvestWithheldTokensToMintInstruction({
+        mint: mint.address,
+        sources: [destinationBToken]
+      })
+    ]);
+
+    await client.sendTransaction([
+      getWithdrawWithheldTokensFromMintInstruction({
+        mint: mint.address,
+        feeReceiver: feeReceiverToken,
+        withdrawWithheldAuthority: client.payer
+      })
+    ]);
+
+    await client.sendTransaction([
+      getSetTransferFeeInstruction({
+        mint: mint.address,
+        transferFeeConfigAuthority: client.payer,
+        transferFeeBasisPoints: 250,
+        maximumFee: 25n
+      })
+    ]);
+    ```
+  </Step>
+</Steps>
+
+<Info>
+  **Käskyjen järjestys**
+
+  `InitializeTransferFeeConfig` on suoritettava ennen `InitializeMint`.
+`CreateAccount`, `InitializeTransferFeeConfig` ja `InitializeMint`
   on sisällytettävä samaan transaktioon.
-</Callout>
+</Info>
 
 ### Lähdeviitteet
 
-| Kohde                                                            | Kuvaus                                                                                                                                                                                                                          | Lähde                                                                                                                                      |
-| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| _rs`TransferFeeConfig`_                                          | Mint-laajennus, joka tallentaa maksuviranomaiset, kertyneen pidätetyn summan sekä vanhemman ja uudemman siirtomaksukonfiguraation.                                                                                              | [Lähde](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/transfer_fee/mod.rs#L128-L145)         |
-| _rs`TransferFee`_                                                | Maksukonfiguraatiorakenne, joka tallennetaan _rs`TransferFeeConfig`_-laajennukseen ja määrittää epoch-ajankohdan, jolloin maksu tulee voimaan, enimmäismaksun ja maksun peruspisteissä.                                         | [Lähde](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/transfer_fee/mod.rs#L32-L40)           |
-| _rs`TransferFeeAmount`_                                          | Token account -laajennus, joka tallentaa siirtojen yhteydessä pidätetyn summan token-tilille.                                                                                                                                   | [Lähde](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/transfer_fee/mod.rs#L169-L177)         |
-| _rs`TransferFeeInstruction::InitializeTransferFeeConfig`_        | Käsky, joka alustaa siirtomaksuasetukset ennen _rs`InitializeMint`_-käskyä.                                                                                                                                                     | [Lähde](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/transfer_fee/instruction.rs#L24-L48)   |
-| _rs`TransferFeeInstruction::TransferCheckedWithFee`_             | Siirtokäsky, joka varmistaa, että käyttäjän toimittama maksu vastaa mintin nykyistä siirtomaksukonfiguraatiota.                                                                                                                 | [Lähde](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/transfer_fee/instruction.rs#L49-L80)   |
-| _rs`TransferFeeInstruction::WithdrawWithheldTokensFromAccounts`_ | Käsky, joka siirtää pidätetyt maksut suoraan token-tileiltä maksunvastaanottajan token-tilille, mintin `withdraw_withheld_authority`-käskyn allekirjoittamana.                                                                  | [Lähde](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/transfer_fee/instruction.rs#L99-L122)  |
-| _rs`TransferFeeInstruction::HarvestWithheldTokensToMint`_        | Lupavapaakäsky, joka siirtää pidätetyt maksut token-tileiltä mint-tilin pidätettyjen maksujen kerääjään.                                                                                                                        | [Lähde](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/transfer_fee/instruction.rs#L123-L134) |
-| _rs`TransferFeeInstruction::WithdrawWithheldTokensFromMint`_     | Käsky, joka nostaa mint-tilin pidätetyt maksut maksunvastaanottajan token-tilille, mintin `withdraw_withheld_authority`-käskyn allekirjoittamana.                                                                               | [Lähde](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/transfer_fee/instruction.rs#L81-L98)   |
-| _rs`TransferFeeInstruction::SetTransferFee`_                     | Käsky, joka päivittää uudemman siirtomaksukonfiguraation, joka tulee voimaan kahden epoch-ajanjakson kuluttua.                                                                                                                  | [Lähde](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/transfer_fee/instruction.rs#L135-L154) |
-| _rs`process_initialize_transfer_fee_config`_                     | Prosessorilogiikka, joka alustaa _rs`TransferFeeConfig`_-laajennuksen alustamattomalle mintille ja asettaa sekä vanhemman että uudemman siirtomaksukonfiguraation alkumaksuun.                                                  | [Lähde](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/extension/transfer_fee/processor.rs#L26-L58)       |
-| _rs`process_withdraw_withheld_tokens_from_accounts`_             | Prosessorilogiikka, joka validoi `withdraw_withheld_authority`-käskyn ja siirtää pidätetyt maksut token-tileiltä kohde-token-tilille.                                                                                           | [Lähde](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/extension/transfer_fee/processor.rs#L208-L278)     |
-| _rs`process_harvest_withheld_tokens_to_mint`_                    | Prosessorilogiikka, joka kerää pidätetyt maksut token-tileiltä mint-tilin pidätettyjen maksujen kerääjään.                                                                                                                      | [Lähde](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/extension/transfer_fee/processor.rs#L181-L206)     |
-| _rs`process_withdraw_withheld_tokens_from_mint`_                 | Prosessorilogiikka, joka validoi `withdraw_withheld_authority`-käskyn ja siirtää mint-tilin pidätetyn summan kohde-token-tilille.                                                                                               | [Lähde](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/extension/transfer_fee/processor.rs#L114-L158)     |
-| _rs`process_set_transfer_fee`_                                   | Prosessorilogiikka, joka validoi siirtomaksukonfiguraation viranomaisen ja päivittää uudemman siirtomaksukonfiguraation tulemaan voimaan kahden epoch-ajanjakson kuluttua.                                                      | [Lähde](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/extension/transfer_fee/processor.rs#L61-L112)      |
-| _rs`get_required_init_account_extensions`_                       | Käytetään token-tilin laajennusten automaattiseen lisäämiseen, kun token-tilejä alustetaan mintissä käytössä olevien laajennusten perusteella. _rs`TransferFeeConfig`_-minteille se lisää _rs`TransferFeeAmount`_-laajennuksen. | [Lähde](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/mod.rs#L1301-L1303)                    |
+| Kohde                                                        | Kuvaus                                                                                                                                                                                                                  | Lähde                                                                                                                                      |
+| ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `TransferFeeConfig`                                          | Mint-laajennus, joka tallentaa maksuviranomaiset, kertyneen pidätetyn summan sekä vanhemman ja uudemman siirtomaksukonfiguraation.                                                                                      | [Lähde](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/transfer_fee/mod.rs#L128-L145)         |
+| `TransferFee`                                                | Maksukonfiguraatiorakenne, joka tallennetaan `TransferFeeConfig`-laajennukseen ja määrittää epoch-ajankohdan, jolloin maksu tulee voimaan, enimmäismaksun ja maksun peruspisteissä.                                     | [Lähde](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/transfer_fee/mod.rs#L32-L40)           |
+| `TransferFeeAmount`                                          | Token account -laajennus, joka tallentaa siirtojen yhteydessä pidätetyn summan token-tilille.                                                                                                                           | [Lähde](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/transfer_fee/mod.rs#L169-L177)         |
+| `TransferFeeInstruction::InitializeTransferFeeConfig`        | Käsky, joka alustaa siirtomaksuasetukset ennen `InitializeMint`-käskyä.                                                                                                                                                 | [Lähde](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/transfer_fee/instruction.rs#L24-L48)   |
+| `TransferFeeInstruction::TransferCheckedWithFee`             | Siirtokäsky, joka varmistaa, että käyttäjän toimittama maksu vastaa mintin nykyistä siirtomaksukonfiguraatiota.                                                                                                         | [Lähde](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/transfer_fee/instruction.rs#L49-L80)   |
+| `TransferFeeInstruction::WithdrawWithheldTokensFromAccounts` | Käsky, joka siirtää pidätetyt maksut suoraan token-tileiltä maksunvastaanottajan token-tilille, mintin `withdraw_withheld_authority`-käskyn allekirjoittamana.                                                          | [Lähde](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/transfer_fee/instruction.rs#L99-L122)  |
+| `TransferFeeInstruction::HarvestWithheldTokensToMint`        | Lupavapaakäsky, joka siirtää pidätetyt maksut token-tileiltä mint-tilin pidätettyjen maksujen kerääjään.                                                                                                                | [Lähde](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/transfer_fee/instruction.rs#L123-L134) |
+| `TransferFeeInstruction::WithdrawWithheldTokensFromMint`     | Käsky, joka nostaa mint-tilin pidätetyt maksut maksunvastaanottajan token-tilille, mintin `withdraw_withheld_authority`-käskyn allekirjoittamana.                                                                       | [Lähde](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/transfer_fee/instruction.rs#L81-L98)   |
+| `TransferFeeInstruction::SetTransferFee`                     | Käsky, joka päivittää uudemman siirtomaksukonfiguraation, joka tulee voimaan kahden epoch-ajanjakson kuluttua.                                                                                                          | [Lähde](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/transfer_fee/instruction.rs#L135-L154) |
+| `process_initialize_transfer_fee_config`                     | Prosessorilogiikka, joka alustaa `TransferFeeConfig`-laajennuksen alustamattomalle mintille ja asettaa sekä vanhemman että uudemman siirtomaksukonfiguraation alkumaksuun.                                              | [Lähde](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/extension/transfer_fee/processor.rs#L26-L58)       |
+| `process_withdraw_withheld_tokens_from_accounts`             | Prosessorilogiikka, joka validoi `withdraw_withheld_authority`-käskyn ja siirtää pidätetyt maksut token-tileiltä kohde-token-tilille.                                                                                   | [Lähde](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/extension/transfer_fee/processor.rs#L208-L278)     |
+| `process_harvest_withheld_tokens_to_mint`                    | Prosessorilogiikka, joka kerää pidätetyt maksut token-tileiltä mint-tilin pidätettyjen maksujen kerääjään.                                                                                                              | [Lähde](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/extension/transfer_fee/processor.rs#L181-L206)     |
+| `process_withdraw_withheld_tokens_from_mint`                 | Prosessorilogiikka, joka validoi `withdraw_withheld_authority`-käskyn ja siirtää mint-tilin pidätetyn summan kohde-token-tilille.                                                                                       | [Lähde](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/extension/transfer_fee/processor.rs#L114-L158)     |
+| `process_set_transfer_fee`                                   | Prosessorilogiikka, joka validoi siirtomaksukonfiguraation viranomaisen ja päivittää uudemman siirtomaksukonfiguraation tulemaan voimaan kahden epoch-ajanjakson kuluttua.                                              | [Lähde](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/extension/transfer_fee/processor.rs#L61-L112)      |
+| `get_required_init_account_extensions`                       | Käytetään token-tilin laajennusten automaattiseen lisäämiseen, kun token-tilejä alustetaan mintissä käytössä olevien laajennusten perusteella. `TransferFeeConfig`-minteille se lisää `TransferFeeAmount`-laajennuksen. | [Lähde](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/mod.rs#L1301-L1303)                    |
 
 ### Typescript
 
@@ -1456,9 +1420,7 @@ on sisällytetty viitteeksi.
 
 #### Kit
 
-<CodeTabs storage="token-ts-kit" flags="r">
-
-```ts !! title="Instructions"
+```ts Instructions highlight={73-79,143-150,155-161,165-172,177-180,184-194}
 import {
   lamports,
   createClient,
@@ -1531,7 +1493,6 @@ await client.sendTransaction([
     space: mintSpace, // Account size in bytes for the mint plus TransferFeeConfig.
     programAddress: TOKEN_2022_PROGRAM_ADDRESS // Program that owns the mint account.
   }),
-  // !mark(1:7)
   getInitializeTransferFeeConfigInstruction({
     mint: mint.address, // Mint account that stores the TransferFeeConfig extension.
     transferFeeConfigAuthority: client.payer.address, // Authority allowed to update the transfer fee later.
@@ -1602,7 +1563,6 @@ await client.sendTransaction([
 ]);
 
 await client.sendTransaction([
-  // !mark(1:8)
   getTransferCheckedWithFeeInstruction({
     source: sourceToken, // Token account sending the transfer.
     mint: mint.address, // Mint with the transfer fee configuration.
@@ -1615,7 +1575,6 @@ await client.sendTransaction([
 ]);
 
 await client.sendTransaction([
-  // !mark(1:7)
   getWithdrawWithheldTokensFromAccountsInstruction({
     mint: mint.address, // Mint with the transfer fee configuration.
     feeReceiver: feeReceiverToken, // Token account receiving the withdrawn fees.
@@ -1626,7 +1585,6 @@ await client.sendTransaction([
 ]);
 
 await client.sendTransaction([
-  // !mark(1:8)
   getTransferCheckedWithFeeInstruction({
     source: sourceToken, // Token account sending the transfer.
     mint: mint.address, // Mint with the transfer fee configuration.
@@ -1639,7 +1597,6 @@ await client.sendTransaction([
 ]);
 
 await client.sendTransaction([
-  // !mark(1:4)
   getHarvestWithheldTokensToMintInstruction({
     mint: mint.address, // Mint that collects harvested withheld fees.
     sources: [destinationBToken] // Token accounts to harvest withheld fees from.
@@ -1647,13 +1604,11 @@ await client.sendTransaction([
 ]);
 
 await client.sendTransaction([
-  // !mark(1:5)
   getWithdrawWithheldTokensFromMintInstruction({
     mint: mint.address, // Mint storing harvested withheld fees.
     feeReceiver: feeReceiverToken, // Token account receiving withdrawn fees.
     withdrawWithheldAuthority: client.payer // Signer matching the mint's `withdraw_withheld_authority`.
   }),
-  // !mark(1:6)
   getSetTransferFeeInstruction({
     mint: mint.address, // Mint whose next transfer fee configuration is updated.
     transferFeeConfigAuthority: client.payer, // Signer authorized to update the transfer fee later.
@@ -1691,13 +1646,9 @@ console.dir(
 );
 ```
 
-</CodeTabs>
-
 #### Web3.js
 
-<CodeTabs storage="token-ts-legacy" flags="r">
-
-```ts !! title="Instructions"
+```ts Instructions highlight={94-101,166-176,185-192,201-211,220-224,233-247}
 import {
   Connection,
   Keypair,
@@ -1791,7 +1742,6 @@ await sendAndConfirmTransaction(
       space: mintLen, // Account size in bytes for the mint plus TransferFeeConfig.
       programId: TOKEN_2022_PROGRAM_ID // Program that owns the mint account.
     }),
-    // !mark(1:8)
     createInitializeTransferFeeConfigInstruction(
       mint.publicKey, // Mint account that stores the TransferFeeConfig extension.
       feePayer.publicKey, // Authority allowed to update the transfer fee later.
@@ -1864,7 +1814,6 @@ await sendAndConfirmTransaction(
 await sendAndConfirmTransaction(
   connection,
   new Transaction().add(
-    // !mark(1:11)
     createTransferCheckedWithFeeInstruction(
       sourceToken, // Token account sending the transfer.
       mint.publicKey, // Mint with the transfer fee configuration.
@@ -1884,7 +1833,6 @@ await sendAndConfirmTransaction(
 await sendAndConfirmTransaction(
   connection,
   new Transaction().add(
-    // !mark(1:8)
     createWithdrawWithheldTokensFromAccountsInstruction(
       mint.publicKey, // Mint with the transfer fee configuration.
       feeReceiverToken, // Token account receiving the withdrawn fees.
@@ -1901,7 +1849,6 @@ await sendAndConfirmTransaction(
 await sendAndConfirmTransaction(
   connection,
   new Transaction().add(
-    // !mark(1:11)
     createTransferCheckedWithFeeInstruction(
       sourceToken, // Token account sending the transfer.
       mint.publicKey, // Mint with the transfer fee configuration.
@@ -1921,7 +1868,6 @@ await sendAndConfirmTransaction(
 await sendAndConfirmTransaction(
   connection,
   new Transaction().add(
-    // !mark(1:5)
     createHarvestWithheldTokensToMintInstruction(
       mint.publicKey, // Mint that collects harvested withheld fees.
       [destinationBToken], // Token accounts to harvest withheld fees from.
@@ -1935,7 +1881,6 @@ await sendAndConfirmTransaction(
 await sendAndConfirmTransaction(
   connection,
   new Transaction().add(
-    // !mark(1:7)
     createWithdrawWithheldTokensFromMintInstruction(
       mint.publicKey, // Mint storing harvested withheld fees.
       feeReceiverToken, // Token account receiving withdrawn fees.
@@ -1943,7 +1888,6 @@ await sendAndConfirmTransaction(
       [], // Additional multisig signers.
       TOKEN_2022_PROGRAM_ID // Token program that processes the withdraw.
     ),
-    // !mark(1:8)
     createSetTransferFeeInstruction(
       mint.publicKey, // Mint whose next transfer fee configuration is updated.
       feePayer.publicKey, // Authority allowed to update the transfer fee later.
@@ -2001,13 +1945,9 @@ console.log(
 console.log("Transfer Fee Config:", getTransferFeeConfig(mintAccount));
 ```
 
-</CodeTabs>
-
 ### Rust
 
-<CodeTabs storage="token-rs" flags="r">
-
-```rust !! title="Rust"
+```rust Rust highlight={70-77,161-171,184-191,204-214,227-231,242-256}
 use anyhow::Result;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_commitment_config::CommitmentConfig;
@@ -2077,7 +2017,6 @@ async fn main() -> Result<()> {
                 mint_space as u64, // Account size in bytes for the mint plus TransferFeeConfig.
                 &TOKEN_2022_PROGRAM_ID, // Program that owns the mint account.
             ),
-            // !mark(1:8)
             initialize_transfer_fee_config(
                 &TOKEN_2022_PROGRAM_ID, // Token program that owns the mint.
                 &mint.pubkey(), // Mint account that stores the TransferFeeConfig extension.
@@ -2169,7 +2108,6 @@ async fn main() -> Result<()> {
     let first_transfer_blockhash = client.get_latest_blockhash().await?;
     let first_transfer_transaction = Transaction::new_signed_with_payer(
         &[
-            // !mark(1:11)
             transfer_checked_with_fee(
                 &TOKEN_2022_PROGRAM_ID, // Token program that processes the transfer.
                 &source_token_address, // Token account sending the transfer.
@@ -2193,7 +2131,6 @@ async fn main() -> Result<()> {
     let withdraw_accounts_blockhash = client.get_latest_blockhash().await?;
     let withdraw_accounts_transaction = Transaction::new_signed_with_payer(
         &[
-            // !mark(1:8)
             withdraw_withheld_tokens_from_accounts(
                 &TOKEN_2022_PROGRAM_ID, // Token program that processes the withdraw.
                 &mint.pubkey(), // Mint with the transfer fee configuration.
@@ -2214,7 +2151,6 @@ async fn main() -> Result<()> {
     let second_transfer_blockhash = client.get_latest_blockhash().await?;
     let second_transfer_transaction = Transaction::new_signed_with_payer(
         &[
-            // !mark(1:11)
             transfer_checked_with_fee(
                 &TOKEN_2022_PROGRAM_ID, // Token program that processes the transfer.
                 &source_token_address, // Token account sending the transfer.
@@ -2238,7 +2174,6 @@ async fn main() -> Result<()> {
     let harvest_blockhash = client.get_latest_blockhash().await?;
     let harvest_transaction = Transaction::new_signed_with_payer(
         &[
-            // !mark(1:5)
             harvest_withheld_tokens_to_mint(
                 &TOKEN_2022_PROGRAM_ID, // Token program that processes the harvest.
                 &mint.pubkey(), // Mint that collects harvested withheld fees.
@@ -2254,7 +2189,6 @@ async fn main() -> Result<()> {
     let finalize_blockhash = client.get_latest_blockhash().await?;
     let finalize_transaction = Transaction::new_signed_with_payer(
         &[
-            // !mark(1:7)
             withdraw_withheld_tokens_from_mint(
                 &TOKEN_2022_PROGRAM_ID, // Token program that processes the withdraw.
                 &mint.pubkey(), // Mint storing harvested withheld fees.
@@ -2262,7 +2196,6 @@ async fn main() -> Result<()> {
                 &fee_payer.pubkey(), // Signer matching the mint's `withdraw_withheld_authority`.
                 &[], // Additional multisig signers.
             )?,
-            // !mark(1:8)
             set_transfer_fee(
                 &TOKEN_2022_PROGRAM_ID, // Token program that owns the mint.
                 &mint.pubkey(), // Mint whose next transfer fee configuration is updated.
@@ -2311,5 +2244,3 @@ async fn main() -> Result<()> {
     Ok(())
 }
 ```
-
-</CodeTabs>

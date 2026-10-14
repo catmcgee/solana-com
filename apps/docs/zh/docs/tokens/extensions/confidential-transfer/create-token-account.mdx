@@ -10,7 +10,7 @@ description:
 
 下图展示了创建启用机密余额的 token account 所涉及的步骤：
 
-```mermaid title="Create Token Account with Confidential Balances"
+```mermaid
 sequenceDiagram
     participant Payer as Wallet
     participant ATA as Associated Token Program
@@ -45,6 +45,46 @@ sequenceDiagram
     Token22-->>TokenAccount: Configure Confidential Balances
     deactivate Token22
 ```
+
+<div className="nojs-only" data-fallback="mermaid">
+  ```text Mermaid
+  sequenceDiagram
+      participant Payer as Wallet
+      participant ATA as Associated Token Program
+      participant Token22 as Token Extensions Program
+      participant ZK as ZK ElGamal Proof Program
+      participant TokenAccount as Token Account
+
+      Payer->>ATA: create_associated_token_account()
+      activate ATA
+      ATA->>Token22: Create token account at deterministic address
+      deactivate ATA
+      activate Token22
+      Token22-->>TokenAccount: Initialize Token Account
+      deactivate Token22
+
+      Payer->>Token22: reallocate() for ConfidentialTransferAccount extension
+      activate Token22
+      Token22-->>TokenAccount: Add space for extension data
+      deactivate Token22
+
+      Payer->>Payer: Derive ElGamal keypair and AES key
+      Payer->>Payer: Generate pubkey validity proof
+      Payer->>Payer: Encrypt initial balance (0) with AES key
+
+      Payer->>ZK: VerifyPubkeyValidity into context state account
+      activate ZK
+      ZK-->>ZK: Verify proof and store result in context state account
+      deactivate ZK
+
+      Payer->>Token22: configure_account() referencing the proof context account
+      activate Token22
+      Token22-->>TokenAccount: Configure Confidential Balances
+      deactivate Token22
+  ```
+</div>
+
+<p className="sol-caption">Create Token Account with Confidential Balances</p>
 
 ### 机密余额 Token Account 状态
 
@@ -102,7 +142,7 @@ pub struct ConfidentialTransferAccount {
 }
 ```
 
-_rs`ConfidentialTransferAccount`_ 包含多个管理机密余额的字段：
+`ConfidentialTransferAccount` 包含多个管理机密余额的字段：
 
 - **approved**：账户的机密余额审批状态。如果 mint account 的 `auto_approve_new_accounts` 配置设为 `true`，所有 token account 将自动获得机密余额的使用批准。
 
@@ -123,18 +163,18 @@ _rs`ConfidentialTransferAccount`_ 包含多个管理机密余额的字段：
 - **pending_balance_credit_counter**：统计来自存款和转账指令的待处理余额入账次数。
 
 - **maximum_pending_balance_credit_counter**：在需要执行
-  _rs`ApplyPendingBalance`_
+  `ApplyPendingBalance`
   指令将待处理余额转换为可用余额之前，允许的待处理入账次数上限。
 
 - **expected_pending_balance_credit_counter**：上次处理
-  _rs`ApplyPendingBalance`_ 指令时，客户端通过 instruction data 提供的
+  `ApplyPendingBalance` 指令时，客户端通过 instruction data 提供的
   `pending_balance_credit_counter` 值。
 
 - **actual_pending_balance_credit_counter**：处理最后一条
-  _rs`ApplyPendingBalance`_ 指令时，token account 上的
+  `ApplyPendingBalance` 指令时，token account 上的
   `pending_balance_credit_counter` 值。
 
-<Callout type="info">
+<Info>
   **待处理余额与可用余额**
 
 机密余额分为待处理余额和可用余额，以防止 DoS 攻击。若没有这种分离，攻击者可以反复向 token
@@ -143,35 +183,35 @@ account 所有者转移代币。由于在提交交易和处理交易之间，加
 account 所有者将无法转移代币。
 
 所有存款和转账金额最初都会添加到待处理余额中。Token account 所有者必须使用
-_rs`ApplyPendingBalance`_
+`ApplyPendingBalance`
 指令将待处理余额转换为可用余额。incoming 转账或存款不会影响 token
 account 的可用余额。
 
-</Callout>
+</Info>
 
-<Callout type="info">
+<Info>
   **待处理余额高位/低位拆分**
 
 机密待处理余额被拆分为 `pending_balance_lo` 和
 `pending_balance_hi`，这是因为 ElGamal 解密对较大数值需要更多计算。您可以在[此处](https://github.com/solana-program/token-2022/blob/efd0c957fefbd79882d77df5fb2dac88c001249c/confidential-transfer/ciphertext-arithmetic/src/lib.rs#L54)找到密文算术实现，该实现在
-_rs`ApplyPendingBalance`_
+`ApplyPendingBalance`
 指令中的使用见[此处](https://github.com/solana-program/token-2022/blob/efd0c957fefbd79882d77df5fb2dac88c001249c/program/src/extension/confidential_transfer/processor.rs#L1180-L1184)。
 
-</Callout>
+</Info>
 
-<Callout type="info">
+<Info>
   **待处理余额信用计数器**
 
-调用 _rs`ApplyPendingBalance`_ 指令将待处理余额转换为可用余额时：
+调用 `ApplyPendingBalance` 指令将待处理余额转换为可用余额时：
 
 1. 客户端查询当前待处理余额和可用余额，对其总和进行加密，并提供一个使用 token
    account 所有者 AES 密钥加密的 `decryptable_available_balance`。
 
-2. 预期信用计数器和实际信用计数器用于追踪从创建 _rs`ApplyPendingBalance`_
+2. 预期信用计数器和实际信用计数器用于追踪从创建 `ApplyPendingBalance`
    指令到处理该指令期间计数器值的变化：
    - `expected_pending_balance_credit_counter`：客户端创建
-     _rs`ApplyPendingBalance`_ 指令时的 `pending_balance_credit_counter` 值
-   - `actual_pending_balance_credit_counter`：处理 _rs`ApplyPendingBalance`_
+     `ApplyPendingBalance` 指令时的 `pending_balance_credit_counter` 值
+   - `actual_pending_balance_credit_counter`：处理 `ApplyPendingBalance`
      指令时，token account 上的 `pending_balance_credit_counter` 值
 
 匹配的预期/实际计数器表明 `decryptable_available_balance` 与 `available_balance`
@@ -190,41 +230,41 @@ _rs`ApplyPendingBalance`_
    - 累加存款指令中的公开金额
    - 解密并累加转账指令中的目标密文金额
 
-</Callout>
+</Info>
 
 ### 所需指令
 
 为 token account 创建和配置机密余额需使用以下指令，这些指令均可在单笔交易中完成：
 
 1. **创建 Token Account**：调用 Associated Token Program 的
-   _rs`AssociatedTokenAccountInstruction::Create`_
+   `AssociatedTokenAccountInstruction::Create`
    指令，在其确定性地址处创建token account。
 
 2. **重新分配账户空间**：调用 Token Extension Program 的
-   _rs`TokenInstruction::Reallocate`_ 指令，为 _rs`ConfidentialTransferAccount`_
+   `TokenInstruction::Reallocate` 指令，为 `ConfidentialTransferAccount`
    状态添加所需空间。
 
 3. **验证 Pubkey 有效性证明**：创建一个由 ZK ElGamal
-   Proof 程序所有的账户，然后调用其 _rs`VerifyPubkeyValidity`_
+   Proof 程序所有的账户，然后调用其 `VerifyPubkeyValidity`
    指令以验证证明并将验证结果存储在该上下文状态账户中。
 
 4. **配置机密余额**：调用 Token Extension Program 的
    [ConfidentialTransferInstruction::ConfigureAccount](https://github.com/solana-program/token-2022/blob/efd0c957fefbd79882d77df5fb2dac88c001249c/program/src/extension/confidential_transfer/processor.rs#L201)
-   指令，通过 _rs`ProofLocation::ContextStateAccount`_ 引用证明上下文状态账户，以初始化
-   _rs`ConfidentialTransferAccount`_ 状态。
+   指令，通过 `ProofLocation::ContextStateAccount` 引用证明上下文状态账户，以初始化
+   `ConfidentialTransferAccount` 状态。
 
-<Callout type="info">
+<Info>
 
 **只有 token account 的所有者才能在 token account 上启用机密余额**。
 
-_rs`ConfigureAccount`_ 指令需要在客户端生成加密密钥和证明，而这些只能由 token account 所有者生成。
+`ConfigureAccount` 指令需要在客户端生成加密密钥和证明，而这些只能由 token account 所有者生成。
 
-pubkey 有效性证明用于验证账户的 ElGamal 公钥是否有效。它通过 _rs`build_pubkey_validity_proof_data`_ 生成，由链上 ZK ElGamal Proof 程序验证并存入上下文状态账户，然后通过 _rs`ProofLocation::ContextStateAccount`_ 从 _rs`ConfigureAccount`_ 中引用，因此代币指令本身不携带任何证明字节。如需了解实现细节，请参阅：
+pubkey 有效性证明用于验证账户的 ElGamal 公钥是否有效。它通过 `build_pubkey_validity_proof_data` 生成，由链上 ZK ElGamal Proof 程序验证并存入上下文状态账户，然后通过 `ProofLocation::ContextStateAccount` 从 `ConfigureAccount` 中引用，因此代币指令本身不携带任何证明字节。如需了解实现细节，请参阅：
 
 - [PubkeyValidityProofData](https://github.com/anza-xyz/agave/blob/b39a9764005ac8596b7e14e61d381305ce57ecaa/zk-sdk/src/zk_elgamal_proof_program/proof_data/pubkey_validity.rs#L58)
 - [PubkeyValidityProof](https://github.com/anza-xyz/agave/blob/b39a9764005ac8596b7e14e61d381305ce57ecaa/zk-sdk/src/sigma_proofs/pubkey_validity.rs#L65)
 
-</Callout>
+</Info>
 
 ## 示例代码
 
@@ -234,10 +274,9 @@ pubkey 有效性证明用于验证账户的 ElGamal 公钥是否有效。它通�
 
 ### Rust
 
-<CodeTabs>
+<CodeGroup>
 
-```rust !! title="main.rs"
-// !collapse(1:36) collapsed
+```rust main.rs expandable
 // Imports: dependencies used by this example.
 use anyhow::{Context, Result};
 use solana_address::Address;
@@ -395,7 +434,6 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-// !collapse(1:1000) collapsed
 // Setup: helper function to create the confidential mint.
 fn create_confidential_mint(rpc_client: &RpcClient, payer: &Keypair, decimals: u8) -> Result<Pubkey> {
     let mint = Keypair::new();
@@ -463,7 +501,7 @@ fn load_keypair() -> Result<Keypair> {
 }
 ```
 
-```toml !! title="Cargo.toml"
+```toml Cargo.toml
 [package]
 name = "confidential-transfer"
 version = "0.1.0"
@@ -495,14 +533,13 @@ dirs = "6.0.0"
 serde_json = "1.0"
 ```
 
-</CodeTabs>
+</CodeGroup>
 
 ### Typescript
 
-<CodeTabs>
+<CodeGroup>
 
-```ts !! title="index.ts"
-// !collapse(1:21) collapsed
+```ts index.ts expandable
 // Imports: dependencies used by this example.
 import {
   deriveAeKeyForOwnerMint,
@@ -579,7 +616,6 @@ console.log(
   `Enabled Confidential Balances on token account ${tokenAccount}: ${result.context.signature}`
 );
 
-// !collapse(1:1000) collapsed
 // Setup: helper function to create the confidential mint.
 async function createConfidentialMint(
   kitClient: typeof client,
@@ -614,7 +650,7 @@ async function createConfidentialMint(
 }
 ```
 
-```json !! title="package.json"
+```json package.json
 {
   "name": "confidential-account",
   "version": "0.1.0",
@@ -634,11 +670,11 @@ async function createConfidentialMint(
 }
 ```
 
-</CodeTabs>
+</CodeGroup>
 
-<Callout type="info">
+<Info>
   TypeScript 辅助函数位于 `@solana-program/token-2022/confidential`
   子路径中，并基于 `@solana/zk-sdk` 提供加密原语。`owner` 和 `client` 来自您的
   `@solana/kit` 配置；返回的指令计划 通过 `@solana/kit`
   的指令计划支持发送，当证明数据过大无法放入单笔交易时，将自动拆分到多笔交易中执行。
-</Callout>
+</Info>

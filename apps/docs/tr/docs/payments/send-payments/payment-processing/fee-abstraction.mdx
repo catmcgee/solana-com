@@ -27,87 +27,73 @@ Hem gönderen hem de sponsor işlemi imzalamalıdır:
 - **Gönderen**, token'larının transferini yetkilendirmek için imzalar
 - **Sponsor**, ağ ücretinin ödenmesini yetkilendirmek için imzalar
 
-<Callout>
+<Note>
   Temel ödeme kavramları için [Solana'da ödemeler nasıl
   çalışır](/docs/payments/how-payments-work) bölümüne bakın.
-</Callout>
+</Note>
 
 Aşağıdaki adımlar temel akışı gösterir. Tam çalıştırılabilir kod için
 [Demo](#demo) bölümüne bakın.
 
-<ScrollyCoding>
+<Steps>
+  <Step title="Sponsor hesabı oluştur">
+    İşlem ücretlerini ödeyecek sponsor için ayrı bir keypair oluşturun. Sponsor'un
+    ücretler için SOL'a ihtiyacı vardır ancak transfer edilen token'ları tutmasına
+    gerek yoktur.
 
-## !!steps Sponsor hesabı oluştur
+    ```ts title="İşlem ücretini sponsorla"
+    const sponsor = await generateKeyPairSigner();
+    ```
+  </Step>
 
-İşlem ücretlerini ödeyecek sponsor için ayrı bir keypair oluşturun. Sponsor'un
-ücretler için SOL'a ihtiyacı vardır ancak transfer edilen token'ları tutmasına
-gerek yoktur.
+  <Step title="Transfer talimatı oluştur">
+    Gönderen yetkili olarak token transfer talimatını oluşturun. Gönderen token'lara
+    sahiptir ve transferi imzalamalıdır.
 
-<CodePlaceholder title="İşlem ücretini sponsorla" />
+    ```ts title="Sponsor işlem ücreti" focus={3-10}
+    const sponsor = await generateKeyPairSigner();
 
-```ts !! title="Sponsor Transaction Fee"
-const sponsor = await generateKeyPairSigner();
-```
+    const transferInstruction = getTransferCheckedInstruction({
+      source: senderAta,
+      mint: mint.address,
+      destination: recipientAta,
+      authority: sender, // Sender signs for the transfer
+      amount: 250_000n, // adjusted for the mint's decimals
+      decimals: 6
+    });
+    ```
+  </Step>
 
-## !!steps Transfer talimatı oluştur
+  <Step title="Sponsor'u ücret ödeyici olarak kullanarak gönder">
+    Sponsoru ücret ödeyen olarak ayarlayarak `payer(sponsor)` aracılığıyla istemciyi
+    oluşturun, ardından `client.sendTransaction` işlevini çağırın. Sponsor, ağ
+    ücretini ödemek için imzalarken gönderen, transferi yetkilendirmek için
+    imzalar—`sendTransaction`, başvurulan tüm imzacıları otomatik olarak toplar.
 
-Gönderen yetkili olarak token transfer talimatını oluşturun. Gönderen token'lara
-sahiptir ve transferi imzalamalıdır.
+    ```ts title="Sponsor işlem ücreti" highlight={13} focus={12-16}
+    const sponsor = await generateKeyPairSigner();
 
-<CodePlaceholder title="Sponsor işlem ücreti" />
+    const transferInstruction = getTransferCheckedInstruction({
+      source: senderAta,
+      mint: mint.address,
+      destination: recipientAta,
+      authority: sender,
+      amount: 250_000n,
+      decimals: 6
+    });
 
-```ts !! title="Sponsor Transaction Fee"
-const sponsor = await generateKeyPairSigner();
+    const client = createClient()
+      .use(payer(sponsor)) // Sponsor pays the transaction fees
+      .use(solanaLocalRpc());
 
-// !focus(1:8)
-const transferInstruction = getTransferCheckedInstruction({
-  source: senderAta,
-  mint: mint.address,
-  destination: recipientAta,
-  authority: sender, // Sender signs for the transfer
-  amount: 250_000n, // adjusted for the mint's decimals
-  decimals: 6
-});
-```
-
-## !!steps Sponsor'u ücret ödeyici olarak kullanarak gönder
-
-Sponsoru ücret ödeyen olarak ayarlayarak `payer(sponsor)` aracılığıyla istemciyi
-oluşturun, ardından `client.sendTransaction` işlevini çağırın. Sponsor, ağ
-ücretini ödemek için imzalarken gönderen, transferi yetkilendirmek için
-imzalar—`sendTransaction`, başvurulan tüm imzacıları otomatik olarak toplar.
-
-<CodePlaceholder title="Sponsor işlem ücreti" />
-
-```ts !! title="Sponsor Transaction Fee"
-const sponsor = await generateKeyPairSigner();
-
-const transferInstruction = getTransferCheckedInstruction({
-  source: senderAta,
-  mint: mint.address,
-  destination: recipientAta,
-  authority: sender,
-  amount: 250_000n,
-  decimals: 6
-});
-
-// !focus(1:5)
-const client = createClient()
-  // !mark
-  .use(payer(sponsor)) // Sponsor pays the transaction fees
-  .use(solanaLocalRpc());
-
-const { context } = await client.sendTransaction([transferInstruction]);
-```
-
-</ScrollyCoding>
+    const { context } = await client.sendTransaction([transferInstruction]);
+    ```
+  </Step>
+</Steps>
 
 ### Demo
 
-<CodeTabs flags="r">
-
-```ts !! title="Demo"
-// !collapse(1:15) collapsed
+```ts Demo highlight={20,64} expandable
 // Click ">" icon on left to expand demo imports
 import { createClient, generateKeyPairSigner, lamports } from "@solana/kit";
 import type { KeyPairSigner } from "@solana/kit";
@@ -127,7 +113,6 @@ import {
 // Generate keypairs for sender, recipient, and sponsor (fee payer)
 const sender = await generateKeyPairSigner();
 const recipient = await generateKeyPairSigner();
-// !mark
 const sponsor = await generateKeyPairSigner();
 
 console.log("Sender Address:", sender.address);
@@ -172,7 +157,6 @@ const transferInstruction = getTransferCheckedInstruction({
 
 // Send transaction with sponsor as fee payer using @solana/kit
 // The sponsor (client.payer) pays fees; the sender signs for the transfer
-// !mark
 const { context } = await client.sendTransaction([transferInstruction]);
 const signature = context.signature;
 
@@ -206,7 +190,6 @@ console.log("Fee Payer Address:", feePayer);
 // =============================================================================
 // Demo Setup Helper Function
 // =============================================================================
-// !collapse(1:1000) collapsed
 
 /**
  * Sets up for a sponsored token transfer demo:
@@ -312,14 +295,12 @@ async function demoSetup(
 }
 ```
 
-</CodeTabs>
-
-<Callout type="caution">
+<Danger>
   Son kullanıcı için bir token account oluşturduğunuzda, kullanıcı bunu
   kapatabilir ve rent için kullanılan SOL'u geri alabilir. Hesap oluşturma için
   kullanıcılardan stablecoin cinsinden ücret almayı düşünün veya bu maliyeti
   ürün ekonominize dahil edin.
-</Callout>
+</Danger>
 
 ## Kora ile ölçekte ücret soyutlama
 
@@ -367,7 +348,7 @@ console.log("Signature:", context.signature);
 
 ### Kora kaynakları
 
-<Cards>
+<Columns cols={2}>
   <Card
     title="Kora Hızlı Başlangıç"
     href="/docs/tools/kora/getting-started/quick-start"
@@ -383,4 +364,4 @@ console.log("Signature:", context.signature);
   <Card title="Node Operatörü Kılavuzu" href="/docs/tools/kora/operators">
     Kendi Kora örneğinizi dağıtın ve yapılandırın.
   </Card>
-</Cards>
+</Columns>

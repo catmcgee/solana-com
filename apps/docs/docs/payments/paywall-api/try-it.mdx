@@ -1,0 +1,53 @@
+---
+title: "Call a paid API"
+description:
+  "Call a paywalled endpoint and follow the HTTP 402 flow: request, price,
+  payment, data. Every step shows the output of a real recorded run."
+---
+
+import Stepper from "/snippets/paths/en/paywall-api/stepper-1.mdx";
+import NextStep from "/snippets/paths/en/paywall-api/next-1.mdx";
+import Demo from "/snippets/paths/en/paywall-api/demo.mdx";
+import Wallet from "/snippets/concepts/en/wallet.mdx";
+import Transaction from "/snippets/concepts/en/transaction.mdx";
+
+<Stepper />
+
+Start as the client. The API below sells tomorrow's forecast for 0.01 USDC per
+request. The client is a script with its own wallet holding test USDC, so it
+can pay without a person approving each call.
+
+<Demo />
+
+What happened:
+
+- The first call got `402 Payment Required`. The body listed the price as
+  `10000` base units of USDC (USDC has 6 decimals, so that is 0.01 USDC), the
+  USDC mint address, the address to pay (`payTo`) and the network.
+- The client signed a USDC transfer for exactly that amount and sent the same
+  request again with the signed transfer in the `X-PAYMENT` header.
+- The server sent the transfer to the network, waited for it to confirm, and
+  answered `200` with the forecast. The network fee for that
+  <span className="sol-chip" data-concept="transaction"><Tooltip headline="Transactions" tip="A transaction is a signed request to change the shared ledger. It either fully happens or doesn't happen at all, and once confirmed anyone can look it up." cta="Learn more" href="/docs/core/transactions">transaction</Tooltip><span className="nojs-only"> ([Transactions](/docs/core/transactions): A transaction is a signed request to change the shared ledger. It either fully happens or doesn't happen at all, and once confirmed anyone can look it up.)</span></span> was
+  5,000 lamports (0.000005 SOL).
+- Sending the same `X-PAYMENT` header again got `402 payment already used`, so
+  one payment buys one response.
+- A client configured to pay at most 5,000 base units refused the 10,000 price
+  and signed nothing.
+
+The output comes from a run on a local Surfpool test network, so the addresses
+and signatures don't exist on public networks.
+
+<Wallet />
+
+<Transaction />
+
+## Why 402?
+
+HTTP has reserved status code 402 "Payment Required" since 1997, without
+defining how to pay. [x402](https://www.x402.org/) is an open protocol that
+fills that gap. The 402 response lists the payments the server accepts, and the
+client retries with a signed payment in a header. On Solana the network fee for
+that payment is a fraction of a cent, so a price of one cent still works.
+
+<NextStep />

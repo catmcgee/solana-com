@@ -77,6 +77,35 @@ sequenceDiagram
     Mainnet-->>Alice: Tokens released to Mainnet wallet
 ```
 
+<div className="nojs-only" data-fallback="mermaid">
+  ```text Mermaid
+  sequenceDiagram
+      participant Admin
+      participant Alice
+      participant Mainnet as Solana Mainnet
+      participant Channel as Private Channel Network
+
+      Note over Admin,Channel: SETUP (one time)
+      Admin->>Mainnet: CreateInstance
+      Admin->>Mainnet: AllowMint
+      Admin->>Mainnet: AddOperator
+
+      Note over Alice,Channel: DEPOSIT
+      Alice->>Mainnet: Deposit (tokens to escrow ATA)
+      Note over Channel: Indexer detects deposit event,<br/>credits Alice's channel balance
+
+      Note over Alice,Channel: OFF-CHAIN TRANSFERS
+      Alice->>Channel: SPL token transfer (via gateway)
+      Channel-->>Alice: Confirmed (~100 ms, no Mainnet fee)
+
+      Note over Alice,Mainnet: WITHDRAWAL
+      Alice->>Channel: WithdrawFunds (burns channel balance)
+      Note over Channel: Indexer detects burn (~1 s),<br/>operator submits ReleaseFunds
+      Channel->>Mainnet: ReleaseFunds (with SMT exclusion proof)
+      Mainnet-->>Alice: Tokens released to Mainnet wallet
+  ```
+</div>
+
 1. **Creación de instancia** - El administrador llama a `CreateInstance`, creando el PDA `Instance`
    y configurando los mints permitidos.
 2. **Depósito** - Los usuarios depositan tokens SPL en la custodia mediante la instrucción `Deposit`.
@@ -111,6 +140,26 @@ sequenceDiagram
     Note over Bob: Balance updated in channel state
 ```
 
+<div className="nojs-only" data-fallback="mermaid">
+  ```text Mermaid
+  sequenceDiagram
+      participant Alice
+      participant Bob
+      participant GW as Gateway
+      participant Pipeline as Write Node Pipeline
+      participant DB as Channel State
+
+      Alice->>GW: SPL token transfer to Bob
+      GW->>Pipeline: Route to write node
+
+      Note over Pipeline: 1. Dedup - reject duplicates and replays<br/>2. SigVerify - validate signatures<br/>3. Sequencer - order into conflict-free batch<br/>4. Executor - apply to off-chain account state<br/>5. Settler - commit to database, update blockhash
+
+      Pipeline->>DB: Commit updated balances
+      GW-->>Alice: Confirmed (off-chain, not recorded on Mainnet)
+      Note over Bob: Balance updated in channel state
+  ```
+</div>
+
 ### Retiro
 
 ```mermaid
@@ -132,6 +181,28 @@ sequenceDiagram
     Operator->>Mainnet: ReleaseFunds (SMT exclusion proof)
     Mainnet-->>Bob: Tokens transferred to Mainnet ATA
 ```
+
+<div className="nojs-only" data-fallback="mermaid">
+  ```text Mermaid
+  sequenceDiagram
+      participant Bob
+      participant Channel as Private Channel Network
+      participant Indexer as indexer-private-channel
+      participant Operator as operator-private-channel
+      participant Mainnet as Solana Mainnet
+
+      Bob->>Channel: WithdrawFunds (burns channel-side balance)
+      Channel-->>Bob: Burn confirmed off-chain
+
+      Note over Indexer: Polls gateway every 1 s
+      Indexer->>Channel: Detect burn event
+      Indexer->>Indexer: Write pending withdrawal to database
+
+      Operator->>Indexer: Pick up pending record
+      Operator->>Mainnet: ReleaseFunds (SMT exclusion proof)
+      Mainnet-->>Bob: Tokens transferred to Mainnet ATA
+  ```
+</div>
 
 ## Cuándo Usar Canales Privados
 

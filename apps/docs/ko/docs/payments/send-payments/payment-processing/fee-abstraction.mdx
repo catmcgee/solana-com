@@ -27,86 +27,72 @@ Solana 트랜잭션에는 네트워크 수수료를 지불하는 계정인 지�
 - **발신자**는 토큰 전송을 승인하기 위해 서명합니다
 - **후원자**는 네트워크 수수료 지불을 승인하기 위해 서명합니다
 
-<Callout>
+<Note>
   핵심 결제 개념은 [Solana에서 결제 작동
   방식](/docs/payments/how-payments-work)을 참조하세요.
-</Callout>
+</Note>
 
-아래 단계는 핵심 흐름을 보여줍니다. 완전히 실행 가능한 코드는 [데모](#demo)를
+아래 단계는 핵심 흐름을 보여줍니다. 완전히 실행 가능한 코드는 [데모](#데모)를
 참조하세요.
 
-<ScrollyCoding>
+<Steps>
+  <Step title="후원자 계정 생성">
+    트랜잭션 수수료를 지불할 후원자를 위한 별도의 키페어를 생성합니다. 후원자는
+    수수료를 위해 SOL이 필요하지만 전송되는 토큰을 보유할 필요는 없습니다.
 
-## !!steps 후원자 계정 생성
+    ```ts title="트랜잭션 수수료 후원"
+    const sponsor = await generateKeyPairSigner();
+    ```
+  </Step>
 
-트랜잭션 수수료를 지불할 후원자를 위한 별도의 키페어를 생성합니다. 후원자는
-수수료를 위해 SOL이 필요하지만 전송되는 토큰을 보유할 필요는 없습니다.
+  <Step title="전송 명령 생성">
+    발신자를 권한으로 하여 토큰 전송 명령을 생성합니다. 발신자는 토큰을 소유하며
+    전송에 서명해야 합니다.
 
-<CodePlaceholder title="트랜잭션 수수료 후원" />
+    ```ts title="스폰서 트랜잭션 수수료" focus={3-10}
+    const sponsor = await generateKeyPairSigner();
 
-```ts !! title="Sponsor Transaction Fee"
-const sponsor = await generateKeyPairSigner();
-```
+    const transferInstruction = getTransferCheckedInstruction({
+      source: senderAta,
+      mint: mint.address,
+      destination: recipientAta,
+      authority: sender, // Sender signs for the transfer
+      amount: 250_000n, // adjusted for the mint's decimals
+      decimals: 6
+    });
+    ```
+  </Step>
 
-## !!steps 전송 명령 생성
+  <Step title="스폰서를 수수료 지불자로 하여 전송하기">
+    `payer(sponsor)`를 통해 스폰서를 수수료 지불자로 설정하여 클라이언트를 생성한
+    후, `client.sendTransaction`를 호출하세요. 스폰서는 네트워크 수수료를 지불하기
+    위해 서명하고 발신자는 전송을 승인하기 위해 서명합니다—`sendTransaction`는
+    참조된 모든 서명자를 자동으로 수집합니다.
 
-발신자를 권한으로 하여 토큰 전송 명령을 생성합니다. 발신자는 토큰을 소유하며
-전송에 서명해야 합니다.
+    ```ts title="스폰서 트랜잭션 수수료" highlight={13} focus={12-16}
+    const sponsor = await generateKeyPairSigner();
 
-<CodePlaceholder title="스폰서 트랜잭션 수수료" />
+    const transferInstruction = getTransferCheckedInstruction({
+      source: senderAta,
+      mint: mint.address,
+      destination: recipientAta,
+      authority: sender,
+      amount: 250_000n,
+      decimals: 6
+    });
 
-```ts !! title="Sponsor Transaction Fee"
-const sponsor = await generateKeyPairSigner();
+    const client = createClient()
+      .use(payer(sponsor)) // Sponsor pays the transaction fees
+      .use(solanaLocalRpc());
 
-// !focus(1:8)
-const transferInstruction = getTransferCheckedInstruction({
-  source: senderAta,
-  mint: mint.address,
-  destination: recipientAta,
-  authority: sender, // Sender signs for the transfer
-  amount: 250_000n, // adjusted for the mint's decimals
-  decimals: 6
-});
-```
-
-## !!steps 스폰서를 수수료 지불자로 하여 전송하기
-
-`payer(sponsor)`를 통해 스폰서를 수수료 지불자로 설정하여 클라이언트를 생성한
-후, `client.sendTransaction`를 호출하세요. 스폰서는 네트워크 수수료를 지불하기
-위해 서명하고 발신자는 전송을 승인하기 위해 서명합니다—`sendTransaction`는
-참조된 모든 서명자를 자동으로 수집합니다.
-
-<CodePlaceholder title="스폰서 트랜잭션 수수료" />
-
-```ts !! title="Sponsor Transaction Fee"
-const sponsor = await generateKeyPairSigner();
-
-const transferInstruction = getTransferCheckedInstruction({
-  source: senderAta,
-  mint: mint.address,
-  destination: recipientAta,
-  authority: sender,
-  amount: 250_000n,
-  decimals: 6
-});
-
-// !focus(1:5)
-const client = createClient()
-  // !mark
-  .use(payer(sponsor)) // Sponsor pays the transaction fees
-  .use(solanaLocalRpc());
-
-const { context } = await client.sendTransaction([transferInstruction]);
-```
-
-</ScrollyCoding>
+    const { context } = await client.sendTransaction([transferInstruction]);
+    ```
+  </Step>
+</Steps>
 
 ### 데모
 
-<CodeTabs flags="r">
-
-```ts !! title="Demo"
-// !collapse(1:15) collapsed
+```ts Demo highlight={20,64} expandable
 // Click ">" icon on left to expand demo imports
 import { createClient, generateKeyPairSigner, lamports } from "@solana/kit";
 import type { KeyPairSigner } from "@solana/kit";
@@ -126,7 +112,6 @@ import {
 // Generate keypairs for sender, recipient, and sponsor (fee payer)
 const sender = await generateKeyPairSigner();
 const recipient = await generateKeyPairSigner();
-// !mark
 const sponsor = await generateKeyPairSigner();
 
 console.log("Sender Address:", sender.address);
@@ -171,7 +156,6 @@ const transferInstruction = getTransferCheckedInstruction({
 
 // Send transaction with sponsor as fee payer using @solana/kit
 // The sponsor (client.payer) pays fees; the sender signs for the transfer
-// !mark
 const { context } = await client.sendTransaction([transferInstruction]);
 const signature = context.signature;
 
@@ -205,7 +189,6 @@ console.log("Fee Payer Address:", feePayer);
 // =============================================================================
 // Demo Setup Helper Function
 // =============================================================================
-// !collapse(1:1000) collapsed
 
 /**
  * Sets up for a sponsored token transfer demo:
@@ -311,13 +294,11 @@ async function demoSetup(
 }
 ```
 
-</CodeTabs>
-
-<Callout type="caution">
+<Danger>
   최종 사용자를 위해 토큰 계정을 생성할 때, 사용자는 해당 계정을 닫고 rent에
   사용된 SOL을 회수할 수 있습니다. 스테이블코인으로 계정 생성 비용을 사용자에게
   청구하거나, 이 비용을 제품 경제 모델에 반영하는 것을 고려하세요.
-</Callout>
+</Danger>
 
 ## Kora를 통한 대규모 수수료 추상화
 
@@ -363,7 +344,7 @@ console.log("Signature:", context.signature);
 
 ### Kora 리소스
 
-<Cards>
+<Columns cols={2}>
   <Card
     title="Kora 빠른 시작"
     href="/docs/tools/kora/getting-started/quick-start"
@@ -379,4 +360,4 @@ console.log("Signature:", context.signature);
   <Card title="노드 운영자 가이드" href="/docs/tools/kora/operators">
     자체 Kora 인스턴스를 배포하고 구성하세요.
   </Card>
-</Cards>
+</Columns>

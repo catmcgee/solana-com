@@ -3,13 +3,13 @@ title: 개요
 description: Private Channels 프로토콜의 아키텍처 및 데이터 흐름
 ---
 
-<Callout type="warning">
+<Warning>
   Private Channels는 보안 감사를 받지 않았으며, 철저한 보안 검토 없이 실제 자금이 포함된 프로덕션 환경에서의 사용은 권장되지 않습니다.
-</Callout>
+</Warning>
 
-<Callout type="info">
+<Info>
   **인스턴스를 배포하시나요?** [운영자 가이드](/docs/tools/private-channels/operators)를 참조하세요. **기존 인스턴스에 통합하시나요?** [퀵스타트](/docs/tools/private-channels/quickstart/installation)를 참조하세요. 이 페이지는 두 대상 모두를 위한 아키텍처 참조 문서입니다.
-</Callout>
+</Info>
 
 ## 아키텍처
 
@@ -66,9 +66,9 @@ Streamer는 RPC를 폴링할 필요 없이 연결된 클라이언트에 채널 �
 - 연결: `ws://localhost:8902`
 - 헬스 엔드포인트: `GET /health` - 내부 폴링 루프가 30초 이상 중단되면 `503` 반환
 
-<Callout type="warning">
+<Warning>
   WebSocket 이벤트 스키마는 아직 공개적으로 문서화되지 않았습니다. 공식 문서가 제공될 때까지 구현 세부 사항은 [`core/src/bin/streamer.rs`](https://github.com/solana-foundation/solana-private-channels/blob/main/core/src/bin/streamer.rs)를 참조하세요.
-</Callout>
+</Warning>
 
 ```mermaid
 flowchart TB
@@ -110,6 +110,48 @@ flowchart TB
     PG_P --> ST
 ```
 
+<div className="nojs-only" data-fallback="mermaid">
+  ```text Mermaid
+  flowchart TB
+      Wallet([User Wallet])
+      Escrow[Escrow Program<br/><i>Solana Mainnet</i>]
+      IS[Solana Mainnet Indexer]
+      IC[Private Channel Indexer]
+      PG_I[(Indexer DB)]
+      OS[Operator - Solana Side]
+      OC[Operator - Channel Side]
+      GW[Gateway :8899]
+      WN[Write Node :8900]
+      WP[Withdraw Program]
+      PG_P[(Postgres Primary)]
+      PG_R[(Postgres Replica)]
+      RN[Read Node :8901]
+      ST[Streamer :8902]
+
+      Wallet -- deposit --> Escrow
+      Wallet -- transact / withdraw --> GW
+      ST -. WebSocket .-> Wallet
+
+      Escrow -- watch --> IS
+      IS -- deposit events --> PG_I
+      PG_I -- pending deposits --> OS
+      OS -- mint --> GW
+
+      GW -- sendTransaction --> WN
+      WN --> WP
+      GW -- watch --> IC
+      IC -- withdrawal events --> PG_I
+      PG_I -- pending withdrawals --> OC
+      OC -- release --> Escrow
+
+      WN -- settle --> PG_P
+      PG_P -- replication --> PG_R
+      PG_R --> RN
+      RN --> GW
+      PG_P --> ST
+  ```
+</div>
+
 ## 트랜잭션 파이프라인
 
 ```text
@@ -150,9 +192,9 @@ Gateway에 제출된 트랜잭션은 상태가 커밋되기 전에 5단계 파�
 
 ## 운영 키 보안
 
-<Callout type="warning">
+<Warning>
   오프체인 서비스는 위의 보안 모델에서 설명된 온체인 Admin/Operator 권한과 무관한 자체 서명자 체계를 사용합니다. `ADMIN_PRIVATE_KEY`는 모든 운영자 서비스에 필수이며 트랜잭션 수수료를 지불합니다. 선택적인 별도의 `OPERATOR_PRIVATE_KEY`는 `ReleaseFunds` 및 `ResetSmtRoot`에 대한 온체인 Operator 서명을 제공하며, 설정되지 않은 경우 `ADMIN_PRIVATE_KEY` 값으로 대체됩니다. 프로토콜 수준의 인스턴스 Admin 키(`CreateInstance` / `AddOperator` / `SetNewAdmin`에 사용)는 어느 변수에도 넣거나 런타임에 노출하지 마세요. 해당 키는 콜드 상태로 오프라인에 보관하세요.
-</Callout>
+</Warning>
 
 `ReleaseFunds`와 `ResetSmtRoot`는 두 개의 온체인 서명이 필요합니다: 수수료 납부자(`ADMIN_PRIVATE_KEY`에서)와 Operator PDA의 권한자(`OPERATOR_PRIVATE_KEY`에서, 또는 설정되지 않은 경우 `ADMIN_PRIVATE_KEY`). 이 배포 가이드의 devnet 워크스루에서는 생성된 operator keypair를 `ADMIN_PRIVATE_KEY`에 넣고 `OPERATOR_PRIVATE_KEY`는 설정하지 않으므로, 동일한 keypair가 두 서명자 역할을 모두 수행합니다. `ADMIN_PRIVATE_KEY`에 저장된 키는 핫 월릿 개인 키와 동일한 수준으로 관리하세요:
 
@@ -164,7 +206,7 @@ Gateway에 제출된 트랜잭션은 상태가 커밋되기 전에 5단계 파�
 
 ## 다음 단계
 
-<Cards>
+<Columns cols={2}>
   <Card
     title="퀵스타트"
     href="/docs/tools/private-channels/quickstart/installation"
@@ -186,4 +228,4 @@ Gateway에 제출된 트랜잭션은 상태가 커밋되기 전에 5단계 파�
   >
     모든 프로그램에 대한 전체 인스트럭션 참조 문서입니다.
   </Card>
-</Cards>
+</Columns>

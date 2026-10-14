@@ -10,7 +10,7 @@ Gizli Bakiyeler, token account'a ekstra durum bilgisi ekleyerek özel token tran
 
 Aşağıdaki diyagram, Gizli Bakiyeler etkinleştirilmiş bir token account oluşturmada yer alan adımları göstermektedir:
 
-```mermaid title="Create Token Account with Confidential Balances"
+```mermaid
 sequenceDiagram
     participant Payer as Wallet
     participant ATA as Associated Token Program
@@ -45,6 +45,46 @@ sequenceDiagram
     Token22-->>TokenAccount: Configure Confidential Balances
     deactivate Token22
 ```
+
+<div className="nojs-only" data-fallback="mermaid">
+  ```text Mermaid
+  sequenceDiagram
+      participant Payer as Wallet
+      participant ATA as Associated Token Program
+      participant Token22 as Token Extensions Program
+      participant ZK as ZK ElGamal Proof Program
+      participant TokenAccount as Token Account
+
+      Payer->>ATA: create_associated_token_account()
+      activate ATA
+      ATA->>Token22: Create token account at deterministic address
+      deactivate ATA
+      activate Token22
+      Token22-->>TokenAccount: Initialize Token Account
+      deactivate Token22
+
+      Payer->>Token22: reallocate() for ConfidentialTransferAccount extension
+      activate Token22
+      Token22-->>TokenAccount: Add space for extension data
+      deactivate Token22
+
+      Payer->>Payer: Derive ElGamal keypair and AES key
+      Payer->>Payer: Generate pubkey validity proof
+      Payer->>Payer: Encrypt initial balance (0) with AES key
+
+      Payer->>ZK: VerifyPubkeyValidity into context state account
+      activate ZK
+      ZK-->>ZK: Verify proof and store result in context state account
+      deactivate ZK
+
+      Payer->>Token22: configure_account() referencing the proof context account
+      activate Token22
+      Token22-->>TokenAccount: Configure Confidential Balances
+      deactivate Token22
+  ```
+</div>
+
+<p className="sol-caption">Create Token Account with Confidential Balances</p>
 
 ### Gizli Bakiyeler Token Account Durumu
 
@@ -102,7 +142,7 @@ pub struct ConfidentialTransferAccount {
 }
 ```
 
-_rs`ConfidentialTransferAccount`_, Gizli Bakiyeleri yöneten çeşitli alanlar içerir:
+`ConfidentialTransferAccount`, Gizli Bakiyeleri yöneten çeşitli alanlar içerir:
 
 - **approved**: Gizli Bakiyeler için hesabın onay durumu. Eğer mint account'un `auto_approve_new_accounts` yapılandırması `true` olarak ayarlanmışsa, tüm token account'lar Gizli Bakiyeler için otomatik olarak onaylanır.
 
@@ -130,18 +170,18 @@ _rs`ConfidentialTransferAccount`_, Gizli Bakiyeleri yöneten çeşitli alanlar i
   bekleyen bakiye kredilerini sayar.
 
 - **maximum_pending_balance_credit_counter**: Bekleyen bakiyeyi kullanılabilir
-  bakiyeye dönüştürmek için _rs`ApplyPendingBalance`_ talimatının gerekli
+  bakiyeye dönüştürmek için `ApplyPendingBalance` talimatının gerekli
   kılınmasından önce izin verilen bekleyen kredi sayısı sınırı.
 
-- **expected_pending_balance_credit_counter**: _rs`ApplyPendingBalance`_
+- **expected_pending_balance_credit_counter**: `ApplyPendingBalance`
   talimatının son işlendiği sırada istemci tarafından instruction data
   aracılığıyla sağlanan `pending_balance_credit_counter` değeri.
 
 - **actual_pending_balance_credit_counter**: token account üzerindeki
-  `pending_balance_credit_counter` değeri, son _rs`ApplyPendingBalance`_
+  `pending_balance_credit_counter` değeri, son `ApplyPendingBalance`
   talimatının işlendiği andaki değerdir.
 
-<Callout type="info">
+<Info>
   **Bekleyen ve Kullanılabilir Bakiye**
 
 Gizli bakiyeler, DoS saldırılarını önlemek amacıyla bekleyen ve kullanılabilir
@@ -153,41 +193,41 @@ yapamaz hale gelirdi ve bu durum işlemin başarısız olmasına yol açardı.
 
 Tüm yatırma ve transfer tutarları başlangıçta bekleyen bakiyeye eklenir. Token
 account sahipleri, bekleyen bakiyeyi kullanılabilir bakiyeye dönüştürmek için
-_rs`ApplyPendingBalance`_ talimatını kullanmalıdır. Gelen transferler veya
+`ApplyPendingBalance` talimatını kullanmalıdır. Gelen transferler veya
 yatırma işlemleri, token account'ın kullanılabilir bakiyesini etkilemez.
 
-</Callout>
+</Info>
 
-<Callout type="info">
+<Info>
   **Bekleyen Bakiye Yüksek/Düşük Bölünmesi**
 
 Gizli bekleyen bakiye, `pending_balance_lo` ve `pending_balance_hi` olarak ikiye
 ayrılır; bunun nedeni ElGamal şifre çözme işleminin büyük sayılar için daha
 fazla hesaplama gerektirmesidir. Şifreli metin aritmetik uygulamasını
 [burada](https://github.com/solana-program/token-2022/blob/efd0c957fefbd79882d77df5fb2dac88c001249c/confidential-transfer/ciphertext-arithmetic/src/lib.rs#L54)
-bulabilirsiniz; bu uygulama _rs`ApplyPendingBalance`_ talimatında
+bulabilirsiniz; bu uygulama `ApplyPendingBalance` talimatında
 [burada](https://github.com/solana-program/token-2022/blob/efd0c957fefbd79882d77df5fb2dac88c001249c/program/src/extension/confidential_transfer/processor.rs#L1180-L1184)
 kullanılmaktadır.
 
-</Callout>
+</Info>
 
-<Callout type="info">
+<Info>
   **Bekleyen Bakiye Kredi Sayaçları**
 
 Bekleyen bakiyeyi kullanılabilir bakiyeye dönüştürmek için
-_rs`ApplyPendingBalance`_ talimatı çağrıldığında:
+`ApplyPendingBalance` talimatı çağrıldığında:
 
 1. İstemci, mevcut bekleyen ve kullanılabilir bakiyeleri sorgular, toplamı
    şifreler ve token account sahibinin AES anahtarı kullanılarak şifrelenmiş bir
    `decryptable_available_balance` sağlar.
 
-2. Beklenen ve gerçek bekleyen kredi sayaçları, _rs`ApplyPendingBalance`_
+2. Beklenen ve gerçek bekleyen kredi sayaçları, `ApplyPendingBalance`
    talimatının oluşturulduğu an ile işlendiği an arasındaki sayaç değeri
    değişikliklerini izler:
    - `expected_pending_balance_credit_counter`: İstemcinin
-     _rs`ApplyPendingBalance`_ talimatını oluşturduğu andaki
+     `ApplyPendingBalance` talimatını oluşturduğu andaki
      `pending_balance_credit_counter` değeri
-   - `actual_pending_balance_credit_counter`: _rs`ApplyPendingBalance`_
+   - `actual_pending_balance_credit_counter`: `ApplyPendingBalance`
      talimatının işlendiği andaki token account üzerindeki
      `pending_balance_credit_counter` değeri
 
@@ -211,7 +251,7 @@ izleyin:
    - Para yatırma talimatlarından kamuya açık tutarları ekleyin
    - Transfer talimatlarından hedef şifreli metin tutarlarını çözümleyip ekleyin
 
-</Callout>
+</Info>
 
 ### Gerekli Talimatlar
 
@@ -219,34 +259,34 @@ Gizli Bakiyeler için bir token account oluşturmak ve yapılandırmak, tek bir 
 
 1. **Token Account'ı Oluşturun**: Belirleyici adresinde token account'ı
    oluşturmak için Associated Token Program'ın
-   _rs`AssociatedTokenAccountInstruction::Create`_ talimatını çağırın.
+   `AssociatedTokenAccountInstruction::Create` talimatını çağırın.
 
-2. **Hesap Alanını Yeniden Tahsis Edin**: _rs`ConfidentialTransferAccount`_
+2. **Hesap Alanını Yeniden Tahsis Edin**: `ConfidentialTransferAccount`
    durumu için alan eklemek amacıyla Token Extension Program'ın
-   _rs`TokenInstruction::Reallocate`_ talimatını çağırın.
+   `TokenInstruction::Reallocate` talimatını çağırın.
 
 3. **Pubkey Geçerlilik Kanıtını Doğrulayın**: ZK ElGamal Proof programına ait
    bir hesap oluşturun, ardından kanıtı doğrulamak ve doğrulanmış sonucu o
-   bağlam durum hesabında depolamak için _rs`VerifyPubkeyValidity`_ talimatını
+   bağlam durum hesabında depolamak için `VerifyPubkeyValidity` talimatını
    çağırın.
 
 4. **Gizli Bakiyeleri Yapılandır**: Token Extensions Program'ın
    [ConfidentialTransferInstruction::ConfigureAccount](https://github.com/solana-program/token-2022/blob/efd0c957fefbd79882d77df5fb2dac88c001249c/program/src/extension/confidential_transfer/processor.rs#L201)
-   talimatını çağırın; _rs`ConfidentialTransferAccount`_ durumunu başlatmak için
-   _rs`ProofLocation::ContextStateAccount`_ aracılığıyla kanıt bağlam durumu hesabına başvurun.
+   talimatını çağırın; `ConfidentialTransferAccount` durumunu başlatmak için
+   `ProofLocation::ContextStateAccount` aracılığıyla kanıt bağlam durumu hesabına başvurun.
 
-<Callout type="info">
+<Info>
 
 **Yalnızca token account sahibi, bir token account üzerinde Gizli Bakiyeleri etkinleştirebilir**.
 
-_rs`ConfigureAccount`_ talimatı, yalnızca token account sahibi tarafından oluşturulabilecek şifreleme anahtarlarının ve bir kanıtın istemci tarafında üretilmesini gerektirir.
+`ConfigureAccount` talimatı, yalnızca token account sahibi tarafından oluşturulabilecek şifreleme anahtarlarının ve bir kanıtın istemci tarafında üretilmesini gerektirir.
 
-Pubkey geçerlilik kanıtı, hesabın ElGamal pubkey'inin geçerli olduğunu doğrular. _rs`build_pubkey_validity_proof_data`_ ile oluşturulur, ZK ElGamal Proof programı tarafından zincir üzerinde bir bağlam durumu hesabına doğrulanır ve ardından _rs`ConfigureAccount`_ tarafından _rs`ProofLocation::ContextStateAccount`_ aracılığıyla referans alınır; böylece token talimatının kendisinde hiçbir kanıt baytı iletilmez. Uygulama ayrıntıları için bkz.:
+Pubkey geçerlilik kanıtı, hesabın ElGamal pubkey'inin geçerli olduğunu doğrular. `build_pubkey_validity_proof_data` ile oluşturulur, ZK ElGamal Proof programı tarafından zincir üzerinde bir bağlam durumu hesabına doğrulanır ve ardından `ConfigureAccount` tarafından `ProofLocation::ContextStateAccount` aracılığıyla referans alınır; böylece token talimatının kendisinde hiçbir kanıt baytı iletilmez. Uygulama ayrıntıları için bkz.:
 
 - [PubkeyValidityProofData](https://github.com/anza-xyz/agave/blob/b39a9764005ac8596b7e14e61d381305ce57ecaa/zk-sdk/src/zk_elgamal_proof_program/proof_data/pubkey_validity.rs#L58)
 - [PubkeyValidityProof](https://github.com/anza-xyz/agave/blob/b39a9764005ac8596b7e14e61d381305ce57ecaa/zk-sdk/src/sigma_proofs/pubkey_validity.rs#L65)
 
-</Callout>
+</Info>
 
 ## Örnek Kod
 
@@ -257,10 +297,9 @@ Gizli Bakiyeler, mainnet ve devnet üzerinde etkinleştirilen ZK ElGamal Proof p
 
 ### Rust
 
-<CodeTabs>
+<CodeGroup>
 
-```rust !! title="main.rs"
-// !collapse(1:36) collapsed
+```rust main.rs expandable
 // Imports: dependencies used by this example.
 use anyhow::{Context, Result};
 use solana_address::Address;
@@ -418,7 +457,6 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-// !collapse(1:1000) collapsed
 // Setup: helper function to create the confidential mint.
 fn create_confidential_mint(rpc_client: &RpcClient, payer: &Keypair, decimals: u8) -> Result<Pubkey> {
     let mint = Keypair::new();
@@ -486,7 +524,7 @@ fn load_keypair() -> Result<Keypair> {
 }
 ```
 
-```toml !! title="Cargo.toml"
+```toml Cargo.toml
 [package]
 name = "confidential-transfer"
 version = "0.1.0"
@@ -518,14 +556,13 @@ dirs = "6.0.0"
 serde_json = "1.0"
 ```
 
-</CodeTabs>
+</CodeGroup>
 
 ### Typescript
 
-<CodeTabs>
+<CodeGroup>
 
-```ts !! title="index.ts"
-// !collapse(1:21) collapsed
+```ts index.ts expandable
 // Imports: dependencies used by this example.
 import {
   deriveAeKeyForOwnerMint,
@@ -602,7 +639,6 @@ console.log(
   `Enabled Confidential Balances on token account ${tokenAccount}: ${result.context.signature}`
 );
 
-// !collapse(1:1000) collapsed
 // Setup: helper function to create the confidential mint.
 async function createConfidentialMint(
   kitClient: typeof client,
@@ -637,7 +673,7 @@ async function createConfidentialMint(
 }
 ```
 
-```json !! title="package.json"
+```json package.json
 {
   "name": "confidential-account",
   "version": "0.1.0",
@@ -657,13 +693,13 @@ async function createConfidentialMint(
 }
 ```
 
-</CodeTabs>
+</CodeGroup>
 
-<Callout type="info">
+<Info>
   TypeScript yardımcı araçları `@solana-program/token-2022/confidential` alt
   yolunda bulunur ve şifreleme ilkel öğeleri için `@solana/zk-sdk` üzerine inşa
   edilir. `owner` ve `client`, `@solana/kit` kurulumunuzdan gelir; döndürülen
   talimat planı, `@solana/kit`'nin talimat planı desteğiyle gönderilir ve
   kanıtlar tek bir işlem için çok büyük olduğunda çalışmayı işlemler arasında
   böler.
-</Callout>
+</Info>

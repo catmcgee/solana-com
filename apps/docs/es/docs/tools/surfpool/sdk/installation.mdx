@@ -18,7 +18,7 @@ Añade el crate como dependencia de desarrollo. El SDK es async por defecto y
 requiere un runtime de Tokio, así que incluye `tokio` con la característica
 `full` para los tests.
 
-```toml title="Cargo.toml"
+```toml Cargo.toml
 [dev-dependencies]
 surfpool-sdk = "1"
 tokio = { version = "1", features = ["full"] }
@@ -90,11 +90,13 @@ instalan automáticamente como `optionalDependencies`:
 | macOS Intel          | `x86_64-apple-darwin`      | `@solana/surfpool-darwin-x64`    |
 | Linux x86-64 (glibc) | `x86_64-unknown-linux-gnu` | `@solana/surfpool-linux-x64-gnu` |
 
-<Callout type="warn" title="Plataforma no compatible">
+<Warning>
+  **Plataforma no compatible**
+
   Si el paquete se instala en una plataforma sin un binario correspondiente, la
   instalación se completa pero `Surfnet.start()` lanzará un error en tiempo de
   ejecución. Abre un issue si necesitas un target adicional.
-</Callout>
+</Warning>
 
 ### Requisitos
 
@@ -109,59 +111,67 @@ instalan automáticamente como `optionalDependencies`:
 Una prueba de funcionamiento básico en una sola línea confirma que el entorno de
 ejecución se inicia y que el endpoint RPC acepta solicitudes.
 
-<CodeTabs storage="surfpool-lang">
+<Tabs>
+  <Tab title="Rust">
+    ```rust Rust
+    use surfpool_sdk::{Signer, Surfnet};
 
-```rust !! title="Rust"
-use surfpool_sdk::{Signer, Surfnet};
+    #[tokio::test]
+    async fn surfpool_sdk_smoke() {
+        let surfnet = Surfnet::start().await.expect("start surfnet");
+        let balance = surfnet
+            .rpc_client()
+            .get_balance(&surfnet.payer().pubkey())
+            .expect("get balance");
+        assert!(balance > 0);
+    }
+    ```
 
-#[tokio::test]
-async fn surfpool_sdk_smoke() {
-    let surfnet = Surfnet::start().await.expect("start surfnet");
-    let balance = surfnet
-        .rpc_client()
-        .get_balance(&surfnet.payer().pubkey())
-        .expect("get balance");
-    assert!(balance > 0);
-}
-```
+    Ejecutar con `cargo test --test smoke`.
+  </Tab>
 
-Ejecutar con `cargo test --test smoke`.
+  <Tab title="TypeScript">
+    ```ts TypeScript
+    import { after, test } from "node:test";
+    import assert from "node:assert/strict";
+    import { Surfnet } from "@solana/surfpool";
 
-```ts !! title="TypeScript"
-import { after, test } from "node:test";
-import assert from "node:assert/strict";
-import { Surfnet } from "@solana/surfpool";
+    const surfnet = Surfnet.start();
+    after(() => surfnet.stop());
 
-const surfnet = Surfnet.start();
-after(() => surfnet.stop());
+    test("surfpool sdk smoke", () => {
+      assert.match(surfnet.rpcUrl, /^http:\/\/127\.0\.0\.1:\d+$/);
+      assert.ok(surfnet.payer.length > 0);
+    });
+    ```
 
-test("surfpool sdk smoke", () => {
-  assert.match(surfnet.rpcUrl, /^http:\/\/127\.0\.0\.1:\d+$/);
-  assert.ok(surfnet.payer.length > 0);
-});
-```
-
-Ejecutar con `node --test smoke.test.ts` (con un cargador TS) o
-`tsx --test smoke.test.ts`.
-
-</CodeTabs>
+    Ejecutar con `node --test smoke.test.ts` (con un cargador TS) o
+    `tsx --test smoke.test.ts`.
+  </Tab>
+</Tabs>
 
 ## Solución de Problemas
 
-<Callout type="warn" title="`failed to bind to port` on Rust">
+<Warning>
+  **\`failed to bind to port\` on Rust**
+
   Otro proceso está ocupando `0.0.0.0` de forma agresiva. Vuelve a ejecutar la
   prueba — el SDK selecciona un nuevo puerto en cada llamada. Si el error
   persiste, comprueba si hay procesos `surfpool` huérfanos.
-</Callout>
+</Warning>
 
-<Callout type="warn" title="`Cannot find module '@solana/surfpool-...'`">
+<Warning>
+  **\`Cannot find module '@solana/surfpool-...'\`**
+
   La entrada `optionalDependencies` para tu plataforma no se instaló. Vuelve a
   ejecutar la instalación con `--include=optional`, o comprueba que tu
   plataforma aparece en la tabla de compatibilidad indicada anteriormente.
-</Callout>
+</Warning>
 
-<Callout type="warn" title="`stop()` hangs in JS">
+<Warning>
+  **\`stop()\` hangs in JS**
+
   Confirma que estás llamando a `stop()` una vez por `start()`. El wrapper de
   Node mantiene los servidores RPC y WebSocket enlazados hasta que `stop()`
   retorna.
-</Callout>
+</Warning>

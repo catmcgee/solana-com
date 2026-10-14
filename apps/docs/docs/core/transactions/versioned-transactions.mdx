@@ -4,7 +4,6 @@ description:
   Legacy, v0, and v1 transaction formats on Solana, including Address Lookup
   Tables (ALTs), version detection, the v1 transaction config, and resource
   limits.
-url: /docs/core/transactions/versioned-transactions
 type: conceptual
 prerequisites:
   - /docs/core/transactions
@@ -14,23 +13,32 @@ related:
   - /docs/core/accounts/account-types
 ---
 
-<Callout type="info" title="Summary">
+import VersionedTransactionAlt from "/snippets/examples/cookbook/transactions/versioned-transaction-alt/versioned-transaction-alt.mdx";
+import V1TransactionsBuild from "/snippets/examples/cookbook/transactions/v1-transactions/build.mdx";
+import V1TransactionsEstimate from "/snippets/examples/cookbook/transactions/v1-transactions/estimate.mdx";
+import V1TransactionsRead from "/snippets/examples/cookbook/transactions/v1-transactions/read.mdx";
+
+<Info>
+  **Summary**
+
   Solana has three transaction formats: legacy, v0, and v1. **v0** adds Address
   Lookup Tables (ALTs) for referencing accounts via 1-byte indices. **v1**
   raises the size limit to 4,096 bytes, moves resource limits into the message
   itself, and removes ALTs.
-</Callout>
+</Info>
 
 Solana supports three transaction formats: **legacy**, **v0**, and **v1**. Each
 one is described below with the same three parts: how it lays out its bytes on
 the wire, how it references accounts, and where its resource limits come from.
 
-<Callout type="warn" title="v1 activation status">
+<Warning>
+  **v1 activation status**
+
   The [v1 format](https://solana.com/upgrades/larger-transaction-sizes) is
   active on mainnet, devnet, and testnet. Reading transactions is a breaking
   change: clients that do not opt in fail on v1 transactions. Existing apps
   should review [preparing for v1](#preparing-for-v1).
-</Callout>
+</Warning>
 
 ## Format comparison
 
@@ -127,21 +135,19 @@ keys to form the complete account keys list. ALT-resolved accounts follow the
 same ordering as static accounts: writable lookups come before read-only
 lookups.
 
-<Callout>
+<Note>
   Address lookup tables only affect how accounts are referenced in the on-wire
   transaction. At execution time, the runtime resolves all indices to full
   account addresses. ALT-resolved accounts can only be writable or read-only
   (non-signer); they cannot be signers.
-</Callout>
+</Note>
 
 ### Create and use an address lookup table
 
 This example creates a lookup table, adds an address, and uses the table to
 compile and send a v0 transaction.
 
-```ts !! title="Versioned transaction with an ALT" file=packages/docs-examples/cookbook/transactions/versioned-transaction-alt/legacy.ts#region=versioned-transaction-alt
-
-```
+<VersionedTransactionAlt />
 
 Only non-signer accounts can be loaded from a lookup table. The fee payer and
 every required signer remain in the message's static account list. An address
@@ -206,13 +212,15 @@ whose bit is set:
 Unknown bits are rejected. Because the message is signed, unrecognized config
 fields cannot be silently dropped.
 
-<Callout type="warn" title="Priority fee is total lamports, not a price">
+<Warning>
+  **Priority fee is total lamports, not a price**
+
   In legacy and v0, the priority fee is set via `SetComputeUnitPrice` as
   **micro-lamports per compute unit**, multiplied by the compute unit limit. In
   v1 it is an **absolute total in lamports** — no multiplication, no rounding.
   Do not carry the per-CU arithmetic across. The total fee formula is otherwise
   unchanged: `(signatures × lamports_per_signature) + priority_fee`.
-</Callout>
+</Warning>
 
 #### ComputeBudget instructions are no-ops in v1
 
@@ -247,13 +255,7 @@ A v1 message is assembled through the same pipeline as a legacy or v0 one. The
 difference is `setTransactionMessageConfig`: the resource limits are a property
 of the message, so the instruction list holds only the program instructions.
 
-<CodeTabs storage="cookbook" flags="r">
-
-```ts !! title="Kit" file=packages/docs-examples/cookbook/transactions/v1-transactions/kit.ts#region=build
-
-```
-
-</CodeTabs>
+<V1TransactionsBuild />
 
 Kit also exposes a setter per config field —
 `setTransactionMessagePriorityFeeLamports`,
@@ -268,13 +270,7 @@ with both limits raised to the runtime maximum, so it cannot fail for want of
 the resources it is measuring. The returned figure is the exact cost of one
 simulated run, so add a margin before relying on it.
 
-<CodeTabs storage="cookbook" flags="r">
-
-```ts !! title="Kit" file=packages/docs-examples/cookbook/transactions/v1-transactions/estimate-kit.ts#region=estimate
-
-```
-
-</CodeTabs>
+<V1TransactionsEstimate />
 
 ## Preparing for v1
 
@@ -311,13 +307,7 @@ Opting in takes the JSON integer `1`. Decoding the returned bytes gives the
 version and the config, which is where the resource limits live — scanning the
 instruction list for ComputeBudget instructions finds nothing.
 
-<CodeTabs storage="cookbook" flags="r">
-
-```ts !! title="Kit" file=packages/docs-examples/cookbook/transactions/v1-transactions/kit.ts#region=read
-
-```
-
-</CodeTabs>
+<V1TransactionsRead />
 
 For the full migration guide — including client library support, streaming
 (Geyser/gRPC) version detection, and simulation behavior — see the

@@ -14,10 +14,10 @@ Một khoản thanh toán chuyển stablecoin từ token account của người 
 account của người nhận. Nếu người nhận đang nhận token này lần đầu tiên, token
 account của họ có thể được tạo như một phần của cùng giao dịch đó.
 
-<Callout>
+<Note>
   Xem [How Payments Work on Solana](/docs/payments/how-payments-work) để hiểu
   các khái niệm thanh toán cốt lõi.
-</Callout>
+</Note>
 
 Plugin `token2022Program()` từ `@solana-program/token-2022` mở rộng client
 [`@solana/kit`](/docs/frontend/client) của bạn với helper `client.token2022`.
@@ -27,111 +27,97 @@ giao dịch, rất lý tưởng cho các lần chuyển thanh toán đơn lẻ.
 Các bước dưới đây cho thấy luồng cốt lõi. Xem [Demo](#demo) để có mã hoàn chỉnh
 có thể chạy được.
 
-<ScrollyCoding>
+<Steps>
+  <Step title="Tạo Token Helper">
+    Thêm plugin `token2022Program()` vào client của bạn bằng
+    `.use(token2022Program())`. Thao tác này sẽ hiển thị `client.token2022`, trong
+    đó `instructions` cung cấp các phương thức cho các thao tác token thông dụng.
 
-## !!steps Tạo Token Helper
+    Sử dụng `token2022Program()` cho các mint thuộc sở hữu của chương trình
+    Token-2022, hoặc `tokenProgram()` từ `@solana-program/token` cho các mint thuộc
+    sở hữu của Token Program gốc.
 
-Thêm plugin `token2022Program()` vào client của bạn bằng
-`.use(token2022Program())`. Thao tác này sẽ hiển thị `client.token2022`, trong
-đó `instructions` cung cấp các phương thức cho các thao tác token thông dụng.
+    ```ts title="Thanh toán cơ bản" focus={1-4}
+    const client = createClient()
+      .use(signer(sender))
+      .use(solanaLocalRpc())
+      .use(token2022Program());
+    ```
+  </Step>
 
-Sử dụng `token2022Program()` cho các mint thuộc sở hữu của chương trình
-Token-2022, hoặc `tokenProgram()` từ `@solana-program/token` cho các mint thuộc
-sở hữu của Token Program gốc.
+  <Step title="Gửi thanh toán">
+    Sử dụng `transferToATA()` để chuyển token giữa các ví. Phương thức này xử lý:
 
-<CodePlaceholder title="Thanh toán cơ bản" />
+    - **Phân giải ATA**: Tự động dẫn xuất Associated Token Accounts (ATAs) cho người
+      gửi và người nhận. Nếu ATA của người nhận chưa tồn tại, lệnh tạo tài khoản sẽ
+      tự động được thêm vào cùng giao dịch đó.
+    - **Số tiền đã kiểm tra**: Truyền `amount` theo đơn vị cơ sở cùng với `decimals`
+      của mint. Lượng chuyển được kiểm tra so với số thập phân của mint trên chuỗi
+      (ví dụ: 250000 đơn vị cơ sở -> 0.25 token, nếu mint có 6 chữ số thập phân)
+    - **Xây dựng giao dịch**: `sendTransaction()` xây dựng, ký và gửi giao dịch,
+      phân giải thành một kết quả mà `context.signature` của nó chứa chữ ký giao
+      dịch
 
-```ts !! title="Basic Payment"
-// !focus(1:4)
-const client = createClient()
-  .use(signer(sender))
-  .use(solanaLocalRpc())
-  .use(token2022Program());
-```
+    ```ts title="Basic Payment" focus={6-14}
+    const client = createClient()
+      .use(signer(sender))
+      .use(solanaLocalRpc())
+      .use(token2022Program());
 
-## !!steps Gửi thanh toán
+    const result = await client.token2022.instructions
+      .transferToATA({
+        mint: mint.address,
+        authority: sender,
+        recipient: recipient.address,
+        amount: 250_000n,
+        decimals: 6
+      })
+      .sendTransaction();
+    ```
+  </Step>
 
-Sử dụng `transferToATA()` để chuyển token giữa các ví. Phương thức này xử lý:
+  <Step title="Xác minh số dư">
+    Sau khi quá trình chuyển hoàn tất, hãy đọc số dư token từ RPC. Dẫn xuất ATA của
+    mỗi ví bằng `findAssociatedTokenPda()`, sau đó gọi `getTokenAccountBalance()` để
+    lấy số dư cho tài khoản đó.
 
-- **Phân giải ATA**: Tự động dẫn xuất Associated Token Accounts (ATAs) cho người
-  gửi và người nhận. Nếu ATA của người nhận chưa tồn tại, lệnh tạo tài khoản sẽ
-  tự động được thêm vào cùng giao dịch đó.
-- **Số tiền đã kiểm tra**: Truyền `amount` theo đơn vị cơ sở cùng với `decimals`
-  của mint. Lượng chuyển được kiểm tra so với số thập phân của mint trên chuỗi
-  (ví dụ: 250000 đơn vị cơ sở -> 0.25 token, nếu mint có 6 chữ số thập phân)
-- **Xây dựng giao dịch**: `sendTransaction()` xây dựng, ký và gửi giao dịch,
-  phân giải thành một kết quả mà `context.signature` của nó chứa chữ ký giao
-  dịch
+    ```ts title="Basic Payment" focus={16-29}
+    const client = createClient()
+      .use(signer(sender))
+      .use(solanaLocalRpc())
+      .use(token2022Program());
 
-<CodePlaceholder title="Basic Payment" />
+    const result = await client.token2022.instructions
+      .transferToATA({
+        mint: mint.address,
+        authority: sender,
+        recipient: recipient.address,
+        amount: 250_000n,
+        decimals: 6
+      })
+      .sendTransaction();
 
-```ts !! title="Basic Payment"
-const client = createClient()
-  .use(signer(sender))
-  .use(solanaLocalRpc())
-  .use(token2022Program());
-
-// !focus(1:9)
-const result = await client.token2022.instructions
-  .transferToATA({
-    mint: mint.address,
-    authority: sender,
-    recipient: recipient.address,
-    amount: 250_000n,
-    decimals: 6
-  })
-  .sendTransaction();
-```
-
-## !!steps Xác minh số dư
-
-Sau khi quá trình chuyển hoàn tất, hãy đọc số dư token từ RPC. Dẫn xuất ATA của
-mỗi ví bằng `findAssociatedTokenPda()`, sau đó gọi `getTokenAccountBalance()` để
-lấy số dư cho tài khoản đó.
-
-<CodePlaceholder title="Basic Payment" />
-
-```ts !! title="Basic Payment"
-const client = createClient()
-  .use(signer(sender))
-  .use(solanaLocalRpc())
-  .use(token2022Program());
-
-const result = await client.token2022.instructions
-  .transferToATA({
-    mint: mint.address,
-    authority: sender,
-    recipient: recipient.address,
-    amount: 250_000n,
-    decimals: 6
-  })
-  .sendTransaction();
-
-// !focus(1:14)
-const [senderAta] = await findAssociatedTokenPda({
-  mint: mint.address,
-  owner: sender.address,
-  tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
-});
-const [recipientAta] = await findAssociatedTokenPda({
-  mint: mint.address,
-  owner: recipient.address,
-  tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
-});
-const senderBalance = await client.rpc.getTokenAccountBalance(senderAta).send();
-const recipientBalance = await client.rpc
-  .getTokenAccountBalance(recipientAta)
-  .send();
-```
-
-</ScrollyCoding>
+    const [senderAta] = await findAssociatedTokenPda({
+      mint: mint.address,
+      owner: sender.address,
+      tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
+    });
+    const [recipientAta] = await findAssociatedTokenPda({
+      mint: mint.address,
+      owner: recipient.address,
+      tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
+    });
+    const senderBalance = await client.rpc.getTokenAccountBalance(senderAta).send();
+    const recipientBalance = await client.rpc
+      .getTokenAccountBalance(recipientAta)
+      .send();
+    ```
+  </Step>
+</Steps>
 
 ### Demo
 
-<CodeTabs flags="r">
-
-```ts !! title="Demo"
-// !collapse(1:14) collapsed
+```ts Demo highlight={34-42} expandable
 // Click ">" icon on left to expand demo imports
 import {
   createClient,
@@ -165,7 +151,6 @@ console.log("\nMint Address:", mint.address);
 
 // Transfer tokens from sender to recipient. The source and destination ATAs are
 // derived automatically, and the recipient's ATA is created if it does not exist.
-// !mark(1:9)
 const result = await client.token2022.instructions
   .transferToATA({
     mint: mint.address,
@@ -208,7 +193,6 @@ console.log(
 // =============================================================================
 // Demo Setup Helper Function
 // =============================================================================
-// !collapse(1:1000) collapsed
 
 /**
  * Sets up for a token transfer demo:
@@ -262,5 +246,3 @@ async function demoSetup(sender: TransactionSigner) {
   };
 }
 ```
-
-</CodeTabs>

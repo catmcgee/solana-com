@@ -13,16 +13,25 @@ export const MEDIA_APP_URL =
     ? vercelMediaUrl
     : developmentMediaUrl);
 
-// Docs app URLs
-const vercelDocsUrl = withRelatedProject({
-  projectName: "solana-com-docs",
-  defaultHost: "https://solana-com-docs.vercel.app",
-});
-const developmentDocsUrl = "http://localhost:3003";
+// Docs: hosted by Mintlify (decisions.md). The retired `solana-com-docs`
+// Vercel project is no longer a rewrite target.
+//
+// Mintlify is root-hosted on its free Hobby plan, so Mintlify file paths equal
+// public paths and only the origin changes between environments. Override with
+// MINTLIFY_ORIGIN (e.g. a branch preview, or `http://localhost:3003` for
+// `pnpm --filter @workspace/docs-tooling mint:dev`).
+//
+// NOTE: to self-host later, upgrade to Mintlify Enterprise and deploy its
+// static export to a Vercel project, then change ONLY this origin. See the
+// MINTLIFY block in rewrites-redirects.ts for the full recommendation.
+const defaultMintlifyOrigin = "https://solana.mintlify.site";
 
-export const DOCS_APP_URL =
-  process.env.NEXT_PUBLIC_DOCS_APP_URL ||
-  (process.env.NODE_ENV === "production" ? vercelDocsUrl : developmentDocsUrl);
+export const MINTLIFY_ORIGIN = (
+  process.env.MINTLIFY_ORIGIN || defaultMintlifyOrigin
+).replace(/\/+$/, "");
+
+/** @deprecated The docs app is Mintlify now; use MINTLIFY_ORIGIN. */
+export const DOCS_APP_URL = MINTLIFY_ORIGIN;
 
 // Templates app URLs
 const vercelTemplatesUrl = withRelatedProject({
@@ -64,7 +73,7 @@ export const BREAKPOINT_APP_URL =
     : developmentBreakpointUrl);
 
 console.log("MEDIA_APP_URL", MEDIA_APP_URL);
-console.log("DOCS_APP_URL", DOCS_APP_URL);
+console.log("MINTLIFY_ORIGIN", MINTLIFY_ORIGIN);
 console.log("templatesAppUrl", templatesAppUrl);
 console.log("ACCELERATE_APP_URL", ACCELERATE_APP_URL);
 console.log("BREAKPOINT_APP_URL", BREAKPOINT_APP_URL);

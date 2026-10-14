@@ -12,12 +12,12 @@ description:
   Program 会拒绝账户与预期铸币地址不匹配的转账，因此误转代币的操作会失败，且不会造成资金损失。本页面大部分内容涵盖 SPL 代币的发送。
 - **原生 SOL** 没有此类保护机制。System
   Program 的转账可以成功进入任何账户，因此发送给错误接收方会永久锁定 SOL。请参阅
-  [发送原生 SOL](#sending-native-sol)。
+  [发送原生 SOL](#发送原生-sol)。
 
-<Callout>
+<Note>
   请参阅 [Solana 支付的工作原理](/docs/payments/how-payments-work)
   了解核心支付概念。
-</Callout>
+</Note>
 
 ## 了解 Solana 地址
 
@@ -44,9 +44,9 @@ Solana 账户有两种类型的地址：曲线上地址和曲线外地址。
 
 使用地址从网络获取[账户](/docs/core/accounts)，检查其程序所有者和账户类型，以确定如何处理该地址。
 
-<Callout>
+<Note>
   了解一个地址是曲线上还是曲线外，并不能告诉您该账户的类型、哪个程序拥有它，或者该地址上是否存在账户。您必须从网络中获取该账户才能确定这些详细信息。
-</Callout>
+</Note>
 
 ### System Program 账户（钱包）
 
@@ -60,11 +60,11 @@ account 支付 rent。由于收款方拥有该 ATA，发送方无法收回为 re
 
 系统账户可以存在于曲线外。如果您的用户想将代币发送到离曲线地址，建议提示用户确认其是否打算将资金发送到智能钱包。
 
-<Callout type="warn">
+<Warning>
   如果没有保护措施，补贴创建 ATA 的机制可能会被利用。恶意
   用户可以请求一笔转账，让你出资创建其 ATA，然后关闭 该 ATA 以取回 rent
   SOL，并重复此操作。
-</Callout>
+</Warning>
 
 ### Token Accounts
 
@@ -73,10 +73,10 @@ Program 或 Token-2022 Program 拥有，并持有代币余额。如果你收到�
 program 拥有，那么在发送前，你应验证该账户是 token account（而不是 mint
 account），并且与预期的代币 mint account 相匹配。
 
-<Callout type="info">
+<Info>
   Token Programs 会自动验证转账中的两个 token accounts 是否持有同一 mint
   的代币。如果验证失败，交易会被拒绝，且不会损失任何资金。
-</Callout>
+</Info>
 
 ### Mint Accounts
 
@@ -105,17 +105,17 @@ account 和 PDA。lamport 只能由账户的所属程序转出，因此将 SOL �
 则**不可接受**：token
 account 持有 SPL 代币，发送至该地址的 SOL 将超出发送方的控制范围。
 
-<Callout type="warn">
+<Warning>
   这是 SOL 丢失的常见方式：用户将代币的铸币地址（或 program account 地址）粘贴到
   SOL 提款操作中。转账成功执行，但 SOL 无法找回。在签署 SOL
   转账前，请务必对接收方进行分类验证。
-</Callout>
+</Warning>
 
 ## 验证流程
 
 下图展示了验证地址的参考决策树：
 
-```mermaid title="Address Verification Flow"
+```mermaid
 flowchart TD
     A["Input address"]
     B["Fetch account info"]
@@ -144,17 +144,46 @@ flowchart TD
     K -- "No" --> V2["VERIFY: Confirm the recipient intends to use a smart wallet"]
 ```
 
-<Steps>
-<Step>
+<div className="nojs-only" data-fallback="mermaid">
+  ```text Mermaid
+  flowchart TD
+      A["Input address"]
+      B["Fetch account info"]
 
-### 获取账户
+      A --> B
+      B --> C{"Account exists onchain?"}
+
+      %% --- Non-existent account path ---
+      C -- "No" --> D{"Is address off-curve (PDA)?"}
+      D -- "Yes" --> V1["VERIFY: Confirm the recipient intends to use a smart wallet"]
+      D -- "No" --> W1["IS_WALLET: Valid unfunded public key address"]
+
+      %% --- Existing account path ---
+      C -- "Yes" --> F{"Check program owner"}
+
+      F -- "Token Program / Token-2022" --> G{"Is token account for expected mint?"}
+      G -- "Yes" --> T1["IS_TOKEN_ACCOUNT: Send directly"]
+      G -- "No" --> R1["REJECT: Wrong account type or mint"]
+
+      F -- "System Program" --> H{"Is address off-curve?"}
+      H -- "No" --> W2["IS_WALLET: Derive ATA and send"]
+      H -- "Yes" --> V3["VERIFY: Confirm the recipient intends to use a smart wallet"]
+
+      F -- "Other Program" --> K{"Allowed by policy?"}
+      K -- "Yes" --> W3["IS_WALLET: Derive ATA and send"]
+      K -- "No" --> V2["VERIFY: Confirm the recipient intends to use a smart wallet"]
+  ```
+</div>
+
+<p className="sol-caption">Address Verification Flow</p>
+
+<Steps titleSize="h3">
+<Step title="获取账户">
 
 使用该地址从网络中获取账户详情。
 
 </Step>
-<Step>
-
-### 账户不存在
+<Step title="账户不存在">
 
 如果该地址不存在账户，请检查地址是在曲线上还是曲线外：
 
@@ -163,9 +192,7 @@ flowchart TD
 - **曲线上**：这是一个尚未充值的有效钱包地址（公钥）。派生 ATA，检查其是否存在，然后向其发送代币。您必须制定策略，决定是否在 ATA 不存在时为其创建提供资金。
 
 </Step>
-<Step>
-
-### 账户存在
+<Step title="账户存在">
 
 如果账户存在，请检查哪个程序拥有它：
 
@@ -189,11 +216,11 @@ flowchart TD
 
 以下示例仅展示地址验证逻辑，本代码仅供参考说明之用。
 
-<Callout>
+<Note>
   演示未展示如何派生 ATA 或构建发送代币的交易。请参阅 [token
   account](/docs/tokens/basics/create-token-account#how-to-create-an-associated-token-account)
   和 [token transfer](/docs/tokens/basics/transfer-tokens) 文档获取示例代码。
-</Callout>
+</Note>
 
 以下演示包含三种可能的结果：
 
@@ -206,10 +233,7 @@ flowchart TD
 
 然后，它将每个结果映射到每种资产的可接受性：`canReceiveNativeSol`（仅限钱包）和 `canReceiveSplToken`（钱包或 token account）。`USER_VERIFICATION` 结果不会被自动接受；您的应用程序应在发送 SPL 代币之前让用户确认其意图。token account 返回 `IS_TOKEN_ACCOUNT`，因此可以接收 SPL 代币，但**不能**接收原生 SOL——正是这一区别防止了 SOL 被锁定。
 
-<CodeTabs flags="r">
-
-```ts !! title="Demo"
-// !collapse(1:35) collapsed
+```ts Demo expandable
 
 import {
   type Address,
@@ -339,7 +363,6 @@ function canReceiveSplToken(result: ValidationResult): boolean {
 // =============================================================================
 // Examples
 // =============================================================================
-// !collapse(1:1000) collapsed
 
 // Wallets
 const EXISTING_WALLET =
@@ -414,5 +437,3 @@ console.log("\n" + "═".repeat(60));
 console.log("  Done!");
 console.log("═".repeat(60) + "\n");
 ```
-
-</CodeTabs>

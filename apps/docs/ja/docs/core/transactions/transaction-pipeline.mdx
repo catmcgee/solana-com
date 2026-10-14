@@ -2,7 +2,6 @@
 title: トランザクションパイプライン
 description:
   Solanaトランザクションが送信からコミットまでどのように処理されるか。8段階の検証パイプライン全体、ネットワークからのトランザクション詳細の読み取り、および一般的な検証エラーについて解説します。
-url: /docs/core/transactions/transaction-pipeline
 type: reference
 prerequisites:
   - /docs/core/transactions
@@ -14,9 +13,11 @@ related:
   - /docs/core/programs/program-execution
 ---
 
-<Callout type="info" title="概要">
+<Info>
+  **概要**
+
   トランザクションは8つの段階を経て処理されます：受信、署名検証、サニタイゼーション、予算/経過時間チェック、手数料支払者の検証、アカウント読み込み、instructions実行、そしてコミット。
-</Callout>
+</Info>
 
 ## トランザクション処理パイプライン
 
@@ -25,9 +26,9 @@ validatorクライアントのソースファイル参照とともに説明し�
 
 ### 1. 受信とデシリアライゼーション
 
-validatorはUDP/QUIC経由でトランザクションバイトを受信します。生バイトは単一パケット内に収まる必要があります（_rs`PACKET_DATA_SIZE`_
-= 1,232バイト）。バイトは _rs`VersionedTransaction`_
-にデシリアライズされ、これには署名配列と _rs`VersionedMessage`_
+validatorはUDP/QUIC経由でトランザクションバイトを受信します。生バイトは単一パケット内に収まる必要があります（`PACKET_DATA_SIZE`
+\= 1,232バイト）。バイトは `VersionedTransaction`
+にデシリアライズされ、これには署名配列と `VersionedMessage`
 （レガシーまたはv0）が含まれます。
 
 次期
@@ -45,14 +46,14 @@ validatorはUDP/QUIC経由でトランザクションバイトを受信します
 ### 3. サニタイゼーション
 
 デシリアライズされたトランザクションはサニタイズされ、
-_rs`SanitizedTransaction`_
+`SanitizedTransaction`
 （または[`RuntimeTransaction`](https://github.com/anza-xyz/agave/blob/v3.1.8/runtime-transaction/src/runtime_transaction.rs#L31)）が生成されます。サニタイゼーションは構造的な不変条件を検証します：
 
 - 署名数がヘッダー内の`num_required_signatures`と一致すること
 - すべてのinstructionの`program_id_index`および`account_indices`が範囲内であること
 - 手数料支払者（アカウントインデックス0）が書き込み可能な署名者であること
 
-_rs`RuntimeTransaction`_
+`RuntimeTransaction`
 ラッパーは、[`TransactionMeta`](https://github.com/anza-xyz/agave/blob/v3.1.8/runtime-transaction/src/transaction_meta.rs#L38-L44)から事前計算されたメタデータをキャッシュします：メッセージハッシュ、投票トランザクションフラグ、プリコンパイル署名カウント（Ed25519/secp256k1/secp256r1）、計算予算instruction詳細、およびinstruction
 dataの合計長。
 
@@ -62,21 +63,21 @@ dataの合計長。
 メソッドは、トランザクションごとにいくつかのチェックを実行します:
 
 **計算バジェット**: トランザクションの計算バジェット instructions が最初に解析され、検証されます。手数料の詳細は、バジェット制限と優先順位付け手数料から計算されます。計算バジェットが無効または矛盾している場合、トランザクションは
-_rs`DuplicateInstruction`_、`InstructionError(..., InvalidInstructionData)`、または
-_rs`InvalidLoadedAccountsDataSizeLimit`_
+`DuplicateInstruction`、`InstructionError(..., InvalidInstructionData)`、または
+`InvalidLoadedAccountsDataSizeLimit`
 などの計算バジェット解析エラーで失敗します。
 
 [v1トランザクション](/docs/core/transactions/versioned-transactions#v1-message-format)
-には解析すべきコンピュートバジェットのinstructionsはありません。制限と優先手数料はメッセージ設定から取得され、メッセージ内のComputeBudget instructionsは設定のために無視されます。未設定のままにしたコンフィグフィールドはデフォルトでゼロになり、これは後で[アカウントの読み込み](#6-load-accounts)時に現れます。
+には解析すべきコンピュートバジェットのinstructionsはありません。制限と優先手数料はメッセージ設定から取得され、メッセージ内のComputeBudget instructionsは設定のために無視されます。未設定のままにしたコンフィグフィールドはデフォルトでゼロになり、これは後で[アカウントの読み込み](#6-アカウントの読み込み)時に現れます。
 
 **ブロックハッシュの経過時間**: トランザクションの `recent_blockhash` が
 [`BlockhashQueue`](https://github.com/anza-xyz/agave/blob/v3.1.8/accounts-db/src/blockhash_queue.rs#L33)
-で検索されます。ハッシュが見つかり、その経過時間が _rs`MAX_PROCESSING_AGE`_ (150
+で検索されます。ハッシュが見つかり、その経過時間が `MAX_PROCESSING_AGE` (150
 slot) 以内であれば、トランザクションは続行されます。見つからない場合、validator は有効な
 [durable nonce](/docs/core/transactions/durable-nonces) をチェックします。
 
 **ステータスキャッシュ**: トランザクションのメッセージハッシュがステータスキャッシュに対してチェックされます。見つかった場合、トランザクションは
-_rs`AlreadyProcessed`_ で拒否されます。
+`AlreadyProcessed` で拒否されます。
 
 ### 5. nonce と手数料支払者を検証
 
@@ -88,7 +89,7 @@ SVMの
 nonce トランザクションの場合、validator は nonce アカウントをロードし、以下を検証します:
 
 - アカウントが System Program によって所有されていること
-- _rs`State::Initialized`_ として解析されること
+- `State::Initialized` として解析されること
 - 保存された durable nonce がトランザクションの `recent_blockhash`
   と一致すること
 - nonce を進めることができること(現在の durable nonce が次の durable
@@ -103,18 +104,18 @@ nonce 値に進められます。[`validate_transaction_nonce`](https://github.c
 によってチェックされます:
 
 - アカウントが存在する必要があります(lamport > 0)、そうでなければ
-  _rs`AccountNotFound`_
+  `AccountNotFound`
 - アカウントはシステムアカウントまたは nonce アカウントである必要があります、そうでなければ
-  _rs`InvalidAccountForFee`_
+  `InvalidAccountForFee`
 - lamport は `min_balance + total_fee`
   をカバーする必要があります。ここで、`min_balance`
   はシステムアカウントの場合は0、nonce アカウントの場合は
   `rent.minimum_balance(NonceState::size())` です。そうでなければ
-  _rs`InsufficientFundsForFee`_
+  `InsufficientFundsForFee`
 - 手数料控除後、アカウントは免除額を維持する必要があります(免除額状態から支払い状態に移行することはできません)
 
 この段階で、手数料は手数料支払者から差し引かれます。手数料が差し引かれた後の手数料支払者（該当する場合は進められたnonce）のスナップショットが
-_rs`RollbackAccounts`_
+`RollbackAccounts`
 として保存されます。これらは、実行が失敗した場合でもコミットされるアカウントです。
 
 ### 6. アカウントの読み込み
@@ -129,27 +130,29 @@ _rs`RollbackAccounts`_
    MiB）に向けて累積。各アカウントには[`TRANSACTION_ACCOUNT_BASE_SIZE`](https://github.com/anza-xyz/agave/blob/v3.1.8/svm/src/account_loader.rs#L45)（64バイト）の基本オーバーヘッドとデータ長が発生
 
 トランザクションのinstructionsによって呼び出される各programについて、ローダーはprogram
-accountが存在し、有効なローダー（`NativeLoader`または _rs`PROGRAM_OWNERS`_
+accountが存在し、有効なローダー（`NativeLoader`または `PROGRAM_OWNERS`
 のいずれか）によって所有されていることを検証します。無効なprogramは
-_rs`ProgramAccountNotFound`_ または _rs`InvalidProgramForExecution`_
+`ProgramAccountNotFound` または `InvalidProgramForExecution`
 で失敗します。
 
 LoaderV3（アップグレード可能）programは、関連するprogramdata
 accountを暗黙的に読み込みます。これも読み込まれたデータサイズの制限にカウントされます。
 
-<Callout type="warn" title="v1トランザクションはこの制限をデフォルトでゼロに設定します">
+<Warning>
+  **v1トランザクションはこの制限をデフォルトでゼロに設定します**
+
   64 MiBのデフォルトはレガシーおよびv0トランザクションに適用されます。[v1
-  フォーマット](/docs/core/transactions/versioned-transactions#v1-message-format)では、読み込まれたアカウントのデータサイズ制限はメッセージ設定から読み取られ、未設定のフィールドは寛大なデフォルト値ではなく**0バイト**がデフォルトとなります。そのため、設定が空のv1トランザクションはこの段階で_rs`MaxLoadedAccountsDataSizeExceeded`_により失敗します。要求されたバジェットは最初に読み込まれるアカウントに対して小さすぎるため、v1にも設定にも言及しないエラーとともに、instructionsが実行される前に失敗が発生します。v1トランザクションを構築する際は、コンピュートユニット制限と読み込まれたアカウントのデータサイズ制限を常に明示的に設定してください。
-</Callout>
+  フォーマット](/docs/core/transactions/versioned-transactions#v1-message-format)では、読み込まれたアカウントのデータサイズ制限はメッセージ設定から読み取られ、未設定のフィールドは寛大なデフォルト値ではなく**0バイト**がデフォルトとなります。そのため、設定が空のv1トランザクションはこの段階で`MaxLoadedAccountsDataSizeExceeded`により失敗します。要求されたバジェットは最初に読み込まれるアカウントに対して小さすぎるため、v1にも設定にも言及しないエラーとともに、instructionsが実行される前に失敗が発生します。v1トランザクションを構築する際は、コンピュートユニット制限と読み込まれたアカウントのデータサイズ制限を常に明示的に設定してください。
+</Warning>
 
 アカウントの読み込みが失敗したが、手数料支払者の検証が成功した場合、トランザクションは[`FeesOnly`](https://github.com/anza-xyz/agave/blob/v3.1.8/svm/src/account_loader.rs#L147-L152)結果となります：手数料は引き続き徴収されますが、instructionsは実行されません。
 
 ### 7. instructionsの実行
 
 [`execute_loaded_transaction`](https://github.com/anza-xyz/agave/blob/v3.1.8/svm/src/transaction_processor.rs#L847)は、読み込まれたすべてのアカウントを含む
-_rs`TransactionContext`_
+`TransactionContext`
 を作成し、[`process_message`](https://github.com/anza-xyz/agave/blob/v3.1.8/svm/src/message_processor.rs)を呼び出します。instructionsは、メッセージ内に出現する順序で順次実行されます。各instructionの呼び出しは
-_rs`InvokeContext`_ を作成し、ターゲットprogramを呼び出します。
+`InvokeContext` を作成し、ターゲットprogramを呼び出します。
 
 #### instructionの処理の詳細
 
@@ -165,13 +168,13 @@ _rs`InvokeContext`_ を作成し、ターゲットprogramを呼び出します�
 3. その他すべてのプログラムに対して、ランタイムは
    [`process_instruction`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/invoke_context.rs#L477)を呼び出し、キャッシュからプログラムを読み込んでBPF仮想マシンで実行します。
 4. instructionの実行完了後、ランタイムは
-   [検証](https://github.com/anza-xyz/agave/blob/v3.1.8/transaction-context/src/lib.rs#L366-L398)を行い、すべてのinstructionアカウント全体のlamport残高が変更されていないことを確認します（_rs`UnbalancedInstruction`_
+   [検証](https://github.com/anza-xyz/agave/blob/v3.1.8/transaction-context/src/lib.rs#L366-L398)を行い、すべてのinstructionアカウント全体のlamport残高が変更されていないことを確認します（`UnbalancedInstruction`
    チェック）。
 5. いずれかのinstructionが失敗した場合、トランザクション全体がロールバックされます。中間状態の変更はコミットされません。
 
 各instructionはinstructionトレースをインクリメントします。トレースには、トップレベルのinstructionsと、それらが呼び出すすべての[CPI](/docs/core/cpi)が含まれます。トレースの合計長（トップレベルのinstructionsとすべてのネストされたCPI）は64
-(_rs`MAX_INSTRUCTION_TRACE_LENGTH`_)を超えることはできません。この制限を超えると、
-_rs`InstructionError::MaxInstructionTraceLengthExceeded`_ が返されます。
+(`MAX_INSTRUCTION_TRACE_LENGTH`)を超えることはできません。この制限を超えると、
+`InstructionError::MaxInstructionTraceLengthExceeded` が返されます。
 
 実行後、ランタイムは以下を検証します：
 
@@ -181,9 +184,9 @@ _rs`InstructionError::MaxInstructionTraceLengthExceeded`_ が返されます。
 ### 8. コミットまたはロールバック
 
 実行が成功した場合、`TransactionContext`から変更されたアカウント状態が
-_rs`AccountLoader`_
+`AccountLoader`
 のバッチローカルキャッシュに書き戻されます。実行が失敗した場合、
-_rs`RollbackAccounts`_
+`RollbackAccounts`
 （手数料が差し引かれた手数料支払者と進められたnonce）のみが書き戻されます。手数料は引き続き徴収されますが、その他すべてのアカウント変更は破棄されます。
 
 ### パイプラインの概要

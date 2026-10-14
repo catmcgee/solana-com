@@ -17,7 +17,7 @@ Rust:
 Adicione o crate como dev-dependency. O SDK é assíncrono por padrão e requer um
 runtime Tokio, portanto inclua `tokio` com a feature `full` para testes.
 
-```toml title="Cargo.toml"
+```toml Cargo.toml
 [dev-dependencies]
 surfpool-sdk = "1"
 tokio = { version = "1", features = ["full"] }
@@ -89,11 +89,13 @@ instalados automaticamente como `optionalDependencies`:
 | macOS Intel          | `x86_64-apple-darwin`      | `@solana/surfpool-darwin-x64`    |
 | Linux x86-64 (glibc) | `x86_64-unknown-linux-gnu` | `@solana/surfpool-linux-x64-gnu` |
 
-<Callout type="warn" title="Plataforma não suportada">
+<Warning>
+  **Plataforma não suportada**
+
   Se o pacote for instalado em uma plataforma sem um binário compatível, a
   instalação é concluída, mas `Surfnet.start()` lançará um erro em tempo de
   execução. Abra uma issue se precisar de um target adicional.
-</Callout>
+</Warning>
 
 ### Requisitos
 
@@ -108,58 +110,66 @@ instalados automaticamente como `optionalDependencies`:
 Um teste rápido de uma linha confirma que o runtime inicia e que o endpoint RPC
 aceita requisições.
 
-<CodeTabs storage="surfpool-lang">
+<Tabs>
+  <Tab title="Rust">
+    ```rust Rust
+    use surfpool_sdk::{Signer, Surfnet};
 
-```rust !! title="Rust"
-use surfpool_sdk::{Signer, Surfnet};
+    #[tokio::test]
+    async fn surfpool_sdk_smoke() {
+        let surfnet = Surfnet::start().await.expect("start surfnet");
+        let balance = surfnet
+            .rpc_client()
+            .get_balance(&surfnet.payer().pubkey())
+            .expect("get balance");
+        assert!(balance > 0);
+    }
+    ```
 
-#[tokio::test]
-async fn surfpool_sdk_smoke() {
-    let surfnet = Surfnet::start().await.expect("start surfnet");
-    let balance = surfnet
-        .rpc_client()
-        .get_balance(&surfnet.payer().pubkey())
-        .expect("get balance");
-    assert!(balance > 0);
-}
-```
+    Execute com `cargo test --test smoke`.
+  </Tab>
 
-Execute com `cargo test --test smoke`.
+  <Tab title="TypeScript">
+    ```ts TypeScript
+    import { after, test } from "node:test";
+    import assert from "node:assert/strict";
+    import { Surfnet } from "@solana/surfpool";
 
-```ts !! title="TypeScript"
-import { after, test } from "node:test";
-import assert from "node:assert/strict";
-import { Surfnet } from "@solana/surfpool";
+    const surfnet = Surfnet.start();
+    after(() => surfnet.stop());
 
-const surfnet = Surfnet.start();
-after(() => surfnet.stop());
+    test("surfpool sdk smoke", () => {
+      assert.match(surfnet.rpcUrl, /^http:\/\/127\.0\.0\.1:\d+$/);
+      assert.ok(surfnet.payer.length > 0);
+    });
+    ```
 
-test("surfpool sdk smoke", () => {
-  assert.match(surfnet.rpcUrl, /^http:\/\/127\.0\.0\.1:\d+$/);
-  assert.ok(surfnet.payer.length > 0);
-});
-```
-
-Execute com `node --test smoke.test.ts` (com um loader TS) ou
-`tsx --test smoke.test.ts`.
-
-</CodeTabs>
+    Execute com `node --test smoke.test.ts` (com um loader TS) ou
+    `tsx --test smoke.test.ts`.
+  </Tab>
+</Tabs>
 
 ## Solução de Problemas
 
-<Callout type="warn" title="`failed to bind to port` on Rust">
+<Warning>
+  **\`failed to bind to port\` on Rust**
+
   Outro processo está vinculando `0.0.0.0` de forma agressiva. Execute o teste
   novamente — o SDK seleciona uma nova porta a cada chamada. Se a falha
   persistir, verifique se há processos `surfpool` órfãos.
-</Callout>
+</Warning>
 
-<Callout type="warn" title="`Cannot find module '@solana/surfpool-...'`">
+<Warning>
+  **\`Cannot find module '@solana/surfpool-...'\`**
+
   A entrada `optionalDependencies` para sua plataforma não foi instalada.
   Execute novamente a instalação com `--include=optional`, ou verifique se sua
   plataforma consta na tabela de plataformas suportadas acima.
-</Callout>
+</Warning>
 
-<Callout type="warn" title="`stop()` hangs in JS">
+<Warning>
+  **\`stop()\` hangs in JS**
+
   Confirme que você está chamando `stop()` uma vez por `start()`. O wrapper Node
   mantém os servidores RPC e WebSocket vinculados até que `stop()` retorne.
-</Callout>
+</Warning>
