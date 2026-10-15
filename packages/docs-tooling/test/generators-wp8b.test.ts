@@ -320,7 +320,7 @@ describe("generated snippets", () => {
       'href="/docs/payments"',
     );
     const card = read("snippets/paths/en/checkout/card.mdx");
-    expect(card).toContain("[Start the path →](/docs/payments/checkout)");
+    expect(card).toContain("[Start the tutorial →](/docs/payments/checkout)");
     // Numbered steps; the first win (step 2) is marked for CSS and readers.
     expect(card).toMatch(
       /<li data-first="true">\[[^\]]+\]\(\/docs\/payments\/checkout\/browser\) <span className="sol-pcard-first">First win<\/span><\/li>/,

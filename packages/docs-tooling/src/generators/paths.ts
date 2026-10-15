@@ -96,7 +96,7 @@ export const PATH_UI = {
   firstWin: "First win",
   done: "Done",
   next: "Next",
-  start: "Start the path",
+  start: "Start the tutorial",
   steps: "steps",
   demoEnv: DEFAULT_TERM_LABELS.env,
   demoRun: DEFAULT_TERM_LABELS.run,
