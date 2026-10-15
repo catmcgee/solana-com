@@ -8,12 +8,12 @@ import { Layers } from "@boxicons/react/Layers";
 import { Package } from "@boxicons/react/Package";
 import { School } from "@boxicons/react/School";
 import { Server } from "@boxicons/react/Server";
-import type { ComponentType, ReactNode } from "react";
+import { Fragment, type ComponentType, type ReactNode } from "react";
 import { getTranslations } from "@workspace/i18n/server";
 import {
+  AGENT_SETUP,
   COST_MODEL,
   DEVELOPER_NEWSLETTER_FORM_ID,
-  HERO_CODE,
   HERO_LINKS,
   HUB_STATS,
   JOB_PATHS,
@@ -32,7 +32,7 @@ import {
 } from "@/data/developers/hub";
 import type { DeveloperUpdate } from "@/lib/developer-media";
 import { CostCalculator } from "./cost-calculator.client";
-import { HeroCode } from "./hero-code.client";
+import { CopyButton } from "./copy-button.client";
 import { NewsletterForm } from "./newsletter-form.client";
 
 type IconComponent = ComponentType<{
@@ -155,6 +155,100 @@ function AssetVisual({ t }: { t: (key: string) => string }) {
   );
 }
 
+/**
+ * Lets a long command wrap between words only (never after the "-" in
+ * "--url"). Copying the selection still yields the exact command.
+ */
+function CommandWords({ command }: { command: string }) {
+  return command.split(" ").map((word, index) => (
+    <Fragment key={index}>
+      {index > 0 && " "}
+      <span className="whitespace-nowrap">{word}</span>
+    </Fragment>
+  ));
+}
+
+type Translate = (key: string, values?: Record<string, string>) => string;
+
+/**
+ * "Build with your agent": the Solana MCP server URL and the one-line setup
+ * commands from https://mcp.solana.com. Everything is plain, selectable text
+ * in the server render; the copy buttons turn on after hydration.
+ */
+function AgentCard({ t, moreHref }: { t: Translate; moreHref: string }) {
+  const row =
+    "m-0 flex items-start gap-3 rounded-xl border bg-[var(--dl-surface)] pe-2 ps-3.5";
+  const code =
+    "min-w-0 flex-1 self-center select-all font-brand-mono text-[var(--dl-text)] [overflow-wrap:anywhere]";
+  const label = "mb-2 text-[13px] text-[var(--dl-dim)]";
+  const copy = { copyText: t("agent.copy"), copiedText: t("agent.copied") };
+
+  return (
+    <section
+      aria-labelledby="dl-agent-title"
+      data-testid="agent-card"
+      className="rounded-2xl border border-[var(--dl-line)] bg-[var(--dl-surface-2)] p-5 md:p-6"
+    >
+      <h2
+        id="dl-agent-title"
+        className="m-0 mb-2 font-brand text-[22px] font-medium leading-tight tracking-[-0.02em] text-[var(--dl-text)]"
+      >
+        {t("agent.title")}
+      </h2>
+      <p className="m-0 mb-5 text-[15px] leading-[1.55] text-[var(--dl-muted)]">
+        {t("agent.body")}
+      </p>
+      <dl className="m-0 flex flex-col gap-4">
+        <div>
+          <dt className={label}>{t("agent.serverUrl")}</dt>
+          <dd className={`${row} border-[var(--dl-line-strong)] py-2.5`}>
+            <code
+              dir="ltr"
+              data-testid="agent-server-url"
+              className={`${code} text-[15px] leading-[1.5]`}
+            >
+              {AGENT_SETUP.serverUrl}
+            </code>
+            <CopyButton
+              text={AGENT_SETUP.serverUrl}
+              label={t("agent.copyServerUrl")}
+              {...copy}
+            />
+          </dd>
+        </div>
+        {AGENT_SETUP.clients.map((client) => (
+          <div key={client.id}>
+            <dt className={label}>{client.name}</dt>
+            <dd className={`${row} border-[var(--dl-line)] py-2`}>
+              <code
+                dir="ltr"
+                data-testid={`agent-command-${client.id}`}
+                className={`${code} text-[13px] leading-[1.6]`}
+              >
+                <CommandWords command={client.command} />
+              </code>
+              <CopyButton
+                text={client.command}
+                label={t("agent.copyCommand", { client: client.name })}
+                {...copy}
+              />
+            </dd>
+          </div>
+        ))}
+      </dl>
+      <a
+        href={moreHref}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={`mt-5 inline-flex items-center gap-1.5 text-sm ${inlineLink}`}
+      >
+        {t("agent.otherClients")}
+        <ArrowRight aria-hidden className={`!size-4 ${arrowDir}`} />
+      </a>
+    </section>
+  );
+}
+
 export async function DevelopersHub({
   locale,
   updates,
@@ -167,7 +261,7 @@ export async function DevelopersHub({
     namespace: "developers.landing",
   });
   const href = (path: string) => localizedHref(locale, path);
-  const tt = (key: string) => t(key);
+  const tt = (key: string, values?: Record<string, string>) => t(key, values);
 
   const defaults = COST_MODEL.defaults;
   const defaultCosts = computeCosts(
@@ -182,7 +276,7 @@ export async function DevelopersHub({
 
   return (
     <main
-      data-dev-landing
+      data-dev-landing="dark"
       className="overflow-hidden bg-[var(--dl-bg)] font-brand text-base text-[var(--dl-text)] transition-colors duration-300 motion-reduce:transition-none"
     >
       {/* Hero */}
@@ -217,43 +311,8 @@ export async function DevelopersHub({
                   {t("hero.secondaryCta")}
                 </a>
               </div>
-              <p className="mb-0 mt-4 text-[13.5px] text-[var(--dl-dim)]">
-                {t.rich("hero.fromEthereum", {
-                  link: (chunks) => (
-                    <a
-                      href={href(HERO_LINKS.fromEthereum)}
-                      className={inlineLink}
-                    >
-                      {chunks}
-                    </a>
-                  ),
-                })}
-              </p>
             </div>
-            <figure
-              aria-label={t("code.label")}
-              className="m-0 overflow-hidden rounded-2xl border border-[var(--dl-line)] bg-[var(--dl-surface-2)]"
-            >
-              <figcaption className="flex justify-between gap-4 border-b border-[var(--dl-line)] px-4 py-2.5 font-brand-mono text-xs text-[var(--dl-dim)]">
-                <span>{HERO_CODE.filename}</span>
-                <span>{t("code.meta")}</span>
-              </figcaption>
-              <div dir="ltr">
-                <HeroCode source={HERO_CODE.source} />
-              </div>
-              <p className="mx-3 mb-3.5 mt-0 rounded-[10px] bg-[var(--dl-surface)] px-3 py-2.5 text-[13px] text-[var(--dl-muted)]">
-                {t.rich("code.note", {
-                  link: (chunks) => (
-                    <a
-                      href={href(HERO_LINKS.checkoutGuide)}
-                      className={inlineLink}
-                    >
-                      {chunks}
-                    </a>
-                  ),
-                })}
-              </p>
-            </figure>
+            <AgentCard t={tt} moreHref={AGENT_SETUP.moreHref} />
           </div>
         </div>
       </section>

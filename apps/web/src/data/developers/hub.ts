@@ -36,7 +36,7 @@ export type JobPathId = (typeof JOB_PATHS)[number]["id"];
 export const MORE_USE_CASES = [
   { id: "markets", href: "/docs/defi" },
   { id: "games", href: "/docs/assets/games" },
-  { id: "agents", href: "/docs/payments/pay-per-call" },
+  { id: "agents", href: "/docs/payments/agentic-payments" },
   { id: "programs", href: "/docs/programs" },
   { id: "all", href: "/docs/finance" },
 ] as const;
@@ -55,8 +55,31 @@ export function localizedHref(locale: string, href: string): string {
 export const HERO_LINKS = {
   picker: "#picker",
   docs: "/docs",
-  fromEthereum: "/docs/from-ethereum",
-  checkoutGuide: "/docs/payments/checkout",
+} as const;
+
+/**
+ * "Build with your agent" hero card. Server URL and commands are copied
+ * verbatim from https://mcp.solana.com (checked 2026-10-15); keep them in
+ * sync with that page.
+ */
+export const MCP_SERVER_URL = "https://mcp.solana.com/mcp";
+
+export const AGENT_SETUP = {
+  serverUrl: MCP_SERVER_URL,
+  clients: [
+    {
+      id: "claudeCode",
+      name: "Claude Code",
+      command: `claude mcp add --transport http solana-mcp ${MCP_SERVER_URL}`,
+    },
+    {
+      id: "codex",
+      name: "Codex",
+      command: `codex mcp add solana-mcp --url ${MCP_SERVER_URL}`,
+    },
+  ],
+  /** Official setup for the other MCP clients (Cursor, VS Code, Windsurf). */
+  moreHref: "https://mcp.solana.com",
 } as const;
 
 /** "Other ways to learn" cards. */
@@ -277,36 +300,3 @@ export function formatAsOf(asOf: string, locale: string): string {
 /** Newsletter list used by the developer hub since the docs-app version. */
 export const DEVELOPER_NEWSLETTER_FORM_ID =
   "f1bc79b9-a1cd-463a-8c2c-e761b2fa108d";
-
-/**
- * The hero code sample. Real @solana/kit 8 + @solana-program/token 0.17 API
- * (`tokenProgram()` plugin, `transferToATA`, `.sendTransaction()`), the same
- * calls used in packages/docs-examples/cookbook/transactions/fee-sponsorship.
- * `customer` is a TransactionSigner and `shop` an Address; the mint is
- * Circle's devnet USDC.
- */
-export const HERO_CODE = {
-  filename: "pay.ts",
-  source: `import { address, createClient } from "@solana/kit";
-import { solanaRpc } from "@solana/kit-plugin-rpc";
-import { payer } from "@solana/kit-plugin-signer";
-import { tokenProgram } from "@solana-program/token";
-
-const USDC = address("4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU");
-
-const client = await createClient()
-  .use(payer(customer))
-  .use(solanaRpc({ rpcUrl: "https://api.devnet.solana.com" }))
-  .use(tokenProgram());
-
-// Send 1.00 USDC (6 decimals) to the shop's token account
-const { context } = await client.token.instructions
-  .transferToATA({
-    mint: USDC,
-    authority: customer,
-    recipient: shop,
-    amount: 1_000_000n,
-    decimals: 6,
-  })
-  .sendTransaction();`,
-} as const;

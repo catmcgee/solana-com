@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import en from "../../../../../packages/i18n/messages/web/en/common.json";
 import {
+  AGENT_SETUP,
   COST_MODEL,
-  HERO_CODE,
+  HERO_LINKS,
   HUB_STATS,
   JOB_PATHS,
   LEARN_ROUTES,
@@ -16,10 +17,6 @@ import {
   localizedHref,
   paymentsFromSliderPosition,
 } from "@/data/developers/hub";
-import {
-  sliceTokens,
-  tokenizeCode,
-} from "@/app/[locale]/developers/code-tokens";
 
 const landing = (en as { developers: { landing: Record<string, any> } })
   .developers.landing;
@@ -141,33 +138,28 @@ describe("developers hub links", () => {
   });
 });
 
-describe("hero code sample", () => {
-  it("uses the real @solana/kit + token plugin API, not a made-up helper", () => {
-    expect(HERO_CODE.source).not.toMatch(/sendUsdc/);
-    for (const call of [
-      'from "@solana/kit"',
-      'from "@solana/kit-plugin-rpc"',
-      'from "@solana/kit-plugin-signer"',
-      'from "@solana-program/token"',
-      "createClient()",
-      ".use(tokenProgram())",
-      ".transferToATA({",
-      ".sendTransaction();",
-    ]) {
-      expect(HERO_CODE.source).toContain(call);
-    }
+describe("build with your agent card", () => {
+  it("uses the official Solana MCP server URL and commands", () => {
+    // Verbatim from https://mcp.solana.com.
+    expect(AGENT_SETUP.serverUrl).toBe("https://mcp.solana.com/mcp");
+    expect(AGENT_SETUP.clients).toEqual([
+      {
+        id: "claudeCode",
+        name: "Claude Code",
+        command:
+          "claude mcp add --transport http solana-mcp https://mcp.solana.com/mcp",
+      },
+      {
+        id: "codex",
+        name: "Codex",
+        command: "codex mcp add solana-mcp --url https://mcp.solana.com/mcp",
+      },
+    ]);
+    expect(AGENT_SETUP.moreHref).toBe("https://mcp.solana.com");
   });
 
-  it("tokenizes losslessly so the highlighted render equals the source", () => {
-    const tokens = tokenizeCode(HERO_CODE.source);
-    expect(tokens.map((t) => t.value).join("")).toBe(HERO_CODE.source);
-    expect(tokens).toContainEqual({ kind: "kw", value: "await" });
-    expect(tokens).toContainEqual({ kind: "fn", value: "transferToATA" });
-    expect(tokens).toContainEqual({ kind: "num", value: "1_000_000n" });
-    expect(
-      sliceTokens(tokens, 12)
-        .map((t) => t.value)
-        .join(""),
-    ).toBe(HERO_CODE.source.slice(0, 12));
+  it("has no Ethereum or EVM links or copy", () => {
+    expect(JSON.stringify(HERO_LINKS)).not.toMatch(/ethereum|evm/i);
+    expect(JSON.stringify(landing)).not.toMatch(/ethereum|\bevm\b|svm guide/i);
   });
 });

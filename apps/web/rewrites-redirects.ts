@@ -291,8 +291,10 @@ const movedDocsRedirects: RedirectInput[] = withMdVariants([
     destination: "/docs/payments/agentic-payments/x402",
   },
   {
+    // Points straight at the final page: x402/making-a-payment was merged
+    // into pay-sh (below), and redirects must never chain.
     source: "/docs/payments/agentic-payments/x402-quickstart",
-    destination: "/docs/payments/agentic-payments/x402/making-a-payment",
+    destination: "/docs/payments/pay-sh#let-an-agent-pay-x402",
   },
   {
     source: "/docs/payments/agentic-payments/x402-facilitator",
@@ -377,7 +379,63 @@ const movedDocsRedirects: RedirectInput[] = withMdVariants([
     source: "/docs/payments/production-readiness",
     destination: "/docs/tools/production-readiness",
   },
+  // Duplicate pages merged into the page that covers the same job
+  // (migration/dup-audit.md, 2026-10-15). Their unique content moved first;
+  // the EN file and its 17 locale copies were deleted. Destinations with an
+  // anchor get no automatic `.md` twin (withMdVariants); see
+  // anchoredMdTwinRedirects below.
+  {
+    source: "/docs/tokenization/quickstart",
+    destination: "/docs/assets/issue-asset",
+  },
+  {
+    // Exact path only: /docs/tokenization/<page> still exists.
+    source: "/docs/tokenization",
+    destination: "/docs/assets#tokenization",
+  },
+  {
+    source: "/docs/payments/quickstart",
+    destination: "/docs/payments/checkout/browser",
+  },
+  {
+    source: "/docs/payments/accept-payments/solana-pay",
+    destination: "/docs/tools/commerce-kit/quickstart/solana-pay",
+  },
+  {
+    source: "/docs/payments/pay-per-call",
+    destination: "/docs/payments/agentic-payments",
+  },
+  {
+    source: "/docs/payments/agentic-payments/x402/making-a-payment",
+    destination: "/docs/payments/pay-sh#let-an-agent-pay-x402",
+  },
+  {
+    source: "/docs/tools/solana-pay/quickstart",
+    destination: "/docs/tools/solana-pay#quick-start",
+  },
 ]);
+
+/**
+ * `.md` twins for the movedDocsRedirects whose destination carries an anchor
+ * (withMdVariants skips those). A markdown twin has no anchors, so it goes to
+ * the destination page's own `.md`. Kept out of withMdVariants, which would
+ * add a `.md.md` twin.
+ */
+const anchoredMdTwinRedirects: RedirectInput[] = [
+  {
+    source: "/docs/payments/agentic-payments/x402-quickstart.md",
+    destination: "/docs/payments/pay-sh.md",
+  },
+  {
+    source: "/docs/payments/agentic-payments/x402/making-a-payment.md",
+    destination: "/docs/payments/pay-sh.md",
+  },
+  { source: "/docs/tokenization.md", destination: "/docs/assets.md" },
+  {
+    source: "/docs/tools/solana-pay/quickstart.md",
+    destination: "/docs/tools/solana-pay.md",
+  },
+];
 
 /**
  * /developers/learn was renamed to /developers/bootcamp. This lived only in
@@ -525,7 +583,7 @@ const M = MINTLIFY_ORIGIN;
  * Docs sections whose index page Mintlify does not serve at its own path
  * (see the rewrite in `mintlifyRewrites`).
  */
-export const MINTLIFY_INDEX_SHADOWED = ["tools", "tokenization"] as const;
+export const MINTLIFY_INDEX_SHADOWED = ["tools"] as const;
 
 /** `/:locale(ar|de|...)` for the 17 Mintlify locales (el is redirected). */
 const L = `:locale(${MINTLIFY_LOCALE_PATTERN})`;
@@ -575,8 +633,9 @@ export const mintlifyRewrites: BeforeFilesRewrite[] = [
   ...buildFallbackRewrites(loadLocaleFallbacks(), M),
   // Section index pages whose sub-pages come EARLIER in the Mintlify nav
   // than the index itself (docs/tools/commerce-kit/** sits in the Payments
-  // tab, docs/tools/index in Resources; docs/tokenization/quickstart in
-  // "Build it" before the Tokenization group). For such a path Mintlify
+  // tab, docs/tools/index in Resources). /docs/tokenization used to be listed
+  // too; its index was merged into /docs/assets#tokenization and is now a
+  // redirect. For such a path Mintlify
   // answers 307 to the first nav page under the prefix instead of serving
   // the index (seen on `mint dev`, WP12 crawl); `/<section>/index` serves
   // it. Keep MINTLIFY_INDEX_SHADOWED in sync with docs-tooling's
@@ -943,6 +1002,7 @@ export default {
     },
     ...dissolvedGuideRedirects,
     ...movedDocsRedirects,
+    ...anchoredMdTwinRedirects,
     ...bootcampRenameRedirects,
     ...docsTagRedirects,
     ...chainMigrationRedirects,

@@ -45,10 +45,11 @@ export function shouldShowDocsSidebarToggle(
 
 /**
  * Landing pages that support light and dark mode on the exact path only.
- * Their subpages (for example /developers/payments) stay dark-only, so these
- * deliberately do not use matchesRouteSegment.
+ * Their subpages stay dark-only, so these deliberately do not use
+ * matchesRouteSegment. The /developers landing is dark-only by design (no
+ * theme toggle), so it is not listed.
  */
-const EXACT_THEME_ROUTES = new Set(["/developers", "/learn"]);
+const EXACT_THEME_ROUTES = new Set(["/learn"]);
 
 function matchesExactRoute(pathname: string | null | undefined) {
   if (!pathname) {

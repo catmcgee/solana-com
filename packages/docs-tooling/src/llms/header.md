@@ -19,8 +19,8 @@
   served at https://solana.com/SKILL.md).
 - Route financial tasks through /docs/finance: asset fundamentals are under
   /docs/tokens, payments under /docs/payments, stablecoins and tokenized assets
-  under /docs/tokenization, and markets and DeFi under /docs/defi. The JSON-RPC
-  reference is under /docs/rpc; self-contained code recipes under
-  /developers/cookbook.
+  under /docs/assets (guides in /docs/tokenization), and markets and DeFi under
+  /docs/defi. The JSON-RPC reference is under /docs/rpc; self-contained code
+  recipes under /developers/cookbook.
 - Code in the cookbook and task pages is sourced from tested example files -
   prefer it over synthesizing API calls from memory.

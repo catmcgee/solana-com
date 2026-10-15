@@ -14,6 +14,7 @@ import {
   docsRoutes,
   marketingRoutes,
 } from "@solana-foundation/solana-com-sitemap";
+import { resolveRedirect } from "./helpers/next-routing";
 
 const repoRoot = findRepoRoot()!;
 const sections = listLlmsSections();
@@ -132,9 +133,12 @@ describe("docs sitemap", () => {
       .filter((row) => row[col("kind")] === "page")
       .filter((row) => row[col("locale")] !== "el")
       .filter((row) => row[col("collection")] !== "developers")
+      // Pages merged into another page since (migration/dup-audit.md) are
+      // redirects now, so they no longer serve their own page.
+      .filter((row) => resolveRedirect(row[col("url")]!).kind !== "redirect")
       .map((row) => `https://solana.com${row[col("url")]}`)
       .filter((url) => !urls.has(url));
-    // Every non-Greek legacy page URL is still listed.
+    // Every non-Greek legacy page URL that is not redirected is still listed.
     expect(missing).toEqual([]);
   });
 });

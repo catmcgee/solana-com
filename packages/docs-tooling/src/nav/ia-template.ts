@@ -85,7 +85,8 @@ export const IA_TEMPLATE: TemplateTab[] = [
               "docs/payments/paywall-api/go-live",
             ],
           },
-          "docs/payments/quickstart",
+          // docs/payments/quickstart was merged into checkout/browser
+          // (migration/dup-audit.md #2) and is a redirect now.
         ],
       },
       {
@@ -103,6 +104,9 @@ export const IA_TEMPLATE: TemplateTab[] = [
                 root: "docs/payments/send-payments/payment-processing/index",
                 pages: [
                   "docs/payments/send-payments/payment-processing/fee-abstraction",
+                  // sidebarTitle: Payouts & disbursements (moved into its own
+                  // group, dup-audit nav clean-up)
+                  "docs/payments/send-payments/payment-processing/batch-payments",
                 ],
               },
             ],
@@ -110,8 +114,9 @@ export const IA_TEMPLATE: TemplateTab[] = [
           {
             group: "Accept payments",
             root: "docs/payments/accept-payments/index",
+            // accept-payments/solana-pay was merged into
+            // tools/commerce-kit/quickstart/solana-pay (dup-audit #3).
             pages: [
-              "docs/payments/accept-payments/solana-pay",
               "docs/payments/accept-payments/verification-tools",
               "docs/payments/accept-payments/indexing",
             ],
@@ -121,20 +126,15 @@ export const IA_TEMPLATE: TemplateTab[] = [
             root: "docs/payments/subscriptions/overview",
             pages: [x("docs/payments/subscriptions")],
           },
-          // sidebarTitle: Payouts & disbursements
-          "docs/payments/send-payments/payment-processing/batch-payments",
           {
+            // docs/payments/pay-per-call was merged into agentic-payments
+            // (now titled "Pay-per-call & agents", dup-audit #4), and
+            // x402/making-a-payment into pay-sh (#5).
             group: "Pay-per-call & agents",
-            root: "docs/payments/pay-per-call",
+            root: "docs/payments/agentic-payments/index",
             labelFrom: "none",
             pages: [
-              {
-                group: "How x402 works",
-                root: "docs/payments/agentic-payments/x402/index",
-                labelFrom: "none",
-                pages: [x("docs/payments/agentic-payments/x402")],
-              },
-              "docs/payments/agentic-payments/index",
+              "docs/payments/agentic-payments/x402/index", // sidebarTitle: How x402 works
               "docs/payments/agentic-payments/mpp",
               "docs/payments/pay-sh",
             ],
@@ -166,6 +166,9 @@ export const IA_TEMPLATE: TemplateTab[] = [
             pages: [x("docs/tools/kora")],
           },
           {
+            // tools/solana-pay/quickstart/index was merged into the index's
+            // Quick Start section (dup-audit #8); the Quick Start group is
+            // rootless in en.json.
             group: "Solana Pay",
             root: "docs/tools/solana-pay/index",
             pages: [x("docs/tools/solana-pay")],
@@ -200,14 +203,17 @@ export const IA_TEMPLATE: TemplateTab[] = [
               "docs/assets/issue-asset/go-live",
             ],
           },
-          "docs/tokenization/quickstart",
+          // docs/tokenization/quickstart was merged into the issue-asset path;
+          // its Kit/Legacy/Rust tabs live on the cookbook page
+          // developers/cookbook/tokens/create-mint-with-extensions (#1).
         ],
       },
       {
         group: "Tokenization",
         labelFrom: "meta:docs/tokenization",
+        // Rootless: the tokenization index was merged into
+        // docs/assets#tokenization (dup-audit #7).
         pages: [
-          "docs/tokenization/index",
           "docs/tokenization/token-acl",
           {
             group: "KYC with Attestations",

@@ -11,7 +11,7 @@ import {
   DEVELOPERS_SOCIAL_IMAGE,
   serializeJsonLd,
 } from "./structured-data";
-import { ThemePrepaint } from "./theme-prepaint";
+import { DarkPrepaint } from "./theme-prepaint";
 
 type Props = { params: Promise<{ locale: string }> };
 
@@ -48,7 +48,7 @@ export default async function Page({ params }: Props) {
 
   return (
     <>
-      <ThemePrepaint />
+      <DarkPrepaint />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(structuredData) }}

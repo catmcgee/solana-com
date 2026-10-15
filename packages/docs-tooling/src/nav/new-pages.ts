@@ -62,15 +62,9 @@ export const NEW_PAGES: readonly NewPage[] = [
     brief:
       "Method and findings from docs-nav-research.md, benchmarked against web2/TradFi docs (Stripe, Canton).",
   },
-  // Payments
-  {
-    page: "docs/payments/pay-per-call",
-    title: "Pay-per-call & agents",
-    description:
-      "Charge per request with x402, and let AI agents pay for APIs on their own.",
-    kind: "hub",
-    brief: "Pay-per-call hub: x402, agents that pay, MPP, pay.sh, facilitator.",
-  },
+  // Payments. The pay-per-call hub (docs/payments/pay-per-call) was merged
+  // into docs/payments/agentic-payments/index, an existing page
+  // (migration/dup-audit.md #4).
   {
     page: "docs/payments/checkout",
     title: "Accept dollar payments that settle in seconds",

@@ -2,7 +2,8 @@ import { expect, test, type Page } from "@playwright/test";
 
 /**
  * /developers landing acceptance (spec §7.5): JS off × light|dark × en|ar|ja,
- * plus a JS-on pass for the theme toggle and hydration.
+ * plus JS-on passes for the dark-only theme, the copy buttons and hydration.
+ * /developers is dark only (no theme toggle); /learn keeps light and dark.
  */
 
 const LOCALES = [
@@ -11,6 +12,12 @@ const LOCALES = [
   { locale: "ja", prefix: "/ja", dir: "ltr" },
 ] as const;
 const SCHEMES = ["light", "dark"] as const;
+const DARK_BG = "rgb(10, 10, 11)";
+const MCP_URL = "https://mcp.solana.com/mcp";
+const COMMANDS = {
+  claudeCode: `claude mcp add --transport http solana-mcp ${MCP_URL}`,
+  codex: `codex mcp add solana-mcp --url ${MCP_URL}`,
+} as const;
 
 async function backgroundOf(page: Page) {
   return page
@@ -29,8 +36,6 @@ async function invisibleElements(page: Page) {
 test.describe("without JavaScript", () => {
   for (const { locale, prefix, dir } of LOCALES) {
     test.describe(`${locale}`, () => {
-      const backgrounds: Record<string, string> = {};
-
       for (const colorScheme of SCHEMES) {
         test(`${colorScheme}: renders every section`, async ({ browser }) => {
           const context = await browser.newContext({
@@ -46,10 +51,33 @@ test.describe("without JavaScript", () => {
           await expect(page.locator("h1")).toHaveCount(1);
           await expect(page.locator("h1")).not.toBeEmpty();
 
-          // Hero code is rendered in full, not typed.
+          // Agent card: URL and commands are visible text; the copy buttons
+          // need JS, so they are hidden and disabled.
+          const card = page.getByTestId("agent-card");
+          await expect(card.getByTestId("agent-server-url")).toHaveText(
+            MCP_URL,
+          );
+          for (const [id, command] of Object.entries(COMMANDS)) {
+            await expect(card.getByTestId(`agent-command-${id}`)).toHaveText(
+              command,
+            );
+          }
           await expect(
-            page.locator("[data-dev-landing] pre code").first(),
-          ).toContainText(".transferToATA({");
+            card.locator('a[href="https://mcp.solana.com"]'),
+          ).toBeVisible();
+          const buttons = card.locator("button");
+          await expect(buttons).toHaveCount(3);
+          for (const button of await buttons.all()) {
+            await expect(button).toBeHidden();
+            await expect(button).toBeDisabled();
+          }
+
+          // No Ethereum / EVM links.
+          await expect(
+            page.locator(
+              '[data-dev-landing] a[href*="ethereum"], [data-dev-landing] a[href*="evm"]',
+            ),
+          ).toHaveCount(0);
 
           const cards = page.getByTestId("job-cards").getByRole("link");
           await expect(cards).toHaveCount(3);
@@ -100,18 +128,11 @@ test.describe("without JavaScript", () => {
 
           expect(await invisibleElements(page)).toEqual([]);
 
-          backgrounds[colorScheme] = await backgroundOf(page);
+          // Dark only, whatever the reader's preference.
+          expect(await backgroundOf(page)).toBe(DARK_BG);
           await context.close();
         });
       }
-
-      test("light and dark backgrounds differ", async () => {
-        test.skip(
-          Object.keys(backgrounds).length < 2,
-          "needs both scheme runs in the same worker",
-        );
-        expect(backgrounds.light).not.toBe(backgrounds.dark);
-      });
     });
   }
 
@@ -144,10 +165,14 @@ test.describe("without JavaScript", () => {
 });
 
 test.describe("with JavaScript", () => {
-  test("theme toggle persists and the page hydrates cleanly", async ({
+  test("stays dark with a light preference, has no toggle, hydrates cleanly", async ({
     browser,
   }) => {
-    const context = await browser.newContext({ colorScheme: "dark" });
+    const context = await browser.newContext({ colorScheme: "light" });
+    // A stored light choice (from /learn or the docs) must not apply here.
+    await context.addInitScript(() => {
+      localStorage.setItem("theme", "light");
+    });
     const page = await context.newPage();
     const errors: string[] = [];
     page.on("console", (message) => {
@@ -162,18 +187,15 @@ test.describe("with JavaScript", () => {
 
     await page.goto("/developers");
     await expect(page.locator("html")).toHaveClass(/\bdark\b/);
-    const dark = await backgroundOf(page);
-
-    await page
-      .getByRole("button", { name: /toggle/i })
-      .first()
-      .click();
-    await expect(page.locator("html")).toHaveClass(/\blight\b/);
-    // The landing background transitions over 300 ms.
-    await expect.poll(() => backgroundOf(page)).not.toBe(dark);
-
-    await page.reload();
-    await expect(page.locator("html")).toHaveClass(/\blight\b/);
+    await expect(page.locator("html")).not.toHaveClass(/\blight\b/);
+    expect(await backgroundOf(page)).toBe(DARK_BG);
+    expect(
+      await page.evaluate(
+        () => getComputedStyle(document.body).backgroundColor,
+      ),
+    ).toBe(DARK_BG);
+    await expect(page.getByRole("button", { name: /toggle/i })).toHaveCount(0);
+    // The stored preference is left alone for the light/dark pages.
     expect(await page.evaluate(() => localStorage.getItem("theme"))).toBe(
       "light",
     );
@@ -187,6 +209,43 @@ test.describe("with JavaScript", () => {
     await expect(page.getByTestId("calc-payments")).toHaveText(/1,000,000/);
 
     expect(errors).toEqual([]);
+    await context.close();
+  });
+
+  test("copy buttons copy the exact strings", async ({ browser }) => {
+    const context = await browser.newContext({
+      permissions: ["clipboard-read", "clipboard-write"],
+    });
+    const page = await context.newPage();
+    await page.goto("/developers");
+    const card = page.getByTestId("agent-card");
+    const targets = [
+      { name: "Copy the server URL", text: MCP_URL },
+      { name: "Copy the Claude Code command", text: COMMANDS.claudeCode },
+      { name: "Copy the Codex command", text: COMMANDS.codex },
+    ];
+    for (const { name, text } of targets) {
+      const button = card.getByRole("button", { name });
+      await expect(button).toBeEnabled();
+      await button.click();
+      await expect(button).toHaveText("Copied");
+      expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
+        text,
+      );
+    }
+    await context.close();
+  });
+
+  test("/learn keeps its theme toggle", async ({ browser }) => {
+    const context = await browser.newContext({ colorScheme: "dark" });
+    const page = await context.newPage();
+    await page.goto("/learn");
+    await expect(page.locator("html")).toHaveClass(/\bdark\b/);
+    await page
+      .getByRole("button", { name: /toggle/i })
+      .first()
+      .click();
+    await expect(page.locator("html")).toHaveClass(/\blight\b/);
     await context.close();
   });
 });

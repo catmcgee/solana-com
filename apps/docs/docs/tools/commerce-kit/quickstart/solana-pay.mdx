@@ -4,6 +4,12 @@ sidebarTitle: "Use with Solana Pay"
 description: Generate Solana Pay URLs, QR codes, and payment transactions
 ---
 
+<Danger>
+  The Commerce Kit is currently in beta. APIs may change before the stable
+  release. For additional details, see the [Commerce Kit
+  documentation](/docs/tools/commerce-kit).
+</Danger>
+
 The `@solana-commerce/solana-pay` package provides complete
 [Solana Pay](https://solanapay.com) functionality for building payment
 experiences, compatible with the
@@ -30,6 +36,18 @@ codes for mobile wallets to scan.
 
 - **`fields`** (`TransferRequestURLFields | TransactionRequestURLFields`) -
   Configuration for the payment URL
+
+The transfer request fields at a glance (details below):
+
+| Parameter   | Type                     | Description                                                        |
+| ----------- | ------------------------ | ------------------------------------------------------------------ |
+| `recipient` | `Address`                | Merchant wallet address (required)                                 |
+| `amount`    | `bigint`                 | Amount scaled by 1e9 (1 SOL = `1_000_000_000n`), whatever the mint |
+| `splToken`  | `Address`                | SPL token mint address (omit for SOL)                              |
+| `reference` | `Address` or `Address[]` | Unique reference(s) for tracking payments                          |
+| `label`     | `string`                 | Merchant name shown in wallet                                      |
+| `message`   | `string`                 | Message shown before payment                                       |
+| `memo`      | `string`                 | Onchain memo attached to transaction                               |
 
 #### `TransferRequestURLFields`
 
@@ -391,6 +409,12 @@ message with:
   `@solana/pay`. SPL token transfers use `transferChecked` and are not affected.
 </Warning>
 
+<Note>
+  `createTransfer` does not create the recipient's associated token account.
+  For an SPL token payment, the recipient's token account for that mint must
+  already exist before you send, or the transfer fails.
+</Note>
+
 #### Error Handling
 
 Throws `CreateTransferError` with specific messages:
@@ -453,6 +477,28 @@ const txMessage = pipe(
 );
 
 // Sign with signTransactionMessageWithSigners and send as usual.
+```
+
+With a Kit client that has a payer and RPC plugins
+([Kit client](/docs/frontend/client)), the same SOL payment is shorter, because
+the client sets the fee payer and lifetime and sends the transaction:
+
+```typescript
+import { address } from "@solana/kit";
+import { getTransferSolInstruction } from "@solana-program/system";
+import { getAddMemoInstruction } from "@solana-program/memo";
+
+// `client.payer` is the sender's TransactionSigner
+const instructions = [
+  getTransferSolInstruction({
+    source: client.payer,
+    destination: address(MERCHANT_WALLET_ADDRESS),
+    amount: 100_000_000n // 0.1 SOL in lamports
+  }),
+  getAddMemoInstruction({ memo: "Coffee purchase" })
+];
+
+await client.sendTransaction(instructions);
 ```
 
 #### Example: USDC Payment

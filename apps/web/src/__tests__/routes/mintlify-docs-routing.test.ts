@@ -98,9 +98,39 @@ describe("Mintlify rewrites", () => {
 
   it("serves index pages Mintlify would 307 away via their /index path", () => {
     expectRewrite("/docs/tools", `${M}/docs/tools/index`);
-    expectRewrite("/fr/docs/tokenization", `${M}/fr/docs/tokenization/index`);
+    expectRewrite("/fr/docs/tools", `${M}/fr/docs/tools/index`);
     expectRewrite("/docs/tools/kora", `${M}/docs/tools/kora`);
     expectRewrite("/docs/tools.md", `${M}/docs/tools.md`);
+  });
+
+  it("redirects the tokenization hub, merged into the assets hub", () => {
+    expectRedirect("/docs/tokenization", "/docs/assets#tokenization");
+    expectRedirect("/fr/docs/tokenization", "/fr/docs/assets#tokenization");
+    expectRedirect("/docs/tokenization.md", "/docs/assets.md");
+    // Exact path only: the tokenization guides keep their URLs.
+    expectRewrite(
+      "/docs/tokenization/token-acl",
+      `${M}/docs/tokenization/token-acl`,
+    );
+  });
+
+  it("sends merged duplicate pages straight to their final page", () => {
+    expectRedirect(
+      "/docs/payments/agentic-payments/x402-quickstart",
+      "/docs/payments/pay-sh#let-an-agent-pay-x402",
+    );
+    expectRedirect(
+      "/docs/payments/agentic-payments/x402/making-a-payment.md",
+      "/docs/payments/pay-sh.md",
+    );
+    expectRedirect(
+      "/ja/docs/payments/quickstart",
+      "/ja/docs/payments/checkout/browser",
+    );
+    expectRedirect(
+      "/docs/tokenization/quickstart.md",
+      "/docs/assets/issue-asset.md",
+    );
   });
 
   it("serves per-section llms.txt from apps/web, not Mintlify", () => {

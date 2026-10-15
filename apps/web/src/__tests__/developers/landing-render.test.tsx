@@ -26,7 +26,8 @@ vi.mock("@@/assets/learn/learn-hero.webp", () => ({
 const { DevelopersHub } =
   await import("@/app/[locale]/developers/developers-hub");
 const { LearnLanding } = await import("@/app/[locale]/learn/learn-landing");
-const { HUB_STATS, JOB_PATHS } = await import("@/data/developers/hub");
+const { AGENT_SETUP, HUB_STATS, JOB_PATHS } =
+  await import("@/data/developers/hub");
 
 function renderWithIntl(ui: ReactElement, locale = "en") {
   return render(
@@ -37,7 +38,7 @@ function renderWithIntl(ui: ReactElement, locale = "en") {
 }
 
 describe("/developers landing", () => {
-  it("renders the hero, real code and every section without client data", async () => {
+  it("renders the hero, the agent card and every section without client data", async () => {
     const { container } = renderWithIntl(
       await DevelopersHub({ locale: "en", updates: [] }),
     );
@@ -48,11 +49,8 @@ describe("/developers landing", () => {
         name: "Build on internet capital markets.",
       }),
     ).toBeInTheDocument();
-    // Full code is in the initial render (no typing needed to read it).
-    expect(container.querySelector("pre code")?.textContent).toContain(
-      ".transferToATA({",
-    );
     for (const name of [
+      "Build with your agent",
       "What are you building?",
       "Why Solana",
       "What would your payments cost?",
@@ -64,6 +62,50 @@ describe("/developers landing", () => {
       ).toBeInTheDocument();
     }
     expect(container.querySelector("[data-dev-landing]")).not.toBeNull();
+  });
+
+  it("server-renders the MCP URL and commands as plain text", async () => {
+    renderWithIntl(await DevelopersHub({ locale: "ja", updates: [] }), "ja");
+    const card = screen.getByTestId("agent-card");
+    expect(within(card).getByTestId("agent-server-url")).toHaveTextContent(
+      "https://mcp.solana.com/mcp",
+    );
+    expect(
+      within(card).getByTestId("agent-command-claudeCode").textContent,
+    ).toBe(AGENT_SETUP.clients[0].command);
+    expect(within(card).getByTestId("agent-command-codex").textContent).toBe(
+      AGENT_SETUP.clients[1].command,
+    );
+    expect(
+      within(card).getByRole("link", {
+        name: /Cursor, VS Code and Windsurf setup/,
+      }),
+    ).toHaveAttribute("href", "https://mcp.solana.com");
+    // No tabs and no code sample.
+    expect(card.querySelector('[role="tab"], pre')).toBeNull();
+  });
+
+  it("has no Ethereum or EVM links", async () => {
+    const { container } = renderWithIntl(
+      await DevelopersHub({ locale: "en", updates: [] }),
+    );
+    expect(container.textContent).not.toMatch(/ethereum|\bEVM\b/i);
+    for (const link of container.querySelectorAll("a")) {
+      expect(link.getAttribute("href") ?? "").not.toMatch(
+        /ethereum|evm|migrate-to-solana/i,
+      );
+    }
+  });
+
+  it("marks the landing dark-only", async () => {
+    const { container } = renderWithIntl(
+      await DevelopersHub({ locale: "en", updates: [] }),
+    );
+    expect(
+      container
+        .querySelector("[data-dev-landing]")
+        ?.getAttribute("data-dev-landing"),
+    ).toBe("dark");
   });
 
   it("links the three job cards to the job-path intros", async () => {

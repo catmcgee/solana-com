@@ -140,8 +140,8 @@ export const BUILD_STEPS = [
   {
     id: "accept",
     links: [
-      { id: "quickstart", href: "/docs/payments/quickstart" },
-      { id: "solanaPay", href: "/docs/payments/accept-payments/solana-pay" },
+      { id: "quickstart", href: "/docs/payments/checkout" },
+      { id: "solanaPay", href: "/docs/tools/solana-pay" },
       { id: "commerceKit", href: "/docs/tools/commerce-kit" },
     ],
   },

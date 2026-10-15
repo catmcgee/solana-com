@@ -32,12 +32,21 @@ deployed `*.mintlify.site` is listed under "Release gates" below.
 Rules for `apps/docs`:
 
 - Never add `.js`, `.jsx` or `.css` files except the owned globals
-  (`run-examples.js`, `ask-ai.js`, `header.js`, `styles/*.css`): Mintlify
-  injects every one of them on every page. `verify-urls` fails on strays.
+  (`run-examples.js`, `ask-ai.js`, `header.js`, `playground.js`,
+  `styles/*.css`): Mintlify injects every one of them on every page.
+  `verify-urls` fails on strays.
 - Never add `.md` notes (README, CLAUDE.md, AGENTS.md): they become pages.
   `.mintignore` is defence in depth only.
 - Folder paths are public URLs. Moving a file changes its URL and needs an
   `apps/web/rewrites-redirects.ts` redirect (page and `.md` twin).
+- Merging a duplicate page into another: move its unique content first, delete
+  the EN file and its locale copies, add the old URL to `movedDocsRedirects`
+  (the bare, `/:locale/` and `.md` variants are generated; a destination with an
+  `#anchor` gets no `.md` twin, so add that to `anchoredMdTwinRedirects`),
+  repoint any existing redirect that targeted the removed page (no chains),
+  update `navigation/en.json` and inbound links, then run `generate` and
+  `verify` (`gen:redirects` mirrors the result into `apps/docs/redirects.json`).
+  The 2026-10-15 merges are listed in the comment above those redirects.
 - Locale folders keep our codes (`ja`, `zh`, `pt`); Mintlify's
   `navigation.languages` uses `jp`, `cn`, `pt-BR` (see `src/lib/locales.ts`).
 - Translations come from Lingo, never from agents.
@@ -479,15 +488,15 @@ solana.com) before cutover. `mint dev` cannot answer them:
    404 on Mintlify itself and are served the English page (with the English
    canonical) by the apps/web fallback rewrite. If production also shows a wrong
    path, stamp `canonical` frontmatter on every page with a transform.
-2. **`/docs/tools` and `/docs/tokenization`.** On `mint dev` they 307 to their
-   first sub-page. Mintlify's dev page lookup only tries
-   `src/_props/<slug>.mdx`, never `<slug>/index.mdx`, and falls back to the
-   first nav page under the prefix. For these two, that page comes before the
-   index in nav order (commerce-kit in Payments, tokenization/quickstart in
-   Build it), so dev redirects. Production resolves pages differently. The
-   apps/web `MINTLIFY_INDEX_SHADOWED` rewrite to `/<section>/index` keeps
-   solana.com correct either way; remove it only if the deployed site
-   answers 200.
+2. **`/docs/tools`.** On `mint dev` it 307s to its first sub-page. Mintlify's
+   dev page lookup only tries `src/_props/<slug>.mdx`, never `<slug>/index.mdx`,
+   and falls back to the first nav page under the prefix. For `/docs/tools` that
+   page (commerce-kit, in Payments) comes before the index in nav order, so dev
+   redirects. Production resolves pages differently. The apps/web
+   `MINTLIFY_INDEX_SHADOWED` rewrite to `/<section>/index` keeps solana.com
+   correct either way; remove it only if the deployed site answers 200.
+   (`/docs/tokenization` was the second case until its index was merged into
+   `/docs/assets#tokenization`; it is now a redirect.)
 3. **`.md` twins and `Accept: text/markdown`** are served by Mintlify (all 404
    on `mint dev`).
 4. **Proxy headers.** Mintlify accepts the proxied Host/Origin, including the
@@ -537,6 +546,23 @@ solana.com) before cutover. `mint dev` cannot answer them:
   run `pnpm --filter @workspace/docs-tooling examples:build`, then
   `import X from "/snippets/examples/<id>.mdx"` and `<X />`. The old
   `file=...#region=` fence syntax is gone.
+- **Open in Playground.** `apps/docs/playground.js` (styles
+  `styles/playground.css`) adds the control to every code block's toolbar. Only
+  code from a generated example snippet can be enabled: before each fence the
+  generator writes a hidden
+  `<div className="sol-pg" data-pg-src data-pg-open data-pg-kind>` marker
+  (`src/examples/playground.ts`). The link is
+  `<origin>/github.com/<source>/<data-pg-open>`. `source` is the one
+  owner/repo/ref value in `playground.js`
+  (`catmcgee/solana-com/tree/mintlify-migration`, which becomes
+  `solana-foundation/solana-com/tree/main` after the merge). Never prefix
+  `https://`, because the playground router then rejects the URL. The
+  playground's GitHub import only accepts Anchor/Native programs ("Could not
+  identify framework" on TS/JS/Rust-client/Python), so `CONFIG.enabledKinds` is
+  `anchor`, `native`, and every current example is greyed out. Add a kind there
+  when the playground can import it. Linked files must exist at that ref on
+  GitHub. Each import costs one unauthenticated GitHub API call per folder
+  (60/hour per reader IP).
 - **Terminal panels (job paths).** A recorded output with a `<stem>.run.json`
   next to its `<stem>.output.txt` renders as a terminal panel
   (`src/lib/terminal.ts`, styles `apps/docs/styles/demo.css`, behaviour
