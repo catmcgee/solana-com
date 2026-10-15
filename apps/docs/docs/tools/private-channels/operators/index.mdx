@@ -30,8 +30,8 @@ Pin these versions on the host to match the Docker images:
 - Docker Engine 26+ (macOS Apple Silicon: enable "Docker VMM" in Settings ->
   Virtual Machine Options)
 - Node.js **24.7.0** and pnpm **10.15.1**
-- Solana CLI **3.1.13** (Agave)
-- Rust **1.91.0**
+- Solana CLI **3.1.13** (Agave; upstream `main` uses 4.2.2)
+- Rust **1.91.0** (upstream `main` uses 1.96+)
 - A Yellowstone gRPC endpoint for Devnet (available from Helius, Triton,
   QuickNode)
 
@@ -71,8 +71,8 @@ For the full service inventory and port assignments, see the
 [Configuration reference](/docs/tools/private-channels/operators/configuration).
 
 > **Security note:** Write-node and read-node ports are bound to loopback
-> (`127.0.0.1`) only, but several other services (gateway, auth, operator
-> metrics, Grafana, Prometheus, cAdvisor) are published to all network
+> (`127.0.0.1`) only, as is Grafana, but several other services (gateway, auth,
+> operator metrics, Prometheus, cAdvisor) are published to all network
 > interfaces by default. See the
 > [Configuration reference](/docs/tools/private-channels/operators/configuration#service-port-reference)
 > for the full port table and firewall these before any public-facing
@@ -148,31 +148,11 @@ takes 30 minutes to an hour.
 
 </Step>
 
-<Step title="Set up the Admin UI">
-
-The Admin UI is a browser-based tool for creating and configuring the escrow
-instance: a development and administration utility, not a user-facing product
-and not a required runtime component. All operations it performs
-(`CreateInstance`, `AllowMint`, `AddOperator`) can also be run via the CLI
-scripts in the repository.
-
-```bash
-cd admin-ui
-pnpm install
-echo "PRIVATE_CHANNEL_RPC_URL=http://localhost:8899" > .env
-pnpm dev   # opens at http://localhost:5173
-```
-
-</Step>
-
 <Step title="Create an escrow instance">
 
-1. Set your browser wallet to **Devnet** and ensure you have Devnet SOL for fees
-2. In the Admin UI, click **Create New Instance** and approve the transaction
-3. Copy the **Instance Address** and set it as `ESCROW_INSTANCE_ID` in
-   `.env.devnet`
-
-Alternatively, use the CLI script:
+Ensure the admin keypair has Devnet SOL for fees, then run the CLI script from
+`scripts/devnet`, which creates the instance and prints its address. Set the
+**Instance Address** as `ESCROW_INSTANCE_ID` in `.env.devnet`.
 
 ```bash
 cargo run --bin create_instance -- https://api.devnet.solana.com ./keypairs/admin.json
@@ -233,15 +213,9 @@ passed, so the trailing `--env-file .env` is required. Without it,
 
 <Step title="Configure the instance">
 
-With the stack running, whitelist a token mint and add your operator via the
-Admin UI:
-
-1. **Allow Mint**: Admin Functions -> Mint Management -> enter mint address ->
-   Allow Mint
-2. **Add Operator**: Admin Functions -> Operator Management -> enter operator
-   pubkey -> Add Operator
-
-Or via CLI:
+With the stack running, whitelist a token mint and add your operator using the
+`scripts/devnet` cargo binaries (check that directory for the binary that allows
+a mint). Add the operator:
 
 ```bash
 cargo run --bin add_operator -- \
@@ -291,7 +265,7 @@ make docker-devnet-clean
 ### Observability
 
 The stack includes Prometheus, Grafana, and cAdvisor for metrics and container
-monitoring. Grafana is accessible on port `37429`.
+monitoring. Grafana is accessible on port `37429` (bound to `127.0.0.1` only).
 
 <Warning>
   The default Grafana password is `admin`. Change it before exposing port 37429

@@ -407,26 +407,33 @@ function useArcClient(): ArcClientSnapshot;
 #### 返回值
 
 ```typescript
-interface ArcClientSnapshot {
-  // Wallet State
-  wallet: {
-    address: Address | null;
-    signer: TransactionSigner | null;
-  };
+import { useState, useEffect } from "react";
+import { useArcClient } from "@solana-commerce/sdk";
+import { createSolanaRpc } from "@solana/kit";
 
-  // Network Configuration
-  network: {
-    cluster: "mainnet" | "devnet" | "testnet";
-    rpcUrl: string;
-  };
+function AccountBalance() {
+  const { network, wallet } = useArcClient();
+  const [balance, setBalance] = useState<bigint | null>(null);
 
-  // Client Configuration
-  config: ArcWebClientConfig;
+  useEffect(() => {
+    if (!wallet.address) return;
 
-  // Actions
-  select: (walletName: string) => Promise<void>;
-  disconnect: () => Promise<void>;
-  selectAccount: (accountAddress: Address) => Promise<void>;
+    const rpc = createSolanaRpc(network.rpcUrl);
+
+    async function fetchBalance() {
+      // getBalance resolves to { context, value }
+      const { value } = await rpc.getBalance(wallet.address!).send();
+      setBalance(value);
+    }
+
+    fetchBalance();
+  }, [wallet.address, network.rpcUrl]);
+
+  if (!wallet.address) return <div>Connect wallet to see balance</div>;
+
+  if (balance === null) return <div>Loading balance...</div>;
+
+  return <div>Balance: {(Number(balance) / 1e9).toFixed(4)} SOL</div>;
 }
 ```
 
@@ -442,30 +449,44 @@ interface ArcClientSnapshot {
 **直接 RPC 查询：**
 
 ```tsx
-import { useArcClient } from "@solana-commerce/sdk";
-import { getSharedRpc } from "@solana-commerce/sdk/core/rpc-manager";
-import { address } from "@solana/kit";
+interface ArcClientSnapshot {
+  // Wallet State
+  wallet: {
+    wallets: StandardWalletInfo[];
+    selectedWallet: Wallet | null;
+    connected: boolean;
+    connecting: boolean;
+    address: Address | null;
+    signer: TransactionSigner | null;
+    accounts?: Array<{ address: Address; icon?: string; raw?: unknown }>;
+    selectedAccount?: Address | null;
+    capabilities?: { walletSupportsVersioned: boolean };
+    connectors?: Array<{
+      id: string;
+      name: string;
+      icon?: string;
+      available: () => boolean;
+      connect: () => Promise<void>;
+    }>;
+  };
 
-function AccountBalance() {
-  const { network, wallet } = useArcClient();
-  const [balance, setBalance] = useState<bigint | null>(null);
+  // Network Configuration
+  network: {
+    rpcUrl: string;
+    isMainnet: boolean;
+    isDevnet: boolean;
+    isTestnet: boolean;
+    canAirdrop: boolean;
+    clusterInfo: ClusterInfo; // { name, rpcUrl, wsUrl?, ... }
+  };
 
-  useEffect(() => {
-    if (!wallet.address) return;
+  // Client Configuration
+  config: ArcWebClientConfig;
 
-    const rpc = getSharedRpc(network.rpcUrl);
-
-    async function fetchBalance() {
-      const result = await rpc.getBalance(wallet.address).send();
-      setBalance(result);
-    }
-
-    fetchBalance();
-  }, [wallet.address, network.rpcUrl]);
-
-  if (!wallet.address) return <div>Connect wallet to see balance</div>;
-
-  return <div>Balance: {(Number(balance) / 1e9).toFixed(4)} SOL</div>;
+  // Actions
+  select: (walletName: string) => Promise<void>;
+  disconnect: () => Promise<void>;
+  selectAccount: (accountAddress: Address) => Promise<void>;
 }
 ```
 
@@ -477,7 +498,7 @@ function NetworkIndicator() {
 
   return (
     <div>
-      <span>Network: {network.cluster}</span>
+      <span>Network: {network.clusterInfo.name}</span>
       {network.canAirdrop && <button onClick={handleAirdrop}>Airdrop</button>}
     </div>
   );

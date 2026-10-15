@@ -2,6 +2,7 @@
 date: 2025-11-28T00:00:00Z
 difficulty: advanced
 title: "NAV Strikes for Money Market Funds on Solana"
+sidebarTitle: "NAV strikes for money market funds on Solana"
 description:
   "Learn how to implement multiple daily NAV strikes for money market funds
   using SPL Token 2022 extensions, enabling institutional-grade subscription and
@@ -283,6 +284,458 @@ shares.
 ```
 
 ## Complete NAV Strikes Implementation
+
+### Project Setup
+
+The reference implementation is a small TypeScript project. Install the
+dependencies and run the demo against a local Surfpool (the demo creates its own
+test USDC, so no mainnet fork is needed):
+
+```bash
+pnpm add @solana/kit @solana-program/system @solana-program/token \
+  @solana-program/token-2022 @solana/spl-token-metadata @solana/web3.js
+pnpm add -D tsx typescript @types/node
+
+# In a second terminal
+surfpool start
+```
+
+Create these files. The engine and demo below import the two helper files in this
+section:
+
+```
+src-kit/
+├── types.ts               # shared types (this section)
+├── test-usdc.ts           # mock USDC helpers (this section)
+├── nav-strike-engine.ts   # NAVStrikeEngine (next section)
+└── examples/
+    └── daily-strikes.ts   # the demo (Complete Usage Example)
+```
+
+Run the demo with `pnpm tsx src-kit/examples/daily-strikes.ts` once all four files
+exist. The full project, including a `web3.js` version, is in the
+[nav-strikes-reference repository](https://github.com/Woody4618/nav-strikes-reference).
+
+`src-kit/types.ts`:
+
+```typescript
+/**
+ * NAV Strikes - Type Definitions (Solana Kit)
+ *
+ * ⚠️ EDUCATIONAL REFERENCE ONLY - NOT FOR PRODUCTION USE
+ */
+
+import type {
+  Address,
+  Rpc,
+  RpcSubscriptions,
+  SolanaRpcApi,
+  SolanaRpcSubscriptionsApi,
+} from "@solana/kit";
+import type { sendAndConfirmTransactionFactory } from "@solana/kit";
+
+/**
+ * Configuration for creating a new fund token
+ */
+export interface FundTokenConfig {
+  /** Display name of the fund */
+  name: string;
+  /** Token symbol (e.g., "EX-MMF") */
+  symbol: string;
+  /** Description of the fund */
+  description?: string;
+  /** URI of the offchain metadata JSON */
+  uri?: string;
+  /** Starting NAV price (typically $1.00) */
+  initialNAV: number;
+  /** Array of strike times in "HH:MM" format (24-hour) */
+  strikeSchedule: string[];
+  /** Token decimals (default: 6 to match USDC) */
+  decimals?: number;
+}
+
+/**
+ * Current state of the fund
+ */
+export interface FundState {
+  /** Mint address of the fund token */
+  fundMint: Address;
+  /** Current NAV in USD (6 decimal precision) */
+  currentNAV: number;
+  /** Timestamp of last NAV strike */
+  lastStrikeTime: Date;
+  /** Total Assets Under Management in USDC */
+  totalAUM: number;
+  /** Total shares outstanding */
+  totalSharesOutstanding: number;
+}
+
+/**
+ * Parameters for subscription (USDC → Fund Shares)
+ */
+export interface SubscriptionParams {
+  /** Fund token mint address */
+  fundMint: Address;
+  /** USDC mint address */
+  usdcMint: Address;
+  /** Investor's address */
+  investor: Address;
+  /** Amount of USDC to invest */
+  usdcAmount: number;
+}
+
+/**
+ * Parameters for redemption (Fund Shares → USDC)
+ */
+export interface RedemptionParams {
+  /** Fund token mint address */
+  fundMint: Address;
+  /** USDC mint address */
+  usdcMint: Address;
+  /** Investor's address */
+  investor: Address;
+  /** Number of shares to redeem */
+  shareAmount: number;
+}
+
+/**
+ * Result of a subscription operation
+ */
+export interface SubscriptionResult {
+  /** Transaction signature */
+  signature: string;
+  /** Amount of USDC invested */
+  usdcAmount: number;
+  /** Number of shares issued */
+  sharesIssued: number;
+  /** NAV at time of execution */
+  executionNAV: number;
+  /** Timestamp */
+  timestamp: Date;
+}
+
+/**
+ * Result of a redemption operation
+ */
+export interface RedemptionResult {
+  /** Transaction signature */
+  signature: string;
+  /** Number of shares redeemed */
+  sharesRedeemed: number;
+  /** Amount of USDC paid out */
+  usdcPaid: number;
+  /** NAV at time of execution */
+  executionNAV: number;
+  /** Timestamp */
+  timestamp: Date;
+}
+
+/**
+ * Result of a NAV strike execution
+ */
+export interface StrikeResult {
+  /** Strike identifier */
+  strikeId: string;
+  /** Strike time */
+  strikeTime: Date;
+  /** NAV used for this strike */
+  nav: number;
+  /** Number of subscriptions processed */
+  subscriptionsProcessed: number;
+  /** Total USDC subscribed */
+  totalUSDCSubscribed: number;
+  /** Total shares minted */
+  totalSharesMinted: number;
+  /** Number of redemptions processed */
+  redemptionsProcessed: number;
+  /** Total shares redeemed */
+  totalSharesRedeemed: number;
+  /** Total USDC paid out */
+  totalUSDCPaid: number;
+  /** Transaction signatures */
+  signatures: string[];
+}
+
+/**
+ * Queued order for a NAV strike
+ */
+export interface StrikeOrder {
+  /** Order ID */
+  orderId: string;
+  /** Investor address */
+  investor: Address;
+  /** Order type */
+  orderType: "subscribe" | "redeem";
+  /** Amount (USDC for subscribe, shares for redeem) */
+  amount: number;
+  /** Target strike time */
+  strikeTime: Date;
+  /** Order status */
+  status: "pending" | "executed" | "failed";
+}
+
+/**
+ * Client configuration for Solana Kit
+ */
+export interface SolanaClient {
+  /** RPC client for making requests */
+  rpc: Rpc<SolanaRpcApi>;
+  /** RPC subscriptions for WebSocket events */
+  rpcSubscriptions: RpcSubscriptions<SolanaRpcSubscriptionsApi>;
+  /** Send and confirm transaction helper */
+  sendAndConfirmTransaction: ReturnType<
+    typeof sendAndConfirmTransactionFactory
+  >;
+}
+```
+
+`src-kit/test-usdc.ts` creates a mock USDC mint (6 decimals) and mints it to the
+demo participants:
+
+```typescript
+/**
+ * Test USDC Utility - Solana Kit Version
+ *
+ * Creates a mock USDC token for testing on local validator or devnet.
+ * This simulates USDC with 6 decimals.
+ *
+ * Built with @solana/kit (web3.js 2.0)
+ *
+ * ⚠️ FOR TESTING ONLY - Not real USDC
+ */
+
+import {
+  Address,
+  appendTransactionMessageInstructions,
+  createTransactionMessage,
+  generateKeyPairSigner,
+  getSignatureFromTransaction,
+  KeyPairSigner,
+  lamports,
+  pipe,
+  setTransactionMessageFeePayerSigner,
+  setTransactionMessageLifetimeUsingBlockhash,
+  signTransactionMessageWithSigners,
+} from "@solana/kit";
+import { getCreateAccountInstruction } from "@solana-program/system";
+import {
+  getInitializeMintInstruction,
+  getMintSize,
+  TOKEN_PROGRAM_ADDRESS,
+  getMintToInstruction,
+  findAssociatedTokenPda,
+  getCreateAssociatedTokenInstruction,
+  fetchMaybeToken,
+  fetchToken,
+} from "@solana-program/token";
+import {
+  TOKEN_2022_PROGRAM_ADDRESS,
+  fetchToken as fetchToken2022,
+} from "@solana-program/token-2022";
+import type { SolanaClient } from "./types";
+
+/**
+ * Helper to send and confirm transactions with correct typing
+ * Works around stricter types in @solana/kit v5+
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function sendTransaction(
+  client: SolanaClient,
+  signedTx: any
+): Promise<void> {
+  await client.sendAndConfirmTransaction(signedTx, { commitment: "confirmed" });
+}
+
+/**
+ * Creates a mock USDC token for testing
+ * Returns the mint address
+ */
+export async function createTestUSDC(
+  client: SolanaClient,
+  payer: KeyPairSigner,
+  mintAuthority: KeyPairSigner
+): Promise<Address> {
+  console.log("\n💵 Creating test USDC token...");
+
+  const mint = await generateKeyPairSigner();
+  const decimals = 6; // USDC has 6 decimals
+
+  const mintSize = getMintSize();
+  const mintRent = await client.rpc
+    .getMinimumBalanceForRentExemption(BigInt(mintSize))
+    .send();
+  const { value: latestBlockhash } = await client.rpc
+    .getLatestBlockhash()
+    .send();
+
+  // Create account instruction
+  const createAccountIx = getCreateAccountInstruction({
+    payer,
+    newAccount: mint,
+    lamports: lamports(mintRent),
+    space: mintSize,
+    programAddress: TOKEN_PROGRAM_ADDRESS,
+  });
+
+  // Initialize mint instruction
+  const initMintIx = getInitializeMintInstruction({
+    mint: mint.address,
+    decimals,
+    mintAuthority: mintAuthority.address,
+    freezeAuthority: null,
+  });
+
+  // Build and send transaction
+  const transactionMessage = pipe(
+    createTransactionMessage({ version: 0 }),
+    (tx) => setTransactionMessageFeePayerSigner(payer, tx),
+    (tx) => setTransactionMessageLifetimeUsingBlockhash(latestBlockhash, tx),
+    (tx) =>
+      appendTransactionMessageInstructions([createAccountIx, initMintIx], tx)
+  );
+
+  const signedTransaction = await signTransactionMessageWithSigners(
+    transactionMessage
+  );
+  await sendTransaction(client, signedTransaction);
+
+  console.log(`✅ Test USDC created: ${mint.address}`);
+  return mint.address;
+}
+
+/**
+ * Mints test USDC to a recipient
+ */
+export async function mintTestUSDC(
+  client: SolanaClient,
+  usdcMint: Address,
+  mintAuthority: KeyPairSigner,
+  recipient: Address,
+  amount: number,
+  recipientName?: string
+): Promise<Address> {
+  const shortAddr = `${recipient.slice(0, 4)}...${recipient.slice(-4)}`;
+  const displayName = recipientName
+    ? `"${recipientName}" (${shortAddr})`
+    : shortAddr;
+  console.log(
+    `\n💵 Minting $${amount.toLocaleString()} test USDC to ${displayName}`
+  );
+
+  // Find the ATA
+  const [ata] = await findAssociatedTokenPda({
+    mint: usdcMint,
+    owner: recipient,
+    tokenProgram: TOKEN_PROGRAM_ADDRESS,
+  });
+
+  const { value: latestBlockhash } = await client.rpc
+    .getLatestBlockhash()
+    .send();
+
+  // Check if account exists
+  const maybeToken = await fetchMaybeToken(client.rpc, ata, {
+    commitment: "confirmed",
+  });
+
+  if (!maybeToken.exists) {
+    // Create ATA first
+    const createAtaIx = getCreateAssociatedTokenInstruction({
+      payer: mintAuthority,
+      owner: recipient,
+      mint: usdcMint,
+      ata,
+      tokenProgram: TOKEN_PROGRAM_ADDRESS,
+    });
+
+    const createAtaMsg = pipe(
+      createTransactionMessage({ version: 0 }),
+      (tx) => setTransactionMessageFeePayerSigner(mintAuthority, tx),
+      (tx) => setTransactionMessageLifetimeUsingBlockhash(latestBlockhash, tx),
+      (tx) => appendTransactionMessageInstructions([createAtaIx], tx)
+    );
+
+    const signedCreateAta = await signTransactionMessageWithSigners(
+      createAtaMsg
+    );
+    await sendTransaction(client, signedCreateAta);
+  }
+
+  // Mint USDC
+  const mintToIx = getMintToInstruction({
+    mint: usdcMint,
+    token: ata,
+    mintAuthority,
+    amount: BigInt(amount * 1e6),
+  });
+
+  const { value: latestBlockhash2 } = await client.rpc
+    .getLatestBlockhash()
+    .send();
+
+  const mintMsg = pipe(
+    createTransactionMessage({ version: 0 }),
+    (tx) => setTransactionMessageFeePayerSigner(mintAuthority, tx),
+    (tx) => setTransactionMessageLifetimeUsingBlockhash(latestBlockhash2, tx),
+    (tx) => appendTransactionMessageInstructions([mintToIx], tx)
+  );
+
+  const signedMint = await signTransactionMessageWithSigners(mintMsg);
+  await sendTransaction(client, signedMint);
+
+  console.log(`✅ Minted $${amount.toLocaleString()} USDC`);
+
+  return ata;
+}
+
+/**
+ * Gets USDC balance for an account
+ */
+export async function getUSDCBalance(
+  client: SolanaClient,
+  usdcMint: Address,
+  owner: Address
+): Promise<number> {
+  try {
+    const [tokenAddress] = await findAssociatedTokenPda({
+      mint: usdcMint,
+      owner,
+      tokenProgram: TOKEN_PROGRAM_ADDRESS,
+    });
+
+    const account = await fetchToken(client.rpc, tokenAddress, {
+      commitment: "confirmed",
+    });
+    return Number(account.data.amount) / 1e6;
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * Gets fund share balance for an account
+ */
+export async function getFundShareBalance(
+  client: SolanaClient,
+  fundMint: Address,
+  owner: Address
+): Promise<number> {
+  try {
+    const [tokenAddress] = await findAssociatedTokenPda({
+      mint: fundMint,
+      owner,
+      tokenProgram: TOKEN_2022_PROGRAM_ADDRESS,
+    });
+
+    const account = await fetchToken2022(client.rpc, tokenAddress, {
+      commitment: "confirmed",
+    });
+    return Number(account.data.amount) / 1e6;
+  } catch {
+    return 0;
+  }
+}
+```
 
 ### Setting Up the NAV Strike Engine
 
@@ -1368,8 +1821,8 @@ Here's a complete example demonstrating a full day of NAV strike operations:
  * Demonstrates multiple daily NAV strikes for a money market fund on Solana.
  * Built with @solana/kit (web3.js 2.0)
  *
- * Run with: npm run demo:kit
- * Requires: solana-test-validator running locally
+ * Run with: pnpm tsx src-kit/examples/daily-strikes.ts
+ * Requires: Surfpool running locally (`surfpool start`)
  *
  * ⚠️ EDUCATIONAL REFERENCE ONLY - NOT FOR PRODUCTION USE
  */

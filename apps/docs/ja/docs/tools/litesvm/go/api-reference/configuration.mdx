@@ -123,7 +123,7 @@ func (s *LiteSVM) SetLamports(lamports uint64) error
 内部エアドロッププールアカウントのデフォルトlamport残高を設定します。
 
 ```go
-if err := svm.SetLamports(1 << 40); err != nil { // ~1.1 trillion lamports (~1,100 SOL)
+if err := svm.SetLamports(1 << 40); err != nil { // airdrop pool of ~1.1 trillion lamports (~1,100 SOL)
     t.Fatal(err)
 }
 ```
@@ -166,12 +166,14 @@ if err := svm.SetTransactionHistory(0); err != nil {   // disable dedup entirely
 
 ```go
 type ComputeBudget struct {
-    // See litesvm-go/litesvm.go for the full field list.
+    // Only ComputeUnitLimit and HeapSize can differ from the defaults.
     // usize fields are normalized to uint64; HeapSize stays uint32.
     ComputeUnitLimit uint64
     HeapSize         uint32
-    // ...
+    // ... VM cost constants, see DefaultComputeBudget()
 }
+
+func DefaultComputeBudget() ComputeBudget
 ```
 
 ### ComputeBudget
@@ -188,8 +190,11 @@ if err != nil {
     t.Fatal(err)
 }
 if !set {
-    budget.ComputeUnitLimit = 1_400_000
+    // No custom budget yet: budget is the zero value, so start from the
+    // defaults before changing a field.
+    budget = litesvm.DefaultComputeBudget()
 }
+budget.ComputeUnitLimit = 200_000
 if err := svm.SetComputeBudget(budget); err != nil {
     t.Fatal(err)
 }
@@ -214,7 +219,6 @@ fs, err := litesvm.NewFeatureSet()
 if err != nil {
     t.Fatal(err)
 }
-defer fs.Close()
 if err := fs.Activate(featureID, 0); err != nil {
     t.Fatal(err)
 }
@@ -224,7 +228,6 @@ fs2, err := litesvm.NewFeatureSetAllEnabled()
 if err != nil {
     t.Fatal(err)
 }
-defer fs2.Close()
 if err := fs2.Deactivate(featureID); err != nil {
     t.Fatal(err)
 }

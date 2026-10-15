@@ -137,10 +137,41 @@ export interface SchemaNode {
   anyOf?: SchemaNode[];
 }
 
+/**
+ * `data/surfpool/examples.json`: curated, live-verified sample requests and
+ * results. The schema-derived samples carry generator placeholders
+ * (`<some-mint>`, slot `123456789`, ...) that Surfnet rejects, so a method
+ * listed here uses these values instead. Methods not listed fall back to the
+ * schema-derived sample.
+ */
+export interface RpcExample {
+  params: unknown[];
+  /** Sample `result` of the response. */
+  result?: unknown;
+  /** Complete response body (used instead of `result`, e.g. for errors). */
+  response?: unknown;
+  /** Extra prose shown under the description. */
+  note?: string;
+}
+
+export interface WsExample {
+  params?: unknown[];
+  /** Sample `params.result` of the notification. */
+  notification?: unknown;
+  /** The method is not implemented by Surfnet: no samples are shown. */
+  unsupported?: boolean;
+}
+
+export interface SurfpoolExamples {
+  rpc: Record<string, RpcExample>;
+  websocket: Record<string, WsExample>;
+}
+
 export interface SurfpoolSchemas {
   rpc: SchemaNode;
   response: SchemaNode;
   websocket: SchemaNode;
+  examples?: SurfpoolExamples;
 }
 
 export interface Field {
@@ -154,6 +185,7 @@ export interface Field {
 export interface RpcMethod {
   name: string;
   description: string;
+  note?: string;
   params: Field[];
   result: Field[];
   request: string;
@@ -163,6 +195,7 @@ export interface RpcMethod {
 export interface WsMethod {
   name: string;
   description: string;
+  unsupported?: boolean;
   params: Field[];
   unsubscribeName: string;
   subscribe: string;
@@ -175,10 +208,14 @@ export interface WsMethod {
 export function loadSurfpoolSchemas(dir = SURFPOOL_DATA_DIR): SurfpoolSchemas {
   const read = (f: string) =>
     JSON.parse(readFileSync(path.join(dir, f), "utf8")) as SchemaNode;
+  const examplesFile = path.join(dir, "examples.json");
   return {
     rpc: read("rpc-schema.json"),
     response: read("response_schema.json"),
     websocket: read("websocket_schema.json"),
+    examples: existsSync(examplesFile)
+      ? (JSON.parse(readFileSync(examplesFile, "utf8")) as SurfpoolExamples)
+      : undefined,
   };
 }
 
@@ -660,6 +697,43 @@ export function sampleFromSchema(
 
 const json = (v: unknown) => JSON.stringify(v, null, 2);
 
+/**
+ * `minContextSlot` samples (`123456789`) make a copy-pasted request fail with
+ * -32016 "Minimum context slot has not been reached", so they are never part
+ * of a schema-derived sample.
+ */
+function withoutMinContextSlot(v: unknown): unknown {
+  if (Array.isArray(v)) return v.map(withoutMinContextSlot);
+  if (v && typeof v === "object")
+    return Object.fromEntries(
+      Object.entries(v)
+        .filter(([k]) => k !== "minContextSlot")
+        .map(([k, x]) => [k, withoutMinContextSlot(x)]),
+    );
+  return v;
+}
+
+/**
+ * Agave validator admin RPC methods that the Surfnet RPC server does not
+ * implement (-32601 "Method not found"). Surfnet only serves `listPlugins`,
+ * `startTime` and the plugin management methods.
+ */
+export const SURFNET_UNSUPPORTED_ADMIN = new Set([
+  "rpcAddress",
+  "setLogFilter",
+  "addAuthorizedVoter",
+  "addAuthorizedVoterFromBytes",
+  "removeAllAuthorizedVoters",
+  "setIdentity",
+  "setIdentityFromBytes",
+  "setStakedNodesOverrides",
+  "repairShredFromPeer",
+  "setRepairWhitelist",
+  "getSecondaryIndexKeySize",
+  "setPublicTpuAddress",
+  "setPublicTpuForwardsAddress",
+]);
+
 const SCHEMA_GROUPS: Record<string, string> = {
   accounts: "AccountsDataEndpoints",
   accountsScan: "AccountsScanEndpoints",
@@ -763,12 +837,23 @@ class RpcModel {
     };
   }
 
-  responseExample(schema: SchemaNode, method: string) {
+  responseExample(schema: SchemaNode, method: string, fieldName = method) {
+    const ex = this.s.examples?.rpc[method];
+    if (ex?.response !== undefined) return json(ex.response);
     return json({
       jsonrpc: "2.0",
       id: 1,
-      result: sampleFromSchema(schema, this.s.response, method),
+      result:
+        ex?.result !== undefined
+          ? ex.result
+          : sampleFromSchema(schema, this.s.response, fieldName),
     });
+  }
+
+  /** Sample params: curated example first, else schema-derived. */
+  exampleParams(method: string, derived: unknown[]): unknown[] {
+    const ex = this.s.examples?.rpc[method];
+    return ex ? ex.params : (withoutMinContextSlot(derived) as unknown[]);
   }
 
   fromSchema(
@@ -785,9 +870,15 @@ class RpcModel {
       return {
         name,
         description: endpoint.description || `${name} method`,
+        note: this.s.examples?.rpc[name]?.note,
         params: [],
         result: resultTree(flatResultFields(schema, this.s.response)),
-        request: json({ jsonrpc: "2.0", id: 1, method: name, params: [] }),
+        request: json({
+          jsonrpc: "2.0",
+          id: 1,
+          method: name,
+          params: this.exampleParams(name, []),
+        }),
         response: this.responseExample(schema, name),
       };
     }
@@ -802,13 +893,14 @@ class RpcModel {
     return {
       name,
       description: endpoint.description || `${name} method`,
+      note: this.s.examples?.rpc[name]?.note,
       params: extractParams(actual, this.s.rpc),
       result: resultTree(flatResultFields(schema, this.s.response)),
       request: json({
         jsonrpc: "2.0",
         id: 1,
         method: name,
-        params: exampleParams,
+        params: this.exampleParams(name, exampleParams),
       }),
       response: this.responseExample(schema, name),
     };
@@ -851,10 +943,16 @@ class RpcModel {
         name,
         description:
           schema.description?.replace(`${m} - `, "") || `${m} method`,
+        note: this.s.examples?.rpc[name]?.note,
         params: [],
         result: resultTree(flatResultFields(schema, this.s.response)),
-        request: json({ jsonrpc: "2.0", id: 1, method: name, params: [] }),
-        response: this.responseExample(schema, m),
+        request: json({
+          jsonrpc: "2.0",
+          id: 1,
+          method: name,
+          params: this.exampleParams(name, []),
+        }),
+        response: this.responseExample(schema, name, m),
       });
     }
     return out;
@@ -921,22 +1019,37 @@ export function websocketMethods(s: SurfpoolSchemas): WsMethod[] {
         children: [],
       });
     }
+    // Positional order: required parameters (pubkey, programId, signature)
+    // first, then the optional config object.
     const sample = request?.properties
-      ? Object.keys(request.properties).map((k) =>
-          sampleFromSchema(request.properties![k], ws),
-        )
+      ? Object.keys(request.properties)
+          .sort((a, b) => (required.has(a) ? 0 : 1) - (required.has(b) ? 0 : 1))
+          .map((k) => sampleFromSchema(request.properties![k], ws))
       : [];
+    const ex = s.examples?.websocket[name];
     out.push({
       name,
       description: def.description || "No description available.",
+      unsupported: ex?.unsupported,
       params,
       unsubscribeName,
-      subscribe: json({ jsonrpc: "2.0", id: 1, method: name, params: sample }),
+      subscribe: json({
+        jsonrpc: "2.0",
+        id: 1,
+        method: name,
+        params: ex?.params ?? sample,
+      }),
       subscribeResponse: json({ jsonrpc: "2.0", id: 1, result: 12345 }),
       notification: json({
         jsonrpc: "2.0",
         method: `${category}Notification`,
-        params: sampleFromSchema(notification, resp),
+        params: {
+          result:
+            ex?.notification !== undefined
+              ? ex.notification
+              : sampleFromSchema(notification, resp),
+          subscription: 12345,
+        },
       }),
       unsubscribe: json({
         jsonrpc: "2.0",
@@ -964,7 +1077,9 @@ export function buildSurfpoolModel(s: SurfpoolSchemas): SurfpoolModel {
         ...m.group("endpoints2"),
         ...m.byCategory("accounts"),
       ]),
-      admin: m.group("endpoints3"),
+      admin: m
+        .group("endpoints3")
+        .filter((x) => !SURFNET_UNSUPPORTED_ADMIN.has(x.name)),
       cheatcodes: m.cheatcodes(),
       network: m.byCategory("network"),
       node: m.byCategory("node"),
@@ -990,8 +1105,8 @@ const INTROS: Record<SurfpoolCategory, string> = {
   network:
     "Access network-wide information like epoch data, inflation rates, and performance metrics.",
   admin:
-    "Administrative controls for managing the Surfnet instance, plugins, and system configuration.",
-  websockets: `Real-time WebSocket subscriptions for monitoring blockchain state changes. Connect to \`${SURFNET_WS}\` when running Surfnet.`,
+    "Administrative controls for managing the Surfnet instance and its plugins. These come from the Agave validator admin RPC, and Surfnet implements only `listPlugins`, `startTime`, `loadPlugin`, `reloadPlugin` and `unloadPlugin`. The other Agave admin methods (for example `setIdentity` or `setLogFilter`) return `-32601 Method not found` on Surfnet and are not listed.",
+  websockets: `Real-time WebSocket subscriptions for monitoring blockchain state changes. Connect to \`${SURFNET_WS}\` when running Surfnet. Surfnet implements \`accountSubscribe\`, \`logsSubscribe\`, \`programSubscribe\`, \`signatureSubscribe\` and \`slotSubscribe\`; \`blockSubscribe\`, \`voteSubscribe\` and \`slotUpdatesSubscribe\` are listed for completeness but are not supported. In every notification the payload is wrapped in \`params.result\`, next to the \`subscription\` id.`,
 };
 
 const mdParser = unified().use(remarkParse).use(remarkGfm);
@@ -1076,6 +1191,7 @@ function rpcMethodNodes(m: RpcMethod): AstNode[] {
   const out: AstNode[] = [
     { type: "heading", depth: 2, children: [{ type: "text", value: m.name }] },
     ...prose(m.description),
+    ...(m.note ? prose(m.note) : []),
   ];
   if (m.params.length) {
     out.push(label("Parameters"), ...m.params.map((p) => field(p, "param")));
@@ -1095,6 +1211,22 @@ function wsMethodNodes(m: WsMethod): AstNode[] {
   ];
   if (m.params.length)
     out.push(label("Parameters"), ...m.params.map((p) => field(p, "param")));
+  if (m.unsupported) {
+    out.push({
+      type: "paragraph",
+      children: [
+        {
+          type: "strong",
+          children: [{ type: "text", value: "Not supported by Surfnet." }],
+        },
+        {
+          type: "text",
+          value: ` ${m.name} is rejected (or not found) by the Surfnet WebSocket server. It is listed because it is part of the Solana RPC API.`,
+        },
+      ],
+    });
+    return out;
+  }
   out.push(
     fence("json", "Subscribe", m.subscribe),
     fence("json", "Subscribe response", m.subscribeResponse),

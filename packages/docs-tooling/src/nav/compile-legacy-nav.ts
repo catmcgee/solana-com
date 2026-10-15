@@ -167,6 +167,7 @@ export function compileLegacyNav(opts: CompileOptions = {}): CompileResult {
       (g.root && ctx.indexPages.has(g.root) ? "card" : undefined);
     const out: NavGroup = {
       group: g.group,
+      ...(g.tag ? { tag: g.tag } : {}),
       ...(g.root ? { root: g.root } : {}),
       ...(g.icon ? { icon: g.icon } : {}),
       ...(g.expanded !== undefined ? { expanded: g.expanded } : {}),

@@ -10,7 +10,7 @@ environment. All test accounts must be explicitly defined, ensuring
 deterministic and repeatable tests.
 
 - [Mollusk SVM Documentation](https://docs.rs/mollusk-svm/latest/mollusk_svm/)
-- [Mollusk Test Usage Examples](https://github.com/anza-xyz/mollusk/tree/0.5.0/harness/tests)
+- [Mollusk Test Usage Examples](https://github.com/anza-xyz/mollusk/tree/0.7.2/harness/tests)
 
 ## Installation
 
@@ -60,8 +60,10 @@ using Mollusk.
     This example demonstrates how to test a basic Solana program using Mollusk. The
     program simply prints "Hello, world!" to the program logs when invoked.
 
-    Running `cargo build-sbf` generates the compiled program at
-    `/target/deploy/<program_name>.so`.
+    Running `cargo build-sbf --arch v0` generates the compiled program at
+    `/target/deploy/<program_name>.so`. Build with `--arch v0`: Mollusk
+    0.7 cannot load programs built with the current default SBPF v3 architecture
+    and `cargo test` fails with `FailedToParse("invalid file header")`.
 
     ```rs src/lib.rs focus={16-30}
     use solana_program::{
@@ -123,7 +125,7 @@ using Mollusk.
     }
     ```
 
-    To execute the test, run `cargo test`.
+    To execute the test, run `cargo build-sbf --arch v0` and then `cargo test`.
 
     When the test runs successfully, you'll see output similar to the following:
 
@@ -131,7 +133,7 @@ using Mollusk.
     running 1 test
     [2025-09-22T19:25:50.427685000Z DEBUG solana_runtime::message_processor::stable_log] Program 11157t3sqMV725NVRLrVQbAu98Jjfk1uCKehJnXXQs invoke [1]
     [2025-09-22T19:25:50.429669000Z DEBUG solana_runtime::message_processor::stable_log] Program log: Hello, world!
-    [2025-09-22T19:25:50.429690000Z DEBUG solana_runtime::message_processor::stable_log] Program 11157t3sqMV725NVRLrVQbAu98Jjfk1uCKehJnXXQs consumed 211 of 1400000 compute units
+    [2025-09-22T19:25:50.429690000Z DEBUG solana_runtime::message_processor::stable_log] Program 11157t3sqMV725NVRLrVQbAu98Jjfk1uCKehJnXXQs consumed 196 of 1400000 compute units
     [2025-09-22T19:25:50.429726000Z DEBUG solana_runtime::message_processor::stable_log] Program 11157t3sqMV725NVRLrVQbAu98Jjfk1uCKehJnXXQs success
     test tests::test_hello_world ... ok
 
@@ -150,11 +152,11 @@ using Mollusk.
     crate-type = ["cdylib", "lib"]
 
     [dependencies]
-    solana-program = "2.2.0"
+    solana-program = "3"
 
     [dev-dependencies]
-    mollusk-svm = "0.5.0"
-    solana-sdk = "2.2.0"
+    mollusk-svm = "0.7"
+    solana-sdk = "3"
     ```
 
     ```txt target/deploy/hello_world.so
@@ -164,7 +166,7 @@ using Mollusk.
 </Steps>
 
 The
-[`Mollusk`](https://docs.rs/mollusk-svm/0.5.0/mollusk_svm/struct.Mollusk.html)
+[`Mollusk`](https://docs.rs/mollusk-svm/0.7.2/mollusk_svm/struct.Mollusk.html)
 struct provides a simple interface for testing Solana programs. All fields can
 be manipulated through a handful of helper methods, but users can also directly
 access and modify them if they desire more control.
@@ -215,7 +217,7 @@ Mollusk provides four main methods for processing instructions:
 | [`process_and_validate_instruction_chain`](#multiple-instructions-with-checks) | Process multiple instructions and perform a series of checks on each result, panicking if any checks fail. |
 
 The
-[`InstructionResult`](https://docs.rs/mollusk-svm-result/0.5.0/mollusk_svm_result/types/struct.InstructionResult.html)
+[`InstructionResult`](https://docs.rs/mollusk-svm-result/0.7.2/mollusk_svm_result/types/struct.InstructionResult.html)
 contains the details of a processed instruction.
 
 #### Single Instruction
@@ -237,8 +239,11 @@ checks.
 <Info>
 
 The examples below run Mollusk in the `main` function for demonstration
-purposes. In practice, you'll typically use Mollusk in a test module annotated
-with the `#[test]` attribute.
+purposes. Because `mollusk-svm` is a dev-dependency, save each example as
+`examples/<name>.rs` and run it with `cargo run --example <name>`. The
+`main` function in `src/main.rs` cannot import dev-dependencies. In practice,
+you'll typically use Mollusk in a test module annotated with the `#[test]`
+attribute.
 
 </Info>
 
@@ -565,7 +570,7 @@ fn main() {
 ### Validation Checks
 
 Mollusk provides a set of
-[helper methods](https://docs.rs/mollusk-svm-result/0.5.0/mollusk_svm_result/check/struct.Check.html)
+[helper methods](https://docs.rs/mollusk-svm-result/0.7.2/mollusk_svm_result/check/struct.Check.html)
 to check the results of a processed instruction.
 
 ```rust Example
@@ -619,7 +624,7 @@ Check::all_rent_exempt()
 ### Persistent Account State
 
 The
-[`MolluskContext`](https://docs.rs/mollusk-svm/0.5.0/mollusk_svm/struct.MolluskContext.html)
+[`MolluskContext`](https://docs.rs/mollusk-svm/0.7.2/mollusk_svm/struct.MolluskContext.html)
 is a wrapper around `Mollusk` that maintains account state across multiple
 instruction calls through its `account_store`. The methods for processing
 instructions are identical to `Mollusk`.
@@ -720,7 +725,7 @@ fn main() {
 ### Mollusk Sysvars
 
 Mollusk provides a custom
-[`Sysvars`](https://docs.rs/mollusk-svm/0.5.0/mollusk_svm/sysvar/struct.Sysvars.html)
+[`Sysvars`](https://docs.rs/mollusk-svm/0.7.2/mollusk_svm/sysvar/struct.Sysvars.html)
 struct for modifying its values for testing.
 
 Use the `warp_to_slot` method to update the sysvar clock to simulate moving
@@ -736,7 +741,7 @@ fn main() {
     // Show initial slot
     println!("Initial slot: {}", mollusk.sysvars.clock.slot);
 
-    // Warp to slot 1000
+    // Warp to slot 100
     mollusk.warp_to_slot(100);
     println!("After warp: {}", mollusk.sysvars.clock.slot);
 
@@ -779,12 +784,12 @@ fn main() {
 
 ## Compute Unit Benchmarking
 
-[`MolluskComputeUnitBencher`](https://docs.rs/mollusk-svm-bencher/0.5.0/mollusk_svm_bencher/struct.MolluskComputeUnitBencher.html)
+[`MolluskComputeUnitBencher`](https://docs.rs/mollusk-svm-bencher/0.7.2/mollusk_svm_bencher/struct.MolluskComputeUnitBencher.html)
 tracks compute unit usage of a program's instructions. Results are written to a
 markdown file.
 
 Requires
-[`mollusk-svm-bencher`](https://docs.rs/mollusk-svm-bencher/0.5.0/mollusk_svm_bencher/index.html)
+[`mollusk-svm-bencher`](https://docs.rs/mollusk-svm-bencher/0.7.2/mollusk_svm_bencher/index.html)
 as a dependency.
 
 The following example benchmarks the compute unit usage of a SOL transfer
@@ -840,10 +845,20 @@ fn main() {
 }
 ```
 
-The benchmark results are written to the specified `out_dir` as a markdown file
-named `compute_units.md`.
+Save the benchmark as `benches/compute_units.rs` and register it in
+`Cargo.toml` with the default test harness disabled:
 
-```md comput_units.md
+```toml Cargo.toml
+[[bench]]
+name = "compute_units"
+harness = false
+```
+
+Run it with `cargo bench`. Running the benchmark as a regular example panics
+because `cargo bench` sets the environment the bencher expects. The results are
+written to the specified `out_dir` as a markdown file named `compute_units.md`.
+
+```md compute_units.md
 #### 2025-09-19 22:28:53.691839 UTC
 
 Solana CLI Version: solana-cli 2.2.20 (src:dabc99a5; feat:3073396398,
@@ -857,7 +872,7 @@ client:Agave)
 ## Token Program Testing
 
 Use the
-[`mollusk-svm-programs-token`](https://docs.rs/mollusk-svm-programs-token/0.5.0/mollusk_svm_programs_token/index.html)
+[`mollusk-svm-programs-token`](https://docs.rs/mollusk-svm-programs-token/0.7.2/mollusk_svm_programs_token/index.html)
 crate add the token program, token2022 program (token extensions), and
 associated token program to Mollusk for testing.
 

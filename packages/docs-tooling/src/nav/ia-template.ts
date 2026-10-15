@@ -10,6 +10,12 @@
  * docs-nav-research.md Revision 3, mapped onto existing page URLs (spec D4:
  * existing pages keep their URLs; only NEW pages get the mockup's URLs).
  *
+ * Group labels never repeat their tab name or another tab's group name
+ * (the first group of a tab is "<topic> basics"/"Get started", the overview
+ * page's sidebarTitle is "Overview"), so breadcrumbs never read
+ * "Payments > Payments". The Kora "Guides" subgroup comes from the legacy
+ * meta.json and was renamed to "Kora guides" in en.json by hand.
+ *
  * Deviations from spec §2.2, each forced by decisions.md:
  * - Video tutorials is an external-link tab on the right (`href`,
  *   `align: "end"`) pointing at the Mintlify-served
@@ -29,7 +35,7 @@ export const IA_TEMPLATE: TemplateTab[] = [
     icon: "house",
     groups: [
       {
-        group: "Start here",
+        group: "Get started",
         pages: [
           "docs/index",
           "docs/finance/index", // sidebarTitle: All use cases
@@ -45,7 +51,7 @@ export const IA_TEMPLATE: TemplateTab[] = [
     icon: "credit-card",
     groups: [
       {
-        group: "Payments",
+        group: "Payment basics",
         pages: [
           "docs/payments/index",
           "docs/payments/how-payments-work",
@@ -53,11 +59,13 @@ export const IA_TEMPLATE: TemplateTab[] = [
         ],
       },
       {
-        group: "Build it",
+        group: "Payment tutorials",
         pages: [
           {
             group: "Build a checkout",
             root: "docs/payments/checkout",
+            tag: "~30 min",
+            expanded: true,
             pages: [
               "docs/payments/checkout/try-it",
               "docs/payments/checkout/browser",
@@ -68,6 +76,8 @@ export const IA_TEMPLATE: TemplateTab[] = [
           {
             group: "Paywall an endpoint",
             root: "docs/payments/paywall-api",
+            tag: "~30 min",
+            expanded: true,
             pages: [
               "docs/payments/paywall-api/try-it",
               "docs/payments/paywall-api/browser",
@@ -79,7 +89,7 @@ export const IA_TEMPLATE: TemplateTab[] = [
         ],
       },
       {
-        group: "Guides",
+        group: "Payment guides",
         pages: [
           {
             group: "Send payments",
@@ -131,8 +141,8 @@ export const IA_TEMPLATE: TemplateTab[] = [
           },
           "docs/finance/privacy", // sidebarTitle: Private payments
           {
-            group: "Advanced",
-            labelFrom: "meta:docs/payments/advanced-payments",
+            group: "Advanced payments",
+            labelFrom: "none",
             pages: [
               "docs/payments/advanced-payments/deferred-execution",
               "docs/payments/advanced-payments/spend-permissions",
@@ -171,16 +181,18 @@ export const IA_TEMPLATE: TemplateTab[] = [
     icon: "layers",
     groups: [
       {
-        group: "Assets",
-        labelFrom: "meta:docs/tokens",
+        group: "Asset basics",
+        labelFrom: "none",
         pages: ["docs/assets/index"],
       },
       {
-        group: "Build it",
+        group: "Asset tutorials",
         pages: [
           {
             group: "Issue an asset",
             root: "docs/assets/issue-asset",
+            tag: "~45 min",
+            expanded: true,
             pages: [
               "docs/assets/issue-asset/try-it",
               "docs/assets/issue-asset/browser",
@@ -225,7 +237,7 @@ export const IA_TEMPLATE: TemplateTab[] = [
             pages: [x("docs/tokens/extensions")],
           },
           {
-            group: "Advanced",
+            group: "Advanced tokens",
             root: "docs/tokens/advanced/index",
             pages: [x("docs/tokens/advanced")],
           },
@@ -244,12 +256,12 @@ export const IA_TEMPLATE: TemplateTab[] = [
     icon: "chart-line",
     groups: [
       {
-        group: "Markets",
+        group: "Market basics",
         labelFrom: "meta:docs/defi",
         pages: ["docs/defi/index"],
       },
       {
-        group: "Guides",
+        group: "Trading guides",
         pages: [
           "docs/defi/exchange",
           {
@@ -269,7 +281,7 @@ export const IA_TEMPLATE: TemplateTab[] = [
     tab: "How Solana works",
     icon: "box",
     groups: [
-      { group: "Overview", pages: ["docs/core/index"] },
+      { group: "Introduction", pages: ["docs/core/index"] },
       {
         group: "The basics",
         pages: [
@@ -344,7 +356,7 @@ export const IA_TEMPLATE: TemplateTab[] = [
     tab: "Resources",
     icon: "wrench",
     groups: [
-      { group: "Resources", pages: ["docs/tools/index"] },
+      { group: "Browse resources", pages: ["docs/tools/index"] },
       {
         group: "Set up",
         pages: [
@@ -363,7 +375,7 @@ export const IA_TEMPLATE: TemplateTab[] = [
         ],
       },
       {
-        group: "Programs",
+        group: "Write programs",
         labelFrom: "meta:docs/core/programs",
         pages: [
           "docs/programs/index",
@@ -451,7 +463,7 @@ export const IA_TEMPLATE: TemplateTab[] = [
         pages: ["developers/cookbook/index", x("developers/cookbook")],
       },
       {
-        group: "Video tutorials",
+        group: "Videos",
         labelFrom: "message:videoTutorials",
         pages: [
           "docs/video-guides/index",

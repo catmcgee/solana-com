@@ -70,53 +70,94 @@ const legacyLightPalette = {
   "#e8833a": "#c45a18",
 };
 
+// Solana palette for every light diagram (zinc neutrals, Solana purple,
+// green and teal, as in the docs mockup's .flow). Applied after the
+// normalizers above, so it also restyles diagrams that were converted
+// earlier. Targets are never keys of the palettes above, which keeps the
+// script idempotent.
+const solanaLightPalette = {
+  "#172033": "#18181b",
+  "#344054": "#3f3f46",
+  "#444444": "#3f3f46",
+  "#444": "#3f3f46",
+  "#5b6678": "#52525b",
+  "#667085": "#71717a",
+  "#6b778c": "#71717a",
+  "#94a3b8": "#a1a1aa",
+  "#98a2b3": "#a1a1aa",
+  "#9aa8b8": "#a1a1aa",
+  "#c9d2de": "#d4d4d8",
+  "#d5dce5": "#e4e4e7",
+  "#eef2f7": "#f4f4f5",
+  "#f8fafc": "#fafafa",
+  "#a21caf": "#9b4dff",
+  "#7e22ce": "#7f5cf0",
+  "#6d5bd0": "#7f5cf0",
+  "#4f63c8": "#7f5cf0",
+  "#fae8ff": "#f3edff",
+  "#ede9fe": "#f3edff",
+  "#f3e8ff": "#f3edff",
+  "#f3f0ff": "#f3edff",
+  "#d7d0f5": "#e3d8fb",
+  "#0284c7": "#3b82f6",
+  "#2563eb": "#3b82f6",
+  "#3b82b6": "#3b82f6",
+  "#0369a1": "#2f6fe0",
+  "#e8f2ff": "#eff6ff",
+  "#f0f9ff": "#eff6ff",
+  "#059669": "#0a8f5a",
+  "#047857": "#0a7a4c",
+  "#0ea982": "#0bb070",
+  "#0f8b78": "#0f9e94",
+  "#159db2": "#0f9e94",
+  "#e6f7f2": "#e3fbef",
+  "#ecfdf5": "#e3fbef",
+};
+
+// Dark pairs are generated from the light files: same layout, page-coloured
+// canvas (#0a0a0b, the docs dark background), brighter accents.
 const darkPalette = {
-  "#ffffff": "#000000",
-  "#f8fafc": "#151d2e",
-  "#eef2f7": "#1c2638",
-  "#d5dce5": "#263247",
-  "#c9d2de": "#3a485f",
-  "#9aa8b8": "#64748b",
-  "#94a3b8": "#64748b",
-  "#6b778c": "#8492a6",
-  "#667085": "#a8b3c2",
-  "#5b6678": "#a8b3c2",
-  "#172033": "#f8fafc",
-  "#344054": "#e2e8f0",
-  "#ede9fe": "#2b2045",
-  "#7c3aed": "#a78bfa",
-  "#fae8ff": "#321a3a",
-  "#a21caf": "#e879f9",
-  "#f3e8ff": "#2d1b42",
-  "#7e22ce": "#c084fc",
-  "#e8f2ff": "#152a44",
-  "#2563eb": "#60a5fa",
-  "#e6f7f2": "#12332e",
-  "#0f8b78": "#2dd4bf",
+  "#ffffff": "#0a0a0b",
+  "#fafafa": "#111113",
+  "#f4f4f5": "#18181b",
+  "#e4e4e7": "#27272a",
+  "#d4d4d8": "#3f3f46",
+  "#a1a1aa": "#71717a",
+  "#71717a": "#a1a1aa",
+  "#52525b": "#a1a1aa",
+  "#3f3f46": "#d4d4d8",
+  "#18181b": "#f2f2f3",
+  "#7c3aed": "#a777ff",
+  "#9b4dff": "#b98bff",
+  "#7f5cf0": "#9b84f5",
+  "#f3edff": "#1c1430",
+  "#e3d8fb": "#4c3a75",
+  "#3b82f6": "#60a5fa",
+  "#2f6fe0": "#60a5fa",
+  "#eff6ff": "#0f1a2e",
+  "#0a8f5a": "#14f195",
+  "#0a7a4c": "#14f195",
+  "#0bb070": "#14f195",
+  "#0f9e94": "#19d3c5",
+  "#e3fbef": "#0b261b",
+  "#b45309": "#fbbf24",
   "#fff7dd": "#342c16",
   "#b88400": "#facc15",
   "#fff0e6": "#352317",
   "#c45a18": "#fb923c",
-  "#0284c7": "#38bdf8",
-  "#059669": "#34d399",
-  "#6d5bd0": "#8b7cf6",
-  "#4f63c8": "#7c8cf8",
-  "#3b82b6": "#60a5fa",
-  "#159db2": "#22d3ee",
-  "#0ea982": "#2dd4bf",
-  "#f3f0ff": "#2b2342",
-  "#d7d0f5": "#594e7a",
-  "#98a2b3": "#64748b",
   "#9a7700": "#facc15",
   "#fff7d6": "#342c16",
+  "#552222": "#fca5a5",
 };
 
+/** Single pass, so one mapping's output is never re-mapped by another. */
 function replacePalette(svg, palette) {
-  return Object.entries(palette).reduce(
-    (result, [source, target]) =>
-      result.replaceAll(new RegExp(source, "gi"), target),
-    svg,
+  const lower = Object.fromEntries(
+    Object.entries(palette).map(([k, v]) => [k.toLowerCase(), v]),
   );
+  const keys = Object.keys(lower).sort((x, y) => y.length - x.length);
+  const re = new RegExp(`(${keys.join("|")})(?![0-9a-f])`, "gi");
+  return svg.replace(re, (m) => lower[m.toLowerCase()]);
 }
 
 function normalizeOverview(svg) {
@@ -224,6 +265,14 @@ const coreLights = await Promise.all(
 );
 const koraLight = await createLightSource(koraPath, normalizeKora);
 
-for (const light of [...overviewLights, ...coreLights, koraLight]) {
+// The frontend, finance and Kora request-lifecycle pairs are drawn by hand
+// in both modes and are left alone.
+const generatedLights = [...overviewLights, ...coreLights, koraLight];
+for (const light of generatedLights) {
+  const svg = await readFile(light, "utf8");
+  const restyled = replacePalette(svg, solanaLightPalette);
+  if (restyled !== svg) await writeFile(light, restyled);
+}
+for (const light of generatedLights) {
   await writeDarkPair(light);
 }

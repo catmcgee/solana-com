@@ -36,6 +36,7 @@ t.Logf("new slot:     %d", after.Slot)
 ### Clock
 
 ```go
+// sysvar is github.com/gagliardetto/solana-go/sysvar
 type Clock struct {
     Slot                uint64
     EpochStartTimestamp int64
@@ -44,7 +45,7 @@ type Clock struct {
     UnixTimestamp       int64
 }
 
-func (s *LiteSVM) Clock() (Clock, error)
+func (s *LiteSVM) Clock() (*sysvar.Clock, error)
 ```
 
 Odczytaj sysvar Clock.
@@ -60,7 +61,7 @@ t.Logf("slot=%d epoch=%d unix=%d", c.Slot, c.Epoch, c.UnixTimestamp)
 ### SetClock
 
 ```go
-func (s *LiteSVM) SetClock(c Clock) error
+func (s *LiteSVM) SetClock(c *sysvar.Clock) error
 ```
 
 Nadpisz sysvar Clock. Odczytaj go, zmień pola i zapisz z powrotem, gdy potrzebujesz kontroli nad `Epoch` lub `UnixTimestamp` (których `WarpToSlot` nie aktualizuje).
@@ -89,13 +90,13 @@ if err := svm.SetClock(c); err != nil {
 
 ```go
 type Rent struct {
-    LamportsPerByteYear uint64
-    ExemptionThreshold  float64
-    BurnPercent         uint8
+    LamportsPerByte    uint64
+    ExemptionThreshold float64
+    BurnPercent        uint8
 }
 
-func (s *LiteSVM) Rent() (Rent, error)
-func (s *LiteSVM) SetRent(r Rent) error
+func (s *LiteSVM) Rent() (*sysvar.Rent, error)
+func (s *LiteSVM) SetRent(r *sysvar.Rent) error
 ```
 
 ```go
@@ -103,7 +104,7 @@ r, err := svm.Rent()
 if err != nil {
     t.Fatal(err)
 }
-t.Logf("lamports/byte-year: %d", r.LamportsPerByteYear)
+t.Logf("lamports/byte: %d", r.LamportsPerByte)
 t.Logf("exemption threshold: %.2f", r.ExemptionThreshold)
 t.Logf("burn percent: %d", r.BurnPercent)
 ```
@@ -135,8 +136,8 @@ type EpochSchedule struct {
     FirstNormalSlot          uint64
 }
 
-func (s *LiteSVM) EpochSchedule() (EpochSchedule, error)
-func (s *LiteSVM) SetEpochSchedule(e EpochSchedule) error
+func (s *LiteSVM) EpochSchedule() (*sysvar.EpochSchedule, error)
+func (s *LiteSVM) SetEpochSchedule(e *sysvar.EpochSchedule) error
 ```
 
 ```go
@@ -156,15 +157,14 @@ type EpochRewards struct {
     DistributionStartingBlockHeight uint64
     NumPartitions                   uint64
     ParentBlockhash                 solana.Hash
-    TotalPointsLo                   uint64 // low 64 bits of the u128 total_points
-    TotalPointsHi                   uint64 // high 64 bits
+    TotalPoints                     bin.Uint128 // u128 total_points
     TotalRewards                    uint64
     DistributedRewards              uint64
     Active                          bool
 }
 
-func (s *LiteSVM) EpochRewards() (EpochRewards, error)
-func (s *LiteSVM) SetEpochRewards(e EpochRewards) error
+func (s *LiteSVM) EpochRewards() (*sysvar.EpochRewards, error)
+func (s *LiteSVM) SetEpochRewards(e *sysvar.EpochRewards) error
 ```
 
 `total_points` jest typu `u128` po stronie Solany; `litesvm-go` udostępnia obie połówki
@@ -176,8 +176,12 @@ bitach, `TotalPointsHi` wynosi `0`, a `TotalPointsLo` jest wartością.
 ### LastRestartSlot / SetLastRestartSlot
 
 ```go
-func (s *LiteSVM) LastRestartSlot() (uint64, error)
-func (s *LiteSVM) SetLastRestartSlot(slot uint64) error
+type LastRestartSlot struct {
+    LastRestartSlot uint64
+}
+
+func (s *LiteSVM) LastRestartSlot() (*sysvar.LastRestartSlot, error)
+func (s *LiteSVM) SetLastRestartSlot(l *sysvar.LastRestartSlot) error
 ```
 
 ```go
@@ -185,7 +189,7 @@ last, err := svm.LastRestartSlot()
 if err != nil {
     t.Fatal(err)
 }
-if err := svm.SetLastRestartSlot(last + 1); err != nil {
+if err := svm.SetLastRestartSlot(&sysvar.LastRestartSlot{LastRestartSlot: last.LastRestartSlot + 1}); err != nil {
     t.Fatal(err)
 }
 ```
@@ -198,8 +202,10 @@ type SlotHash struct {
     Hash solana.Hash
 }
 
-func (s *LiteSVM) SlotHashes() ([]SlotHash, error)
-func (s *LiteSVM) SetSlotHashes(items []SlotHash) error
+type SlotHashes []SlotHash
+
+func (s *LiteSVM) SlotHashes() (sysvar.SlotHashes, error)
+func (s *LiteSVM) SetSlotHashes(items sysvar.SlotHashes) error
 ```
 
 ### SlotHistory
@@ -208,22 +214,18 @@ func (s *LiteSVM) SetSlotHashes(items []SlotHash) error
 wycinka (slice).
 
 ```go
-sh, err := litesvm.NewSlotHistory()
-if err != nil {
-    t.Fatal(err)
-}
-defer sh.Close()
+sh := sysvar.NewSlotHistory()
 
 sh.Add(42)
 
 switch sh.Check(42) {
-case litesvm.SlotHistoryFound:
+case sysvar.SlotHistoryFound:
     // ...
-case litesvm.SlotHistoryNotFound:
+case sysvar.SlotHistoryNotFound:
     // ...
-case litesvm.SlotHistoryTooOld:
+case sysvar.SlotHistoryTooOld:
     // ...
-case litesvm.SlotHistoryFuture:
+case sysvar.SlotHistoryFuture:
     // ...
 }
 
@@ -248,15 +250,21 @@ if err := svm.SetSlotHistory(sh); err != nil {
 ## Historia Stake
 
 ```go
-type StakeHistoryItem struct {
-    Epoch        uint64
+type StakeHistoryEntry struct {
     Effective    uint64
     Activating   uint64
     Deactivating uint64
 }
 
-func (s *LiteSVM) StakeHistory() ([]StakeHistoryItem, error)
-func (s *LiteSVM) SetStakeHistory(items []StakeHistoryItem) error
+type StakeHistoryItem struct {
+    Epoch uint64
+    Entry StakeHistoryEntry
+}
+
+type StakeHistory []StakeHistoryItem
+
+func (s *LiteSVM) StakeHistory() (sysvar.StakeHistory, error)
+func (s *LiteSVM) SetStakeHistory(items sysvar.StakeHistory) error
 ```
 
 ## Testowanie Logiki Zależnej od Czasu

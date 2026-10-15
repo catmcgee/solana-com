@@ -89,7 +89,7 @@ Token ACL은 **무허가 해동** 기능을 제공합니다 - 사용자는 Gate 
 │   3. Gate Program validates user                    │
 │      ├─> On allow list? ✅ THAW                     │
 │      ├─> On block list? ❌ STAY FROZEN              │
-│      └─> AllowAllEoas mode? ✅ THAW                 │
+│      └─> Block mode, not listed? ✅ THAW            │
 │                                                     │
 │   4. Account thawed instantly!                      │
 │      └─> User can receive tokens immediately        │
@@ -310,8 +310,8 @@ ABL (허용 차단 목록) Gate Program은 여러 모드를 지원합니다:
 
 ```bash
 pnpm add @solana/kit @solana-program/token-2022 @solana-program/system \
-  @solana-program/compute-budget @token-acl/sdk @token-acl/abl-sdk \
-  @solana/spl-token-metadata @solana/web3.js ws
+  @solana-program/compute-budget @solana/token-acl-sdk \
+  @solana/token-acl-gate-sdk @solana/spl-token-metadata @solana/web3.js ws
 ```
 
 ### 2단계: Token ACL로 토큰 생성
@@ -319,19 +319,28 @@ pnpm add @solana/kit @solana-program/token-2022 @solana-program/system \
 Token ACL로 규정 준수 토큰을 생성하는 완전한 예제입니다:
 
 ```typescript
+import { readFile } from "node:fs/promises";
+import { homedir } from "node:os";
+
 import {
   createSolanaRpc,
   createSolanaRpcSubscriptions,
   sendAndConfirmTransactionFactory,
   getSignatureFromTransaction,
   generateKeyPairSigner,
+  createKeyPairSignerFromBytes,
+  assertIsTransactionWithBlockhashLifetime,
   pipe,
   createTransactionMessage,
-  setTransactionMessageFeePayer,
+  setTransactionMessageFeePayerSigner,
   setTransactionMessageLifetimeUsingBlockhash,
   appendTransactionMessageInstructions,
   signTransactionMessageWithSigners,
-  lamports
+  fetchEncodedAccount,
+  lamports,
+  type Address,
+  type Instruction,
+  type TransactionSigner
 } from "@solana/kit";
 
 import { getCreateAccountInstruction } from "@solana-program/system";
@@ -357,8 +366,10 @@ import {
   getCreateConfigInstruction,
   findMintConfigPda,
   getTogglePermissionlessInstructionsInstruction,
-  findThawExtraMetasAccountPda
-} from "@token-acl/sdk";
+  findThawExtraMetasAccountPda,
+  createThawPermissionlessIdempotentInstructionWithExtraMetas,
+  TOKEN_ACL_PROGRAM_ADDRESS
+} from "@solana/token-acl-sdk";
 
 // ABL Gate Program SDK
 import {
@@ -367,26 +378,51 @@ import {
   getAddWalletInstruction,
   findListConfigPda,
   findWalletEntryPda,
-  ABL_PROGRAM_ADDRESS,
+  TOKEN_ACL_GATE_PROGRAM_PROGRAM_ADDRESS,
   Mode
-} from "@token-acl/abl-sdk";
+} from "@solana/token-acl-gate-sdk";
 
 // TLV sizes for Token-2022 extensions
 const TYPE_SIZE = 2;
 const LENGTH_SIZE = 2;
 
+// Shared setup used by all following steps
+const rpc = createSolanaRpc("http://localhost:8899");
+const rpcSubscriptions = createSolanaRpcSubscriptions("ws://localhost:8900");
+const sendAndConfirm = sendAndConfirmTransactionFactory({
+  rpc,
+  rpcSubscriptions
+});
+
+// Load a keypair file (JSON array of bytes) as a signer
+async function loadKeypair(path: string): Promise<TransactionSigner> {
+  const bytes = new Uint8Array(JSON.parse(await readFile(path, "utf8")));
+  return createKeyPairSignerFromBytes(bytes);
+}
+
+// Build, sign and send a transaction with the given instructions
+async function sendInstructions(
+  feePayer: TransactionSigner,
+  instructions: Instruction[]
+) {
+  const { value: blockhash } = await rpc.getLatestBlockhash().send();
+  const message = pipe(
+    createTransactionMessage({ version: 0 }),
+    (tx) => setTransactionMessageFeePayerSigner(feePayer, tx),
+    (tx) => setTransactionMessageLifetimeUsingBlockhash(blockhash, tx),
+    (tx) => appendTransactionMessageInstructions(instructions, tx)
+  );
+  const signedTx = await signTransactionMessageWithSigners(message);
+  // Narrow the lifetime type so sendAndConfirm accepts the transaction
+  assertIsTransactionWithBlockhashLifetime(signedTx);
+  await sendAndConfirm(signedTx, { commitment: "confirmed" });
+  return getSignatureFromTransaction(signedTx);
+}
+
+// Your payer: mint authority, Token ACL authority and ABL list authority
+const payer = await loadKeypair(`${homedir()}/.config/solana/id.json`);
+
 async function createTokenACLMint() {
-  // Setup RPC
-  const rpc = createSolanaRpc("http://localhost:8899");
-  const rpcSubscriptions = createSolanaRpcSubscriptions("ws://localhost:8900");
-  const sendAndConfirm = sendAndConfirmTransactionFactory({
-    rpc,
-    rpcSubscriptions
-  });
-
-  // Load your payer keypair
-  const payer = await loadKeypair("~/.config/solana/id.json");
-
   // Generate mint keypair
   const mint = await generateKeyPairSigner();
   console.log(`🪙  Mint: ${mint.address}`);
@@ -396,6 +432,7 @@ async function createTokenACLMint() {
   const TOKEN_SYMBOL = "COMP";
   const TOKEN_URI = "";
   const TOKEN_ACL_KEY = "token_acl";
+  const GATE_PROGRAM = TOKEN_ACL_GATE_PROGRAM_PROGRAM_ADDRESS;
 
   // Define extensions
   const defaultAccountStateExtension = extension("DefaultAccountState", {
@@ -414,10 +451,7 @@ async function createTokenACLMint() {
     name: TOKEN_NAME,
     symbol: TOKEN_SYMBOL,
     uri: TOKEN_URI,
-    additionalMetadata: [[TOKEN_ACL_KEY, ABL_PROGRAM_ADDRESS]] as [
-      string,
-      string
-    ][]
+    additionalMetadata: [[TOKEN_ACL_KEY, GATE_PROGRAM]] as [string, string][]
   };
   const metadataLen = pack(metadataForSizing).length;
   const totalSpace = baseMintSize + metadataLen + TYPE_SIZE + LENGTH_SIZE;
@@ -433,53 +467,39 @@ async function createTokenACLMint() {
     extensions
   );
 
-  // Build transaction
-  const { value: blockhash } = await rpc.getLatestBlockhash().send();
-  const createMintTx = pipe(
-    createTransactionMessage({ version: 0 }),
-    (tx) => setTransactionMessageFeePayer(payer.address, tx),
-    (tx) => setTransactionMessageLifetimeUsingBlockhash(blockhash, tx),
-    (tx) =>
-      appendTransactionMessageInstructions(
-        [
-          getSetComputeUnitLimitInstruction({ units: 400_000 }),
-          getCreateAccountInstruction({
-            payer,
-            newAccount: mint,
-            lamports: lamports(mintRent),
-            space: baseMintSize,
-            programAddress: TOKEN_2022_PROGRAM_ADDRESS
-          }),
-          ...extensionInstructions,
-          getInitializeMintInstruction({
-            mint: mint.address,
-            decimals: 6,
-            mintAuthority: payer.address,
-            freezeAuthority: payer.address
-          }),
-          getInitializeTokenMetadataInstruction({
-            metadata: mint.address,
-            updateAuthority: payer.address,
-            mint: mint.address,
-            mintAuthority: payer,
-            name: TOKEN_NAME,
-            symbol: TOKEN_SYMBOL,
-            uri: TOKEN_URI
-          }),
-          getUpdateTokenMetadataFieldInstruction({
-            metadata: mint.address,
-            updateAuthority: payer,
-            field: tokenMetadataField("Key", [TOKEN_ACL_KEY]),
-            value: ABL_PROGRAM_ADDRESS
-          })
-        ],
-        tx
-      )
-  );
-
-  // Sign and send
-  const signedTx = await signTransactionMessageWithSigners(createMintTx);
-  await sendAndConfirm(signedTx, { commitment: "confirmed" });
+  // Build and send the transaction
+  await sendInstructions(payer, [
+    getSetComputeUnitLimitInstruction({ units: 400_000 }),
+    getCreateAccountInstruction({
+      payer,
+      newAccount: mint,
+      lamports: lamports(mintRent),
+      space: baseMintSize,
+      programAddress: TOKEN_2022_PROGRAM_ADDRESS
+    }),
+    ...extensionInstructions,
+    getInitializeMintInstruction({
+      mint: mint.address,
+      decimals: 6,
+      mintAuthority: payer.address,
+      freezeAuthority: payer.address
+    }),
+    getInitializeTokenMetadataInstruction({
+      metadata: mint.address,
+      updateAuthority: payer.address,
+      mint: mint.address,
+      mintAuthority: payer,
+      name: TOKEN_NAME,
+      symbol: TOKEN_SYMBOL,
+      uri: TOKEN_URI
+    }),
+    getUpdateTokenMetadataFieldInstruction({
+      metadata: mint.address,
+      updateAuthority: payer,
+      field: tokenMetadataField("Key", [TOKEN_ACL_KEY]),
+      value: GATE_PROGRAM
+    })
+  ]);
 
   console.log("✅ Mint created with TokenMetadata");
   return mint.address;
@@ -491,37 +511,42 @@ async function createTokenACLMint() {
 민트를 생성한 후 Token ACL 구성을 생성하세요:
 
 ```typescript
-async function createTokenACLConfig(
-  mintAddress: Address,
-  payer: TransactionSigner
-) {
-  const [mintConfigPda] = await findMintConfigPda({ mint: mintAddress });
-  console.log(`📋 MintConfig PDA: ${mintConfigPda}`);
+import {
+  findAssociatedTokenPda,
+  getCreateAssociatedTokenInstructionAsync
+} from "@solana-program/token-2022";
 
-  const createConfigIx = getCreateConfigInstruction({
-    payer: payer.address,
-    authority: payer,
+async function main() {
+  const mintAddress = await createTokenACLMint();
+  const mintConfigPda = await createTokenACLConfig(mintAddress);
+  const listConfigPda = await setupAllowList(mintAddress, mintConfigPda);
+  await enablePermissionlessThaw(mintConfigPda);
+
+  // A new user creates a token account. It starts frozen (DefaultAccountState)
+  const user = await generateKeyPairSigner();
+  const createAtaIx = await getCreateAssociatedTokenInstructionAsync({
+    payer,
     mint: mintAddress,
-    mintConfig: mintConfigPda,
-    gatingProgram: ABL_PROGRAM_ADDRESS
+    owner: user.address
+  });
+  await sendInstructions(payer, [createAtaIx]);
+  const [userAta] = await findAssociatedTokenPda({
+    owner: user.address,
+    mint: mintAddress,
+    tokenProgram: TOKEN_2022_PROGRAM_ADDRESS
   });
 
-  const { value: blockhash } = await rpc.getLatestBlockhash().send();
-  const tx = pipe(
-    createTransactionMessage({ version: 0 }),
-    (tx) => setTransactionMessageFeePayer(payer.address, tx),
-    (tx) => setTransactionMessageLifetimeUsingBlockhash(blockhash, tx),
-    (tx) => appendTransactionMessageInstructions([createConfigIx], tx)
+  // Not on the allow list yet: the thaw is rejected by the gate program
+  await userThawsAccount(mintAddress, userAta, user.address).catch((e) =>
+    console.log("❌ Thaw rejected (wallet not on allow list)")
   );
 
-  const signedTx = await signTransactionMessageWithSigners(tx);
-  await sendAndConfirm(signedTx, { commitment: "confirmed" });
-
-  console.log("✅ Token ACL config created");
-  console.log("   Freeze authority transferred to MintConfig PDA");
-
-  return mintConfigPda;
+  // Add the wallet to the allow list, then thaw
+  await addToAllowList(listConfigPda, user.address);
+  await userThawsAccount(mintAddress, userAta, user.address);
 }
+
+await main();
 ```
 
 ### 4단계: ABL Gate Program 설정
@@ -533,186 +558,10 @@ ABL 목록을 생성하고 추가 메타를 설정하세요:
 <Tab title="AllowAllEoas Mode">
 
 ```typescript
-// AllowAllEoas - All regular wallets can thaw automatically
-async function setupAllowAllEoas(
-  mintAddress: Address,
-  mintConfigPda: Address,
-  payer: TransactionSigner
-) {
-  const listSeed = mintAddress; // Use mint as seed
-  const [listConfigPda] = await findListConfigPda({
-    authority: payer.address,
-    seed: listSeed
-  });
-
-  const createListIx = getCreateListInstruction({
-    authority: payer,
-    listConfig: listConfigPda,
-    mode: Mode.AllowAllEoas, // All EOAs can thaw
-    seed: listSeed
-  });
-
-  const [thawExtraMetasPda] = await findThawExtraMetasAccountPda(
-    { mint: mintAddress },
-    { programAddress: ABL_PROGRAM_ADDRESS }
-  );
-
-  const setupMetasIx = getSetupExtraMetasInstruction({
-    authority: payer,
-    tokenAclMintConfig: mintConfigPda,
-    mint: mintAddress,
-    extraMetas: thawExtraMetasPda,
-    lists: [listConfigPda]
-  });
-
-  // Send transaction with both instructions...
-  console.log("✅ ABL list created with AllowAllEoas mode");
-}
-```
-
-</Tab>
-
-<Tab title="Allow List Mode">
-
-```typescript
-// Allow List - Only whitelisted wallets can thaw
-async function setupAllowList(
-  mintAddress: Address,
-  mintConfigPda: Address,
-  payer: TransactionSigner
-) {
-  const listSeed = mintAddress;
-  const [listConfigPda] = await findListConfigPda({
-    authority: payer.address,
-    seed: listSeed
-  });
-
-  const createListIx = getCreateListInstruction({
-    authority: payer,
-    listConfig: listConfigPda,
-    mode: Mode.Allow, // Only allow-listed wallets
-    seed: listSeed
-  });
-
-  // Setup extra metas...
-  console.log("✅ Allow list created - only whitelisted wallets can thaw");
-}
-
-// Add wallet to allow list
-async function addToAllowList(
-  listConfigPda: Address,
-  walletToAdd: Address,
-  authority: TransactionSigner
-) {
-  const [walletEntryPda] = await findWalletEntryPda({
-    listConfig: listConfigPda,
-    walletAddress: walletToAdd
-  });
-
-  const addWalletIx = getAddWalletInstruction({
-    authority,
-    listConfig: listConfigPda,
-    walletEntry: walletEntryPda,
-    wallet: walletToAdd
-  });
-
-  // Send transaction...
-  console.log(`✅ Added ${walletToAdd} to allow list`);
-}
-```
-
-</Tab>
-
-<Tab title="Block List Mode">
-
-```typescript
-// Block List - All wallets can thaw EXCEPT blocked ones
-async function setupBlockList(
-  mintAddress: Address,
-  mintConfigPda: Address,
-  payer: TransactionSigner
-) {
-  const listSeed = mintAddress;
-  const [listConfigPda] = await findListConfigPda({
-    authority: payer.address,
-    seed: listSeed
-  });
-
-  const createListIx = getCreateListInstruction({
-    authority: payer,
-    listConfig: listConfigPda,
-    mode: Mode.Block, // Block listed wallets
-    seed: listSeed
-  });
-
-  // Setup extra metas...
-  console.log("✅ Block list created - blocked wallets cannot thaw");
-}
-
-// Add wallet to block list (e.g., sanctioned address)
-async function addToBlockList(
-  listConfigPda: Address,
-  walletToBlock: Address,
-  authority: TransactionSigner
-) {
-  const [walletEntryPda] = await findWalletEntryPda({
-    listConfig: listConfigPda,
-    walletAddress: walletToBlock
-  });
-
-  const addWalletIx = getAddWalletInstruction({
-    authority,
-    listConfig: listConfigPda,
-    walletEntry: walletEntryPda,
-    wallet: walletToBlock
-  });
-
-  // Send transaction...
-  console.log(`🚫 Added ${walletToBlock} to block list`);
-}
-```
-
-</Tab>
-
-</Tabs>
-
-### 5단계: 무허가 해동 활성화
-
-사용자가 자신의 계정을 해동할 수 있도록 활성화하세요:
-
-```typescript
-async function enablePermissionlessThaw(
-  mintConfigPda: Address,
-  authority: TransactionSigner
-) {
-  const toggleIx = getTogglePermissionlessInstructionsInstruction({
-    authority,
-    mintConfig: mintConfigPda,
-    thawEnabled: true,
-    freezeEnabled: false // Optional: enable permissionless freeze too
-  });
-
-  // Send transaction...
-  console.log("✅ Permissionless thaw enabled");
-}
-```
-
-### 6단계: 사용자가 자신의 계정 해동
-
-이제 사용자는 SDK를 사용하여 자신의 계정을 해동할 수 있습니다:
-
-```typescript
-import {
-  createThawPermissionlessIdempotentInstructionWithExtraMetas,
-  TOKEN_ACL_PROGRAM_ADDRESS
-} from "@token-acl/sdk";
-import { fetchEncodedAccount } from "@solana/kit";
-
 async function userThawsAccount(
   mintAddress: Address,
   userAta: Address,
-  userAddress: Address,
-  payer: TransactionSigner
+  userAddress: Address
 ) {
   // Account retriever function for the SDK
   const accountRetriever = async (addr: Address) => {
@@ -730,8 +579,179 @@ async function userThawsAccount(
       accountRetriever // account fetcher
     );
 
-  // Send transaction signed by payer...
+  // The payer signs; the user does not need to sign
+  await sendInstructions(payer, [thawIx]);
   console.log("✅ Account thawed permissionlessly!");
+}
+```
+
+</Tab>
+
+<Tab title="Allow List Mode">
+
+```typescript
+// Allow List - Only whitelisted wallets can thaw
+async function setupAllowList(mintAddress: Address, mintConfigPda: Address) {
+  const listSeed = mintAddress; // Use mint as seed
+  const [listConfigPda] = await findListConfigPda({
+    authority: payer.address,
+    seed: listSeed
+  });
+
+  const createListIx = getCreateListInstruction({
+    authority: payer,
+    payer,
+    listConfig: listConfigPda,
+    mode: Mode.Allow, // Only allow-listed wallets
+    seed: listSeed
+  });
+
+  const [thawExtraMetasPda] = await findThawExtraMetasAccountPda(
+    { mint: mintAddress },
+    { programAddress: TOKEN_ACL_GATE_PROGRAM_PROGRAM_ADDRESS }
+  );
+
+  const setupMetasIx = getSetupExtraMetasInstruction({
+    authority: payer,
+    payer,
+    tokenAclMintConfig: mintConfigPda,
+    mint: mintAddress,
+    extraMetas: thawExtraMetasPda,
+    addresses: [listConfigPda]
+  });
+
+  await sendInstructions(payer, [createListIx, setupMetasIx]);
+
+  console.log("✅ Allow list created - only whitelisted wallets can thaw");
+  return listConfigPda;
+}
+
+// Add wallet to allow list
+async function addToAllowList(listConfigPda: Address, walletToAdd: Address) {
+  const [walletEntryPda] = await findWalletEntryPda({
+    listConfig: listConfigPda,
+    wallet: walletToAdd
+  });
+
+  const addWalletIx = getAddWalletInstruction({
+    authority: payer,
+    payer,
+    listConfig: listConfigPda,
+    walletEntry: walletEntryPda,
+    wallet: walletToAdd
+  });
+
+  await sendInstructions(payer, [addWalletIx]);
+  console.log(`✅ Added ${walletToAdd} to allow list`);
+}
+```
+
+</Tab>
+
+<Tab title="Block List Mode">
+
+```typescript
+// Block List - All wallets can thaw EXCEPT blocked ones
+async function setupBlockList(mintAddress: Address, mintConfigPda: Address) {
+  const listSeed = mintAddress;
+  const [listConfigPda] = await findListConfigPda({
+    authority: payer.address,
+    seed: listSeed
+  });
+
+  const createListIx = getCreateListInstruction({
+    authority: payer,
+    payer,
+    listConfig: listConfigPda,
+    mode: Mode.Block, // Block listed wallets
+    seed: listSeed
+  });
+
+  const [thawExtraMetasPda] = await findThawExtraMetasAccountPda(
+    { mint: mintAddress },
+    { programAddress: TOKEN_ACL_GATE_PROGRAM_PROGRAM_ADDRESS }
+  );
+
+  const setupMetasIx = getSetupExtraMetasInstruction({
+    authority: payer,
+    payer,
+    tokenAclMintConfig: mintConfigPda,
+    mint: mintAddress,
+    extraMetas: thawExtraMetasPda,
+    addresses: [listConfigPda]
+  });
+
+  await sendInstructions(payer, [createListIx, setupMetasIx]);
+
+  console.log("✅ Block list created - blocked wallets cannot thaw");
+  return listConfigPda;
+}
+
+// Add wallet to block list (e.g., sanctioned address)
+async function addToBlockList(listConfigPda: Address, walletToBlock: Address) {
+  const [walletEntryPda] = await findWalletEntryPda({
+    listConfig: listConfigPda,
+    wallet: walletToBlock
+  });
+
+  const addWalletIx = getAddWalletInstruction({
+    authority: payer,
+    payer,
+    listConfig: listConfigPda,
+    walletEntry: walletEntryPda,
+    wallet: walletToBlock
+  });
+
+  await sendInstructions(payer, [addWalletIx]);
+  console.log(`🚫 Added ${walletToBlock} to block list`);
+}
+```
+
+</Tab>
+
+</Tabs>
+
+### 5단계: 무허가 해동 활성화
+
+사용자가 자신의 계정을 해동할 수 있도록 활성화하세요:
+
+```typescript
+async function enablePermissionlessThaw(mintConfigPda: Address) {
+  const toggleIx = getTogglePermissionlessInstructionsInstruction({
+    authority: payer,
+    mintConfig: mintConfigPda,
+    thawEnabled: true,
+    freezeEnabled: false // Optional: enable permissionless freeze too
+  });
+
+  await sendInstructions(payer, [toggleIx]);
+  console.log("✅ Permissionless thaw enabled");
+}
+```
+
+### 6단계: 사용자가 자신의 계정 해동
+
+이제 사용자는 SDK를 사용하여 자신의 계정을 해동할 수 있습니다:
+
+```typescript
+async function createTokenACLConfig(mintAddress: Address) {
+  const [mintConfigPda] = await findMintConfigPda({ mint: mintAddress });
+  console.log(`📋 MintConfig PDA: ${mintConfigPda}`);
+
+  const createConfigIx = getCreateConfigInstruction({
+    payer: payer.address,
+    authority: payer,
+    mint: mintAddress,
+    mintConfig: mintConfigPda,
+    gatingProgram: TOKEN_ACL_GATE_PROGRAM_PROGRAM_ADDRESS
+  });
+
+  await sendInstructions(payer, [createConfigIx]);
+
+  console.log("✅ Token ACL config created");
+  console.log("   Freeze authority transferred to MintConfig PDA");
+
+  return mintConfigPda;
 }
 ```
 
@@ -776,55 +796,63 @@ console.log(`   ATA: ${associatedTokenAddress}`);
 ```typescript
 async function setupCompositeLists(
   mintAddress: Address,
-  mintConfigPda: Address,
-  payer: TransactionSigner
+  mintConfigPda: Address
 ) {
-  // Create ALLOW list
-  const allowListSeed = /* unique seed for allow list */;
+  // Create ALLOW list (seeded with the mint)
+  const allowListSeed = mintAddress;
   const [allowListPda] = await findListConfigPda({
     authority: payer.address,
-    seed: allowListSeed,
+    seed: allowListSeed
   });
 
   const createAllowListIx = getCreateListInstruction({
     authority: payer,
+    payer,
     listConfig: allowListPda,
     mode: Mode.Allow,
-    seed: allowListSeed,
+    seed: allowListSeed
   });
 
-  // Create BLOCK list
-  const blockListSeed = /* unique seed for block list */;
+  // Create BLOCK list (any unique address works as a seed)
+  const blockListSeed = (await generateKeyPairSigner()).address;
   const [blockListPda] = await findListConfigPda({
     authority: payer.address,
-    seed: blockListSeed,
+    seed: blockListSeed
   });
 
   const createBlockListIx = getCreateListInstruction({
     authority: payer,
+    payer,
     listConfig: blockListPda,
     mode: Mode.Block,
-    seed: blockListSeed,
+    seed: blockListSeed
   });
 
   // Setup extra metas with BOTH lists
   const [thawExtraMetasPda] = await findThawExtraMetasAccountPda(
     { mint: mintAddress },
-    { programAddress: ABL_PROGRAM_ADDRESS }
+    { programAddress: TOKEN_ACL_GATE_PROGRAM_PROGRAM_ADDRESS }
   );
 
   const setupMetasIx = getSetupExtraMetasInstruction({
     authority: payer,
+    payer,
     tokenAclMintConfig: mintConfigPda,
     mint: mintAddress,
     extraMetas: thawExtraMetasPda,
-    lists: [allowListPda, blockListPda], // Both lists!
+    addresses: [allowListPda, blockListPda] // Both lists!
   });
 
-  // Send transaction...
+  await sendInstructions(payer, [
+    createAllowListIx,
+    createBlockListIx,
+    setupMetasIx
+  ]);
+
   console.log("✅ Composite lists created");
   console.log("   - Allow list: Only whitelisted users can thaw");
   console.log("   - Block list: Blocked users can NEVER thaw");
+  return { allowListPda, blockListPda };
 }
 ```
 
@@ -857,15 +885,10 @@ async function setupCompositeLists(
 
 ```typescript
 // Create allow list
-const createListIx = getCreateListInstruction({
-  authority: issuer,
-  listConfig: allowListPda,
-  mode: Mode.Allow,
-  seed: mintAddress
-});
+const allowListPda = await setupAllowList(mintAddress, mintConfigPda);
 
 // After KYC verification, add investor
-await addToAllowList(allowListPda, kycVerifiedInvestor, issuer);
+await addToAllowList(allowListPda, kycVerifiedInvestor);
 ```
 
 ### 2. 제재 규정 준수
@@ -874,15 +897,10 @@ await addToAllowList(allowListPda, kycVerifiedInvestor, issuer);
 
 ```typescript
 // Create block list
-const createListIx = getCreateListInstruction({
-  authority: complianceOfficer,
-  listConfig: blockListPda,
-  mode: Mode.Block,
-  seed: mintAddress
-});
+const blockListPda = await setupBlockList(mintAddress, mintConfigPda);
 
 // Block sanctioned address
-await addToBlockList(blockListPda, sanctionedAddress, complianceOfficer);
+await addToBlockList(blockListPda, sanctionedAddress);
 ```
 
 ### 3. PDA 보호가 있는 개방형 토큰
@@ -890,12 +908,12 @@ await addToBlockList(blockListPda, sanctionedAddress, complianceOfficer);
 **AllowAllEoas**를 사용하여 모든 일반 지갑을 허용하면서 PDA(스마트 컨트랙트)를 차단하세요:
 
 ```typescript
-const createListIx = getCreateListInstruction({
-  authority: payer,
-  listConfig: listConfigPda,
-  mode: Mode.AllowAllEoas, // Regular wallets OK, PDAs blocked
-  seed: mintAddress
-});
+# Create an ALLOW list (only whitelisted wallets can thaw)
+token-acl-gate-cli create-list --mode allow
+
+# Create a BLOCK list (blocked wallets cannot thaw)
+token-acl-gate-cli create-list --mode block
+
 ```
 
 ### 4. 완전한 기업 규정 준수
@@ -949,8 +967,8 @@ Token ACL CLI는 민트 구성 및 동결/해동 작업을 관리합니다.
 # Install from crates.io
 cargo install token-acl-cli
 
-# Verify installation
-token-acl --version
+# Verify installation (the binary is named 'token-acl-cli')
+token-acl-cli --version
 ```
 
 #### Token ACL 명령어
@@ -972,7 +990,7 @@ token-acl --version
 
 ```bash
 # Create a mint config (delegates freeze authority to Token ACL)
-token-acl create-config <MINT_ADDRESS> \
+token-acl-cli create-config <MINT_ADDRESS> \
   --gating-program GATEzzqxhJnsWF6vHRsgtixxSB8PaQdcqGEVTEHWiULz
 ```
 
@@ -982,34 +1000,36 @@ token-acl create-config <MINT_ADDRESS> \
 # Enable permissionless thaw only (recommended for most use cases)
 # - Users can self-service unfreeze after passing gate checks
 # - Only authority can freeze accounts (security best practice)
-token-acl set-instructions --enable-thaw --disable-freeze <MINT_ADDRESS>
+token-acl-cli set-instructions --enable-thaw --disable-freeze <MINT_ADDRESS>
 
 # Enable both permissionless thaw AND freeze
 # Use case: Allow anyone to freeze blocked users, or users to self-freeze
-token-acl set-instructions --enable-thaw --enable-freeze <MINT_ADDRESS>
+token-acl-cli set-instructions --enable-thaw --enable-freeze <MINT_ADDRESS>
 
 # Disable all permissionless operations (authority-only mode)
-token-acl set-instructions --disable-thaw --disable-freeze <MINT_ADDRESS>
+token-acl-cli set-instructions --disable-thaw --disable-freeze <MINT_ADDRESS>
 ```
 
 #### 해동/동결 작업
 
 ```bash
-# Thaw an account permissionlessly (user self-service)
-token-acl thaw-permissionless <MINT_ADDRESS> <TOKEN_ACCOUNT_ADDRESS>
+# Thaw an account permissionlessly (user self-service).
+# Pass --owner to derive the associated token account, or --token-account
+token-acl-cli thaw-permissionless --mint <MINT_ADDRESS> --owner <OWNER_ADDRESS>
+token-acl-cli thaw-permissionless --mint <MINT_ADDRESS> --token-account <TOKEN_ACCOUNT_ADDRESS>
 
 # Thaw using authority (issuer operation)
-token-acl thaw <MINT_ADDRESS> <TOKEN_ACCOUNT_ADDRESS>
+token-acl-cli thaw <TOKEN_ACCOUNT_ADDRESS>
 
 # Freeze using authority (compliance enforcement)
-token-acl freeze <MINT_ADDRESS> <TOKEN_ACCOUNT_ADDRESS>
+token-acl-cli freeze <TOKEN_ACCOUNT_ADDRESS>
 ```
 
 #### 하나의 명령으로 ATA 생성 및 해동
 
 ```bash
 # Creates associated token account and thaws it automatically
-token-acl create-ata-and-thaw-permissionless --mint <MINT_ADDRESS> --owner <WALLET_ADDRESS>
+token-acl-cli create-ata-and-thaw-permissionless --mint <MINT_ADDRESS> --owner <WALLET_ADDRESS>
 ```
 
 ### ABL Gate CLI (`allow-block-list`)
@@ -1022,8 +1042,8 @@ ABL Gate CLI는 허용/차단 목록과 지갑 항목을 관리합니다.
 # Install from crates.io
 cargo install token-acl-gate-cli
 
-# Verify installation (binary is named 'allow-block-list')
-allow-block-list --version
+# Verify installation (the binary is named 'token-acl-gate-cli')
+token-acl-gate-cli --version
 ```
 
 #### ABL Gate 명령어
@@ -1039,14 +1059,11 @@ allow-block-list --version
 #### 목록 생성
 
 ```bash
-# Create an ALLOW list (only whitelisted wallets can thaw)
-allow-block-list create-list --mode allow
+# Add wallet to a list (works for both allow and block lists)
+token-acl-gate-cli add-wallet <LIST_ADDRESS> <WALLET_ADDRESS>
 
-# Create a BLOCK list (blocked wallets cannot thaw)
-allow-block-list create-list --mode block
-
-# Create an ALLOW-ALL-EOAs list (all regular wallets can thaw)
-allow-block-list create-list --mode allow-all-eoas
+# Remove wallet from a list
+token-acl-gate-cli remove-wallet <LIST_ADDRESS> <WALLET_ADDRESS>
 ```
 
 명령어는 `list_config` PDA 주소와 `seed`를 출력합니다 - **반드시 저장하세요!**
@@ -1054,21 +1071,21 @@ allow-block-list create-list --mode allow-all-eoas
 #### 목록의 지갑 관리
 
 ```bash
-# Add wallet to a list (works for both allow and block lists)
-allow-block-list add-wallet <LIST_ADDRESS> <WALLET_ADDRESS>
+# Apply a single list to a mint
+token-acl-gate-cli apply-lists-to-mint <MINT_ADDRESS> <LIST_ADDRESS>
 
-# Remove wallet from a list
-allow-block-list remove-wallet <LIST_ADDRESS> <WALLET_ADDRESS>
+# Apply multiple lists (e.g., allow + block for composite compliance)
+token-acl-gate-cli apply-lists-to-mint <MINT_ADDRESS> <ALLOW_LIST> <BLOCK_LIST>
 ```
 
 #### 민트에 목록 적용
 
 ```bash
 # Apply a single list to a mint
-allow-block-list apply-lists-to-mint <MINT_ADDRESS> <LIST_ADDRESS>
+token-acl-gate-cli apply-lists-to-mint <MINT_ADDRESS> <LIST_ADDRESS>
 
 # Apply multiple lists (e.g., allow + block for composite compliance)
-allow-block-list apply-lists-to-mint <MINT_ADDRESS> <ALLOW_LIST> <BLOCK_LIST>
+token-acl-gate-cli apply-lists-to-mint <MINT_ADDRESS> <ALLOW_LIST> <BLOCK_LIST>
 ```
 
 ### CLI 전역 옵션
@@ -1091,6 +1108,7 @@ allow-block-list apply-lists-to-mint <MINT_ADDRESS> <ALLOW_LIST> <BLOCK_LIST>
 # STEP 1: Configure Solana CLI
 # ============================================================================
 solana config set --url localhost
+# The CLIs read the RPC URL and keypair from this config (or use -u and -k)
 
 # ============================================================================
 # STEP 2: Create Token22 Mint with Metadata + DefaultAccountState Extensions
@@ -1107,12 +1125,9 @@ spl-token create-token \
   --default-account-state frozen \
   --enable-metadata
 
-# Output:
-# Creating token 7KzLwpXMzKa8JiqYr2ookFjxLx1xMF4xM4YhVqPJpump
-# Address: 7KzLwpXMzKa8JiqYr2ookFjxLx1xMF4xM4YhVqPJpump
-
-# Save the mint address for use in subsequent commands
-MINT=7KzLwpXMzKa8JiqYr2ookFjxLx1xMF4xM4YhVqPJpump
+# The output includes the new mint address ("Address: <MINT>").
+# Save it for use in subsequent commands
+MINT=<MINT_ADDRESS>
 
 # Initialize the token metadata
 spl-token initialize-metadata $MINT "Compliant Token" "COMP" "https://example.com/metadata.json"
@@ -1129,33 +1144,29 @@ spl-token display $MINT
 # ============================================================================
 
 # This transfers freeze authority from your wallet to the Token ACL MintConfig PDA
-token-acl create-config $MINT \
+token-acl-cli create-config $MINT \
   --gating-program GATEzzqxhJnsWF6vHRsgtixxSB8PaQdcqGEVTEHWiULz
 
-# Output:
-# ✅ Config created for mint 7KzLwpXMzKa8JiqYr2ookFjxLx1xMF4xM4YhVqPJpump
-# MintConfig PDA: 9xYzAbCdEfGhIjKlMnOpQrStUvWxYz123456789abc
+# Output: "config: <MintConfig PDA>" followed by the transaction signature
 
 # ============================================================================
 # STEP 4: Create ABL Lists
 # ============================================================================
 
 # Create a block list for sanctions compliance
-allow-block-list create-list --mode block
+token-acl-gate-cli create-list --mode block
 
-# Output:
-# list_config: 5HnJkLmNoPqRsTuVwXyZ987654321defghijk
-# seed: 3AbCdEfGhIjKlMnOpQrStUvWxYz123456789
+# Output: "list_config: <LIST PDA>", "seed: <SEED>" and the transaction signature
 
-# Save the block list address
-BLOCK_LIST=5HnJkLmNoPqRsTuVwXyZ987654321defghijk
+# Save the block list address (the list_config value)
+BLOCK_LIST=<LIST_CONFIG_ADDRESS>
 
 # ============================================================================
 # STEP 5: Apply Lists to Mint
 # ============================================================================
 
 # Configure the block list to be used for this mint's permissionless operations
-allow-block-list apply-lists-to-mint $MINT $BLOCK_LIST
+token-acl-gate-cli apply-lists-to-mint $MINT $BLOCK_LIST
 
 # ============================================================================
 # STEP 6: Enable Permissionless Thaw
@@ -1164,7 +1175,7 @@ allow-block-list apply-lists-to-mint $MINT $BLOCK_LIST
 # Allow users to thaw their own accounts (if not on block list)
 # --enable-thaw: Users can self-service unfreeze after passing gate checks
 # --disable-freeze: Only authority can freeze
-token-acl set-instructions --enable-thaw --disable-freeze $MINT
+token-acl-cli set-instructions --enable-thaw --disable-freeze $MINT
 
 # ============================================================================
 # STEP 7: Manage Block List (Compliance Operations)
@@ -1176,19 +1187,19 @@ token-acl set-instructions --enable-thaw --disable-freeze $MINT
 
 # Step 7a: Add wallet to block list
 # Replace with actual wallet address to block (must be valid base58 pubkey)
-allow-block-list add-wallet $BLOCK_LIST <WALLET_TO_BLOCK>
+token-acl-gate-cli add-wallet $BLOCK_LIST <WALLET_TO_BLOCK>
 
 # Step 7b: Freeze their existing token account (if they have one)
 # This requires the token account address, not the wallet address
 # spl-token address --verbose --token $MINT to get the token account address
-# token-acl freeze <TOKEN_ACCOUNT_ADDRESS>
+# token-acl-cli freeze <TOKEN_ACCOUNT_ADDRESS>
 
 # Note: Adding to block list alone only prevents them from THAWING.
 # If their account is already thawed, they can still use it until you freeze it!
 
 # Later, if sanctions are lifted:
 # 1. Remove from block list
-# allow-block-list remove-wallet $BLOCK_LIST <WALLET_ADDRESS>
+# token-acl-gate-cli remove-wallet $BLOCK_LIST <WALLET_ADDRESS>
 # 2. User can then thaw their account again
 
 # ============================================================================
@@ -1198,11 +1209,10 @@ allow-block-list add-wallet $BLOCK_LIST <WALLET_TO_BLOCK>
 # A user can now create their token account and thaw it in one command
 # Use your own wallet or generate one: solana-keygen new --no-outfile
 USER_WALLET=$(solana address)  # Uses your configured wallet
-token-acl create-ata-and-thaw-permissionless --mint $MINT --owner $USER_WALLET
+token-acl-cli create-ata-and-thaw-permissionless --mint $MINT --owner $USER_WALLET
 
-# Output:
-# ✅ Created ATA: 8AbCdEfGhIjKlMnOpQrStUvWxYz123456789xyz
-# ✅ Thawed successfully!
+# Output: "mint:", "token_account_pk:" and "token_account_owner_pk:" lines,
+# followed by the transaction signature
 
 # ============================================================================
 # STEP 9: Mint Tokens to User

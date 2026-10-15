@@ -303,9 +303,16 @@ export class DvPEngine {
     ];
     const spaceWithoutMetadataExtension = getMintLen(extensions);
 
-    // Calculate rent for FULL space (mint + metadata + TLV overhead)
+    // Reserve headroom so metadata fields can grow later (for example
+    // couponRate "4.5" -> "4.75") without the mint falling below rent exemption
+    const METADATA_HEADROOM = 100;
+
+    // Calculate rent for FULL space (mint + metadata + TLV overhead + headroom)
     const lamports = await this.connection.getMinimumBalanceForRentExemption(
-      spaceWithoutMetadataExtension + metadataLen + metadataExtension
+      spaceWithoutMetadataExtension +
+        metadataLen +
+        metadataExtension +
+        METADATA_HEADROOM
     );
 
     // Build transaction following the official docs pattern
@@ -315,7 +322,7 @@ export class DvPEngine {
         fromPubkey: issuer.publicKey,
         newAccountPubkey: mintKeypair.publicKey,
         space: spaceWithoutMetadataExtension, // Just base space
-        lamports, // But rent for full space (includes metadata + TLV)
+        lamports, // But rent for full space (metadata + TLV + headroom)
         programId: TOKEN_2022_PROGRAM_ID
       }),
       // 2. Initialize metadata pointer (before mint!)
@@ -627,7 +634,7 @@ export class DvPEngine {
   }
 
   /**
-   * Airdrops SOL for testing (devnet/testnet only)
+   * Airdrops SOL for testing (local Surfpool, devnet or testnet only)
    */
   async airdropSol(publicKey: PublicKey, amount: number): Promise<void> {
     console.log(`\n💰 Airdropping ${amount} SOL to ${publicKey.toBase58()}`);
@@ -646,20 +653,23 @@ export class DvPEngine {
 Oto kompletny przykład demonstrujący cały przepływ pracy DvP:
 
 ```typescript
-import { Connection, Keypair, clusterApiUrl, PublicKey } from "@solana/web3.js";
+import { Connection, Keypair, PublicKey } from "@solana/web3.js";
 import {
+  getAssociatedTokenAddress,
   getOrCreateAssociatedTokenAccount,
   mintTo,
   TOKEN_2022_PROGRAM_ID,
   TOKEN_PROGRAM_ID
 } from "@solana/spl-token";
 
-// Standard USDC mint address on mainnet
+// Standard USDC mint address on mainnet. This example runs on a local Surfpool
+// forked from mainnet: `surfpool start --network mainnet`
 const USDC_MINT = new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
+const RPC_URL = "http://localhost:8899";
 
 async function runDvPExample() {
   // 1. Initialize connection and keypairs
-  const connection = new Connection(clusterApiUrl("devnet"));
+  const connection = new Connection(RPC_URL, "confirmed");
 
   const settlementAgent = Keypair.generate();
   const issuer = Keypair.generate();
@@ -670,7 +680,7 @@ async function runDvPExample() {
   // 2. Initialize DvP engine
   const dvp = new DvPEngine(connection, settlementAgent);
 
-  // 3. Airdrop SOL for transaction fees (devnet only)
+  // 3. Airdrop SOL for transaction fees (local Surfpool or devnet)
   await dvp.airdropSol(settlementAgent.publicKey, 2);
   await dvp.airdropSol(issuer.publicKey, 2);
   await dvp.airdropSol(investor.publicKey, 2);
@@ -723,8 +733,36 @@ async function runDvPExample() {
     TOKEN_PROGRAM_ID
   );
 
-  // In production, investor would acquire USDC from exchange/market
-  // For this example, assume they have 95,000 USDC
+  // The issuer needs a USDC account to receive the payment
+  await getOrCreateAssociatedTokenAccount(
+    connection,
+    issuer,
+    USDC_MINT,
+    issuer.publicKey,
+    false,
+    "confirmed",
+    { commitment: "confirmed" },
+    TOKEN_PROGRAM_ID
+  );
+
+  // In production, the investor would acquire USDC from an exchange or market.
+  // On Surfpool, credit the investor with 95,000 USDC (6 decimals) using the
+  // surfnet_setTokenAccount cheatcode
+  await fetch(RPC_URL, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "surfnet_setTokenAccount",
+      params: [
+        investor.publicKey.toBase58(),
+        USDC_MINT.toBase58(),
+        { amount: 95_000_000_000 },
+        TOKEN_PROGRAM_ID.toBase58()
+      ]
+    })
+  });
 
   // 8. Delegate authority to settlement agent
   console.log("\n🔐 Delegating authority to settlement agent...");
@@ -764,7 +802,7 @@ async function runDvPExample() {
   console.log(`   Transaction: ${result.signature}`);
   console.log(`   Timestamp: ${result.timestamp.toISOString()}`);
   console.log(
-    `   View on explorer: https://explorer.solana.com/tx/${result.signature}?cluster=devnet`
+    `   View on explorer: https://explorer.solana.com/tx/${result.signature}?cluster=custom&customUrl=${encodeURIComponent(RPC_URL)}`
   );
 
   // 10. Verify balances

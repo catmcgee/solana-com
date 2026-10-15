@@ -1,5 +1,6 @@
 ---
 title: Recurring Delegation
+sidebarTitle: "Recurring delegation"
 description: Guide for setting up recurring delegation transactions.
 ---
 
@@ -15,14 +16,14 @@ delegation, then use that delegation PDA for transfers.
 <Tabs>
   <Tab title="TypeScript">
     ```bash
-    pnpm add @solana/subscriptions @solana/kit @solana/kit-plugin-rpc @solana/kit-plugin-signer @solana-program/token
+    pnpm add @solana/subscriptions @solana/kit@^7 @solana/kit-plugin-rpc@^0.15 @solana/kit-plugin-signer@^0.13 @solana-program/token@^0.15
     ```
   </Tab>
 
   <Tab title="Rust">
     ```toml
     [dependencies]
-    subscriptions = "0.4.0"
+    subscriptions = "0.5.0"
     solana-instruction = "^3"
     solana-address = { version = "^2", features = ["curve25519"] }
     ```
@@ -65,7 +66,7 @@ The setup has four parts:
     const nonce = 0n;
     const amountPerPeriod = 1_000_000n;
     const periodLengthS = 86_400n;
-    const startTs = now;
+    const startTs = 0n; // start when the transaction lands
     const expiryTs = now + periodLengthS * 30n;
 
     const [userAta] = await findAssociatedTokenPda({
@@ -119,7 +120,11 @@ The setup has four parts:
   <Tab title="Rust">
     ```rust
     use solana_address::{address, Address};
-    use subscriptions::{generated::{instructions::*, types::*}, SUBSCRIPTIONS_ID};
+    use subscriptions::{
+        accounts::SubscriptionAuthority,
+        generated::{instructions::*, types::*},
+        SUBSCRIPTIONS_ID,
+    };
 
     const SYSTEM_PROGRAM_ID: Address = address!("11111111111111111111111111111111");
     const TOKEN_PROGRAM_ID: Address = address!("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
@@ -159,6 +164,10 @@ The setup has four parts:
         .token_program(TOKEN_PROGRAM_ID)
         .instruction();
 
+    // Read `init_id` from the Subscription Authority account: fetch it once the
+    // init instruction above has landed and decode it.
+    let authority_account: SubscriptionAuthority = authority_account;
+
     let create_ix = CreateRecurringDelegationBuilder::new()
         .delegator(user)
         .subscription_authority(subscription_authority)
@@ -170,6 +179,7 @@ The setup has four parts:
             period_length_s,
             start_ts,
             expiry_ts,
+            expected_subscription_authority_init_id: authority_account.init_id,
         })
         .instruction();
     ```
@@ -205,7 +215,7 @@ rejects transfers that would exceed the period's remaining allowance.
 
   <Tab title="Rust">
     ```rust
-    use subscriptions::{TransferData, TransferRecurringBuilder};
+    use subscriptions::generated::{instructions::TransferRecurringBuilder, types::TransferData};
 
     let receiver_ata: Address = address!("RECEIVER_TOKEN_ACCOUNT_ADDRESS_HERE");
 
@@ -262,6 +272,12 @@ the delegation PDA and returns its rent to the signer.
 - Once the next period starts, the pulled amount resets.
 - `expiryTs` is a hard stop: once it passes, transfers fail and the sponsor can
   recover rent. There is no spend-time grace period.
+- The examples use `startTs = 0n`, so the delegation starts when the transaction
+  lands. On a local Surfpool the cluster clock can lag your wall clock, so a
+  `startTs` of "now" may still be in the future for the program, and a transfer
+  right after creation fails with `DelegationNotStarted` (error 407). Either
+  keep `startTs` at `0`, or advance the clock first with the `surfnet_timeTravel`
+  RPC method, passing `absoluteTimestamp` set to the current time.
 - Set `startTs` to `0` to start the delegation when the transaction lands on
   chain instead of at a fixed time. This widens the window to get the user to
   sign and onboard. When you do this, `expiryTs` must be non-zero — a

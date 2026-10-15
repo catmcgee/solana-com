@@ -375,15 +375,15 @@ server-renders inactive Tabs/CodeGroup panels but hides them;
 `html:not([data-theme-preference])` (Mintlify's head script sets that attribute;
 without JS it never appears). Patterns:
 
-| Need                                  | Use                                                                                                                        | Never                                                                                         |
-| ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| Hide-without-JS-only content          | `className="nojs-only"` (`div` or `span`)                                                                                  | raw `<noscript>` (stripped)                                                                   |
-| Collapsible                           | `<Accordion>` / `<Expandable>` (native `<details>`)                                                                        | raw `<details>`, `<abbr>` (stripped)                                                          |
-| Tooltip text                          | `<Tooltip tip="T">x</Tooltip><span className="nojs-only"> (T)</span>` (sibling, not child)                                 | text only in `tip`                                                                            |
-| Mermaid                               | keep the fence; convert adds `<div className="nojs-only" data-fallback="mermaid">` with the source; caption `.sol-caption` |                                                                                               |
-| iframe / YouTube                      | `<Frame><iframe/></Frame>` plus a plain link right after (no iframe is in the server HTML; nojs.css hides the empty box)   | iframe alone                                                                                  |
-| Snippets that must render server-side | default-imported MDX snippet with string props, or page-local `export const`                                               | `/snippets/*.jsx` components or JSX expression children `{"…"}` inside snippets (client-only) |
-| Code in several languages             | `<CodeGroup>` (titles = tab labels; without JS panels are numbered `1 · …` to match the tab row)                           |                                                                                               |
+| Need                                  | Use                                                                                                                                                                                                                                   | Never                                                                                         |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Hide-without-JS-only content          | `className="nojs-only"` (`div` or `span`)                                                                                                                                                                                             | raw `<noscript>` (stripped)                                                                   |
+| Collapsible                           | `<Accordion>` / `<Expandable>` (native `<details>`)                                                                                                                                                                                   | raw `<details>`, `<abbr>` (stripped)                                                          |
+| Tooltip text                          | `<Tooltip tip="T">x</Tooltip><span className="nojs-only"> (T)</span>` (sibling, not child)                                                                                                                                            | text only in `tip`                                                                            |
+| Mermaid                               | keep the fence; convert adds `<div className="sol-mermaid" data-fallback="mermaid">` with the pre-rendered light/dark SVG (run `tsx scripts/render-mermaid.ts` then `python3 scripts/embed-diagram-fonts.py`); caption `.sol-caption` | hand-written fallback divs                                                                    |
+| iframe / YouTube                      | `<Frame><iframe/></Frame>` plus a plain link right after (no iframe is in the server HTML; nojs.css hides the empty box)                                                                                                              | iframe alone                                                                                  |
+| Snippets that must render server-side | default-imported MDX snippet with string props, or page-local `export const`                                                                                                                                                          | `/snippets/*.jsx` components or JSX expression children `{"…"}` inside snippets (client-only) |
+| Code in several languages             | `<CodeGroup>` (titles = tab labels; without JS panels are numbered `1 · …` to match the tab row)                                                                                                                                      |                                                                                               |
 
 `expandable` code blocks: Mintlify server-renders every line but collapses the
 block to 190px behind a "See all N lines" button that needs JS. `nojs.css`
@@ -723,7 +723,26 @@ Advanced code blocks with:
 
 ##### Mermaid Diagrams
 
-Flowcharts and sequence diagrams rendered from markdown.
+Flowcharts and sequence diagrams rendered from markdown. In the Mintlify project
+each fence is pre-rendered to a themed SVG pair (Solana palette, both modes,
+readable without JS): after adding or editing a fence run
+`pnpm --filter @workspace/docs-tooling convert`, then
+`npx tsx scripts/render-mermaid.ts` and `python3 scripts/embed-diagram-fonts.py`
+(needs `pip install fonttools brotli`). `render-mermaid.ts --check` fails on
+missing or orphaned figures.
+
+##### Diagrams (SVG)
+
+Diagrams are SVG light/dark pairs (`name-light.svg` + `name.svg`) shown with
+`<img className="block dark:hidden">` / `<img className="hidden dark:block">`.
+Use the docs palette (zinc neutrals, Solana purple `#9945ff`/`#7c3aed`, green
+`#0a8f5a`/`#14f195`, teal `#19d3c5`, 1.5px strokes, 8-10px corners);
+`scripts/sync-diagram-themes.mjs` restyles the generated core diagrams and
+derives their dark pairs. Labels must be SVG `<text>` in Diatype; run
+`scripts/embed-diagram-fonts.py` so they render in Diatype inside `<img>`.
+Linear flows on hub and path pages are HTML
+(`<ol className="sol-flow not-prose">` with
+`<li><b>Step</b><span>caption</span></li>`), not images.
 
 ##### AI Chat (Vercel AI SDK)
 

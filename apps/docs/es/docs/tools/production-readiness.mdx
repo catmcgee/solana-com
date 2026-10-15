@@ -356,6 +356,7 @@ import {
   SOLANA_ERROR__BLOCK_HEIGHT_EXCEEDED,
   SOLANA_ERROR__TRANSACTION_ERROR__INSUFFICIENT_FUNDS_FOR_FEE,
   SOLANA_ERROR__TRANSACTION_ERROR__BLOCKHASH_NOT_FOUND,
+  SOLANA_ERROR__TRANSACTION_ERROR__ACCOUNT_NOT_FOUND,
   SOLANA_ERROR__INSTRUCTION_ERROR__INSUFFICIENT_FUNDS
 } from "@solana/kit";
 
@@ -363,10 +364,14 @@ function handlePaymentError(error: unknown): {
   message: string;
   retryable: boolean;
 } {
+  // Preflight failures arrive wrapped ("Transaction simulation failed"), with
+  // the specific code on `error.cause`. Unwrap it before matching.
+  const e = isSolanaError(error) && error.cause ? error.cause : error;
+
   // Blockhash expired—rebuild and retry
   if (
     isSolanaError(error, SOLANA_ERROR__BLOCK_HEIGHT_EXCEEDED) ||
-    isSolanaError(error, SOLANA_ERROR__TRANSACTION_ERROR__BLOCKHASH_NOT_FOUND)
+    isSolanaError(e, SOLANA_ERROR__TRANSACTION_ERROR__BLOCKHASH_NOT_FOUND)
   ) {
     return { message: "Transaction expired—rebuilding", retryable: true };
   }
@@ -374,16 +379,21 @@ function handlePaymentError(error: unknown): {
   // Insufficient SOL for fees
   if (
     isSolanaError(
-      error,
+      e,
       SOLANA_ERROR__TRANSACTION_ERROR__INSUFFICIENT_FUNDS_FOR_FEE
     )
   ) {
     return { message: "Not enough SOL for fees", retryable: false };
   }
 
+  // Fee payer account has never been funded ("no record of a prior credit")
+  if (isSolanaError(e, SOLANA_ERROR__TRANSACTION_ERROR__ACCOUNT_NOT_FOUND)) {
+    return { message: "Fee payer account is not funded", retryable: false };
+  }
+
   // Insufficient token balance
   if (
-    isSolanaError(error, SOLANA_ERROR__INSTRUCTION_ERROR__INSUFFICIENT_FUNDS)
+    isSolanaError(e, SOLANA_ERROR__INSTRUCTION_ERROR__INSUFFICIENT_FUNDS)
   ) {
     return { message: "Insufficient balance", retryable: false };
   }

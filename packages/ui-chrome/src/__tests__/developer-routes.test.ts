@@ -7,11 +7,19 @@ import {
 } from "../developer-routes";
 
 describe("developer route matching", () => {
-  it("shows the developer nav on exact or nested developer routes", () => {
-    expect(shouldShowDevelopersNav("/developers")).toBe(true);
-    expect(shouldShowDevelopersNav("/de/developers")).toBe(true);
+  it("shows the developer nav on docs and nested developer routes", () => {
+    expect(shouldShowDevelopersNav("/developers/templates")).toBe(true);
+    expect(shouldShowDevelopersNav("/de/developers/cookbook")).toBe(true);
     expect(shouldShowDevelopersNav("/docs")).toBe(true);
     expect(shouldShowDevelopersNav("/fr/docs/rpc")).toBe(true);
+  });
+
+  it("hides the developer nav on the /developers landing itself", () => {
+    expect(shouldShowDevelopersNav("/developers")).toBe(false);
+    expect(shouldShowDevelopersNav("/developers/")).toBe(false);
+    expect(shouldShowDevelopersNav("/es/developers")).toBe(false);
+    expect(shouldShowDevelopersNav("/de/developers")).toBe(false);
+    expect(shouldShowDevelopersNav("/developers?ref=nav")).toBe(false);
   });
 
   it("does not show the developer nav on unrelated paths containing the same text", () => {

@@ -1,7 +1,6 @@
 ---
 title: How to Implement Gasless Transaction Bundles with Jito and Kora
-description:
-  This guide teaches you how to implement gasless Jito Bundles using Kora.
+description: This guide teaches you how to implement gasless Jito Bundles using Kora.
 date: 2025-01-09
 ---
 
@@ -139,6 +138,7 @@ get_payer_signer = true
 max_allowed_lamports = 1000000
 max_signatures = 10
 price_source = "Mock"
+allowed_tokens = []
 allowed_programs = [
     "11111111111111111111111111111111",            # System Program
     "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr", # Memo Program
@@ -155,6 +155,7 @@ enabled = true
 
 [kora.bundle.jito]
 block_engine_url = "https://mainnet.block-engine.jito.wtf"
+simulate_bundle_url = "https://mainnet.rpc.jito.wtf"  # Jito-Solana RPC, required for bundles
 ```
 
 **Important** settings for bundle support:
@@ -223,7 +224,7 @@ import {
   setTransactionMessageFeePayerSigner,
   setTransactionMessageLifetimeUsingBlockhash,
   appendTransactionMessageInstruction,
-  generateKeyPairSigner
+  generateKeyPairSigner,
 } from "@solana/kit";
 import { getAddMemoInstruction } from "@solana-program/memo";
 import { getTransferSolInstruction } from "@solana-program/system";
@@ -236,7 +237,7 @@ const CONFIG = {
   jitoTipLamports: MINIMUM_JITO_TIP,
   bundleSize: 4, // We'll create 4 transactions for this demo
   pollIntervalMs: 6000,
-  pollTimeoutMs: 60000
+  pollTimeoutMs: 60000,
 };
 ```
 
@@ -264,7 +265,7 @@ const JITO_TIP_ACCOUNTS = [
   "DfXygSm4jCyNCybVYYK6DwvWqjKee8pbDmJGcLWNDXjh",
   "ADuUkR4vqLUMWXxW9gh6D6L8pMSawimctcNZ5pGwDcEt",
   "DttWaMuVvTiduZRnguLF7jNxTgiMBZ1hyAumKUiL2KRL",
-  "3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT"
+  "3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT",
 ];
 
 function getRandomTipAccount(): string {
@@ -290,7 +291,7 @@ async function initializeClients() {
 
   const client = new KoraClient({
     rpcUrl: CONFIG.koraRpcUrl,
-    apiKey: "kora_facilitator_api_key_example"
+    apiKey: "kora_facilitator_api_key_example",
   });
 
   return { client };
@@ -328,7 +329,7 @@ verify our transactions after they land on Solana Mainnet.
 async function createBundleTransactions(
   client: KoraClient,
   senderKeypair: KeyPairSigner,
-  signer_address: string
+  signer_address: string,
 ) {
   console.log("\n[3/4] Creating bundle transactions");
 
@@ -346,30 +347,30 @@ async function createBundleTransactions(
     console.log(
       `  → Transaction ${i + 1}: Kora Memo "Bundle tx #${i + 1}"${
         isLastTransaction ? " + Jito tip" : ""
-      }`
+      }`,
     );
 
     // Build transaction with memo
     let transactionMessage = pipe(
       createTransactionMessage({
-        version: 0
+        version: 0,
       }),
       (tx) => setTransactionMessageFeePayerSigner(noopSigner, tx),
       (tx) =>
         setTransactionMessageLifetimeUsingBlockhash(
           {
             blockhash: latestBlockhash.blockhash as Blockhash,
-            lastValidBlockHeight: 0n
+            lastValidBlockHeight: 0n,
           },
-          tx
+          tx,
         ),
       (tx) =>
         appendTransactionMessageInstruction(
           getAddMemoInstruction({
             memo: `Kora Bundle tx #${i + 1} of ${CONFIG.bundleSize}`,
-            signers: [senderKeypair]
+            signers: [senderKeypair],
           }),
-          tx
+          tx,
         ),
       // Add Jito tip to the LAST transaction only
       (tx) =>
@@ -378,11 +379,11 @@ async function createBundleTransactions(
               getTransferSolInstruction({
                 source: noopSigner,
                 destination: address(tipAccount),
-                amount: CONFIG.jitoTipLamports
+                amount: CONFIG.jitoTipLamports,
               }),
-              tx
+              tx,
             )
-          : tx
+          : tx,
     );
 
     // Sign with sender keypair (required for memo instruction)
@@ -424,14 +425,14 @@ async function main() {
     const transactions = await createBundleTransactions(
       client,
       senderKeypair,
-      signer_address
+      signer_address,
     );
 
     // Step 4: Sign and send bundle
     console.log("\n[4/4] Signing and sending bundle");
     const { bundle_uuid } = await client.signAndSendBundle({
       transactions,
-      signer_key: signer_address
+      signer_key: signer_address,
     });
 
     console.log("\nBundle UUID:");

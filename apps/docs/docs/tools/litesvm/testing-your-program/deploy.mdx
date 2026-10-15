@@ -10,8 +10,9 @@ let mut svm = LiteSVM::new();
 ```
 
 This creates the basic litesvm test instance, which includes all runtime
-features enabled, default sysvars, precompiles, spl programs, sigverify, and all
-built in programs like the system program.
+features enabled, default sysvars, spl programs, sigverify, and all built in
+programs like the system program. Precompiles (ed25519, secp256k1, secp256r1)
+are included when the `precompiles` feature of `litesvm` is enabled.
 
 To interact with any other program in your tests, you must deploy that program
 to your test environment.
@@ -123,6 +124,8 @@ solana program dump YourProgramID program.so --url devnet
 Then load it in your tests:
 
 ```rust
+use solana_sdk::pubkey;
+
 svm.add_program_from_file(
     pubkey!("gSbePebfvPy7tRqimPoVecS2UsBvYv46ynrzWocc92s"),
     "pyth.so"
@@ -178,7 +181,13 @@ let account = svm.get_account(&program_id)
     .expect("Program account doesn't exist");
 
 assert!(account.executable, "Program not executable");
-assert_eq!(account.owner, solana_sdk::bpf_loader::id(), "Wrong owner");
+// LiteSVM deploys programs through the upgradeable loader
+// (add it with `cargo add --dev solana-sdk-ids`)
+assert_eq!(
+    account.owner,
+    solana_sdk_ids::bpf_loader_upgradeable::id(),
+    "Wrong owner"
+);
 assert!(!account.data.is_empty(), "Program data is empty");
 
 println!("✅ Program verified at {}", program_id);
@@ -229,6 +238,8 @@ assert_eq!(instruction.program_id, program_id, "Instruction uses wrong program I
 **Solution**: Deploy all dependency programs:
 
 ```rust
+use solana_sdk::pubkey;
+
 // Find all dependency programs and make sure they are deployed
 svm.add_program_from_file(
     pubkey!("gSbePebfvPy7tRqimPoVecS2UsBvYv46ynrzWocc92s"),

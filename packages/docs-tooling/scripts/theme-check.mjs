@@ -12,7 +12,11 @@
  *
  * For each path x {light, dark} x {JS on, JS off} x {desktop, mobile} it:
  *   - saves a screenshot to --out (default ./theme-shots)
- *   - asserts that the top bar is dark (#0a0a0b) in both modes
+ *   - asserts that the top bar, tab row and page share one colour per mode
+ *     (white / #0a0a0b), with no GitHub button in the top bar
+ *   - with JS, asserts the floating "Ask AI" pill (ask-ai.js) is bottom-right
+ *   - on path pages, asserts the sidebar path box (numbered, ★ on step 2)
+ *   - asserts every mermaid fence has its pre-rendered figure (.sol-mermaid)
  *   - asserts that the 4th tab is "Markets" with a divider pseudo-element
  *   - asserts that an external (http) tab sits at the far end of the tab row
  *   - asserts that body links are purple and pass 4.5:1 contrast against the page
@@ -52,12 +56,12 @@ const BASE = (args.base || process.env.BASE || "http://localhost:3000").replace(
 const PATHS = (
   args.paths ||
   process.env.PATHS ||
-  "/docs,/docs/payments,/ar/docs"
+  "/docs,/docs/payments,/docs/payments/checkout/browser,/docs/payments/agentic-payments/x402,/ar/docs"
 ).split(",");
 const OUT = args.out || "theme-shots";
 mkdirSync(OUT, { recursive: true });
 
-const INK = "rgb(10, 10, 11)";
+const PAGE = { light: "rgb(255, 255, 255)", dark: "rgb(10, 10, 11)" };
 
 function lum([r, g, b]) {
   const c = [r, g, b].map((v) => {
@@ -115,25 +119,76 @@ for (const path of PATHS) {
             /^https?:/.test(t.getAttribute("href") || ""),
           );
           const row = q("#navbar .nav-tabs");
+          // Body links only: cards, steppers and path cards (.not-prose)
+          // draw their own link styles.
           const link =
-            q("#content-area .prose a.link") ||
-            q("#content-area .prose a[href]");
+            q("#content-area .prose a.link:not(.not-prose a):not(.card)") ||
+            q("#content-area .prose a[href]:not(.not-prose a):not(.card)");
           const pageBg = cs(document.body).backgroundColor;
+          const pill = q("#sol-ask-ai .sol-ask-pill");
+          const pillBox = pill?.getBoundingClientRect();
+          // Desktop sidebar or, on phones, the drawer (when open).
+          const box = [
+            ...document.querySelectorAll("#sidebar-content li, #mobile-nav li"),
+          ].find(
+            (li) =>
+              li.getClientRects().length > 0 &&
+              li.querySelector(":scope > button .nav-tag-pill"),
+          );
+          const star = box?.querySelector(":scope > ul > li:nth-child(2) > a");
           const code = q("#content-area pre");
           return {
             dark: html.classList.contains("dark"),
             barImage: cs(bar)?.backgroundImage || "",
+            barBg: cs(bar)?.backgroundColor || "",
+            github: !!q('#navbar a[href^="https://github.com/"]'),
+            // Mintlify's own assistant entries must not show: the floating
+            // "Ask AI" pill (ask-ai.js) is the only way in.
+            assistantBar: [
+              ...document.querySelectorAll(
+                "#assistant-entry, #assistant-entry-mobile, .chat-assistant-floating-input",
+              ),
+            ].some((e) => e.getClientRects().length > 0),
+            pill: pillBox
+              ? {
+                  right: Math.round(innerWidth - pillBox.right),
+                  bottom: Math.round(innerHeight - pillBox.bottom),
+                }
+              : null,
+            pathBox: box
+              ? {
+                  border: cs(box).borderTopWidth,
+                  star: star ? getComputedStyle(star, "::after").content : "",
+                }
+              : null,
+            mermaidFences: document.querySelectorAll(
+              '[data-component-name="mermaid-container"]',
+            ).length,
+            mermaidFigures:
+              document.querySelectorAll(".sol-mermaid img").length,
+            // Each .sol-mermaid figure holds a light and a dark drawing;
+            // exactly one of them may be visible.
+            mermaidVisible: [...document.querySelectorAll(".sol-mermaid")].map(
+              (f) =>
+                [...f.querySelectorAll("img")].filter(
+                  (i) => getComputedStyle(i).display !== "none",
+                ).length,
+            ),
             tabCount: tabs.length,
             fourthText: fourth?.textContent?.trim() || "",
             fourthAfter: fourth
               ? getComputedStyle(fourth, "::after").content
               : "",
             tabsVisible: !!row && row.getBoundingClientRect().width > 0,
+            // Distance from the row's end edge (left in RTL).
             extRight:
               ext && row
                 ? Math.round(
-                    row.getBoundingClientRect().right -
-                      ext.getBoundingClientRect().right,
+                    getComputedStyle(row).direction === "rtl"
+                      ? ext.getBoundingClientRect().left -
+                          row.getBoundingClientRect().left
+                      : row.getBoundingClientRect().right -
+                          ext.getBoundingClientRect().right,
                   )
                 : null,
             linkColor: cs(link)?.color || "",
@@ -174,8 +229,31 @@ for (const path of PATHS) {
           fail(ctxName, `${r.seeAllButtons} inert "See all" button(s)`);
         if (js && (scheme === "dark") !== r.dark)
           fail(ctxName, `theme class mismatch (dark=${r.dark})`);
-        if (!r.barImage.includes(INK))
-          fail(ctxName, `top bar not ink: ${r.barImage.slice(0, 80)}`);
+        const want = PAGE[r.dark ? "dark" : "light"];
+        if (r.barBg !== want)
+          fail(ctxName, `top bar ${r.barBg}, expected the page colour ${want}`);
+        if (r.pageBg !== want && r.pageBg !== "rgba(0, 0, 0, 0)")
+          fail(ctxName, `page ${r.pageBg}, expected ${want}`);
+        if (r.github) fail(ctxName, "GitHub button in the top bar");
+        if (r.assistantBar)
+          fail(ctxName, "Mintlify assistant entry or bottom bar visible");
+        if (js && (!r.pill || r.pill.right > 32 || r.pill.bottom > 32))
+          fail(
+            ctxName,
+            `Ask AI pill missing or misplaced: ${JSON.stringify(r.pill)}`,
+          );
+        if (
+          r.pathBox &&
+          (r.pathBox.border !== "1px" || !/\u2605|★/.test(r.pathBox.star))
+        )
+          fail(ctxName, `sidebar path box off: ${JSON.stringify(r.pathBox)}`);
+        if (r.mermaidFences && r.mermaidFigures < r.mermaidFences)
+          fail(ctxName, "mermaid fence without its pre-rendered figure");
+        if (r.mermaidVisible.some((n) => n !== 1))
+          fail(
+            ctxName,
+            `mermaid figures must show exactly one drawing: ${JSON.stringify(r.mermaidVisible)}`,
+          );
         if (r.tabsVisible) {
           if (
             r.tabCount >= 4 &&

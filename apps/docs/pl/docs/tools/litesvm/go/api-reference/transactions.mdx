@@ -22,7 +22,6 @@ out, err := svm.SendLegacyTransaction(txBytes)
 if err != nil {
     t.Fatal(err)
 }
-defer out.Close()
 
 if !out.IsOk() {
     t.Fatalf("tx failed: %s\nlogs: %v", out.Error(), out.Logs())
@@ -64,7 +63,6 @@ sim, err := svm.SimulateLegacyTransaction(txBytes)
 if err != nil {
     t.Fatal(err)
 }
-defer sim.Close()
 
 if !sim.IsOk() {
     t.Fatalf("sim failed: %s", sim.Error())
@@ -78,8 +76,7 @@ if err != nil {
     t.Fatal(err)
 }
 for _, p := range posts {
-    t.Logf("%s: %d lamports", p.Address, p.Account.Lamports())
-    p.Account.Close()
+    t.Logf("%s: %d lamports", p.Address, p.Account.Lamports)
 }
 ```
 
@@ -109,16 +106,12 @@ niezależnie od powodzenia lub niepowodzenia. Zawsze wywołuj `Close`.
 ### InnerInstruction
 
 ```go
-type CompiledInstruction struct {
-    ProgramIDIndex uint8
-    Accounts       []byte // indices into the transaction's account table
-    Data           []byte
+type InnerInstruction struct {
+    Instruction solana.CompiledInstruction // indices point into the transaction's account table
+    StackHeight uint16                     // 1 for top-level, higher for deeper CPIs
 }
 
-type InnerInstruction struct {
-    Instruction CompiledInstruction
-    StackHeight uint8 // 1 for top-level, higher for deeper CPIs
-}
+type InnerInstructionsList [][]InnerInstruction
 ```
 
 `InnerInstructions()` zwraca wycinek indeksowany według instrukcji najwyższego poziomu, która
@@ -129,7 +122,7 @@ wyzwoliła każdą partię CPI.
 ```go
 type PostAccount struct {
     Address solana.PublicKey
-    Account *Account // close this when done
+    Account *solana.Account
 }
 ```
 
@@ -157,6 +150,7 @@ tx, _ := solana.NewTransaction(
     blockhash,
     solana.TransactionPayer(payer),
 )
+_ = tx // sign, marshal and send it
 ```
 
 ### ExpireBlockhash
@@ -206,7 +200,6 @@ Wyszukaj poprzednią transakcję według podpisu:
 ```go
 prior := svm.GetTransaction(sig) // nil if unknown
 if prior != nil {
-    defer prior.Close()
     t.Logf("found: %s, fee=%d", prior.Signature(), prior.Fee())
 }
 ```
@@ -243,7 +236,9 @@ out, err := svm.SendLegacyTransaction(txBytes)
 if err != nil {
     t.Fatal(err)
 }
-defer out.Close()
+if !out.IsOk() {
+    t.Fatalf("tx failed: %s", out.Error())
+}
 ```
 
 <Info>

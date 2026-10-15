@@ -52,7 +52,8 @@
  * - Mermaid renders client-side only (nothing in the server HTML), so every
  *   mermaid fence is followed by `<div className="nojs-only">` holding the
  *   diagram source as a `text` fence (setup probe pattern 3). Skipped when
- *   the next block already is a no-JS fallback (or a WP3 diagram Frame).
+ *   the next block already is a no-JS fallback, the pre-rendered figure
+ *   from mermaid.ts, or a WP3 diagram Frame.
  *
  * Order 900 (cleanup band): runs after every component transform, so
  * WP3/WP4/WP5 see raw Code Hike syntax (notes needs `!tooltip`, APIMethod
@@ -508,7 +509,13 @@ function convertMermaid(
     );
   }
   const next = hasCaption ? after[1] : after[0];
-  if (!isNojsBlock(next) && !isJsx(next, "Frame")) {
+  // mermaid.ts (order 86) already put the pre-rendered figure there.
+  const isFigure =
+    isJsx(next, "div") &&
+    (
+      next!.attributes as { name?: string; value?: unknown }[] | undefined
+    )?.some((a) => a.name === "data-fallback" && a.value === "mermaid");
+  if (!isNojsBlock(next) && !isJsx(next, "Frame") && !isFigure) {
     out.push(
       flow(
         "div",

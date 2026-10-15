@@ -1,5 +1,6 @@
 ---
 title: IDL - an easy to use Program Interface
+sidebarTitle: "IDL - an easy to use program interface"
 description:
   "IDLs are a JSON representation of a program and let you decode the program's
   instructions and accounts, generate clients in different languages and lets
@@ -78,7 +79,7 @@ program.account.counter.subscribe(counterPda).on("change", (account) => {
 connection.onAccountChange(counterPda, (accInfo) => {
   console.log(
     "Account changed:",
-    program.coder.accounts.decode("counterData", account.data)
+    program.coder.accounts.decode("counter", accInfo.data)
   );
 });
 ```
@@ -182,7 +183,7 @@ Then in your client (TypeScript, v0.30+) you can call program instructions and
 fetch accounts as easy as this:
 
 ```ts
-import { AnchorProvider, Program } from "@coral-xyz/anchor";
+import { AnchorProvider, Program } from "@anchor-lang/core";
 import idl from "./counter.json";
 
 const provider = AnchorProvider.local();
@@ -238,24 +239,21 @@ For native Solana programs:
 
 ## Storing IDLs On-Chain
 
-There are two ways to upload IDLs onchain. The most used and standard one is the
-Anchor IDL account. How Anchor allows you to upload your IDLs onchain is by
-adding additional instructions to your program allow you to upload and update
-your IDLs onchain. This adds some extra size to the program and this is why the
-program metadata program was created. In the program metadata program all the
-program IDLs and security.txt info like name, contact and icon are stored in
+There are two ways to upload IDLs onchain: the Program Metadata Program (PMP),
+which is what Anchor 1.x uses, and the legacy Anchor IDL account. In the PMP all
+the program IDLs and security.txt info like name, contact and icon are stored in
 PDAs of the
 [program metadata program](https://github.com/solana-program/program-metadata).
+The legacy mechanism adds extra instructions to your program, which increases
+program size and is why the PMP was created.
 
-### Anchor IDL Account
+### Anchor IDL commands (Anchor 1.x)
 
-Anchor saves IDLs onchain in a PDA of your program.
+In Anchor 1.x, `anchor idl init` and `anchor idl upgrade` write to Program
+Metadata Program accounts, so explorers, wallets, and SDKs can fetch the IDL
+directly from Solana.
 
-- IDLs can be uploaded **onchain** to the Anchor IDL account.
-- This allows explorers, wallets, and SDKs to fetch the IDL directly from
-  Solana.
-
-First time (initialize the IDL account):
+First time (initialize the IDL):
 
 ```bash
 anchor idl init <PROGRAM_ID> -f target/idl/counter.json --provider.cluster devnet
@@ -267,19 +265,34 @@ Upgrades (subsequent updates by the authority):
 anchor idl upgrade <PROGRAM_ID> -f target/idl/counter.json --provider.cluster devnet
 ```
 
-Useful related commands:
+Fetch an IDL:
 
 ```bash
 anchor idl fetch -o idl.json <PROGRAM_ID>
-anchor idl authority <PROGRAM_ID>
-anchor idl set-authority -p <PROGRAM_ID> -n <NEW_AUTHORITY>
-anchor idl erase-authority -p <PROGRAM_ID>
 ```
 
-Note that by default the Anchor IDL account generation is permissionless. So
-upload your IDL as soon as possible and then set an authority.
+`anchor idl` also provides `build`, `fetch-historical`, `convert`, `type`,
+`close`, `create-buffer`, `set-buffer-authority` and `write-buffer`. Run
+`anchor idl --help` for details.
 
-You can read more about the Anchor IDL account in the
+### Legacy Anchor IDL account
+
+Before Anchor 1.0, Anchor saved IDLs onchain in a PDA of your program. The
+authority commands for that account now live under the deprecated
+`anchor legacy-idl` subcommand:
+
+```bash
+anchor legacy-idl authority <PROGRAM_ID>
+anchor legacy-idl set-authority -p <PROGRAM_ID> -n <NEW_AUTHORITY>
+anchor legacy-idl erase-authority -p <PROGRAM_ID>
+```
+
+On pre-1.0 Anchor versions the same commands are available as
+`anchor idl authority`, `anchor idl set-authority` and
+`anchor idl erase-authority`. For the legacy account, upload was permissionless
+by default, so upload your IDL as soon as possible and then set an authority.
+
+You can read more about Anchor IDLs in the
 [Anchor docs](https://www.anchor-lang.com/docs/basics/idl).
 
 ### Program Metadata Program (PMP)

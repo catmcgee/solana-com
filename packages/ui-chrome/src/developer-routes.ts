@@ -12,11 +12,26 @@ function matchesRouteSegment(
   return path === route || path.startsWith(`${route}/`);
 }
 
+/**
+ * The docs tab bar (Start here, Payments, ...) under the global header.
+ * The /developers landing is a marketing page with its own job picker, so it
+ * shows only the global header; its sub-pages (templates, cookbook, ...) and
+ * the docs keep the bar so readers can move between docs sections.
+ */
 export function shouldShowDevelopersNav(pathname: string | null | undefined) {
+  if (isExactRoute(pathname, "/developers")) return false;
   return (
     matchesRouteSegment(pathname, "/developers") ||
     matchesRouteSegment(pathname, "/docs")
   );
+}
+
+function isExactRoute(pathname: string | null | undefined, route: string) {
+  if (!pathname) return false;
+  const path =
+    getPathnameWithoutLocale(pathname.split(/[?#]/)[0]!).replace(/\/+$/, "") ||
+    "/";
+  return path === route;
 }
 
 export function shouldShowDocsSidebarToggle(

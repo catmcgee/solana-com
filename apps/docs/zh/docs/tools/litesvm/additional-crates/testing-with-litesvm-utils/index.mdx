@@ -10,7 +10,8 @@ description: 了解如何使用 litesvm-utils crate 简化 Solana 程序测试
 请确保已安装所有必要的依赖项：
 
 ```bash
-cargo add --dev litesvm litesvm-utils
+cargo add --dev litesvm-utils solana-sdk@3 spl-token
+cargo add --dev solana-system-interface@2 --features bincode
 ```
 
 ## 什么是 litesvm-utils？
@@ -49,7 +50,8 @@ crate 提供了必要的辅助 trait 和工具，可简化 Solana 程序测试�
 
 ```rust
 use litesvm_utils::{AssertionHelpers, LiteSVM, Signer, TestHelpers, TransactionHelpers};
-use solana_sdk::{native_token::LAMPORTS_PER_SOL, system_instruction};
+use solana_sdk::native_token::LAMPORTS_PER_SOL;
+use solana_system_interface::instruction as system_instruction;
 
 #[test]
 fn test_with_utils() {
@@ -62,16 +64,14 @@ fn test_with_utils() {
     // Create a token mint easily
     let mint = svm.create_token_mint(&alice, 9).unwrap();
 
-    // Create associated token accounts (returns Pubkey)
+    // Create an associated token account (returns Pubkey)
     let alice_ata = svm.create_associated_token_account(&mint.pubkey(), &alice).unwrap();
-    let bob_ata = svm.create_associated_token_account(&mint.pubkey(), &bob).unwrap();
 
     // Mint tokens
     svm.mint_to(&mint.pubkey(), &alice_ata, &alice, 1000).unwrap();
 
     // Assert balances
     svm.assert_token_balance(&alice_ata, 1000);
-    svm.assert_token_balance(&bob_ata, 0);
 
     // Execute a SOL transfer with rich result handling
     let transfer_ix = system_instruction::transfer(
@@ -85,6 +85,10 @@ fn test_with_utils() {
 
     // Verify the transfer
     svm.assert_sol_balance(&bob.pubkey(), LAMPORTS_PER_SOL);
+
+    // Bob now has SOL, so he can pay for his own associated token account
+    let bob_ata = svm.create_associated_token_account(&mint.pubkey(), &bob).unwrap();
+    svm.assert_token_balance(&bob_ata, 0);
 }
 ```
 

@@ -40,7 +40,7 @@ const url = encodeURL({
 });
 
 console.log(url.toString());
-// solana:merchant...?amount=0.1&label=Coffee%20Shop&message=...
+// solana:<merchant-address>?amount=0.1&label=Coffee+Shop&message=Thanks+for+your+order%21
 ```
 
 ### Parametri URL
@@ -64,7 +64,7 @@ import { encodeURL } from "@solana-commerce/solana-pay";
 
 const url = encodeURL({
   recipient: address("merchant-wallet"),
-  amount: 25000000n, // 25 USDC (6 decimals)
+  amount: 25_000_000_000n, // 25 USDC: encodeURL scales amount by 1e9 for every mint
   splToken: USDC_MINT,
   label: "My Store"
 });
@@ -142,17 +142,21 @@ const qr = await createStyledQRCode(url.toString(), {
 Usa `createTransfer` per costruire una transazione completa da firmare:
 
 ```typescript
-import { createTransfer } from "@solana-commerce/solana-pay";
+import { address } from "@solana/kit";
+import { getTransferSolInstruction } from "@solana-program/system";
+import { getAddMemoInstruction } from "@solana-program/memo";
 
-const transaction = await createTransfer(
-  client.rpc,
-  address(SENDER_WALLET_ADDRESS),
-  {
-    recipient: address(MERCHANT_WALLET_ADDRESS),
-    amount: 100000000n, // 0.1 SOL
-    memo: "Coffee purchase"
-  }
-);
+// `client.payer` is the sender's TransactionSigner
+const instructions = [
+  getTransferSolInstruction({
+    source: client.payer,
+    destination: address(MERCHANT_WALLET_ADDRESS),
+    amount: 100_000_000n // 0.1 SOL in lamports
+  }),
+  getAddMemoInstruction({ memo: "Coffee purchase" })
+];
+
+await client.sendTransaction(instructions);
 ```
 
 Per i token SPL, includi l'indirizzo mint:
@@ -160,12 +164,14 @@ Per i token SPL, includi l'indirizzo mint:
 ```typescript
 const USDC_MINT = address("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
 
+import { createTransfer } from "@solana-commerce/solana-pay";
+
 const transaction = await createTransfer(
   client.rpc,
   address(SENDER_WALLET_ADDRESS),
   {
     recipient: address(MERCHANT_WALLET_ADDRESS),
-    amount: 25000000n, // 25 USDC
+    amount: 25_000_000n, // 25 USDC in base units (6 decimals)
     splToken: USDC_MINT,
     reference: [orderReference],
     memo: "Order #12345"
@@ -181,7 +187,9 @@ Valida ed estrai dati dagli URL Solana Pay:
 import { parseURL, ParseURLError } from "@solana-commerce/solana-pay";
 
 try {
-  const parsed = parseURL("solana:merchant...?amount=1.5&label=Store");
+  const parsed = parseURL(
+    "solana:GsbwXfJraMomNxBcjYLcG3mxkBUiyWXAB32fGbSMQRdW?amount=1.5&label=Store"
+  );
 
   console.log(parsed.recipient); // Address
   console.log(parsed.amount); // 1500000000n (lamports)

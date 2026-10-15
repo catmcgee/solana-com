@@ -11,8 +11,15 @@ import { repoRoot } from "../lib/paths.ts";
 export function formatFiles(files: string[]): boolean {
   const bin = path.join(repoRoot, "node_modules", ".bin", "oxfmt");
   if (!files.length || !existsSync(bin)) return false;
-  execFileSync(bin, files, { cwd: repoRoot, stdio: "ignore" });
-  return true;
+  try {
+    execFileSync(bin, files, { cwd: repoRoot, stdio: "ignore" });
+    return true;
+  } catch {
+    // oxfmt exits non-zero when every file is matched by .oxfmtrc.json
+    // ignorePatterns (apps/docs/navigation/** and generated/** are). Those
+    // files are not format-checked in CI, so unformatted output is fine.
+    return false;
+  }
 }
 
 /** True when `file` holds `expected` (JSON compared semantically). */

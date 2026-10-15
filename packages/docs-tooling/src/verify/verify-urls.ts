@@ -265,6 +265,8 @@ export function layoutKey(
 export function strayAssetsInDocsRoot(
   allow: readonly string[] = [
     "apps/docs/run-examples.js",
+    // Floating "Ask AI" pill (redesign 2026-10-15; styles/ask-ai.css).
+    "apps/docs/ask-ai.js",
     "apps/docs/styles/",
     // Client-only progressive-enhancement demos (WP8b, spec §3.4.6).
     "apps/docs/snippets/demos/",

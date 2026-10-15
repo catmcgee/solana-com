@@ -54,7 +54,9 @@ svm.set_sysvar(&clock);
 ### get_sysvar
 
 ```rust
-pub fn get_sysvar<T: Sysvar>(&self) -> T
+pub fn get_sysvar<T>(&self) -> T
+where
+    T: Sysvar + SysvarId + DeserializeOwned<Dst = T>,
 ```
 
 Читання значення системної змінної.
@@ -72,7 +74,9 @@ let epoch_schedule: EpochSchedule = svm.get_sysvar();
 ### set_sysvar
 
 ```rust
-pub fn set_sysvar<T: Sysvar>(&mut self, sysvar: &T)
+pub fn set_sysvar<T>(&mut self, sysvar: &T)
+where
+    T: Sysvar + SysvarId + Serialize<Src = T>,
 ```
 
 Запис значення системної змінної.
@@ -80,11 +84,9 @@ pub fn set_sysvar<T: Sysvar>(&mut self, sysvar: &T)
 ```rust
 use solana_sdk::rent::Rent;
 
-let rent = Rent {
-    lamports_per_byte_year: 3480,
-    exemption_threshold: 2.0,
-    burn_percent: 50,
-};
+// Read the current rent, change a field, and write it back
+let mut rent: Rent = svm.get_sysvar();
+rent.lamports_per_byte = 3480;
 
 svm.set_sysvar(&rent);
 ```
@@ -123,7 +125,8 @@ println!("Slots per epoch: {}", schedule.slots_per_epoch);
 ### Історія стейкингу
 
 ```rust
-use solana_sdk::stake_history::{StakeHistory, StakeHistoryEntry};
+// cargo add --dev solana-sysvar@4.2
+use solana_sysvar::stake_history::{StakeHistory, StakeHistoryEntry};
 
 let mut stake_history = StakeHistory::default();
 stake_history.add(
@@ -172,7 +175,11 @@ let current_time = clock.unix_timestamp;
 // Warp forward 1 hour (3600 seconds)
 // Slots roughly correspond to ~0.4 seconds on Solana
 let target_slot = clock.slot + (3600.0 / 0.4) as u64;
-svm.warp_to_slot(target_slot);
+// `warp_to_slot` only moves the slot, so set the timestamp yourself
+let mut warped: Clock = svm.get_sysvar();
+warped.slot = target_slot;
+warped.unix_timestamp = current_time + 3600;
+svm.set_sysvar(&warped);
 
 // Verify timestamp increased
 let new_clock: Clock = svm.get_sysvar();

@@ -29,6 +29,7 @@ import {
 } from "../src/convert/transforms/_rpc.ts";
 import {
   SURFPOOL_CATEGORIES,
+  SURFNET_UNSUPPORTED_ADMIN,
   SURFPOOL_SNIPPET_DIR,
   loadSurfpoolSchemas,
   mergeJson,
@@ -309,7 +310,11 @@ describe("WP4 Surfpool snippets", () => {
       schemas.response.$defs?.WebSocketSubscriptions?.properties ?? {},
     ))
       expected.add(name);
-    const missing = [...expected].filter((m) => !headings.has(m)).sort();
+    // Agave admin methods that Surfnet does not implement are intentionally
+    // left out of the admin page.
+    const missing = [...expected]
+      .filter((m) => !SURFNET_UNSUPPORTED_ADMIN.has(m) && !headings.has(m))
+      .sort();
     expect(missing).toEqual([]);
     expect(expected.size).toBeGreaterThan(90);
   });

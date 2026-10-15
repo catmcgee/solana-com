@@ -1,5 +1,6 @@
 ---
 title: Verification Tools
+sidebarTitle: "Verification tools"
 description:
   Verify incoming stablecoin payments and reconcile them with your orders.
 ---
@@ -16,7 +17,12 @@ Check your stablecoin balance using the
 [`getTokenAccountBalance`](/docs/rpc/http/gettokenaccountbalance) RPC method:
 
 ```typescript
-import { createSolanaRpc, address, type Address } from "@solana/kit";
+import {
+  createSolanaRpc,
+  address,
+  type Address,
+  type Signature
+} from "@solana/kit";
 import {
   findAssociatedTokenPda,
   TOKEN_PROGRAM_ADDRESS
@@ -111,6 +117,13 @@ after each transaction, we can determine the payment amount and direction
 (incoming vs outgoing).
 
 ```typescript
+type Payment = {
+  signature: Signature;
+  timestamp: bigint | null;
+  amount: bigint;
+  type: "incoming" | "outgoing";
+};
+
 async function getRecentPayments(
   tokenAccountAddress: Address,
   limit = 100
@@ -118,18 +131,21 @@ async function getRecentPayments(
   const signatures = await rpc
     .getSignaturesForAddress(tokenAccountAddress, { limit })
     .send();
-  const payments: ParsedPayment[] = [];
+  const payments: Payment[] = [];
 
   for (const sig of signatures) {
     const tx = await rpc
-      .getTransaction(sig.signature, { maxSupportedTransactionVersion: 1 })
+      .getTransaction(sig.signature, {
+        maxSupportedTransactionVersion: 1,
+        encoding: "json"
+      })
       .send();
 
     if (!tx?.meta?.preTokenBalances || !tx?.meta?.postTokenBalances) continue;
 
     // Find our ATA's index in the transaction
     const accountKeys = tx.transaction.message.accountKeys;
-    const ataIndex = accountKeys.findIndex((key) => key === ata);
+    const ataIndex = accountKeys.findIndex((key) => key === tokenAccountAddress);
     if (ataIndex === -1) continue;
 
     // Compare pre/post balances for our ATA
@@ -188,15 +204,36 @@ individual transfer instructions and provide transaction-level detail.
 
 When senders include memos (invoice IDs, order numbers), you can extract them
 from the transaction's message using the `getTransaction` RPC method and the
-`jsonParsed` encoding:
+`jsonParsed` encoding. The RPC only parses memos from some Memo program
+versions. For others, such as the program `@solana-program/memo` uses, the
+instruction carries just `programId` and base58 `data`, so match on the program
+id and decode the data yourself:
 
 ```typescript
-function extractMemos(transaction): string | null {
+import { address, getBase58Encoder, getUtf8Decoder } from "@solana/kit";
+import { MEMO_PROGRAM_ADDRESS } from "@solana-program/memo";
+
+// Current Memo program (used by @solana-program/memo) and the legacy v1 program
+const MEMO_PROGRAMS = [
+  MEMO_PROGRAM_ADDRESS,
+  address("MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr")
+];
+
+function extractMemos(transaction): string {
   const { instructions } = transaction.transaction.message;
   let memos = "";
   for (const instruction of instructions) {
-    if (instruction.program !== "spl-memo") continue;
-    memos += instruction.parsed + "; ";
+    if (instruction.program === "spl-memo") {
+      // The RPC parsed the instruction for us
+      memos += instruction.parsed + "; ";
+    } else if (
+      MEMO_PROGRAMS.includes(instruction.programId) &&
+      instruction.data
+    ) {
+      // Not parsed by the RPC: decode the base58 instruction data as UTF-8
+      const bytes = getBase58Encoder().encode(instruction.data);
+      memos += getUtf8Decoder().decode(bytes) + "; ";
+    }
   }
   return memos;
 }

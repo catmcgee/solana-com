@@ -115,7 +115,7 @@ const url = encodeURL({
 });
 
 console.log(url.toString());
-// solana:merchantWalletAddress123...?amount=0.1&label=Coffee%20Shop&message=Thanks%20for%20your%20order!
+// solana:merchantWalletAddress123...?amount=0.1&label=Coffee+Shop&message=Thanks+for+your+order%21
 ```
 
 #### Esempio: Pagamento Token SPL
@@ -128,7 +128,7 @@ const usdcMint = address("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
 
 const url = encodeURL({
   recipient: address("merchantWallet..."),
-  amount: 25000000n, // 25 USDC (6 decimals)
+  amount: 25_000_000_000n, // 25 USDC (encodeURL always divides by 1e9 -> amount=25)
   splToken: usdcMint,
   label: "USDC Payment",
   message: "Pay with USDC stablecoin"
@@ -315,7 +315,7 @@ import { address } from "@solana/kit";
 async function createBrandedQR() {
   const url = encodeURL({
     recipient: address("merchant..."),
-    amount: 25000000n, // 25 USDC (6 decimals)
+    amount: 25_000_000_000n, // 25 USDC (encodeURL always divides by 1e9 -> amount=25)
     splToken: address("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"),
     label: "Coffee Shop",
     message: "Scan to pay with USDC"
@@ -392,21 +392,55 @@ Solleva `CreateTransferError` con messaggi specifici:
 #### Esempio: Pagamento SOL
 
 ```typescript
-import { createTransfer } from "@solana-commerce/solana-pay";
-import { address, createSolanaRpc } from "@solana/kit";
+import {
+  address,
+  appendTransactionMessageInstructions,
+  createSolanaRpc,
+  createTransactionMessage,
+  generateKeyPairSigner,
+  lamports,
+  pipe,
+  setTransactionMessageFeePayerSigner,
+  setTransactionMessageLifetimeUsingBlockhash,
+  AccountRole
+} from "@solana/kit";
+import { getTransferSolInstruction } from "@solana-program/system";
+import { getAddMemoInstruction } from "@solana-program/memo";
 
 const rpc = createSolanaRpc("https://api.mainnet.solana.com");
+const sender = await generateKeyPairSigner(); // in a browser, use the wallet's signer
+const reference = (await generateKeyPairSigner()).address;
 
-// Build SOL transfer transaction
-const txMessage = await createTransfer(rpc, address("sender-wallet-address"), {
-  recipient: address("merchant-wallet-address"),
-  amount: 100000000n, // 0.1 SOL
-  memo: "Coffee purchase"
+const transfer = getTransferSolInstruction({
+  source: sender,
+  destination: address("merchant-wallet-address"),
+  amount: lamports(100_000_000n) // 0.1 SOL
 });
 
-// Transaction is ready to sign and send
-// (wallet signing is handled separately)
-console.log("Transaction ready:", txMessage);
+const { value: latestBlockhash } = await rpc.getLatestBlockhash().send();
+
+const txMessage = pipe(
+  createTransactionMessage({ version: 0 }),
+  (tx) => setTransactionMessageFeePayerSigner(sender, tx),
+  (tx) => setTransactionMessageLifetimeUsingBlockhash(latestBlockhash, tx),
+  (tx) =>
+    appendTransactionMessageInstructions(
+      [
+        {
+          ...transfer,
+          // The reference is a read-only account on the transfer instruction
+          accounts: [
+            ...transfer.accounts,
+            { address: reference, role: AccountRole.READONLY }
+          ]
+        },
+        getAddMemoInstruction({ memo: "Coffee purchase" })
+      ],
+      tx
+    )
+);
+
+// Sign with signTransactionMessageWithSigners and send as usual.
 ```
 
 #### Esempio: Pagamento USDC

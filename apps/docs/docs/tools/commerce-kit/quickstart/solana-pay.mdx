@@ -1,5 +1,6 @@
 ---
 title: Solana Pay
+sidebarTitle: "Use with Solana Pay"
 description: Generate Solana Pay URLs, QR codes, and payment transactions
 ---
 
@@ -39,9 +40,14 @@ Used for simple payment requests (direct transfers):
   `Address` type from `@solana/kit`.
 
 - **`amount`** (`bigint`, optional) - Payment amount in **lamports** (atomic
-  units). For SOL, 1 SOL = 1,000,000,000 lamports (9 decimals). For SPL tokens,
-  use the token's decimal precision (e.g., USDC uses 6 decimals, so 1 USDC =
-  1,000,000).
+  units). For SOL, 1 SOL = 1,000,000,000 lamports (9 decimals). `encodeURL`
+  always divides by 1e9 when it writes the `amount` query parameter, whatever
+  the token's decimals (as of `@solana-commerce/solana-pay@0.1.1`). For a
+  6-decimal token such as USDC, pass the amount scaled to 9 decimals: 1 USDC =
+  `1_000_000_000n`, so 25 USDC = `25_000_000_000n`. Passing the token's atomic
+  units (`25_000_000n`) produces `amount=0.025`, and the wallet requests 0.025
+  USDC. If you need a different scale, use `encodeURL` from `@solana/pay`, whose
+  `amount` is a decimal number.
 
 - **`splToken`** (`Address`, optional) - The SPL token mint address for token
   payments. If omitted, the payment is assumed to be in SOL.
@@ -114,7 +120,7 @@ const url = encodeURL({
 });
 
 console.log(url.toString());
-// solana:merchantWalletAddress123...?amount=0.1&label=Coffee%20Shop&message=Thanks%20for%20your%20order!
+// solana:merchantWalletAddress123...?amount=0.1&label=Coffee+Shop&message=Thanks+for+your+order%21
 ```
 
 #### Example: SPL Token Payment
@@ -127,7 +133,7 @@ const usdcMint = address("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
 
 const url = encodeURL({
   recipient: address("merchantWallet..."),
-  amount: 25000000n, // 25 USDC (6 decimals)
+  amount: 25_000_000_000n, // 25 USDC (encodeURL always divides by 1e9 -> amount=25)
   splToken: usdcMint,
   label: "USDC Payment",
   message: "Pay with USDC stablecoin"
@@ -310,7 +316,7 @@ import { address } from "@solana/kit";
 async function createBrandedQR() {
   const url = encodeURL({
     recipient: address("merchant..."),
-    amount: 25000000n, // 25 USDC (6 decimals)
+    amount: 25_000_000_000n, // 25 USDC (encodeURL always divides by 1e9 -> amount=25)
     splToken: address("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"),
     label: "Coffee Shop",
     message: "Scan to pay with USDC"
@@ -340,13 +346,12 @@ async function createBrandedQR() {
 
 ### `createTransfer(rpc, sender, fields)`
 
-Builds a complete Solana transaction message for a payment transfer. This
-function automatically detects whether to create a SOL or SPL token transfer
-based on the `splToken` parameter, and constructs all necessary instructions.
-The function sets a blockhash lifetime for the transaction using the latest
-blockhash from the RPC client and returns a complete, unsigned transaction ready
-for signing and submission to the RPC (type
-`TransactionMessageWithBlockhashLifetime`, compatible with Solana Kit).
+Builds a Solana transaction message for an SPL token payment transfer. It
+constructs the transfer, optional memo and reference instructions, sets a
+blockhash lifetime from the RPC client and returns an unsigned transaction
+message (type `TransactionMessageWithBlockhashLifetime`, compatible with Solana
+Kit). You must set a fee payer before signing. SOL payments are not supported
+correctly in `@solana-commerce/solana-pay@0.1.1` (see the warning below).
 
 #### Parameters
 
@@ -373,8 +378,18 @@ message with:
 
 - Version 0 format (supports address lookup tables)
 - Blockhash lifetime (transaction expires after ~60 seconds)
-- All necessary instructions (transfer + optional memo)
-- Ready to be signed with wallet and submitted to RPC
+- All necessary instructions (transfer + optional memo) for SPL token payments
+- No fee payer: call `setTransactionMessageFeePayer` (or
+  `setTransactionMessageFeePayerSigner`) before signing and sending
+
+<Warning>
+  As of `@solana-commerce/solana-pay@0.1.1`, `createTransfer` without `splToken`
+  does **not** build a SOL transfer. It returns a single Token program
+  `Transfer` instruction and silently drops `memo` and `reference`, so the
+  transaction fails on-chain with `IncorrectProgramId`. For SOL, build the
+  instructions yourself (see the example below) or use `createTransfer` from
+  `@solana/pay`. SPL token transfers use `transferChecked` and are not affected.
+</Warning>
 
 #### Error Handling
 
@@ -385,22 +400,59 @@ Throws `CreateTransferError` with specific messages:
 
 #### Example: SOL Payment
 
+Build the System program transfer, a memo and the reference account yourself
+until `createTransfer` handles SOL correctly:
+
 ```typescript
-import { createTransfer } from "@solana-commerce/solana-pay";
-import { address, createSolanaRpc } from "@solana/kit";
+import {
+  address,
+  appendTransactionMessageInstructions,
+  createSolanaRpc,
+  createTransactionMessage,
+  generateKeyPairSigner,
+  lamports,
+  pipe,
+  setTransactionMessageFeePayerSigner,
+  setTransactionMessageLifetimeUsingBlockhash,
+  AccountRole
+} from "@solana/kit";
+import { getTransferSolInstruction } from "@solana-program/system";
+import { getAddMemoInstruction } from "@solana-program/memo";
 
 const rpc = createSolanaRpc("https://api.mainnet.solana.com");
+const sender = await generateKeyPairSigner(); // in a browser, use the wallet's signer
+const reference = (await generateKeyPairSigner()).address;
 
-// Build SOL transfer transaction
-const txMessage = await createTransfer(rpc, address("sender-wallet-address"), {
-  recipient: address("merchant-wallet-address"),
-  amount: 100000000n, // 0.1 SOL
-  memo: "Coffee purchase"
+const transfer = getTransferSolInstruction({
+  source: sender,
+  destination: address("merchant-wallet-address"),
+  amount: lamports(100_000_000n) // 0.1 SOL
 });
 
-// Transaction is ready to sign and send
-// (wallet signing is handled separately)
-console.log("Transaction ready:", txMessage);
+const { value: latestBlockhash } = await rpc.getLatestBlockhash().send();
+
+const txMessage = pipe(
+  createTransactionMessage({ version: 0 }),
+  (tx) => setTransactionMessageFeePayerSigner(sender, tx),
+  (tx) => setTransactionMessageLifetimeUsingBlockhash(latestBlockhash, tx),
+  (tx) =>
+    appendTransactionMessageInstructions(
+      [
+        {
+          ...transfer,
+          // The reference is a read-only account on the transfer instruction
+          accounts: [
+            ...transfer.accounts,
+            { address: reference, role: AccountRole.READONLY }
+          ]
+        },
+        getAddMemoInstruction({ memo: "Coffee purchase" })
+      ],
+      tx
+    )
+);
+
+// Sign with signTransactionMessageWithSigners and send as usual.
 ```
 
 #### Example: USDC Payment

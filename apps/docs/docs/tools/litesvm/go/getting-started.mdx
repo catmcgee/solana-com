@@ -15,16 +15,16 @@ everything in-memory inside your test runner.
 flow naturally between `litesvm-go` and the rest of the Go Solana ecosystem.
 
 <Info>
-  **Requirements:** Go 1.24+. No Rust toolchain needed - prebuilt static
-  archives are vendored in the module and selected automatically by `GOOS` /
-  `GOARCH`. Supported platforms: macOS (amd64, arm64), Linux (amd64, arm64;
-  glibc or musl), Windows (amd64).
+  **Requirements:** Go 1.25.7+. `litesvm-go` v0.3.0 and later is pure Go with no
+  cgo, so there is no Rust toolchain, no vendored archives and no build tags,
+  and cross-compilation works with plain `GOOS` / `GOARCH`.
 </Info>
 
 A fresh `LiteSVM` handle exposes airdrops, transactions (legacy + v0),
 simulation, account read/write, sysvars, compute budget, feature gates, time
-travel, custom programs, and transaction history - all backed by the same Rust
-core that powers the Rust and TypeScript SDKs.
+travel, custom programs, and transaction history. The engine is the SVM from
+[mithril](https://github.com/Overclock-Validator/mithril), running as pure Go
+inside your test process.
 
 ## Quick Start
 
@@ -51,8 +51,11 @@ go get github.com/gagliardetto/solana-go
 ```
 
 <Warning>
-  **Alpine / musl users:** add `-tags musl` to your `go build` / `go test`
-  invocation so the right vendored archive is linked.
+  `go get github.com/LiteSVM/litesvm-go` installs the latest tag. v0.3.0 is a
+  pure-Go rewrite with a different API from the v0.1 / v0.2 cgo bindings:
+  accounts are plain `*solana.Account` values (no handles and no `Close`), and
+  sysvars use the `github.com/gagliardetto/solana-go/sysvar` types. These pages
+  describe v0.3.0 and later.
 </Warning>
 
 </Step>
@@ -100,10 +103,9 @@ func TestSetup(t *testing.T) {
 
 <Info>
   `litesvm.New()` returns a `*LiteSVM` and an `error`. Every entry point in
-  `litesvm-go` follows the same `(value, error)` shape; panics on the Rust side
-  are caught and converted to errors. Always `defer svm.Close()` so the
-  underlying Rust handle is released - or rely on the finalizer, though explicit
-  `Close` is preferred for predictable cleanup.
+  `litesvm-go` follows the same `(value, error)` shape, and every error wraps
+  the `litesvm.ErrLiteSVM` sentinel, so you can detect it with `errors.Is`.
+  `svm.Close()` is a no-op kept so that `defer svm.Close()` stays valid.
 </Info>
 
 </Step>
@@ -192,7 +194,6 @@ func TestTransfer(t *testing.T) {
     if err != nil {
         t.Fatal(err)
     }
-    defer out.Close()
 
     if !out.IsOk() {
         t.Fatalf("tx failed: %s\nlogs: %v", out.Error(), out.Logs())
@@ -211,8 +212,7 @@ func TestTransfer(t *testing.T) {
 <Info>
   `SendLegacyTransaction` and `SendVersionedTransaction` both return a
   `*TxOutcome` whether the transaction succeeded or failed. Call `IsOk()` before
-  reading success-only fields, and always `defer out.Close()` to release the
-  Rust handle.
+  reading success-only fields.
 </Info>
 
 ## Working with TxOutcome
@@ -225,7 +225,6 @@ out, err := svm.SendLegacyTransaction(txBytes)
 if err != nil {
     t.Fatal(err)
 }
-defer out.Close()
 
 if !out.IsOk() {
     t.Fatalf("error: %s", out.Error())
@@ -253,7 +252,6 @@ sim, err := svm.SimulateLegacyTransaction(txBytes)
 if err != nil {
     t.Fatal(err)
 }
-defer sim.Close()
 
 posts, err := sim.PostAccounts()
 if err != nil {
@@ -261,8 +259,7 @@ if err != nil {
 }
 for _, p := range posts {
     _ = p.Address
-    _ = p.Account.Lamports()
-    p.Account.Close()
+    _ = p.Account.Lamports
 }
 ```
 
@@ -279,7 +276,7 @@ _ = svm.SetSigverify(false)        // accept unsigned / badly-signed txs
 _ = svm.SetBlockhashCheck(false)   // skip recent-blockhash enforcement
 _ = svm.SetTransactionHistory(0)   // 0 disables dedup; any N caps history
 _ = svm.SetLogBytesLimit(-1)       // negative = unlimited
-_ = svm.SetLamports(1 << 40)       // default lamports for new accounts
+_ = svm.SetLamports(1 << 40)       // reset the airdrop pool balance
 _ = svm.SetSysvars()               // reset sysvars to defaults
 _ = svm.SetBuiltins()              // reload built-in programs
 _ = svm.SetDefaultPrograms()       // reload SPL Token, Memo, etc.
@@ -290,14 +287,13 @@ _ = svm.WithNativeMints()          // seed wrapped-SOL mint
 ## Notes
 
 **Thread safety.** A `*LiteSVM` handle is not safe for concurrent use from
-multiple goroutines (the underlying Rust type is not `Sync`, and most methods
-mutate internal state). Confine a handle to a single goroutine, or guard it with
-a `sync.Mutex`.
+multiple goroutines (most methods mutate internal state). Confine a handle to a
+single goroutine, or guard it with a `sync.Mutex`. Separate instances are fully
+isolated from each other.
 
-**Panic behavior.** Vendored release archives are built with `immediate-abort`:
-any panic inside Rust aborts the host process directly, without unwinding. This
-is a deliberate trade for smaller archives. If you ever hit one in practice,
-please open an issue with a reproducer.
+**Error strings.** `TxOutcome.Error()` returns the Agave wire-format JSON for
+the failure, for example `"BlockhashNotFound"` or
+`{"InstructionError":[0,{"Custom":1}]}`.
 
 ## What's Next
 

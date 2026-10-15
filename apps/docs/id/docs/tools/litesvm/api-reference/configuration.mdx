@@ -17,11 +17,11 @@ Tetapkan batas unit komputasi dan ukuran heap.
 ```rust
 use solana_compute_budget::compute_budget::ComputeBudget;
 
-let mut svm = LiteSVM::default()
+let mut svm = LiteSVM::new()
     .with_compute_budget(ComputeBudget {
         compute_unit_limit: 1_400_000,
         heap_size: 256 * 1024,
-        ..ComputeBudget::default()
+        ..ComputeBudget::new_with_defaults(true)
     });
 ```
 
@@ -35,7 +35,7 @@ Aktifkan atau nonaktifkan verifikasi tanda tangan. Default: `true`.
 
 ```rust
 // Disable for faster tests
-let mut svm = LiteSVM::default()
+let mut svm = LiteSVM::new()
     .with_sigverify(false);
 ```
 
@@ -49,7 +49,7 @@ Aktifkan atau nonaktifkan validasi blockhash. Default: `true`.
 
 ```rust
 // Disable to use any blockhash
-let mut svm = LiteSVM::default()
+let mut svm = LiteSVM::new()
     .with_blockhash_check(false);
 ```
 
@@ -63,8 +63,12 @@ Tetapkan jumlah transaksi yang disimpan dalam riwayat. Default: `0`.
 
 ```rust
 // Keep last 100 transactions
-let mut svm = LiteSVM::default()
+let mut svm = LiteSVM::new()
     .with_transaction_history(100);
+
+// Disable history and allow duplicate transactions
+let mut svm = LiteSVM::new()
+    .with_transaction_history(0);
 ```
 
 ## with_log_bytes_limit
@@ -77,11 +81,11 @@ Tetapkan jumlah maksimum byte untuk log transaksi. Default: `Some(10_000)`.
 
 ```rust
 // Unlimited logs
-let mut svm = LiteSVM::default()
+let mut svm = LiteSVM::new()
     .with_log_bytes_limit(None);
 
 // Custom limit (50KB)
-let mut svm = LiteSVM::default()
+let mut svm = LiteSVM::new()
     .with_log_bytes_limit(Some(50_000));
 ```
 
@@ -94,7 +98,7 @@ pub fn with_lamports(self, lamports: u64) -> Self
 Tetapkan lamport awal untuk pengumpulan biaya. Default: `1_000_000_000`.
 
 ```rust
-let mut svm = LiteSVM::default()
+let mut svm = LiteSVM::new()
     .with_lamports(10_000_000_000);
 ```
 
@@ -107,7 +111,7 @@ pub fn with_default_programs(self) -> Self
 Sertakan program SPL default (Token, Associated Token, dll.).
 
 ```rust
-let mut svm = LiteSVM::default()
+let mut svm = LiteSVM::new()
     .with_default_programs();
 ```
 
@@ -121,7 +125,7 @@ Menyertakan sysvar default (Clock, Rent, EpochSchedule, SlotHashes,
 StakeHistory, dll.).
 
 ```rust
-let mut svm = LiteSVM::default()
+let mut svm = LiteSVM::new()
     .with_sysvars();
 ```
 
@@ -136,7 +140,7 @@ Konfigurasikan feature set Solana untuk menguji fitur runtime tertentu.
 ```rust
 use agave_feature_set::FeatureSet;
 
-let mut svm = LiteSVM::default()
+let mut svm = LiteSVM::new()
     .with_feature_set(FeatureSet::all_enabled());
 ```
 
@@ -150,7 +154,7 @@ pub fn with_precompiles(self) -> Self
 Menyertakan program precompile standar (ed25519, secp256k1, secp256r1).
 
 ```rust
-let mut svm = LiteSVM::default()
+let mut svm = LiteSVM::new()
     .with_precompiles();
 ```
 
@@ -159,7 +163,7 @@ let mut svm = LiteSVM::default()
 
 ```toml
 [dev-dependencies]
-litesvm = { version = "0.11", features = ["precompiles"] }
+litesvm = { version = "0.18", features = ["precompiles"] }
 ```
 
 </Info>
@@ -174,7 +178,7 @@ Sertakan akun feature gate di lingkungan pengujian. Ini memastikan perilaku
 runtime Solana yang dibatasi fitur tercermin secara akurat dalam pengujian Anda.
 
 ```rust
-let mut svm = LiteSVM::default()
+let mut svm = LiteSVM::new()
     .with_feature_accounts();
 ```
 
@@ -186,7 +190,7 @@ selama exekusi transaksi. Fitur ini mengimplikasikan fitur
 
 ```toml
 [dev-dependencies]
-litesvm = { version = "0.11", features = ["register-tracing"] }
+litesvm = { version = "0.18", features = ["register-tracing"] }
 ```
 
 Gunakan `LiteSVM::new_debuggable(true)` untuk membuat instance dengan pelacakan
@@ -215,13 +219,13 @@ Membutuhkan fitur `invocation-inspect-callback`.
 
 ```toml
 [dev-dependencies]
-litesvm = { version = "0.11", features = ["invocation-inspect-callback"] }
+litesvm = { version = "0.18", features = ["invocation-inspect-callback"] }
 ```
 
 ```rust
-use litesvm::{LiteSVM, types::InvocationInspectCallback};
-use solana_svm::invoke_context::InvokeContext;
-use solana_svm_transaction::svm_message::SVMMessage;
+use litesvm::{InvocationInspectCallback, LiteSVM};
+use solana_program_runtime::invoke_context::InvokeContext;
+use solana_transaction::sanitized::SanitizedTransaction;
 
 struct MyInspector;
 
@@ -229,9 +233,10 @@ impl InvocationInspectCallback for MyInspector {
     fn before_invocation(
         &self,
         _svm: &LiteSVM,
-        _tx: &impl SVMMessage,
+        _tx: &SanitizedTransaction,
         _program_indices: &[u16],
-        _invoke_context: &InvokeContext,
+        _invoke_context: &mut InvokeContext,
+        _enable_register_tracing: bool,
     ) {
         println!("Before program invocation");
     }
@@ -239,6 +244,8 @@ impl InvocationInspectCallback for MyInspector {
     fn after_invocation(
         &self,
         _svm: &LiteSVM,
+        _tx: &SanitizedTransaction,
+        _program_indices: &[u16],
         _invoke_context: &InvokeContext,
         _enable_register_tracing: bool,
     ) {

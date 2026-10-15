@@ -17,7 +17,7 @@ description: دليل لإعداد معاملات التفويض الثابت.
   <Tab title="TypeScript">
 
     ```bash
-    pnpm add @solana/subscriptions @solana/kit @solana/kit-plugin-rpc @solana/kit-plugin-signer @solana-program/token
+    pnpm add @solana/subscriptions @solana/kit@^7 @solana/kit-plugin-rpc@^0.15 @solana/kit-plugin-signer@^0.13 @solana-program/token@^0.15
     ```
 
   </Tab>
@@ -26,7 +26,7 @@ description: دليل لإعداد معاملات التفويض الثابت.
 
     ```toml
     [dependencies]
-    subscriptions = "0.4.0"
+    subscriptions = "0.5.0"
     solana-instruction = "^3"
     solana-address = { version = "^2", features = ["curve25519"] }
     ```
@@ -121,7 +121,11 @@ description: دليل لإعداد معاملات التفويض الثابت.
 
     ```rust
     use solana_address::{address, Address};
-    use subscriptions::{generated::{instructions::*, types::*}, SUBSCRIPTIONS_ID};
+    use subscriptions::{
+        accounts::SubscriptionAuthority,
+        generated::{instructions::*, types::*},
+        SUBSCRIPTIONS_ID,
+    };
 
     const SYSTEM_PROGRAM_ID: Address = address!("11111111111111111111111111111111");
     const TOKEN_PROGRAM_ID: Address = address!("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
@@ -159,12 +163,21 @@ description: دليل لإعداد معاملات التفويض الثابت.
         .token_program(TOKEN_PROGRAM_ID)
         .instruction();
 
+    // Read `init_id` from the Subscription Authority account: fetch it once the
+    // init instruction above has landed and decode it.
+    let authority_account: SubscriptionAuthority = authority_account;
+
     let create_ix = CreateFixedDelegationBuilder::new()
         .delegator(user)
         .subscription_authority(subscription_authority)
         .delegation_account(delegation_pda)
         .delegatee(delegatee)
-        .fixed_delegation(CreateFixedDelegationData { nonce, amount, expiry_ts })
+        .fixed_delegation(CreateFixedDelegationData {
+            nonce,
+            amount,
+            expiry_ts,
+            expected_subscription_authority_init_id: authority_account.init_id,
+        })
         .instruction();
     ```
 
@@ -202,7 +215,7 @@ description: دليل لإعداد معاملات التفويض الثابت.
   <Tab title="Rust">
 
     ```rust
-    use subscriptions::{TransferData, TransferFixedBuilder};
+    use subscriptions::generated::{instructions::TransferFixedBuilder, types::TransferData};
 
     let receiver_ata: Address = address!("RECEIVER_TOKEN_ACCOUNT_ADDRESS_HERE");
 

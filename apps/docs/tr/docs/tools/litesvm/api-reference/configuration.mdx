@@ -17,11 +17,11 @@ Hesaplama birimi limitlerini ve heap boyutunu ayarlayın.
 ```rust
 use solana_compute_budget::compute_budget::ComputeBudget;
 
-let mut svm = LiteSVM::default()
+let mut svm = LiteSVM::new()
     .with_compute_budget(ComputeBudget {
         compute_unit_limit: 1_400_000,
         heap_size: 256 * 1024,
-        ..ComputeBudget::default()
+        ..ComputeBudget::new_with_defaults(true)
     });
 ```
 
@@ -35,7 +35,7 @@ pub fn with_sigverify(self, sigverify: bool) -> Self
 
 ```rust
 // Disable for faster tests
-let mut svm = LiteSVM::default()
+let mut svm = LiteSVM::new()
     .with_sigverify(false);
 ```
 
@@ -50,7 +50,7 @@ Blockhash doğrulamasını etkinleştirin veya devre dışı bırakın. Varsayı
 
 ```rust
 // Disable to use any blockhash
-let mut svm = LiteSVM::default()
+let mut svm = LiteSVM::new()
     .with_blockhash_check(false);
 ```
 
@@ -64,8 +64,12 @@ Geçmişte tutulacak işlem sayısını ayarlayın. Varsayılan: `0`.
 
 ```rust
 // Keep last 100 transactions
-let mut svm = LiteSVM::default()
+let mut svm = LiteSVM::new()
     .with_transaction_history(100);
+
+// Disable history and allow duplicate transactions
+let mut svm = LiteSVM::new()
+    .with_transaction_history(0);
 ```
 
 ## with_log_bytes_limit
@@ -79,11 +83,11 @@ pub fn with_log_bytes_limit(self, limit: Option<usize>) -> Self
 
 ```rust
 // Unlimited logs
-let mut svm = LiteSVM::default()
+let mut svm = LiteSVM::new()
     .with_log_bytes_limit(None);
 
 // Custom limit (50KB)
-let mut svm = LiteSVM::default()
+let mut svm = LiteSVM::new()
     .with_log_bytes_limit(Some(50_000));
 ```
 
@@ -97,7 +101,7 @@ pub fn with_lamports(self, lamports: u64) -> Self
 `1_000_000_000`.
 
 ```rust
-let mut svm = LiteSVM::default()
+let mut svm = LiteSVM::new()
     .with_lamports(10_000_000_000);
 ```
 
@@ -110,7 +114,7 @@ pub fn with_default_programs(self) -> Self
 Varsayılan SPL programlarını dahil edin (Token, Associated Token, vb.).
 
 ```rust
-let mut svm = LiteSVM::default()
+let mut svm = LiteSVM::new()
     .with_default_programs();
 ```
 
@@ -124,7 +128,7 @@ Varsayılan sysvar'ları dahil eder (Clock, Rent, EpochSchedule, SlotHashes,
 StakeHistory, vb.).
 
 ```rust
-let mut svm = LiteSVM::default()
+let mut svm = LiteSVM::new()
     .with_sysvars();
 ```
 
@@ -140,7 +144,7 @@ yapılandırın.
 ```rust
 use agave_feature_set::FeatureSet;
 
-let mut svm = LiteSVM::default()
+let mut svm = LiteSVM::new()
     .with_feature_set(FeatureSet::all_enabled());
 ```
 
@@ -154,7 +158,7 @@ pub fn with_precompiles(self) -> Self
 Standart ön derleme programlarını dahil eder (ed25519, secp256k1, secp256r1).
 
 ```rust
-let mut svm = LiteSVM::default()
+let mut svm = LiteSVM::new()
     .with_precompiles();
 ```
 
@@ -163,7 +167,7 @@ let mut svm = LiteSVM::default()
 
 ```toml
 [dev-dependencies]
-litesvm = { version = "0.11", features = ["precompiles"] }
+litesvm = { version = "0.18", features = ["precompiles"] }
 ```
 
 </Info>
@@ -178,7 +182,7 @@ Test ortamına özellik kapısı hesaplarını dahil edin. Bu, özellik kapılı
 çalışma zamanı davranışının testlerinizde doğru şekilde yansıtılmasını sağlar.
 
 ```rust
-let mut svm = LiteSVM::default()
+let mut svm = LiteSVM::new()
     .with_feature_accounts();
 ```
 
@@ -189,7 +193,7 @@ izlemeyi etkinleştirir. `invocation-inspect-callback` özelliğini de kapsar.
 
 ```toml
 [dev-dependencies]
-litesvm = { version = "0.11", features = ["register-tracing"] }
+litesvm = { version = "0.18", features = ["register-tracing"] }
 ```
 
 Yazmaç izleme etkinleştirilmiş bir örnek oluşturmak için
@@ -218,13 +222,13 @@ kaydedin. `invocation-inspect-callback` özelliğini gerektirir.
 
 ```toml
 [dev-dependencies]
-litesvm = { version = "0.11", features = ["invocation-inspect-callback"] }
+litesvm = { version = "0.18", features = ["invocation-inspect-callback"] }
 ```
 
 ```rust
-use litesvm::{LiteSVM, types::InvocationInspectCallback};
-use solana_svm::invoke_context::InvokeContext;
-use solana_svm_transaction::svm_message::SVMMessage;
+use litesvm::{InvocationInspectCallback, LiteSVM};
+use solana_program_runtime::invoke_context::InvokeContext;
+use solana_transaction::sanitized::SanitizedTransaction;
 
 struct MyInspector;
 
@@ -232,9 +236,10 @@ impl InvocationInspectCallback for MyInspector {
     fn before_invocation(
         &self,
         _svm: &LiteSVM,
-        _tx: &impl SVMMessage,
+        _tx: &SanitizedTransaction,
         _program_indices: &[u16],
-        _invoke_context: &InvokeContext,
+        _invoke_context: &mut InvokeContext,
+        _enable_register_tracing: bool,
     ) {
         println!("Before program invocation");
     }
@@ -242,6 +247,8 @@ impl InvocationInspectCallback for MyInspector {
     fn after_invocation(
         &self,
         _svm: &LiteSVM,
+        _tx: &SanitizedTransaction,
+        _program_indices: &[u16],
         _invoke_context: &InvokeContext,
         _enable_register_tracing: bool,
     ) {

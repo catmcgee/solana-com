@@ -237,6 +237,7 @@ describe("generated snippets", () => {
     expect(errors(r.paths.problems)).toEqual([]);
     expect(errors(r.concepts.problems)).toEqual([]);
     for (const f of [...r.paths.written, ...r.concepts.written]) {
+      if (!f.endsWith(".mdx")) continue;
       const full = read(f);
       expect(
         full.startsWith(
@@ -299,7 +300,7 @@ describe("generated snippets", () => {
       /<li data-state="done"><a href="\/docs\/payments\/checkout\/try-it">/,
     );
     expect(s2).toMatch(
-      /<li data-state="current"><a href="\/docs\/payments\/checkout\/browser" aria-current="step">/,
+      /<li data-state="current"( data-first="true")?><a href="\/docs\/payments\/checkout\/browser" aria-current="step">/,
     );
     expect(s2.match(/aria-current/g)).toHaveLength(1);
     // Accessible name reads "Step 1, Done: Title", not "Step 1DoneTitle".
@@ -315,8 +316,15 @@ describe("generated snippets", () => {
     expect(read("snippets/paths/en/checkout/next-4.mdx")).toContain(
       'href="/docs/payments"',
     );
-    expect(read("snippets/paths/en/checkout/card.mdx")).toContain(
-      "[Start the path →](/docs/payments/checkout)",
+    const card = read("snippets/paths/en/checkout/card.mdx");
+    expect(card).toContain("[Start the path →](/docs/payments/checkout)");
+    // Numbered steps; the first win (step 2) is marked for CSS and readers.
+    expect(card).toMatch(
+      /<li data-first="true">\[[^\]]+\]\(\/docs\/payments\/checkout\/browser\) <span className="sol-pcard-first">First win<\/span><\/li>/,
+    );
+    const css = read("styles/paths-sidebar.css");
+    expect(css).toContain(
+      'li[data-group-tag][id$="/docs/payments/checkout"]\n  > ul\n  > li:nth-child(2)\n  > a::after',
     );
   });
 

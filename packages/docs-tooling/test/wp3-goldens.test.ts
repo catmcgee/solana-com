@@ -23,7 +23,10 @@ import { transform as mentions } from "../src/convert/transforms/mentions.ts";
 import { transform as sideBySide } from "../src/convert/transforms/side-by-side.ts";
 import { transform as scrolly } from "../src/convert/transforms/scrolly.ts";
 import { transform as files } from "../src/convert/transforms/files.ts";
-import { transform as mermaid } from "../src/convert/transforms/mermaid.ts";
+import {
+  mermaidHash,
+  transform as mermaid,
+} from "../src/convert/transforms/mermaid.ts";
 import { transform as terminal } from "../src/convert/transforms/terminal.ts";
 import type { AstNode } from "../src/types.ts";
 
@@ -133,7 +136,7 @@ describe("WP3 goldens", () => {
         expect(hits).toEqual([]);
       });
 
-      it("pairs every mermaid fence with a no-JS fallback", () => {
+      it("pairs every mermaid fence with its pre-rendered figure", () => {
         const { tree } = mdxCodec.parse(output, { path: g.file.path });
         walk(tree, (n) => {
           const kids = n.children ?? [];
@@ -142,9 +145,15 @@ describe("WP3 goldens", () => {
             const next = kids[i + 1] as AstNode | undefined;
             expect(next?.type).toBe("mdxJsxFlowElement");
             expect(next?.name).toBe("div");
-            const inner = next?.children?.[0];
-            expect(inner?.type).toBe("code");
-            expect(inner?.value).toBe(c.value);
+            const attrs = (next?.attributes ?? []) as {
+              name: string;
+              value: unknown;
+            }[];
+            expect(attrs.find((a) => a.name === "data-mermaid")?.value).toBe(
+              mermaidHash(String(c.value)),
+            );
+            const imgs = (next?.children ?? []).filter((k) => k.name === "img");
+            expect(imgs).toHaveLength(2);
           });
         });
       });

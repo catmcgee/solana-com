@@ -14,6 +14,8 @@ export interface NavGroup {
   /** Page that opens when the group label is clicked. */
   root?: NavPage;
   icon?: string;
+  /** Small label next to the group name (path groups show their duration). */
+  tag?: string;
   expanded?: boolean;
   hidden?: boolean;
   searchable?: boolean;
@@ -69,6 +71,7 @@ export interface TemplateGroup {
   group: string;
   root?: NavPage;
   icon?: string;
+  tag?: string;
   expanded?: boolean;
   hidden?: boolean;
   searchable?: boolean;

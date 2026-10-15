@@ -29,7 +29,10 @@ Kit 客户端（`createKitKoraClient`）是将 Kora 集成到 Solana 应用程�
 ## 安装
 
 ```bash
-pnpm add @solana/kora @solana/kit
+pnpm add @solana/kora @solana/kit@^6.1 @solana-program/token@^0.12 \
+  @solana-program/compute-budget@^0.13 \
+  @solana/kit-plugin-instruction-plan@^0.6 @solana/kit-plugin-payer@^0.6 \
+  @solana/kit-plugin-rpc@^0.6
 ```
 
 对等依赖项（`@solana-program/token`、`@solana-program/compute-budget`、`@solana/kit-plugin-*`）会被大多数包管理器自动安装。如果需要手动安装，请参阅[安装说明](/docs/tools/kora/getting-started/installation)。
@@ -75,14 +78,32 @@ Kit 客户端可与 Kit 程序插件组合使用。例如，使用 `tokenProgram
 
 ```typescript
 import { createKitKoraClient } from "@solana/kora";
-import { tokenProgram } from "@solana-program/token";
+import {
+  findAssociatedTokenPda,
+  tokenProgram,
+  TOKEN_PROGRAM_ADDRESS
+} from "@solana-program/token";
 import { address } from "@solana/kit";
+
+const usdcMint = address("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
 
 const koraClient = await createKitKoraClient({
   endpoint: "http://localhost:8080",
   rpcUrl: "http://127.0.0.1:8899",
-  feeToken: address("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"),
+  feeToken: usdcMint,
   feePayerWallet: userSigner
+});
+
+// Derive the sender's and recipient's associated token accounts
+const [senderAta] = await findAssociatedTokenPda({
+  owner: userSigner.address,
+  mint: usdcMint,
+  tokenProgram: TOKEN_PROGRAM_ADDRESS
+});
+const [recipientAta] = await findAssociatedTokenPda({
+  owner: recipientAddress,
+  mint: usdcMint,
+  tokenProgram: TOKEN_PROGRAM_ADDRESS
 });
 
 // Compose with the token program plugin
@@ -91,8 +112,11 @@ const client = koraClient.use(tokenProgram());
 // Use token program methods — Kora handles all fee abstraction
 await client.token.instructions
   .transferToATA({
-    source: userTokenAccount,
-    destination: recipientAddress,
+    source: senderAta,
+    destination: recipientAta, // the recipient's ATA, not their wallet address
+    recipient: recipientAddress, // wallet that owns the destination ATA
+    mint: usdcMint,
+    decimals: 6,
     amount: 1_000_000n, // 1 USDC
     authority: userSigner
   })
