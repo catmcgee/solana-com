@@ -44,7 +44,7 @@ describe("Mintlify origin", () => {
   it("defaults to the root-hosted *.mintlify.site preview", () => {
     expect(M).toMatch(/^https?:\/\/[^/]+$/);
     if (!process.env.MINTLIFY_ORIGIN) {
-      expect(M).toBe("https://solana.mintlify.site");
+      expect(M).toBe("https://solana-f31f4a8d.mintlify.site");
     }
   });
 

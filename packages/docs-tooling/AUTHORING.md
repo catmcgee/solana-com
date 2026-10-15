@@ -441,9 +441,9 @@ solana.com) before cutover. `mint dev` cannot answer them:
 5. **Consent.** The dashboard cookie banner is on, and GTM/PostHog load only
    after Accept.
 6. **The origin serves pages publicly.** `MINTLIFY_ORIGIN`
-   (apps/web/apps-urls.ts, default `https://solana.mintlify.site`) must answer a
-   docs page with `200` and the page HTML. At WP12 review it answered every
-   request with a `302` to Mintlify's end-user auth
+   (apps/web/apps-urls.ts, default `https://solana-f31f4a8d.mintlify.site`) must
+   answer a docs page with `200` and the page HTML. At WP12 review it answered
+   every request with a `302` to Mintlify's end-user auth
    (`app.mintlify.com/api/end-user-auth/deployment?next=solana.mintlify.io`), so
    the deployment was either auth-protected or not this project. Confirm the
    subdomain is ours and public, then

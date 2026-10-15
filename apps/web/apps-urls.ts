@@ -24,7 +24,7 @@ export const MEDIA_APP_URL =
 // NOTE: to self-host later, upgrade to Mintlify Enterprise and deploy its
 // static export to a Vercel project, then change ONLY this origin. See the
 // MINTLIFY block in rewrites-redirects.ts for the full recommendation.
-const defaultMintlifyOrigin = "https://solana.mintlify.site";
+const defaultMintlifyOrigin = "https://solana-f31f4a8d.mintlify.site";
 
 export const MINTLIFY_ORIGIN = (
   process.env.MINTLIFY_ORIGIN || defaultMintlifyOrigin
