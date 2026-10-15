@@ -88,6 +88,7 @@ test.describe("without JavaScript", () => {
             `${prefix}/docs/payments/checkout`,
             `${prefix}/docs/payments/paywall-api`,
             `${prefix}/docs/assets/issue-asset`,
+            `${prefix}/docs/defi/settle-trade`,
           ]);
 
           // Stats with visible footnotes and external sources.

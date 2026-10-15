@@ -90,11 +90,12 @@ describe("cost calculator model", () => {
 });
 
 describe("developers hub links", () => {
-  it("points the three job cards at the job-path intros", () => {
+  it("points the four job cards at the job-path intros", () => {
     expect(JOB_PATHS.map((job) => job.href)).toEqual([
       "/docs/payments/checkout",
       "/docs/payments/paywall-api",
       "/docs/assets/issue-asset",
+      "/docs/defi/settle-trade",
     ]);
     for (const job of JOB_PATHS) {
       expect(landing.picker.cards[job.id]).toMatchObject({

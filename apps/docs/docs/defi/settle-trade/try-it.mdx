@@ -1,0 +1,86 @@
+---
+title: "Watch a trade settle"
+description:
+  "See a delivery-versus-payment trade at work: the price comes from a live
+  Pyth feed, Settle fails with the cash leg missing and moves nothing, then
+  both legs move in one transaction."
+---
+
+import Stepper from "/snippets/paths/en/settle-trade/stepper-1.mdx";
+import Demo from "/snippets/paths/en/settle-trade/demo.mdx";
+import Pda from "/snippets/concepts/en/pda.mdx";
+import Next from "/snippets/paths/en/settle-trade/next-1.mdx";
+
+<Stepper />
+
+An investor sells 4 LSF, shares of the restricted demo asset from
+[Issue an asset](/docs/assets/issue-asset), to another approved investor. The
+shares are priced at \$1.25 each and paid for in USDC. A settlement agent, such
+as the venue that matched the trade, records the terms and is the only one who
+can settle. Press **Run** to step through the output of this tutorial's
+example code on a local test network (Surfpool). Nothing is sent from your
+browser, and you need no code or wallet for this step.
+
+<Demo />
+
+The agent sent the same `SettleDvp` instruction twice. The first time the cash
+leg was missing, so nothing moved. The second time both escrows held their
+agreed amounts, and the LSF and the USDC changed hands in one transaction.
+
+## Where the price came from
+
+The first line of the run is the USDC/USD price, read from Pyth's price feed
+account on mainnet (Surfpool copied the account the first time the code read
+it). The shares are priced in US dollars, \$5.00 for 4 LSF, and the buyer pays
+in USDC, so the code divides the dollar amount by the USDC/USD price and rounds
+up to the next USDC base unit. Before it uses the price, it checks that the
+account belongs to Pyth's receiver program, that it holds the USDC/USD feed and
+that the price is recent and precise enough. You read that code in the next
+step.
+
+The price is fixed into the trade record when the trade is created. The DvP
+program never reads the oracle: at settlement it only checks that each escrow
+holds the agreed amount.
+
+## Why the first settle failed
+
+```text title="Failed settle (excerpt of the output)"
+Settle with the cash leg unfunded (skipPreflight): failed onchain
+  err: {"InstructionError":[4,{"Custom":4}]}
+  DvP error 4: DvP leg is not funded with the expected amount
+  fee paid anyway: 5000 lamports
+Nothing moved: asset escrow 4 LSF | cash escrow 0 USDC | buyer 0 LSF | seller 0 USDC
+```
+
+How to read it:
+
+- The settle transaction has five instructions. The first four create the token
+  accounts that receive each side's proceeds, if they don't exist yet.
+  Instruction 4, counting from 0, is `SettleDvp`.
+- `{"Custom":4}` is the DvP program's error 4, `LegNotFunded`: an escrow holds
+  less than its agreed amount. The buyer hadn't sent the USDC yet.
+- Transactions are all-or-nothing, so none of the five instructions took
+  effect. The LSF stayed in its escrow, and the buyer and the seller received
+  nothing.
+- The transaction was sent with `skipPreflight`, so it landed onchain as a
+  failed transaction and the agent still paid the 5000-lamport network fee.
+  Sent normally, the RPC node simulates it first and rejects it before it lands.
+
+The trade stayed open, so the buyer could still pay. Once the cash escrow held
+the agreed USDC, the same instruction settled both legs and closed the trade
+record and both escrow accounts.
+
+<Pda />
+
+## Why the issuer approved the escrow
+
+LSF token accounts start frozen until the issuer approves them, and the
+trade's escrow is a new LSF token account, owned by the trade record. So
+before the seller could fund the asset leg, the issuer approved (thawed) the
+escrow, the same way it approves a new investor. The asset's rules apply to the
+trade too: the issuer could also pause the asset or freeze the escrow while the
+trade is open (see [supported tokens](/docs/defi/dvp-program#supported-tokens)).
+
+In the next step you read the code that prices, records and settles this trade.
+
+<Next />

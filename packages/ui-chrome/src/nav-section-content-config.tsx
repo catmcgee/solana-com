@@ -117,8 +117,8 @@ export const useSolanaSafetyItems: NavItemDefinition[] = [
 
 /**
  * "What are you building?" column of the Build dropdown. Each entry links to a
- * job-path intro in the docs; DeFi, games and agents sit behind "More use
- * cases" until their paths exist. Token Extensions moved into the
+ * job-path intro in the docs; games and agents sit behind "More use cases"
+ * until their paths exist. Token Extensions moved into the
  * tokenization path, so it is no longer listed here.
  */
 export const buildJobItems: NavItemDefinition[] = [
@@ -144,6 +144,14 @@ export const buildJobItems: NavItemDefinition[] = [
     descriptionKey: "nav.build.jobs.items.asset.description",
     href: "/docs/assets/issue-asset",
     icon: CoinsAddIcon,
+    variant: "large",
+  },
+  {
+    id: "build-job-trade",
+    titleKey: "nav.build.jobs.items.trade.title",
+    descriptionKey: "nav.build.jobs.items.trade.description",
+    href: "/docs/defi/settle-trade",
+    icon: FlowIcon,
     variant: "large",
   },
   {
