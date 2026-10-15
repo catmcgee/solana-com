@@ -15,6 +15,7 @@ import { shouldShowDevelopersNav } from "./developer-routes";
 
 import SolanaLogo from "./assets/logotype.inline.svg";
 import Moon from "./assets/icons/moon.inline.svg";
+import { isDocsHref } from "./url-config";
 import Sun from "./assets/icons/sun.inline.svg";
 
 const NOSCRIPT_LINKS = [
@@ -53,7 +54,13 @@ function NoScriptNav({ pathname }: { pathname: string }) {
         <ul className="m-0 flex list-none flex-wrap gap-x-5 gap-y-1 p-0">
           {NOSCRIPT_LINKS.map((link) => (
             <li key={link.href}>
-              <a href={withLocale(locale, link.href)} className={linkClass}>
+              <a
+                href={withLocale(locale, link.href)}
+                className={linkClass}
+                {...(isDocsHref(link.href)
+                  ? { target: "_blank", rel: "noopener noreferrer" }
+                  : {})}
+              >
                 {t(link.labelKey)}
               </a>
             </li>
