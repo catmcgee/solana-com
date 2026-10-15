@@ -128,6 +128,7 @@ const darkPalette = {
   "#3f3f46": "#d4d4d8",
   "#18181b": "#f2f2f3",
   "#7c3aed": "#a777ff",
+  "#7a2fe0": "#b78aff", // the system accent (brand-diagrams.mjs)
   "#9b4dff": "#b98bff",
   "#7f5cf0": "#9b84f5",
   "#f3edff": "#1c1430",
@@ -250,15 +251,26 @@ async function writeDarkPair(light) {
   await writeFile(dark, replacePalette(source, darkPalette));
 }
 
-const overviewLights = (await listSvgFiles(overviewRoot)).filter((file) =>
-  file.endsWith("-light.svg"),
+// Figures drawn by draw-concepts.mjs carry data-sol-drawn="hand" and are
+// written in both modes by that script: never normalize or re-pair them.
+const handDrawn = async (file) =>
+  /<svg\b[^>]*data-sol-drawn="hand"/.test(await readFile(file, "utf8"));
+async function notHandDrawn(files) {
+  const keep = await Promise.all(files.map(async (f) => !(await handDrawn(f))));
+  return files.filter((_, i) => keep[i]);
+}
+
+const overviewLights = await notHandDrawn(
+  (await listSvgFiles(overviewRoot)).filter((file) =>
+    file.endsWith("-light.svg"),
+  ),
 );
 for (const light of overviewLights) {
   await writeFile(light, normalizeOverview(await readFile(light, "utf8")));
 }
 
-const coreSources = (await listSvgFiles(coreRoot)).filter(
-  (file) => !file.endsWith("-light.svg"),
+const coreSources = await notHandDrawn(
+  (await listSvgFiles(coreRoot)).filter((file) => !file.endsWith("-light.svg")),
 );
 const coreLights = await Promise.all(
   coreSources.map((source) => createLightSource(source, normalizeLegacy)),

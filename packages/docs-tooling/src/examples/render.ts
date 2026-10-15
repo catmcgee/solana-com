@@ -11,8 +11,17 @@
  *   output until the reader presses Run (the button is in the markup but
  *   only shown once the script is live).
  * - A tab without a recorded output gets no Run button (decisions.md).
+ * - A recorded output with a `<stem>.run.json` (prompt commands, result
+ *   badges) renders as the terminal panel of src/lib/terminal.ts instead:
+ *   the full output is in the server HTML, and run-examples.js streams it
+ *   back in when the reader presses Run.
  */
 import type { Block } from "./blocks.ts";
+import {
+  DEFAULT_TERM_LABELS,
+  renderTerminal,
+  type RunMeta,
+} from "../lib/terminal.ts";
 
 export interface RenderTab {
   title: string;
@@ -23,6 +32,11 @@ export interface RenderTab {
   /** Recorded output (already trimmed), or undefined. */
   output?: string;
   outputNote?: string;
+  /**
+   * `<stem>.run.json` next to the output: render the terminal panel
+   * (src/lib/terminal.ts) instead of the plain Run block.
+   */
+  runMeta?: RunMeta;
 }
 
 export interface RenderInput {
@@ -84,6 +98,15 @@ function runBlock(input: RenderInput, tab: RenderTab): string {
     tab.outputNote ||
     input.block.outputNote ||
     DEFAULT_OUTPUT_NOTE;
+  if (tab.runMeta && !runner)
+    return renderTerminal({
+      id: input.id,
+      tab: tab.title,
+      kind: "block",
+      title: tab.runMeta.title ?? note,
+      labels: DEFAULT_TERM_LABELS,
+      steps: [{ output: tab.output!, meta: tab.runMeta }],
+    });
   const attrs = [
     `className="sol-run"`,
     `data-run=${jsxAttr(input.id)}`,

@@ -28,6 +28,9 @@
  *   is replaced, so the transform stays idempotent.
  * - `title="T"` (Code Hike) becomes the caption paragraph after the figure,
  *   the same output fences.ts specifies (§3.2), and is the image alt text.
+ *   Without a title or caption, alt text comes from the fence's `accTitle:`
+ *   / `accDescr:` lines, then from the nearest preceding heading
+ *   ("Lifecycle diagram"); "Diagram" only when there is neither.
  */
 import { createHash } from "node:crypto";
 import type { AstNode, Transform } from "../../types.ts";
@@ -44,6 +47,15 @@ export const MERMAID_DIR = "/docs-assets/assets/docs/mermaid";
 /** Stable id of a diagram source (file names of its SVG pair). */
 export function mermaidHash(source: string): string {
   return createHash("sha256").update(source).digest("hex").slice(0, 12);
+}
+
+/**
+ * Flowcharts drawn left to right also get a phone drawing, the same graph
+ * top to bottom (`<hash>-sm-light.svg` / `<hash>-sm.svg`), which
+ * styles/diagrams.css shows below 640px instead of a sideways scroll.
+ */
+export function hasPhoneVariant(source: string): boolean {
+  return /^\s*(?:flowchart|graph)\s+(?:LR|RL)\b/m.test(source);
 }
 
 function fallbackFor(source: string, alt: string): AstNode {
@@ -68,6 +80,12 @@ function fallbackFor(source: string, alt: string): AstNode {
     [
       img("block dark:hidden", `${h}-light.svg`),
       img("hidden dark:block", `${h}.svg`),
+      ...(hasPhoneVariant(source)
+        ? [
+            img("block dark:hidden", `${h}-sm-light.svg`),
+            img("hidden dark:block", `${h}-sm.svg`),
+          ]
+        : []),
     ],
   );
 }
@@ -93,11 +111,42 @@ function captionOf(n: AstNode | undefined): string | undefined {
 function isCurrent(n: AstNode, source: string, alt: string): boolean {
   if (getAttr(n as never, "data-mermaid") !== mermaidHash(source)) return false;
   const imgs = (n.children ?? []).filter((k) => isJsx(k, "img"));
+  const want = hasPhoneVariant(source) ? 4 : 2;
   return (
-    (n.children ?? []).length === 2 &&
-    imgs.length === 2 &&
+    (n.children ?? []).length === want &&
+    imgs.length === want &&
     imgs.every((k) => getAttr(k as never, "alt") === alt)
   );
+}
+
+/**
+ * Alt text from the fence itself: mermaid's `accTitle:` and `accDescr:`
+ * lines ("Title. Description."), when the author wrote them.
+ */
+export function accessibleName(source: string): string | undefined {
+  const t = /^\s*accTitle\s*:\s*(.+)$/m.exec(source)?.[1]?.trim();
+  const d = /^\s*accDescr\s*:\s*(.+)$/m.exec(source)?.[1]?.trim();
+  if (!t && !d) return undefined;
+  const dot = (x: string) => (/[.!?]$/.test(x) ? x : `${x}.`);
+  return [t, d]
+    .filter(Boolean)
+    .map((x) => dot(x!))
+    .join(" ");
+}
+
+/** Alt text fallback: "<nearest preceding heading> diagram". */
+function headingBefore(kids: AstNode[], i: number): string | undefined {
+  for (let j = i - 1; j >= 0; j--) {
+    const k = kids[j]!;
+    if (k.type !== "heading") continue;
+    const text = (n: AstNode): string =>
+      typeof n.value === "string"
+        ? n.value
+        : (n.children ?? []).map(text).join("");
+    const t = text(k).trim();
+    return t ? `${t} diagram` : undefined;
+  }
+  return undefined;
 }
 
 function titleOf(meta: string | null | undefined): string | undefined {
@@ -128,7 +177,11 @@ export const transform: Transform = {
         const next = kids[i + 1];
         const caption =
           title ?? captionOf(kids[i + (isFallback(next) ? 2 : 1)]);
-        const alt = caption ?? "Diagram";
+        const alt =
+          caption ??
+          accessibleName(code.value) ??
+          headingBefore(kids, i) ??
+          "Diagram";
         if (isFallback(next)) {
           if (!isCurrent(next!, code.value, alt))
             kids.splice(i + 1, 1, fallbackFor(code.value, alt));

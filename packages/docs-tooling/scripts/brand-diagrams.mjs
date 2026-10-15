@@ -8,17 +8,24 @@
  *
  * Run it last, after sync-diagram-themes.mjs. It is idempotent.
  *
- * 1. Colour: one Solana set per mode. Light: purple #7c3aed, teal #0f9e94,
- *    green #0a8f5a, zinc neutrals. Dark: purple #b78aff, teal #19d3c5,
- *    green #14f195. Tailwind sky/blue, emerald, amber, orange and the extra
- *    purples are folded into those.
- * 2. Stroke: 1.5px as drawn in the 688px content column (strokes are scaled
- *    by the figure's own down-scaling factor).
+ * 1. Colour: the docs illustration system (see draw-concepts.mjs): zinc
+ *    neutrals and ONE accent, the theme link purple (light #7a2fe0, dark
+ *    #b78aff). Legacy purples fold into the accent; teal, green, blue,
+ *    amber and orange fold into neutral zinc (stroke/text #71717a light,
+ *    #a1a1aa dark); every pastel fill becomes the neutral surface
+ *    (#fafafa light, #151518 dark).
+ * 2. Stroke: 1.25px as drawn in the 688px content column (strokes are
+ *    scaled by the figure's own down-scaling factor). Corners: 8px as drawn.
  * 3. Type: the most common label size is brought to about 13px as drawn in
  *    the column. Scaled down by at most 0.7x; scaled up (at most 1.15x)
  *    only in the roomy hub and finance figures, so labels never outgrow
  *    their boxes.
  * 4. Flat: drop shadows are removed (the mockup's figures are flat).
+ * 5. One accent per file, on the focal shape only (see oneAccent).
+ * 6. One arrowhead, an open chevron (see openHeads).
+ *
+ * Files drawn by draw-concepts.mjs (root attribute data-sol-drawn="hand")
+ * are already in the system and are skipped.
  */
 import { readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -30,7 +37,8 @@ const root = path.resolve(
 );
 const COLUMN = 688;
 const TARGET_FONT = 13;
-const TARGET_STROKE = 1.5;
+const TARGET_STROKE = 1.25;
+const TARGET_RADIUS = 8;
 
 const LIGHT = {
   // purples -> one purple
@@ -74,6 +82,7 @@ const LIGHT = {
   "#552222": "#18181b",
 };
 const DARK = {
+  "#7a2fe0": "#b78aff",
   "#a777ff": "#b78aff",
   "#b98bff": "#b78aff",
   "#9b84f5": "#b78aff",
@@ -100,6 +109,28 @@ const DARK = {
   "#a8b3c3": "#a1a1aa",
   "#f8fafc": "#f2f2f3",
   "#64748b": "#8b8b94",
+};
+
+// Second stage: the one-accent system. Targets are never keys of LIGHT,
+// DARK or these maps, so the pass stays idempotent.
+const SYSTEM_LIGHT = {
+  "#7c3aed": "#7a2fe0",
+  "#f3edff": "#fafafa",
+  "#e3d8fb": "#d4d4d8",
+  "#0f9e94": "#71717a",
+  "#e6f8f6": "#fafafa",
+  "#0a8f5a": "#71717a",
+  "#e3fbef": "#fafafa",
+  "#9de8c4": "#d4d4d8",
+};
+const SYSTEM_DARK = {
+  "#1c1430": "#151518",
+  "#4c3a75": "#3f3f46",
+  "#19d3c5": "#a1a1aa",
+  "#0b2422": "#151518",
+  "#14f195": "#a1a1aa",
+  "#0b261b": "#151518",
+  "#1f6b4b": "#3f3f46",
 };
 
 function list(dir) {
@@ -158,10 +189,21 @@ function brand(svg, dark, file = "") {
 
   let out = mapText(svg, (t) => {
     t = recolor(t, dark ? DARK : LIGHT);
-    // Highlighter-yellow field marks -> purple tint.
+    t = recolor(t, dark ? SYSTEM_DARK : SYSTEM_LIGHT);
+    return t;
+  });
+  out = openHeads(oneAccent(out, dark, file), dark);
+  out = mapText(out, (t) => {
+    t = recolor(t, dark ? SYSTEM_DARK : SYSTEM_LIGHT);
+    // Highlighter field marks (yellow, later purple tints) -> neutral.
     t = t.replace(
-      /rgba\(\s*247\s*,\s*195\s*,\s*36\s*,\s*[\d.]+\s*\)/g,
-      dark ? "rgba(153,69,255,0.3)" : "rgba(153,69,255,0.14)",
+      /rgba\(\s*(?:247\s*,\s*195\s*,\s*36|153\s*,\s*69\s*,\s*255)\s*,\s*[\d.]+\s*\)/g,
+      dark ? "#1c1c1f" : "#f4f4f5",
+    );
+    // 8px corners as drawn (pills and circles, rx > 16, keep theirs).
+    const rr = num(TARGET_RADIUS / scale);
+    t = t.replace(/(\s(?:rx|ry)=")([\d.]+)(")/g, (m, a, v, b) =>
+      Number(v) >= 3 && Number(v) <= 16 ? a + rr + b : m,
     );
     // Flat figures: no drop shadows.
     t = t.replace(/\sfilter="url\(#[^)]*\)"/g, "");
@@ -206,11 +248,83 @@ function brand(svg, dark, file = "") {
   return out;
 }
 
+/*
+ * 5. One accent, chosen by hand, never spread by script. The accent stays on
+ *    ONE shape per file (FOCAL[file], default the first accent-stroked
+ *    shape in source order); every other accent stroke folds to neutral
+ *    zinc, and accent text folds to the muted label colour.
+ */
+const ACCENT_RE = /#(?:7a2fe0|b78aff)(?![0-9a-f])/i;
+const FOCAL = {
+  // file (relative, no -light / .svg) -> index of the shape that keeps it
+  "frontend/sign-in-decision": 0, // "Wallet connected", the entry point
+  "tools/kora/request-lifecycle": 0, // the client app
+};
+function oneAccent(svg, dark, file) {
+  const rel = path
+    .relative(root, file)
+    .replace(/\\/g, "/")
+    .replace(/(-light)?\.svg$/, "");
+  const keep = FOCAL[rel] ?? 0;
+  const stroke = dark ? "#71717a" : "#71717a";
+  const muted = dark ? "#a1a1aa" : "#52525b";
+  let i = 0;
+  return mapText(svg, (t) =>
+    t
+      // Shapes: keep the focal one.
+      .replace(
+        /<(rect|path|circle|ellipse|polygon|polyline|line)\b[^>]*>/g,
+        (tag) => {
+          if (!/stroke="#(?:7a2fe0|b78aff)"/i.test(tag) || /<marker/.test(tag))
+            return tag;
+          return i++ === keep
+            ? tag
+            : tag.replace(/stroke="#(?:7a2fe0|b78aff)"/i, `stroke="${stroke}"`);
+        },
+      )
+      // Text (attributes and CSS rules): muted.
+      .replace(
+        /(<(?:text|tspan)\b[^>]*\sfill=")#(?:7a2fe0|b78aff)(")/gi,
+        `$1${muted}$2`,
+      )
+      .replace(
+        /(\.[\w-]+\s*\{[^}]*?)fill:\s*#(?:7a2fe0|b78aff)(?![0-9a-f])/gi,
+        (m, a) => (/stroke/.test(m) ? m : `${a}fill:${muted}`),
+      ),
+  );
+}
+
+/*
+ * 6. One arrowhead: an open chevron. Filled triangle heads (in <marker>s
+ *    and as 3-point <polygon>s) become open strokes in the edge colour.
+ */
+function openHeads(svg, dark) {
+  const col = dark ? "#a1a1aa" : "#71717a";
+  return mapText(svg, (t) =>
+    t
+      .replace(
+        /(<marker\b[^>]*>)(\s*<path\b[^>]*d="M\s*-?[\d.]+[ ,]-?[\d.]+\s*L?\s*(?:10|9)[ ,]5\s*L?\s*-?[\d.]+[ ,](?:10|9)\s*(?:z|Z)"[^>]*\/>)/g,
+        (m, open) =>
+          `${open}<path d="M2 1.5L8.5 5L2 8.5" fill="none" stroke="${col}" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"/>`,
+      )
+      .replace(
+        /<polygon\b([^>]*)points="\s*([-\d.]+[ ,][-\d.]+)\s+([-\d.]+[ ,][-\d.]+)\s+([-\d.]+[ ,][-\d.]+)\s*"([^>]*)\/?>(<\/polygon>)?/g,
+        (m, a, p1, p2, p3, b) => {
+          const attrs = (a + b)
+            .replace(/\sfill="[^"]*"/, "")
+            .replace(/\/\s*$/, "");
+          return `<polyline${attrs} points="${p1} ${p2} ${p3}" fill="none"/>`;
+        },
+      ),
+  );
+}
+
 const check = process.argv.includes("--check");
 let changed = 0;
 for (const file of list(root)) {
   if (file.includes(`${path.sep}surfpool${path.sep}`)) continue; // screenshots
   const svg = readFileSync(file, "utf8");
+  if (/<svg\b[^>]*data-sol-drawn="hand"/.test(svg)) continue; // draw-concepts.mjs
   const dark = !file.endsWith("-light.svg");
   // A dark file without a light sibling is a single-mode drawing; treat it
   // as light (it is shown on both backgrounds).

@@ -267,9 +267,10 @@ export function strayAssetsInDocsRoot(
     "apps/docs/run-examples.js",
     // Floating "Ask AI" pill (redesign 2026-10-15; styles/ask-ai.css).
     "apps/docs/ask-ai.js",
+    // The solana.com header: generated bundle of packages/ui-chrome Header
+    // (gen:header, src/header-bundle).
+    "apps/docs/header.js",
     "apps/docs/styles/",
-    // Client-only progressive-enhancement demos (WP8b, spec §3.4.6).
-    "apps/docs/snippets/demos/",
   ],
 ) {
   const out: string[] = [];

@@ -1,0 +1,3525 @@
+#!/usr/bin/env node
+/**
+ * Hand-authored concept diagrams (core concepts, transactions, PDAs, tokens,
+ * payments), drawn in the docs illustration system. Each figure is laid out
+ * by hand on an 8px grid in the 688px content column, so 13px labels are
+ * 13px on the page, and is written once per mode:
+ *
+ *   node packages/docs-tooling/scripts/draw-concepts.mjs [--only name,...]
+ *   python3 packages/docs-tooling/scripts/embed-diagram-fonts.py
+ *
+ * Writes <path>-light.svg (light) and <path>.svg (dark) under
+ * apps/docs/docs-assets/assets/docs. The root carries data-sol-drawn="hand":
+ * brand-diagrams.mjs and sync-diagram-themes.mjs leave these files alone.
+ *
+ * The system (AUTHORING.md "Diagrams (SVG)"; keep brand-diagrams.mjs and
+ * render-mermaid.ts in step):
+ * - Monochrome zinc, ONE accent (theme link purple) for the focal element.
+ * - No fills beyond the surface colour, no gradients, shadows or glows.
+ * - 1px box strokes, 1.25px connectors, 8px corners, one open-chevron head.
+ * - Type: Diatype 13px/500 titles, left-aligned; 12px/400 labels. One rule:
+ *   titles and field labels are names, always Diatype (even identifiers:
+ *   MessageHeader, rent_epoch). Values, header tags and description lines
+ *   follow isCode: code (u64, Pubkey, true, 5,000, "seed", 9fXw…k2Qe,
+ *   findProgramAddress, (pda, bump)) in Favorit Mono 12px; words (System
+ *   Program, fee payer, one or more) in Diatype 12px. No glyph arrows;
+ *   phrases start with words, not numerals ("one instruction").
+ * - Phones: SM holds a portrait drawing per core figure (<name>-sm*.svg,
+ *   336px wide), shown below 640px by styles/diagrams.css.
+ * - Edge labels: one placement. Beside the line, 8px off it: above a
+ *   horizontal segment, after (right of) a vertical one. Never knocked out.
+ * - Solid connector = acts on / owns; dashed = refers to / derives from.
+ * - Transparent canvas (sits on the page).
+ */
+import { mkdirSync, writeFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const root = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../../../apps/docs/docs-assets/assets/docs",
+);
+
+export const PALETTE = {
+  light: {
+    page: "#ffffff",
+    surface: "#ffffff",
+    ink: "#18181b",
+    ink2: "#52525b",
+    ink3: "#71717a",
+    line: "#d4d4d8",
+    hair: "#e4e4e7",
+    edge: "#8b8b94",
+    accent: "#7a2fe0",
+  },
+  dark: {
+    page: "#0a0a0b",
+    surface: "#111113",
+    ink: "#f2f2f3",
+    ink2: "#a1a1aa",
+    ink3: "#8b8b94",
+    line: "#3f3f46",
+    hair: "#27272a",
+    edge: "#71717a",
+    accent: "#b78aff",
+  },
+};
+const SANS = "Diatype,Inter,ui-sans-serif,system-ui,sans-serif";
+const MONO = "'ABC Favorit Mono',ui-monospace,SFMono-Regular,Menlo,monospace";
+const W = 688;
+const R = 8; // corner radius
+const ROW = 32; // field row height
+const HEAD = 40; // card header height
+const HEAD_DESC = 60; // card header height with a description line
+const GAP = 8; // edge label offset from its line
+const SUBROW = 48; // field row with a second, muted line
+
+const esc = (s) =>
+  String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const n = (v) => String(Math.round(v * 100) / 100);
+
+/**
+ * The one value rule: is `v` code (a type name or a literal)? Code is set in
+ * mono; everything else (human names, prose) in the sans.
+ */
+export function isCode(v) {
+  const s = String(v);
+  return (
+    /^(u8|u16|u32|u64|u128|i64|bool|bytes|Hash|Epoch|Pubkey\??|compact-u16|true|false|null|n)$/.test(
+      s,
+    ) ||
+    /^(Vec|Option)<.+>$/.test(s) ||
+    /^[A-Z][a-z]+[A-Z]\w*$/.test(s) || // PascalCase type: AccountMeta
+    /^[a-z]+[A-Z]\w*(\(.*\))?$/.test(s) || // camelCase call: findProgramAddress
+    /^\d[\d,.]*$/.test(s) || // 5,000 · 126
+    /^\(.*\)$/.test(s) || // tuple: (pda, bump)
+    /^[a-z_]+ [−+×] \d+$/.test(s) || // expression: bump − 1
+    /^[\d, …→]+$/.test(s) || // 255, 254, …
+    /…/.test(s) || // shortened address 9fXw…k2Qe
+    /^".*"|"$/.test(s) || // string literal
+    /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(s) // base58 address
+  );
+}
+
+/** A drawing for one mode. */
+class Pen {
+  constructor(mode) {
+    this.mode = mode;
+    this.c = PALETTE[mode];
+    this.back = []; // edges (drawn under cards)
+    this.front = [];
+  }
+
+  text(x, y, s, o = {}) {
+    const size = o.size ?? 12;
+    const attrs = [
+      `x="${n(x)}"`,
+      `y="${n(y + size * 0.35)}"`,
+      o.anchor && o.anchor !== "start" ? `text-anchor="${o.anchor}"` : "",
+      o.mono ? `font-family="${MONO}"` : "",
+      `font-size="${size}"`,
+      o.weight ? `font-weight="${o.weight}"` : "",
+      `fill="${o.fill ?? this.c.ink}"`,
+    ].filter(Boolean);
+    (o.layer ?? this.front).push(`<text ${attrs.join(" ")}>${esc(s)}</text>`);
+  }
+
+  /** A value: mono when it is code, sans otherwise (see isCode). */
+  value(x, y, v, o = {}) {
+    const code = o.code ?? isCode(v);
+    this.text(x, y, v, { ...o, mono: code });
+  }
+
+  rect(x, y, w, h, o = {}) {
+    const sw = o.sw ?? 1;
+    const off = sw % 2 ? 0.5 : 0; // crisp 1px lines
+    (o.layer ?? this.front).push(
+      `<rect x="${n(x + off)}" y="${n(y + off)}" width="${n(w - 2 * off)}" height="${n(h - 2 * off)}" rx="${o.r ?? R}" fill="${o.fill ?? this.c.surface}" stroke="${o.stroke ?? this.c.line}" stroke-width="${sw}"${o.dash ? ` stroke-dasharray="${o.dash}"` : ""}/>`,
+    );
+  }
+
+  hline(x1, x2, y, o = {}) {
+    this.front.push(
+      `<path d="M${n(x1)} ${n(y + 0.5)}H${n(x2)}" stroke="${o.stroke ?? this.c.hair}" stroke-width="1"/>`,
+    );
+  }
+
+  vline(x, y1, y2, o = {}) {
+    this.front.push(
+      `<path d="M${n(x + 0.5)} ${n(y1)}V${n(y2)}" stroke="${o.stroke ?? this.c.hair}" stroke-width="1"/>`,
+    );
+  }
+
+  /**
+   * A card: left-aligned title (+ optional tag on the right, optional
+   * description lines) and optional field rows [label, value, opts].
+   * Titles and field labels are names: always Diatype, even when the name
+   * is an identifier. Tags, descriptions and values follow isCode.
+   * Row opts: {code} overrides isCode, {accent} colours the value, {note}
+   * adds a muted middle column at `noteX`, {sub} a muted second line under
+   * the label (the row grows to SUBROW). `minH` pads the card to a height
+   * shared with its neighbours.
+   */
+  card({
+    x,
+    y,
+    w,
+    title,
+    tag,
+    desc,
+    rows = [],
+    accent,
+    minH = 0,
+    noteX = 0,
+    dash,
+  }) {
+    const c = this.c;
+    const lines = desc == null ? [] : [].concat(desc);
+    const head = lines.length ? HEAD_DESC + (lines.length - 1) * 18 : HEAD;
+    const rh = (r) => (r[2]?.sub ? SUBROW : ROW);
+    const h = Math.max(minH, head + rows.reduce((a, r) => a + rh(r), 0));
+    this.rect(x, y, w, h, {
+      stroke: accent ? c.accent : c.line,
+      sw: accent ? 1.25 : 1,
+      dash,
+    });
+    const ty = lines.length ? y + 23 : y + head / 2;
+    this.text(x + 16, ty, title, { size: 13, weight: 500 });
+    // A call wrapped over several lines is still one piece of code.
+    const code = isCode(
+      lines.join("").replace(/\s+/g, " ").replace(/\( /, "("),
+    );
+    lines.forEach((l, i) =>
+      this.value(x + 16, y + 41 + i * 18, l, { fill: c.ink2, code }),
+    );
+    if (tag)
+      this.value(x + w - 16, ty, tag, {
+        fill: accent ? c.accent : c.ink3,
+        anchor: "end",
+      });
+    const out = { x, y, w, h, head, rows: [] };
+    const inset = accent ? 1.25 : 1;
+    let ry = y + head;
+    rows.forEach((r) => {
+      const [label, value, o = {}] = r;
+      const hh = rh(r);
+      const ly = o.sub ? ry + 16 : ry + hh / 2;
+      this.hline(x + inset, x + w - inset, ry);
+      if (o.index != null)
+        this.text(x + 16, ly, String(o.index), { mono: true, fill: c.ink3 });
+      const lx = x + (o.index != null ? 40 : 16);
+      this.text(lx, ly, label, { fill: c.ink2 });
+      if (o.sub) this.text(lx, ry + 34, o.sub, { fill: c.ink3 });
+      if (o.note) this.text(x + noteX, ly, o.note, { fill: c.ink3 });
+      if (value != null)
+        this.value(x + w - 16, ly, value, {
+          anchor: "end",
+          code: o.code,
+          fill: o.accent ? c.accent : c.ink,
+        });
+      out.rows.push({ y: ly, top: ry, bottom: ry + hh });
+      ry += hh;
+    });
+    out.cx = x + w / 2;
+    out.cy = y + h / 2;
+    out.right = x + w;
+    out.bottom = y + h;
+    out.headY = ty;
+    return out;
+  }
+
+  /**
+   * A byte strip: one outline, hairline dividers, a field name and a size
+   * per cell. One cell may carry the accent (outline drawn flush on it).
+   */
+  strip({ x, y, h = 56, cells }) {
+    const c = this.c;
+    const w = cells.reduce((a, k) => a + k.w, 0);
+    this.rect(x, y, w, h);
+    let cx = x;
+    const out = { x, y, w, h, right: x + w, bottom: y + h, cells: [] };
+    cells.forEach((k, i) => {
+      if (i) this.vline(cx, y + 1, y + h - 1, { stroke: c.line });
+      this.text(cx + 12, k.sub ? y + 21 : y + h / 2, k.title, {
+        size: 13,
+        weight: 500,
+        fill: k.dim ? c.ink3 : c.ink,
+      });
+      if (k.sub)
+        this.value(cx + 12, y + 39, k.sub, { fill: k.dim ? c.ink3 : c.ink2 });
+      out.cells.push({ x: cx, w: k.w, cx: cx + k.w / 2, right: cx + k.w });
+      cx += k.w;
+    });
+    cells.forEach((k, i) => {
+      if (!k.accent) return;
+      const cell = out.cells[i];
+      const first = i === 0,
+        last = i === cells.length - 1;
+      const x1 = cell.x,
+        x2 = cell.right;
+      const r = R;
+      const d = [
+        `M${n(x1 + (first ? r : 0))} ${n(y + 0.625)}`,
+        `H${n(x2 - (last ? r : 0))}`,
+        last
+          ? `Q${n(x2 - 0.625)} ${n(y + 0.625)} ${n(x2 - 0.625)} ${n(y + r)}`
+          : "",
+        `V${n(y + h - (last ? r : 0))}`,
+        last
+          ? `Q${n(x2 - 0.625)} ${n(y + h - 0.625)} ${n(x2 - r)} ${n(y + h - 0.625)}`
+          : "",
+        `H${n(x1 + (first ? r : 0))}`,
+        first
+          ? `Q${n(x1 + 0.625)} ${n(y + h - 0.625)} ${n(x1 + 0.625)} ${n(y + h - r)}`
+          : "",
+        `V${n(y + (first ? r : 0))}`,
+        first
+          ? `Q${n(x1 + 0.625)} ${n(y + 0.625)} ${n(x1 + r)} ${n(y + 0.625)}`
+          : "",
+        "Z",
+      ].join("");
+      this.front.push(
+        `<path d="${d}" fill="none" stroke="${c.accent}" stroke-width="1.25"/>`,
+      );
+    });
+    return out;
+  }
+
+  /**
+   * A span: hairline bracket (line with end ticks) marking a range, label
+   * 8px beside it. Horizontal (x1..x2 at y, label above unless `below`) or
+   * vertical (y1..y2 at x, label after).
+   */
+  span({ x1, x2, y, y1, y2, x, label, labelX, labelY, below, accent }) {
+    const col = accent ? this.c.accent : this.c.edge;
+    const fill = accent ? this.c.accent : this.c.ink2;
+    if (y1 != null) {
+      this.front.push(
+        `<path d="M${n(x - 4)} ${n(y1 + 0.5)}H${n(x + 0.5)}V${n(y2 - 0.5)}H${n(x - 4)}" fill="none" stroke="${col}" stroke-width="1"/>`,
+      );
+      if (label)
+        this.text(labelX ?? x + GAP, labelY ?? (y1 + y2) / 2, label, {
+          fill,
+        });
+      return;
+    }
+    const t = below ? 4 : -4;
+    this.front.push(
+      `<path d="M${n(x1 + 0.5)} ${n(y + t)}V${n(y + 0.5)}H${n(x2 - 0.5)}V${n(y + t)}" fill="none" stroke="${col}" stroke-width="1"/>`,
+    );
+    this.text(x1, below ? y + GAP + 8 : y - GAP - 6, label, { fill });
+  }
+
+  /**
+   * Connector through orthogonal points, corners rounded to 8px, open
+   * chevron head at the end (and start if `both`). `label` sits beside
+   * segment `seg` (default: the longest), 8px off the line: above a
+   * horizontal segment, after a vertical one (`side: "before"` flips it).
+   */
+  edge(pts, o = {}) {
+    const c = this.c;
+    const stroke = o.accent ? c.accent : c.edge;
+    let d = `M${n(pts[0][0])} ${n(pts[0][1])}`;
+    for (let i = 1; i < pts.length; i++) {
+      const [x, y] = pts[i];
+      const next = pts[i + 1];
+      if (!next) {
+        d += `L${n(x)} ${n(y)}`;
+        break;
+      }
+      const [px, py] = pts[i - 1];
+      const r = Math.min(
+        o.r ?? 8,
+        Math.hypot(x - px, y - py) / 2,
+        Math.hypot(next[0] - x, next[1] - y) / 2,
+      );
+      const ux = Math.sign(x - px),
+        uy = Math.sign(y - py);
+      const vx = Math.sign(next[0] - x),
+        vy = Math.sign(next[1] - y);
+      d += `L${n(x - ux * r)} ${n(y - uy * r)}Q${n(x)} ${n(y)} ${n(x + vx * r)} ${n(y + vy * r)}`;
+    }
+    const id = o.accent ? "ha" : "hn";
+    this.back.push(
+      `<path d="${d}" fill="none" stroke="${stroke}" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"${o.dashed ? ' stroke-dasharray="4 4"' : ""}${o.head === false ? "" : ` marker-end="url(#${id})"`}${o.both ? ` marker-start="url(#${id})"` : ""}/>`,
+    );
+    if (o.label) {
+      let seg = o.seg;
+      if (seg == null) {
+        let best = -1;
+        for (let i = 0; i < pts.length - 1; i++) {
+          const len = Math.hypot(
+            pts[i + 1][0] - pts[i][0],
+            pts[i + 1][1] - pts[i][1],
+          );
+          if (len > best) {
+            best = len;
+            seg = i;
+          }
+        }
+      }
+      const [a, b] = [pts[seg], pts[seg + 1]];
+      const fill = o.accent ? c.accent : c.ink2;
+      if (a[1] === b[1]) {
+        this.text((a[0] + b[0]) / 2, a[1] - GAP - 6, o.label, {
+          anchor: "middle",
+          fill,
+        });
+      } else {
+        const before = o.side === "before";
+        this.text(a[0] + (before ? -GAP : GAP), (a[1] + b[1]) / 2, o.label, {
+          anchor: before ? "end" : "start",
+          fill,
+        });
+      }
+    }
+  }
+
+  /** Large operator glyph (+, =) between cards. */
+  op(x, y, s) {
+    this.text(x, y, s, { size: 16, anchor: "middle", fill: this.c.ink3 });
+  }
+
+  /** A curve (the Ed25519 sketch): a thin neutral line, no head. */
+  curve(d) {
+    this.back.push(
+      `<path d="${d}" fill="none" stroke="${this.c.edge}" stroke-width="1.25" stroke-linecap="round"/>`,
+    );
+  }
+
+  dot(x, y, o = {}) {
+    this.front.push(
+      `<circle cx="${n(x)}" cy="${n(y)}" r="4" fill="${this.c.page}" stroke="${o.accent ? this.c.accent : this.c.ink2}" stroke-width="1.25"/>`,
+    );
+  }
+
+  svg(w, h, label) {
+    const c = this.c;
+    const head = (id, col) =>
+      `<marker id="${id}" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path d="M3 1.5L8.5 5L3 8.5" fill="none" stroke="${col}" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"/></marker>`;
+    return [
+      `<svg xmlns="http://www.w3.org/2000/svg" data-sol-drawn="hand" data-sol-type="1" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" role="img" aria-label="${esc(label)}" font-family="${SANS}">`,
+      `<defs>${head("hn", c.edge)}${head("ha", c.accent)}</defs>`,
+      ...this.back,
+      ...this.front,
+      `</svg>`,
+      "",
+    ].join("\n");
+  }
+}
+
+/* ------------------------------------------------------------- figures */
+
+/**
+ * Account + owner + account data, the pattern behind the program, mint,
+ * token and wallet account figures. The owner field points straight at the
+ * owner; the data field (dashed) at the decoded account data, if any.
+ */
+function ownedAccount(
+  p,
+  {
+    name,
+    tag,
+    owner,
+    ownerTag,
+    executable,
+    lamports = "u64",
+    dataValue = "bytes",
+    data,
+    dataTag = "account data",
+    fields,
+    label,
+  },
+) {
+  const acct = p.card({
+    x: 24,
+    y: 24,
+    w: 304,
+    title: name,
+    tag,
+    accent: true,
+    rows: [
+      ["owner", owner],
+      ["executable", executable],
+      ["lamports", lamports],
+      ["data", dataValue],
+    ],
+  });
+  const prog = p.card({
+    x: 416,
+    y: acct.rows[0].y - HEAD / 2,
+    w: 248,
+    title: owner,
+    tag: ownerTag,
+  });
+  p.edge(
+    [
+      [acct.right, acct.rows[0].y],
+      [prog.x, acct.rows[0].y],
+    ],
+    { label: "owner" },
+  );
+  let bottom = Math.max(acct.bottom, prog.bottom);
+  if (data) {
+    const dataCard = p.card({
+      x: 416,
+      y: Math.max(prog.bottom + 24, acct.rows[3].y - HEAD / 2),
+      w: 248,
+      title: data,
+      tag: dataTag,
+      rows: fields,
+    });
+    const dy = dataCard.headY;
+    p.edge(
+      [
+        [acct.right, acct.rows[3].y],
+        [372, acct.rows[3].y],
+        [372, dy],
+        [dataCard.x, dy],
+      ],
+      { dashed: true },
+    );
+    bottom = Math.max(bottom, dataCard.bottom);
+  }
+  return [W, bottom + 24, label];
+}
+
+function programAccount(p, name, label) {
+  return ownedAccount(p, {
+    name,
+    tag: "program account",
+    owner: "BPF Loader",
+    ownerTag: "loader",
+    executable: "true",
+    data: "Program code",
+    fields: [["format", "sBPF ELF"]],
+    label,
+  });
+}
+
+/** The Ed25519 sketch shared by the on- and off-curve figures. */
+function ed25519(p, { x0, y0, x1, y1 }) {
+  // A 1/x-like branch: steep at the top left, flat at the bottom right.
+  const d = `M${x0} ${y0}C${x0 + 40} ${y0 + (y1 - y0) * 0.7} ${x0 + (x1 - x0) * 0.3} ${y1} ${x1} ${y1}`;
+  p.curve(d);
+  p.text(x0 + 12, y0 + 4, "Ed25519 curve", { fill: p.c.ink3 });
+  // Point on the curve at parameter t.
+  return (t) => {
+    const P = [
+      [x0, y0],
+      [x0 + 40, y0 + (y1 - y0) * 0.7],
+      [x0 + (x1 - x0) * 0.3, y1],
+      [x1, y1],
+    ];
+    const u = 1 - t;
+    const k = [u * u * u, 3 * u * u * t, 3 * u * t * t, t * t * t];
+    return [
+      k.reduce((a, v, i) => a + v * P[i][0], 0),
+      k.reduce((a, v, i) => a + v * P[i][1], 0),
+    ];
+  };
+}
+
+const FIGURES = {
+  /* ------------------------------------------------------ accounts */
+
+  "core/accounts/accounts": (p) => {
+    const c = p.c;
+    // Key-value store
+    const x = 24,
+      y = 24,
+      w = 312;
+    const rows = [
+      ["4Nd1m…Bm5a", "account"],
+      ["9WzDX…AWWM", "account"],
+      ["Gh9Zw…Pn2A", "account"],
+    ];
+    const RH = 36;
+    const h = HEAD + 28 + rows.length * RH;
+    const col = x + 160;
+    p.rect(x, y, w, h);
+    p.text(x + 16, y + HEAD / 2, "Accounts", { size: 13, weight: 500 });
+    p.text(x + w - 16, y + HEAD / 2, "key-value store", {
+      anchor: "end",
+      fill: c.ink3,
+    });
+    p.hline(x + 1, x + w - 1, y + HEAD);
+    p.text(x + 16, y + HEAD + 14, "address", { fill: c.ink2 });
+    p.text(col + 16, y + HEAD + 14, "value", { fill: c.ink2 });
+    const focus = 1;
+    const fTop = y + HEAD + 28 + focus * RH;
+    rows.forEach(([k, v], i) => {
+      const ry = y + HEAD + 28 + i * RH;
+      if (i !== focus && i !== focus + 1) p.hline(x + 1, x + w - 1, ry);
+      p.value(x + 16, ry + RH / 2, k, { fill: c.ink });
+      p.text(col + 16, ry + RH / 2, v, {
+        fill: i === focus ? c.accent : c.ink2,
+      });
+    });
+    // Column divider, broken under the highlighted row.
+    p.vline(col, y + HEAD + 1, fTop);
+    p.vline(col, fTop + RH, y + h - 1);
+    // Highlight: flush with the row, full table width.
+    p.front.push(
+      `<rect x="${x + 0.625}" y="${fTop + 0.625}" width="${w - 1.25}" height="${RH - 1.25}" rx="0" fill="none" stroke="${c.accent}" stroke-width="1.25"/>`,
+    );
+    const fy = fTop + RH / 2;
+    const acct = p.card({
+      x: 400,
+      y: fy - HEAD / 2,
+      w: 264,
+      title: "Account",
+      tag: "struct",
+      rows: [
+        ["lamports", "u64"],
+        ["data", "Vec<u8>"],
+        ["owner", "Pubkey"],
+        ["executable", "bool"],
+        ["rent_epoch", "Epoch"],
+      ],
+    });
+    p.edge(
+      [
+        [x + w, fy],
+        [acct.x, fy],
+      ],
+      { accent: true },
+    );
+    return [
+      W,
+      Math.max(y + h, acct.bottom) + 24,
+      "Accounts: a key-value store from address to account, and the fields of one account",
+    ];
+  },
+
+  "core/accounts/account-address": (p) => {
+    const addr = p.card({
+      x: 24,
+      y: 24,
+      w: 448,
+      title: "Address",
+      tag: "public key, base58",
+      accent: true,
+      rows: [["address", "14grJpemFaf88c8tiVb77W7TYg2W3ir6pfkKz3YjhhZ5"]],
+    });
+    const acct = p.card({
+      x: 24,
+      y: addr.bottom + 56,
+      w: 264,
+      title: "Account",
+      rows: [
+        ["lamports", "u64"],
+        ["data", "Vec<u8>"],
+        ["owner", "Pubkey"],
+        ["executable", "bool"],
+      ],
+    });
+    p.edge(
+      [
+        [80, addr.bottom],
+        [80, acct.y],
+      ],
+      { label: "identifies" },
+    );
+    return [
+      W,
+      acct.bottom + 24,
+      "An account is found by its address: a 32-byte public key, written in base58",
+    ];
+  },
+
+  "core/accounts/system-account": (p) =>
+    ownedAccount(p, {
+      name: "Wallet Account",
+      tag: "system account",
+      owner: "System Program",
+      ownerTag: "program",
+      executable: "false",
+      lamports: "1,000,000",
+      dataValue: "empty",
+      label:
+        "A wallet account: owned by the System Program, not executable, holding 1,000,000 lamports and no data",
+    }),
+
+  "core/accounts/data-account": (p) => {
+    // Reads left to right, like every other owner arrow: the data account,
+    // then its owner, then the owner's owner. Each card drops so its title
+    // sits level with the owner row before it, so the arrows run straight.
+    const cw = 176,
+      xs = [24, 256, 488];
+    const mk = (i, y, title, owner, exec, data, accent) =>
+      p.card({
+        x: xs[i],
+        y,
+        w: cw,
+        title,
+        accent,
+        rows: [
+          ["owner", owner],
+          ["executable", exec],
+          ["lamports", "u64"],
+          ["data", data],
+        ],
+      });
+    const acct = mk(
+      0,
+      24,
+      "Data Account",
+      "Program",
+      "false",
+      "program state",
+      true,
+    );
+    const prog = mk(
+      1,
+      acct.rows[0].y - HEAD / 2,
+      "Program",
+      "BPF Loader",
+      "true",
+      "program code",
+    );
+    const loader = mk(
+      2,
+      prog.rows[0].y - HEAD / 2,
+      "BPF Loader",
+      "Native Loader",
+      "true",
+      "loader code",
+    );
+    const link = (from, to) =>
+      p.edge(
+        [
+          [from.right, from.rows[0].y],
+          [to.x, from.rows[0].y],
+        ],
+        { label: "owner" },
+      );
+    link(acct, prog);
+    link(prog, loader);
+    return [
+      W,
+      loader.bottom + 24,
+      "A data account stores state; its owner field names the program that can change it, and that program is in turn owned by its loader",
+    ];
+  },
+
+  "core/accounts/program-account-expanded": (p) => {
+    const prog = p.card({
+      x: 24,
+      y: 24,
+      w: 272,
+      title: "Program",
+      tag: "program account",
+      rows: [
+        ["owner", "Upgradeable Loader"],
+        ["executable", "true"],
+        ["lamports", "u64"],
+        ["data", "programdata address"],
+      ],
+    });
+    const pd = p.card({
+      x: 392,
+      y: 24,
+      w: 272,
+      title: "Program Data",
+      tag: "account",
+      accent: true,
+      rows: [
+        ["owner", "Upgradeable Loader"],
+        ["executable", "false"],
+        ["lamports", "u64"],
+        ["data", "program code"],
+      ],
+    });
+    p.edge(
+      [
+        [prog.right, prog.rows[3].y],
+        [pd.x, pd.rows[3].y],
+      ],
+      { dashed: true, label: "points to" },
+    );
+    return [
+      W,
+      pd.bottom + 24,
+      "An upgradeable program: the program account stores the address of a separate program data account, which holds the code",
+    ];
+  },
+
+  "core/accounts/program-account-simple": (p) =>
+    programAccount(
+      p,
+      "Program",
+      "A program account: owned by a loader, executable, with program code as its data",
+    ),
+
+  /* -------------------------------------------------- transactions */
+
+  "core/transactions/transaction-simple": (p) => {
+    const c = p.c;
+    const words = ["zero", "one", "two", "three"];
+    const tx = (x, ins, accent) => {
+      const w = 248;
+      const h = HEAD + ins.length * ROW;
+      p.rect(x, 24, w, h, accent ? { stroke: c.accent, sw: 1.25 } : {});
+      p.text(x + 16, 24 + HEAD / 2, "Transaction", { size: 13, weight: 500 });
+      p.text(
+        x + w - 16,
+        24 + HEAD / 2,
+        `${words[ins.length]} instruction${ins.length > 1 ? "s" : ""}`,
+        { anchor: "end", fill: accent ? c.accent : c.ink3 },
+      );
+      const inset = accent ? 1.25 : 1;
+      ins.forEach((s, i) => {
+        const iy = 24 + HEAD + i * ROW;
+        p.hline(x + inset, x + w - inset, iy);
+        p.text(x + 16, iy + ROW / 2, String(i), { mono: true, fill: c.ink3 });
+        p.text(x + 40, iy + ROW / 2, s, { fill: c.ink2 });
+      });
+      return { bottom: 24 + h, right: x + w };
+    };
+    const b1 = tx(24, ["Instruction"]);
+    const b2 = tx(304, ["Instruction", "Instruction", "Instruction"], true);
+    p.span({
+      x: b2.right + 16,
+      y1: 24 + HEAD + 4,
+      y2: b2.bottom - 4,
+      label: "",
+      accent: true,
+    });
+    p.text(b2.right + 16 + GAP, (24 + HEAD + b2.bottom) / 2, "all or none", {
+      fill: c.accent,
+    });
+    return [
+      W,
+      Math.max(b1.bottom, b2.bottom) + 24,
+      "Two transactions: one with a single instruction, one with three instructions that execute atomically",
+    ];
+  },
+
+  "core/transactions/tx_format": (p) => {
+    const tx = p.card({
+      x: 24,
+      y: 24,
+      w: 280,
+      title: "Transaction",
+      tag: "struct",
+      rows: [
+        ["signatures", "Vec<Signature>"],
+        ["message", "Message"],
+      ],
+    });
+    const msg = p.card({
+      x: 376,
+      y: tx.rows[1].y - HEAD / 2,
+      w: 288,
+      title: "Message",
+      tag: "struct",
+      accent: true,
+      rows: [
+        ["header", "MessageHeader"],
+        ["account_keys", "Vec<Pubkey>"],
+        ["recent_blockhash", "Hash"],
+        ["instructions", "Vec<Instruction>"],
+      ],
+    });
+    p.edge(
+      [
+        [tx.right, tx.rows[1].y],
+        [msg.x, tx.rows[1].y],
+      ],
+      { accent: true },
+    );
+    return [
+      W,
+      msg.bottom + 24,
+      "A transaction has two parts: the signatures, and the message they sign",
+    ];
+  },
+
+  "core/transactions/issues_with_legacy_txs": (p) => {
+    const s = p.strip({
+      x: 24,
+      y: 48,
+      cells: [
+        { w: 168, title: "signatures", sub: "n × 64 bytes" },
+        { w: 80, title: "header", sub: "3 bytes" },
+        { w: 160, title: "account keys", sub: "n × 32 bytes" },
+        { w: 104, title: "blockhash", sub: "32 bytes" },
+        { w: 128, title: "instructions", sub: "the rest" },
+      ],
+    });
+    const [sig, , , , ins] = s.cells;
+    p.span({ x1: sig.x, x2: sig.right - 4, y: 40, label: "Signatures" });
+    p.span({ x1: sig.right + 4, x2: ins.right, y: 40, label: "Message" });
+    // The limit: one dimension line under the whole strip.
+    const y = s.bottom + 24;
+    p.edge(
+      [
+        [s.x + 1, y],
+        [s.right - 1, y],
+      ],
+      { accent: true, both: true },
+    );
+    p.text(s.x, y + GAP + 10, "1,232 bytes in total, the size of one packet", {
+      fill: p.c.accent,
+    });
+    return [
+      W,
+      y + GAP + 10 + 24,
+      "A legacy transaction, signatures and message together, must fit in one 1,232-byte packet",
+    ];
+  },
+
+  "core/transactions/message_header": (p) => {
+    const hdr = p.card({
+      x: 24,
+      y: 24,
+      w: 640,
+      title: "MessageHeader",
+      tag: "3 bytes",
+      accent: true,
+      noteX: 272,
+      rows: [
+        ["num_required_signatures", "u8", { note: "accounts that must sign" }],
+        [
+          "num_readonly_signed_accounts",
+          "u8",
+          { note: "of those, accounts that are read-only" },
+        ],
+        [
+          "num_readonly_unsigned_accounts",
+          "u8",
+          { note: "non-signers that are read-only" },
+        ],
+      ],
+    });
+    return [
+      W,
+      hdr.bottom + 24,
+      "The message header: three one-byte counts that give each account in account_keys its permissions",
+    ];
+  },
+
+  "core/transactions/compat_array_of_account_addresses": (p) => {
+    const keys = p.card({
+      x: 24,
+      y: 24,
+      w: 344,
+      title: "Account addresses",
+      tag: "in order",
+      rows: [
+        ["signer, writable", "fee payer first", { index: 1 }],
+        ["signer, read-only", null, { index: 2 }],
+        ["non-signer, writable", null, { index: 3 }],
+        ["non-signer, read-only", null, { index: 4 }],
+      ],
+    });
+    // One bracket column: the 1-2 and 4 brackets on it, the row-2 bracket
+    // nested 12px inside. Same stroke and cap; labels on one column. Only
+    // the focal count (signers) carries the accent.
+    const [r1, r2, , r4] = keys.rows;
+    const col = keys.right + 28,
+      inner = col - 12,
+      lx = col + GAP;
+    p.span({
+      x: col,
+      y1: r1.top + 6,
+      y2: r2.bottom - 6,
+      label: "num_required_signatures",
+      labelX: lx,
+      labelY: r1.y,
+      accent: true,
+    });
+    p.span({
+      x: inner,
+      y1: r2.top + 6,
+      y2: r2.bottom - 6,
+      label: "num_readonly_signed_accounts",
+      labelX: lx,
+      labelY: r2.y,
+    });
+    p.span({
+      x: col,
+      y1: r4.top + 6,
+      y2: r4.bottom - 6,
+      label: "num_readonly_unsigned_accounts",
+      labelX: lx,
+      labelY: r4.y,
+    });
+    return [
+      W,
+      keys.bottom + 24,
+      "Account addresses are ordered signer-writable, signer-read-only, non-signer-writable, non-signer-read-only; the header counts mark the boundaries",
+    ];
+  },
+
+  "core/transactions/compact_array_of_ixs": (p) => {
+    const list = p.card({
+      x: 24,
+      y: 24,
+      w: 288,
+      title: "Instructions",
+      tag: "compact array",
+      rows: [
+        ["length", "compact-u16"],
+        ["instruction", "CompiledInstruction", { index: 0 }],
+        ["instruction", "CompiledInstruction", { index: 1 }],
+        ["instruction", "CompiledInstruction", { index: 2 }],
+      ],
+    });
+    const ix = p.card({
+      x: 376,
+      y: list.rows[1].y - HEAD / 2,
+      w: 288,
+      title: "CompiledInstruction",
+      accent: true,
+      rows: [
+        ["program_id_index", "u8"],
+        ["accounts", "Vec<u8>"],
+        ["data", "Vec<u8>"],
+      ],
+    });
+    p.edge(
+      [
+        [list.right, list.rows[1].y],
+        [ix.x, list.rows[1].y],
+      ],
+      { accent: true },
+    );
+    return [
+      W,
+      Math.max(list.bottom, ix.bottom) + 24,
+      "The instructions field: a length, then each compiled instruction, which names its program and accounts by index into account_keys",
+    ];
+  },
+
+  "core/transactions/compact_array_format": (p) => {
+    const s = p.strip({
+      x: 24,
+      y: 24,
+      cells: [
+        { w: 152, title: "length", sub: "compact-u16", accent: true },
+        { w: 128, title: "item 0" },
+        { w: 128, title: "item 1" },
+        { w: 128, title: "item 2" },
+        { w: 104, title: "…", dim: true },
+      ],
+    });
+    return [
+      W,
+      s.bottom + 24,
+      "A compact array: a compact-u16 length, then the items",
+    ];
+  },
+
+  "core/transactions/instruction": (p) => {
+    const tx = p.card({
+      x: 24,
+      y: 24,
+      w: 264,
+      title: "Transaction",
+      rows: [
+        ["signatures", "Vec<Signature>"],
+        ["instruction", "Instruction"],
+      ],
+    });
+    const ix = p.card({
+      x: 360,
+      y: tx.rows[1].y - HEAD / 2,
+      w: 304,
+      title: "Instruction",
+      accent: true,
+      rows: [
+        ["program_id", "Pubkey", { note: "program to call" }],
+        ["accounts", "Vec<AccountMeta>", { note: "" }],
+        ["data", "Vec<u8>", { note: "arguments" }],
+      ],
+      noteX: 104,
+    });
+    p.edge(
+      [
+        [tx.right, tx.rows[1].y],
+        [ix.x, tx.rows[1].y],
+      ],
+      { accent: true },
+    );
+    return [
+      W,
+      ix.bottom + 24,
+      "An instruction names the program to call, the accounts it uses and the data it passes",
+    ];
+  },
+
+  "core/transactions/accountmeta": (p) => {
+    const tx = p.card({ x: 24, y: 56, w: 152, title: "Transaction" });
+    const ix = p.card({
+      x: 224,
+      y: 56,
+      w: 224,
+      title: "Instruction",
+      rows: [
+        ["program_id", "Pubkey"],
+        ["accounts", "Vec<AccountMeta>"],
+        ["data", "Vec<u8>"],
+      ],
+    });
+    p.edge(
+      [
+        [tx.right, tx.headY],
+        [ix.x, tx.headY],
+      ],
+      { label: "has" },
+    );
+    const meta = (y, who, signer, accent) =>
+      p.card({
+        x: 512,
+        y,
+        w: 152,
+        title: "AccountMeta",
+        tag: who,
+        accent,
+        rows: [
+          ["pubkey", "Pubkey"],
+          ["is_signer", signer],
+          ["is_writable", "true"],
+        ],
+      });
+    const a = meta(24, "sender", "true", true);
+    const b = meta(a.bottom + 24, "receiver", "false");
+    const ay = ix.rows[1].y;
+    p.edge([
+      [ix.right, ay],
+      [480, ay],
+      [480, a.headY],
+      [a.x, a.headY],
+    ]);
+    p.edge([
+      [ix.right, ay],
+      [480, ay],
+      [480, b.headY],
+      [b.x, b.headY],
+    ]);
+    return [
+      W,
+      b.bottom + 24,
+      "An instruction's accounts field is a list of AccountMeta: each names an account and whether it signs and is written",
+    ];
+  },
+
+  "core/transactions/sol-transfer": (p) => {
+    const wallet = p.card({ x: 24, y: 24, w: 176, title: "Sender wallet" });
+    const tx = p.card({
+      x: 24,
+      y: 120,
+      w: 176,
+      title: "Transaction",
+      rows: [
+        ["signer", "Sender"],
+        ["instruction", "Transfer"],
+        ["blockhash", "Hash"],
+      ],
+    });
+    p.edge(
+      [
+        [56, wallet.bottom],
+        [56, tx.y],
+      ],
+      { label: "signs, sends" },
+    );
+    const ix = p.card({
+      x: 248,
+      y: 120,
+      w: 208,
+      title: "Transfer",
+      tag: "instruction",
+      accent: true,
+      rows: [
+        ["program", "System Program"],
+        ["accounts", "2 AccountMeta", { code: false }],
+        ["data", "amount"],
+      ],
+    });
+    p.edge(
+      [
+        [tx.right, tx.rows[1].y],
+        [216, tx.rows[1].y],
+        [216, ix.headY],
+        [ix.x, ix.headY],
+      ],
+      {},
+    );
+    const meta = (y, who, signer) =>
+      p.card({
+        x: 512,
+        y,
+        w: 152,
+        title: who,
+        rows: [
+          ["is_signer", signer],
+          ["is_writable", "true"],
+        ],
+      });
+    const a = meta(24, "Sender", "true");
+    const b = meta(a.bottom + 24 + 40, "Receiver", "false");
+    const ay = ix.rows[1].y;
+    p.edge([
+      [ix.right, ay],
+      [484, ay],
+      [484, a.headY],
+      [a.x, a.headY],
+    ]);
+    p.edge([
+      [ix.right, ay],
+      [484, ay],
+      [484, b.headY],
+      [b.x, b.headY],
+    ]);
+    return [
+      W,
+      Math.max(tx.bottom, ix.bottom, b.bottom) + 24,
+      "A SOL transfer: the sender signs a transaction whose transfer instruction lists the sender as a writable signer and the receiver as writable",
+    ];
+  },
+
+  "core/transactions/sol-transfer-process": (p) => {
+    const acct = (y, name, change) =>
+      p.card({
+        x: 24,
+        y,
+        w: 248,
+        title: name,
+        rows: [
+          ["lamports", change],
+          ["owner", "System Program"],
+        ],
+      });
+    const s = acct(24, "Sender wallet", "− amount");
+    const r = acct(s.bottom + 48, "Receiver wallet", "+ amount");
+    const tx = p.card({
+      x: 432,
+      y: 24,
+      w: 232,
+      title: "Transaction",
+      rows: [["instruction", "Transfer"]],
+    });
+    const sys = p.card({
+      x: 432,
+      y: (s.rows[0].y + r.rows[0].y) / 2 - HEAD / 2,
+      w: 232,
+      title: "System Program",
+      tag: "program",
+      accent: true,
+    });
+    p.edge(
+      [
+        [s.right, s.headY],
+        [tx.x, s.headY],
+      ],
+      { label: "signs, sends" },
+    );
+    p.edge(
+      [
+        [tx.x + 40, tx.bottom],
+        [tx.x + 40, sys.y],
+      ],
+      { label: "invokes" },
+    );
+    const tx0 = 352;
+    p.edge(
+      [
+        [sys.x, sys.headY],
+        [tx0, sys.headY],
+        [tx0, s.rows[0].y],
+        [s.right, s.rows[0].y],
+      ],
+      { label: "debits", seg: 2 },
+    );
+    p.edge(
+      [
+        [sys.x, sys.headY],
+        [tx0, sys.headY],
+        [tx0, r.rows[0].y],
+        [r.right, r.rows[0].y],
+      ],
+      { label: "credits", seg: 2 },
+    );
+    return [
+      W,
+      r.bottom + 24,
+      "Processing a SOL transfer: the System Program debits the sender's lamports and credits the receiver's",
+    ];
+  },
+
+  /* ---------------------------------------------------------- PDAs */
+
+  "core/pda/pda": (p) => {
+    // Three equal columns, 32px gutters, equal heights (every card has a
+    // one-line description).
+    const cw = 192,
+      xs = [24, 248, 472];
+    const inputs = p.card({
+      x: xs[0],
+      y: 24,
+      w: cw,
+      title: "Inputs",
+      desc: "seeds and a program ID",
+      rows: [
+        ["seeds", '"vault", user'],
+        ["program id", "Prog…1111"],
+      ],
+    });
+    const fn = p.card({
+      x: xs[1],
+      y: 24,
+      w: cw,
+      title: "Derive",
+      desc: "findProgramAddress",
+      rows: [
+        ["bump", "255, 254, …"],
+        ["until", "off curve"],
+      ],
+    });
+    const pda = p.card({
+      x: xs[2],
+      y: 24,
+      w: cw,
+      title: "PDA",
+      desc: "off the Ed25519 curve",
+      accent: true,
+      rows: [
+        ["address", "9fXw…k2Qe"],
+        ["bump", "254"],
+      ],
+    });
+    p.edge([
+      [inputs.right, inputs.headY],
+      [fn.x, inputs.headY],
+    ]);
+    p.edge(
+      [
+        [fn.right, fn.headY],
+        [pda.x, fn.headY],
+      ],
+      { accent: true },
+    );
+    // The PDA is the address of an account the program can sign for.
+    const acct = p.card({
+      x: pda.x,
+      y: pda.bottom + 56,
+      w: cw,
+      title: "Account",
+      rows: [["owner", "the program"]],
+    });
+    p.edge(
+      [
+        [pda.x + 40, pda.bottom],
+        [pda.x + 40, acct.y],
+      ],
+      { dashed: true, label: "address of" },
+    );
+    return [
+      W,
+      acct.bottom + 24,
+      "A program derived address: seeds and a program ID go through findProgramAddress to produce an off-curve address and bump",
+    ];
+  },
+
+  "core/pda/pda-derivation": (p) => {
+    // Steps are named in words; the call each step makes is its
+    // description, in mono (isCode).
+    const w = 432;
+    const a = p.card({
+      x: 24,
+      y: 24,
+      w,
+      title: "Start at bump 255",
+      desc: "findProgramAddress(seeds, programId)",
+    });
+    const b = p.card({
+      x: 24,
+      y: a.bottom + 48,
+      w,
+      title: "Create a candidate address",
+      desc: "createProgramAddress(seeds, bump, programId)",
+    });
+    const chk = p.card({
+      x: 24,
+      y: b.bottom + 48,
+      w,
+      title: "Is the address off the Ed25519 curve?",
+      dash: "4 4",
+    });
+    const ret = p.card({
+      x: 24,
+      y: chk.bottom + 48,
+      w,
+      title: "Return the address and bump",
+      desc: "(pda, bump)",
+      accent: true,
+    });
+    const dec = p.card({
+      x: 520,
+      y: chk.y,
+      w: 144,
+      title: "Next bump",
+      desc: "bump − 1",
+    });
+    const vx = 64;
+    p.edge([
+      [vx, a.bottom],
+      [vx, b.y],
+    ]);
+    p.edge([
+      [vx, b.bottom],
+      [vx, chk.y],
+    ]);
+    p.edge(
+      [
+        [vx, chk.bottom],
+        [vx, ret.y],
+      ],
+      { label: "yes", accent: true },
+    );
+    p.edge(
+      [
+        [chk.right, chk.headY],
+        [dec.x, chk.headY],
+      ],
+      { label: "no" },
+    );
+    p.edge(
+      [
+        [dec.cx, dec.y],
+        [dec.cx, b.headY],
+        [b.right, b.headY],
+      ],
+      { label: "try again", seg: 0 },
+    );
+    return [
+      W,
+      ret.bottom + 24,
+      "Deriving a PDA: start at bump 255 and count down until the address falls off the Ed25519 curve, then return the address and bump",
+    ];
+  },
+
+  "core/pda/address-on-curve": (p) => {
+    // The sketch ends 32px inside the frame on every side.
+    const at = ed25519(p, { x0: 56, y0: 32, x1: 632, y1: 264 });
+    const card = (t, x, y, title, addr, bal) => {
+      const [px, py] = at(t);
+      const k = p.card({
+        x,
+        y,
+        w: 208,
+        title,
+        rows: [
+          ["address", addr],
+          ["balance", bal],
+        ],
+      });
+      p.edge(
+        [
+          [px + 6, py],
+          [k.x, py],
+        ],
+        { head: false },
+      );
+      p.dot(px, py);
+      p.text(px + 16, py - GAP - 6, "on curve", { fill: p.c.ink3 });
+      return k;
+    };
+    // Points chosen so the leader lines are horizontal into the card rows.
+    card(0.16, 176, 40, "Alice's wallet", "4Nd1…Bm5a", "15 SOL");
+    card(0.5, 416, 120, "Bob's wallet", "9WzD…AWWM", "27 SOL");
+    return [
+      W,
+      296,
+      "Two wallet addresses: public keys that are points on the Ed25519 curve, each with a private key that can sign",
+    ];
+  },
+
+  "core/pda/address-off-curve": (p) => {
+    // Two rows of equal cards: the program and the seed on top; the
+    // derivation and the PDA under the seed. The sketch keeps a 32px
+    // margin.
+    const cw = 208;
+    const at = ed25519(p, { x0: 56, y0: 32, x1: 376, y1: 336 });
+    const prog = p.card({
+      x: 128,
+      y: 40,
+      w: cw,
+      title: "Counter program",
+      rows: [["address", "Coun…1111"]],
+    });
+    // The point on the curve level with the program's address row.
+    let lo = 0,
+      hi = 1;
+    for (let k = 0; k < 40; k++) {
+      const mid = (lo + hi) / 2;
+      if (at(mid)[1] < prog.rows[0].y) lo = mid;
+      else hi = mid;
+    }
+    const [px, py] = at(lo);
+    p.dot(px, py);
+    p.edge(
+      [
+        [px + 6, prog.rows[0].y],
+        [prog.x, prog.rows[0].y],
+      ],
+      { head: false },
+    );
+    const sx = W - 24 - cw;
+    const seed = p.card({
+      x: sx,
+      y: 40,
+      w: cw,
+      title: "Seed",
+      rows: [["string", '"global state"']],
+    });
+    const fn = p.card({
+      x: sx,
+      y: seed.bottom + 48,
+      w: cw,
+      title: "Derive",
+      desc: "findProgramAddress",
+    });
+    const pda = p.card({
+      x: sx,
+      y: fn.bottom + 48,
+      w: cw,
+      title: "PDA",
+      tag: "off curve",
+      accent: true,
+      rows: [
+        ["address", "7xKX…gAsU"],
+        ["count", "126"],
+      ],
+    });
+    p.edge(
+      [
+        [seed.x + 40, seed.bottom],
+        [seed.x + 40, fn.y],
+      ],
+      { label: "seed" },
+    );
+    const gx = (prog.right + sx) / 2;
+    p.edge(
+      [
+        [prog.right, prog.rows[0].y],
+        [gx, prog.rows[0].y],
+        [gx, fn.headY],
+        [fn.x, fn.headY],
+      ],
+      { label: "program ID", seg: 1, side: "before" },
+    );
+    p.edge(
+      [
+        [seed.x + 40, fn.bottom],
+        [seed.x + 40, pda.y],
+      ],
+      { label: "derives" },
+    );
+    return [
+      W,
+      Math.max(pda.bottom, 336 + 8) + 24,
+      "A PDA: derived from a seed and the program's address, it falls off the Ed25519 curve, so no private key exists for it",
+    ];
+  },
+
+  "core/cpi/cpi": (p) => {
+    // Three equal columns on one 56px gutter.
+    const cw = 176,
+      xs = [24, 256, 488];
+    const wallet = p.card({
+      x: xs[0],
+      y: 24,
+      w: cw,
+      title: "Wallet",
+      tag: "signer",
+    });
+    const tx = p.card({
+      x: xs[0],
+      y: 136,
+      w: cw,
+      title: "Transaction",
+      rows: [["instruction", "Program A"]],
+    });
+    const a = p.card({
+      x: xs[1],
+      y: 136,
+      w: cw,
+      title: "Program A",
+      rows: [["stack height", "1"]],
+    });
+    const b = p.card({
+      x: xs[2],
+      y: 136,
+      w: cw,
+      title: "Program B",
+      accent: true,
+      rows: [["stack height", "2"]],
+    });
+    p.edge(
+      [
+        [xs[0] + 40, wallet.bottom],
+        [xs[0] + 40, tx.y],
+      ],
+      { label: "signs, sends" },
+    );
+    p.edge(
+      [
+        [tx.right, tx.headY],
+        [a.x, tx.headY],
+      ],
+      { label: "invokes" },
+    );
+    p.edge(
+      [
+        [a.right, a.headY],
+        [b.x, a.headY],
+      ],
+      { accent: true, label: "CPI" },
+    );
+    return [
+      W,
+      tx.bottom + 24,
+      "Cross-program invocation: a wallet signs a transaction whose instruction invokes Program A, which invokes Program B",
+    ];
+  },
+
+  "diagrams/core-concepts": (p) => {
+    // Two rows on one grid: three 168px columns, 76px gutters (room for
+    // edge labels), every card in a row the same height. Both horizontal
+    // edges run on the title band, so they meet each card at its name.
+    const cw = 168,
+      xs = [16, 260, 504];
+    const top = 24;
+    const acc = p.card({
+      x: xs[0],
+      y: top,
+      w: cw,
+      title: "Accounts",
+      desc: "Store onchain state",
+      rows: [["owner", "a program"]],
+    });
+    const prog = p.card({
+      x: xs[1],
+      y: top,
+      w: cw,
+      title: "Programs",
+      desc: "Stateless logic",
+      accent: true,
+      rows: [["state", "in accounts"]],
+    });
+    const tx = p.card({
+      x: xs[2],
+      y: top,
+      w: cw,
+      title: "Transactions",
+      desc: "Execute atomically",
+      rows: [["holds", "instructions"]],
+    });
+    const y2 = prog.bottom + 56;
+    const pda = p.card({
+      x: xs[0],
+      y: y2,
+      w: cw,
+      title: "PDAs",
+      desc: "Derived addresses",
+    });
+    const cpi = p.card({
+      x: xs[1],
+      y: y2,
+      w: cw,
+      title: "CPIs",
+      desc: "Calls across programs",
+    });
+    const fees = p.card({
+      x: xs[2],
+      y: y2,
+      w: cw,
+      title: "Fees",
+      desc: "Price execution",
+    });
+    const hy = top + HEAD_DESC / 2;
+    p.edge(
+      [
+        [prog.x, hy],
+        [acc.right, hy],
+      ],
+      { both: true, label: "read, write" },
+    );
+    p.edge(
+      [
+        [tx.x, hy],
+        [prog.right, hy],
+      ],
+      { label: "call" },
+    );
+    const band = (prog.bottom + y2) / 2;
+    p.edge(
+      [
+        [prog.x + 32, prog.bottom],
+        [prog.x + 32, band],
+        [pda.cx, band],
+        [pda.cx, pda.y],
+      ],
+      { label: "derive", seg: 1 },
+    );
+    p.edge(
+      [
+        [prog.cx, prog.bottom],
+        [prog.cx, cpi.y],
+      ],
+      { label: "invoke" },
+    );
+    p.edge(
+      [
+        [tx.cx, tx.bottom],
+        [tx.cx, fees.y],
+      ],
+      { label: "pay" },
+    );
+    return [
+      W,
+      fees.bottom + 24,
+      "Core concepts: accounts store state, programs hold logic, transactions carry instructions that call programs and pay fees; programs derive PDAs and invoke other programs through CPIs",
+    ];
+  },
+
+  "core/fees/fees": (p) => {
+    const c = p.c;
+    const base = p.card({
+      x: 24,
+      y: 24,
+      w: 208,
+      title: "Base fee",
+      tag: "required",
+      rows: [
+        ["per signature", "5,000 lamports"],
+        ["signatures", "one or more"],
+      ],
+    });
+    const prio = p.card({
+      x: 264,
+      y: 24,
+      w: 208,
+      title: "Prioritization fee",
+      tag: "optional",
+      rows: [
+        ["CU price", "set by you"],
+        ["CU limit", "set by you"],
+      ],
+    });
+    const total = p.card({
+      x: 504,
+      y: 24,
+      w: 160,
+      title: "Transaction fee",
+      accent: true,
+      rows: [
+        ["paid in", "SOL"],
+        ["paid by", "fee payer"],
+      ],
+    });
+    p.op(248, base.cy, "+");
+    p.op(488, base.cy, "=");
+    // Where each part goes: one annotation per column, one style.
+    const y = base.bottom + 20;
+    p.text(base.x, y, "Half burned, half to the validator.", { fill: c.ink2 });
+    p.text(prio.x, y, "All of it to the validator.", { fill: c.ink2 });
+    p.text(total.x, y, "Charged even if it fails.", { fill: c.ink2 });
+    return [
+      W,
+      y + 24,
+      "A transaction fee is the base fee of 5,000 lamports per signature plus an optional prioritization fee of compute unit price times compute unit limit",
+    ];
+  },
+
+  /* -------------------------------------------------------- tokens */
+
+  "core/tokens/token-program": (p) =>
+    programAccount(
+      p,
+      "Token Program",
+      "The Token Program account: owned by a loader, executable, with program code as its data",
+    ),
+
+  "core/tokens/mint-account": (p) =>
+    ownedAccount(p, {
+      name: "Mint Account",
+      tag: "account",
+      owner: "Token Program",
+      ownerTag: "program",
+      executable: "false",
+      data: "Mint data",
+      fields: [
+        ["supply", "u64"],
+        ["decimals", "u8"],
+        ["mint authority", "Pubkey?"],
+        ["freeze authority", "Pubkey?"],
+      ],
+      label:
+        "A mint account: owned by the Token Program, with supply, decimals and authorities as its data",
+    }),
+
+  "core/tokens/token-account": (p) =>
+    ownedAccount(p, {
+      name: "Token Account",
+      tag: "account",
+      owner: "Token Program",
+      ownerTag: "program",
+      executable: "false",
+      data: "Token account data",
+      fields: [
+        ["mint", "Pubkey"],
+        ["owner", "Pubkey"],
+        ["amount", "u64"],
+      ],
+      label:
+        "A token account: owned by the Token Program, with mint, owner and amount as its data",
+    }),
+
+  "core/tokens/token-account-relationship": (p) => {
+    const sys = p.card({ x: 24, y: 24, w: 192, title: "System Program" });
+    const tok = p.card({ x: 360, y: 24, w: 208, title: "Token Program" });
+    const wallet = p.card({ x: 24, y: 152, w: 192, title: "Wallet Account" });
+    const ta = p.card({
+      x: 256,
+      y: 152,
+      w: 208,
+      title: "Token Account",
+      accent: true,
+      rows: [
+        ["mint", "Mint Account"],
+        ["owner", "Wallet Account"],
+        ["amount", "u64"],
+      ],
+    });
+    const mint = p.card({ x: 504, y: 152, w: 160, title: "Mint Account" });
+    p.edge(
+      [
+        [sys.cx, sys.bottom],
+        [sys.cx, wallet.y],
+      ],
+      { label: "owns" },
+    );
+    const ty = tok.bottom;
+    const by = 112;
+    p.edge(
+      [
+        [tok.cx - 24, ty],
+        [tok.cx - 24, by],
+        [ta.cx, by],
+        [ta.cx, ta.y],
+      ],
+      { label: "owns", seg: 2, side: "before" },
+    );
+    p.edge(
+      [
+        [tok.cx + 24, ty],
+        [tok.cx + 24, by],
+        [mint.cx, by],
+        [mint.cx, mint.y],
+      ],
+      { label: "owns", seg: 2 },
+    );
+    // Field references.
+    p.edge(
+      [
+        [ta.x, ta.rows[1].y],
+        [wallet.cx, ta.rows[1].y],
+        [wallet.cx, wallet.bottom],
+      ],
+      { dashed: true },
+    );
+    p.edge(
+      [
+        [ta.right, ta.rows[0].y],
+        [mint.cx, ta.rows[0].y],
+        [mint.cx, mint.bottom],
+      ],
+      { dashed: true },
+    );
+    return [
+      W,
+      ta.bottom + 24,
+      "Account relationships: the System Program owns the wallet; the Token Program owns the token account and the mint; the token account's mint and owner fields point to the mint and the wallet",
+    ];
+  },
+
+  "core/tokens/associated-token-account": (p) => {
+    const wallet = p.card({
+      x: 24,
+      y: 24,
+      w: 176,
+      title: "Wallet Account",
+      desc: "the owner",
+    });
+    const mint = p.card({
+      x: 488,
+      y: 24,
+      w: 176,
+      title: "Mint Account",
+      desc: "the token",
+    });
+    const fn = p.card({
+      x: 248,
+      y: 24,
+      w: 192,
+      title: "Derive",
+      desc: "findProgramAddress",
+    });
+    const ata = p.card({
+      x: 240,
+      y: 128,
+      w: 208,
+      title: "Associated Token Account",
+      accent: true,
+      rows: [
+        ["mint", "Mint Account"],
+        ["owner", "Wallet Account"],
+        ["amount", "u64"],
+      ],
+    });
+    p.edge(
+      [
+        [wallet.right, fn.headY],
+        [fn.x, fn.headY],
+      ],
+      { label: "seed" },
+    );
+    p.edge(
+      [
+        [mint.x, fn.headY],
+        [fn.right, fn.headY],
+      ],
+      { label: "seed" },
+    );
+    p.edge(
+      [
+        [fn.cx, fn.bottom],
+        [fn.cx, ata.y],
+      ],
+      { accent: true, label: "address" },
+    );
+    p.edge(
+      [
+        [ata.x, ata.rows[1].y],
+        [wallet.cx, ata.rows[1].y],
+        [wallet.cx, wallet.bottom],
+      ],
+      { dashed: true },
+    );
+    p.edge(
+      [
+        [ata.right, ata.rows[0].y],
+        [mint.cx, ata.rows[0].y],
+        [mint.cx, mint.bottom],
+      ],
+      { dashed: true },
+    );
+    return [
+      W,
+      ata.bottom + 24,
+      "Associated token account: its address is a PDA derived from the wallet and the mint; its mint and owner fields point back to them",
+    ];
+  },
+
+  "core/tokens/token-account-relationship-ata": (p) => {
+    // Matrix: wallets x mints, one ATA per pair. Equal 24px gutters. Row
+    // and column headers are title-only cards (40px); a row header sits
+    // level with the title of the cells it labels.
+    const g = 24;
+    const wx = 24,
+      ww = 160;
+    const cw = (W - 24 - wx - ww - 2 * g) / 2; // 216
+    const colX = [wx + ww + g, wx + ww + g + cw + g];
+    const ch = HEAD + 2 * ROW; // 104
+    const hy = 24;
+    const rowY = [hy + HEAD + g, hy + HEAD + g + ch + g];
+    ["Mint A", "Mint B"].forEach((m, k) =>
+      p.card({ x: colX[k], y: hy, w: cw, title: m }),
+    );
+    const wallets = ["Wallet 1", "Wallet 2"];
+    wallets.forEach((wName, r) => {
+      p.card({ x: wx, y: rowY[r], w: ww, title: wName });
+      ["Mint A", "Mint B"].forEach((m, k) => {
+        p.card({
+          x: colX[k],
+          y: rowY[r],
+          w: cw,
+          title: "Associated Token Account",
+          accent: r === 0 && k === 0,
+          rows: [
+            ["mint", m],
+            ["owner", wName],
+          ],
+        });
+      });
+    });
+    return [
+      W,
+      rowY[1] + ch + 24,
+      "Two wallets and two mints give four associated token accounts, one for each wallet and mint pair",
+    ];
+  },
+
+  "diagrams/assets-overview": (p) => {
+    // Wallet -> Token Program -> (Mint Account, Token Accounts). The
+    // program's two edges leave one mid-edge point and fork 24px out.
+    const mint = p.card({
+      x: 448,
+      y: 24,
+      w: 216,
+      title: "Mint Account",
+      desc: "Supply and authorities",
+    });
+    const accts = p.card({
+      x: 448,
+      y: mint.bottom + 32,
+      w: 216,
+      title: "Token Accounts",
+      desc: "Balances for this mint",
+      rows: [
+        ["Alice", "90"],
+        ["Bob", "10"],
+      ],
+    });
+    const mid = (mint.headY + accts.headY) / 2;
+    const prog = p.card({
+      x: 232,
+      y: mid - HEAD_DESC / 2,
+      w: 168,
+      title: "Token Program",
+      desc: "Applies the rules",
+      accent: true,
+    });
+    const wallet = p.card({
+      x: 24,
+      y: prog.y,
+      w: 160,
+      title: "Wallet or app",
+      desc: "Signs instructions",
+    });
+    p.edge(
+      [
+        [wallet.right, prog.cy],
+        [prog.x, prog.cy],
+      ],
+      { label: "signs" },
+    );
+    const fx = prog.right + 24;
+    p.edge([
+      [prog.right, prog.cy],
+      [fx, prog.cy],
+      [fx, mint.headY],
+      [mint.x, mint.headY],
+    ]);
+    p.edge([
+      [prog.right, prog.cy],
+      [fx, prog.cy],
+      [fx, accts.headY],
+      [accts.x, accts.headY],
+    ]);
+    return [
+      W,
+      accts.bottom + 24,
+      "The Token Program updates a mint and its token accounts while owners authorize balance changes",
+    ];
+  },
+
+  /* ------------------------------------------------------ payments */
+
+  "payments/payment-flow": (p) => {
+    const c = p.c;
+    // Balances as before / after columns (no glyph arrows). The transfer
+    // is the focus: both rows it touches, and the edge, carry the accent.
+    const ledger = (x, w, title, rows, focus) => {
+      const sub = 28;
+      const h = HEAD + sub + rows.length * ROW;
+      p.rect(x, 24, w, h);
+      p.text(x + 16, 24 + HEAD / 2, title, { size: 13, weight: 500 });
+      p.hline(x + 1, x + w - 1, 24 + HEAD);
+      const bx = x + w - 88,
+        ax = x + w - 16;
+      p.text(x + 16, 24 + HEAD + 14, "token account", { fill: c.ink3 });
+      p.text(bx, 24 + HEAD + 14, "before", { fill: c.ink3, anchor: "end" });
+      p.text(ax, 24 + HEAD + 14, "after", { fill: c.ink3, anchor: "end" });
+      const out = [];
+      rows.forEach(([label, before, after], i) => {
+        const ry = 24 + HEAD + sub + i * ROW;
+        if (i !== focus && i !== focus + 1) p.hline(x + 1, x + w - 1, ry);
+        p.text(x + 16, ry + ROW / 2, label, { fill: c.ink2 });
+        p.value(bx, ry + ROW / 2, before, {
+          anchor: "end",
+          fill: after == null ? c.ink : c.ink3,
+        });
+        if (after != null)
+          p.value(ax, ry + ROW / 2, after, {
+            anchor: "end",
+            fill: i === focus ? c.accent : c.ink,
+          });
+        out.push({ top: ry, y: ry + ROW / 2 });
+      });
+      const r = out[focus];
+      p.front.push(
+        `<rect x="${x + 0.625}" y="${r.top + 0.625}" width="${w - 1.25}" height="${ROW - 1.25}" rx="0" fill="none" stroke="${c.accent}" stroke-width="1.25"/>`,
+      );
+      return { x, right: x + w, bottom: 24 + h, rows: out };
+    };
+    const sender = ledger(
+      24,
+      296,
+      "Sender's wallet",
+      [
+        ["USDG", "100", "90"],
+        ["USDC", "50"],
+        ["PYUSD", "200"],
+      ],
+      0,
+    );
+    const recv = ledger(
+      392,
+      272,
+      "Receiver's wallet",
+      [["USDG", "45", "55"]],
+      0,
+    );
+    p.edge(
+      [
+        [sender.right, sender.rows[0].y],
+        [recv.x, sender.rows[0].y],
+      ],
+      { accent: true, label: "10 USDG" },
+    );
+    return [
+      W,
+      sender.bottom + 24,
+      "A stablecoin payment: 10 USDG moves from the sender's USDG token account to the receiver's",
+    ];
+  },
+};
+
+/* ------------------------------------------------------------ phones
+ * Portrait variants, <name>-sm{-light,}.svg, for the core figures: the
+ * same content restacked for a 336px drawing (the frame on a 390px phone),
+ * so labels stay at 12-13px instead of shrinking. styles/diagrams.css shows
+ * them below 640px, in place of the desktop drawing.
+ */
+const SW = 336; // phone drawing width
+const SX = 16; // phone margin
+const SC = SW - 2 * SX; // 304: full-width card
+const SH = (SC - 16) / 2; // 144: half-width card, 16px gutter
+const SX2 = SX + SH + 16; // second half column
+
+/** Owner above, account, data below; arrows point at what they name. */
+function ownedAccountSm(
+  p,
+  {
+    name,
+    owner,
+    executable,
+    lamports = "u64",
+    dataValue = "bytes",
+    data,
+    fields,
+    label,
+  },
+) {
+  const prog = p.card({ x: SX, y: 24, w: SC, title: owner });
+  const acct = p.card({
+    x: SX,
+    y: prog.bottom + 48,
+    w: SC,
+    title: name,
+    accent: true,
+    rows: [
+      ["owner", owner],
+      ["executable", executable],
+      ["lamports", lamports],
+      ["data", dataValue],
+    ],
+  });
+  p.edge(
+    [
+      [SX + 40, acct.y],
+      [SX + 40, prog.bottom],
+    ],
+    { label: "owner" },
+  );
+  let bottom = acct.bottom;
+  if (data) {
+    const d = p.card({
+      x: SX,
+      y: acct.bottom + 48,
+      w: SC,
+      title: data,
+      tag: "account data",
+      rows: fields,
+    });
+    p.edge(
+      [
+        [SX + 40, acct.bottom],
+        [SX + 40, d.y],
+      ],
+      { dashed: true, label: "data" },
+    );
+    bottom = d.bottom;
+  }
+  return [SW, bottom + 24, label];
+}
+
+/** Elbow from a parent's bottom edge (at x) into a child's top centre. */
+function forkSm(p, parent, x, child, o = {}) {
+  const band = (parent.bottom + child.y) / 2;
+  const pts =
+    Math.abs(x - child.cx) < 1
+      ? [
+          [x, parent.bottom],
+          [x, child.y],
+        ]
+      : [
+          [x, parent.bottom],
+          [x, band],
+          [child.cx, band],
+          [child.cx, child.y],
+        ];
+  p.edge(pts, { seg: pts.length > 2 ? 2 : 0, ...o });
+}
+
+/** A vertical chain of full-width cards joined by labelled edges. */
+function chainSm(p, items, label) {
+  let y = 24,
+    prev = null;
+  for (const it of items) {
+    const { edge, edgeAccent, dashed, ...card } = it;
+    const k = p.card({ x: SX, w: SC, ...card, y: prev ? y + 48 : y });
+    if (prev)
+      p.edge(
+        [
+          [SX + 40, prev.bottom],
+          [SX + 40, k.y],
+        ],
+        { label: edge, accent: edgeAccent, dashed },
+      );
+    prev = k;
+    y = k.bottom;
+  }
+  return [SW, y + 24, label];
+}
+
+const SM = {
+  "core/accounts/accounts@sm": (p) => {
+    const c = p.c;
+    const x = SX,
+      y = 24,
+      w = SC;
+    const rows = [
+      ["4Nd1m…Bm5a", "account"],
+      ["9WzDX…AWWM", "account"],
+      ["Gh9Zw…Pn2A", "account"],
+    ];
+    const RH = 36;
+    const h = HEAD + 28 + rows.length * RH;
+    const col = x + 152;
+    p.rect(x, y, w, h);
+    p.text(x + 16, y + HEAD / 2, "Accounts", { size: 13, weight: 500 });
+    p.text(x + w - 16, y + HEAD / 2, "key-value store", {
+      anchor: "end",
+      fill: c.ink3,
+    });
+    p.hline(x + 1, x + w - 1, y + HEAD);
+    p.text(x + 16, y + HEAD + 14, "address", { fill: c.ink2 });
+    p.text(col + 16, y + HEAD + 14, "value", { fill: c.ink2 });
+    const focus = rows.length - 1;
+    const fTop = y + HEAD + 28 + focus * RH;
+    rows.forEach(([k, v], i) => {
+      const ry = y + HEAD + 28 + i * RH;
+      if (i !== focus) p.hline(x + 1, x + w - 1, ry);
+      p.value(x + 16, ry + RH / 2, k, { fill: c.ink });
+      p.text(col + 16, ry + RH / 2, v, {
+        fill: i === focus ? c.accent : c.ink2,
+      });
+    });
+    p.vline(col, y + HEAD + 1, fTop);
+    p.vline(col, fTop + RH, y + h - 1);
+    p.front.push(
+      `<rect x="${x + 0.625}" y="${fTop + 0.625}" width="${w - 1.25}" height="${RH - 1.25}" rx="0" fill="none" stroke="${c.accent}" stroke-width="1.25"/>`,
+    );
+    const acct = p.card({
+      x,
+      y: y + h + 48,
+      w,
+      title: "Account",
+      tag: "struct",
+      rows: [
+        ["lamports", "u64"],
+        ["data", "Vec<u8>"],
+        ["owner", "Pubkey"],
+        ["executable", "bool"],
+        ["rent_epoch", "Epoch"],
+      ],
+    });
+    p.edge(
+      [
+        [col + 16 + 24, y + h],
+        [col + 16 + 24, acct.y],
+      ],
+      { accent: true },
+    );
+    return [
+      SW,
+      acct.bottom + 24,
+      "Accounts: a key-value store from address to account, and the fields of one account",
+    ];
+  },
+
+  "core/accounts/account-address@sm": (p) =>
+    chainSm(
+      p,
+      [
+        {
+          title: "Address",
+          tag: "public key, base58",
+          accent: true,
+          rows: [["address", "14grJpemFa…3YjhhZ5"]],
+        },
+        {
+          edge: "identifies",
+          title: "Account",
+          rows: [
+            ["lamports", "u64"],
+            ["data", "Vec<u8>"],
+            ["owner", "Pubkey"],
+            ["executable", "bool"],
+          ],
+        },
+      ],
+      "An account is found by its address: a 32-byte public key, written in base58",
+    ),
+
+  "core/accounts/system-account@sm": (p) =>
+    ownedAccountSm(p, {
+      name: "Wallet Account",
+      owner: "System Program",
+      executable: "false",
+      lamports: "1,000,000",
+      dataValue: "empty",
+      label:
+        "A wallet account: owned by the System Program, not executable, holding 1,000,000 lamports and no data",
+    }),
+
+  "core/accounts/program-account-simple@sm": (p) =>
+    ownedAccountSm(p, {
+      name: "Program",
+      owner: "BPF Loader",
+      executable: "true",
+      data: "Program code",
+      fields: [["format", "sBPF ELF"]],
+      label:
+        "A program account: owned by a loader, executable, with program code as its data",
+    }),
+
+  "core/tokens/token-program@sm": (p) =>
+    ownedAccountSm(p, {
+      name: "Token Program",
+      owner: "BPF Loader",
+      executable: "true",
+      data: "Program code",
+      fields: [["format", "sBPF ELF"]],
+      label:
+        "The Token Program account: owned by a loader, executable, with program code as its data",
+    }),
+
+  "core/tokens/mint-account@sm": (p) =>
+    ownedAccountSm(p, {
+      name: "Mint Account",
+      owner: "Token Program",
+      executable: "false",
+      data: "Mint data",
+      fields: [
+        ["supply", "u64"],
+        ["decimals", "u8"],
+        ["mint authority", "Pubkey?"],
+        ["freeze authority", "Pubkey?"],
+      ],
+      label:
+        "A mint account: owned by the Token Program, with supply, decimals and authorities as its data",
+    }),
+
+  "core/tokens/token-account@sm": (p) =>
+    ownedAccountSm(p, {
+      name: "Token Account",
+      owner: "Token Program",
+      executable: "false",
+      data: "Token account data",
+      fields: [
+        ["mint", "Pubkey"],
+        ["owner", "Pubkey"],
+        ["amount", "u64"],
+      ],
+      label:
+        "A token account: owned by the Token Program, with mint, owner and amount as its data",
+    }),
+
+  "core/accounts/data-account@sm": (p) => {
+    // Owner above, as in the other phone figures: loader, program, data.
+    const mk = (y, title, owner, exec, data, accent) =>
+      p.card({
+        x: SX,
+        y,
+        w: SC,
+        title,
+        accent,
+        rows: [
+          ["owner", owner],
+          ["executable", exec],
+          ["lamports", "u64"],
+          ["data", data],
+        ],
+      });
+    const loader = mk(24, "BPF Loader", "Native Loader", "true", "loader code");
+    const prog = mk(
+      loader.bottom + 48,
+      "Program",
+      "BPF Loader",
+      "true",
+      "program code",
+    );
+    const acct = mk(
+      prog.bottom + 48,
+      "Data Account",
+      "Program",
+      "false",
+      "program state",
+      true,
+    );
+    for (const [from, to] of [
+      [acct, prog],
+      [prog, loader],
+    ])
+      p.edge(
+        [
+          [SX + 40, from.y],
+          [SX + 40, to.bottom],
+        ],
+        { label: "owner" },
+      );
+    return [
+      SW,
+      acct.bottom + 24,
+      "A data account stores state; its owner field names the program that can change it, and that program is in turn owned by its loader",
+    ];
+  },
+
+  "core/accounts/program-account-expanded@sm": (p) =>
+    chainSm(
+      p,
+      [
+        {
+          title: "Program",
+          tag: "program account",
+          rows: [
+            ["owner", "Upgradeable Loader"],
+            ["executable", "true"],
+            ["lamports", "u64"],
+            ["data", "programdata address"],
+          ],
+        },
+        {
+          edge: "points to",
+          dashed: true,
+          title: "Program Data",
+          tag: "account",
+          accent: true,
+          rows: [
+            ["owner", "Upgradeable Loader"],
+            ["executable", "false"],
+            ["lamports", "u64"],
+            ["data", "program code"],
+          ],
+        },
+      ],
+      "An upgradeable program: the program account stores the address of a separate program data account, which holds the code",
+    ),
+
+  "core/transactions/transaction-simple@sm": (p) => {
+    const c = p.c;
+    const words = ["zero", "one", "two", "three"];
+    const w = 232;
+    const tx = (y, ins, accent) => {
+      const h = HEAD + ins.length * ROW;
+      p.rect(SX, y, w, h, accent ? { stroke: c.accent, sw: 1.25 } : {});
+      p.text(SX + 16, y + HEAD / 2, "Transaction", { size: 13, weight: 500 });
+      p.text(
+        SX + w - 16,
+        y + HEAD / 2,
+        `${words[ins.length]} instruction${ins.length > 1 ? "s" : ""}`,
+        {
+          anchor: "end",
+          fill: accent ? c.accent : c.ink3,
+        },
+      );
+      ins.forEach((s, i) => {
+        const iy = y + HEAD + i * ROW;
+        p.hline(SX + (accent ? 1.25 : 1), SX + w - (accent ? 1.25 : 1), iy);
+        p.text(SX + 16, iy + ROW / 2, String(i), { mono: true, fill: c.ink3 });
+        p.text(SX + 40, iy + ROW / 2, s, { fill: c.ink2 });
+      });
+      return { y, bottom: y + h };
+    };
+    const b1 = tx(24, ["Instruction"]);
+    const b2 = tx(
+      b1.bottom + 24,
+      ["Instruction", "Instruction", "Instruction"],
+      true,
+    );
+    const bx = SX + w + 12;
+    p.span({
+      x: bx,
+      y1: b2.y + HEAD + 4,
+      y2: b2.bottom - 4,
+      label: "",
+      accent: true,
+    });
+    p.text(bx + GAP, (b2.y + HEAD + b2.bottom) / 2 - 8, "all or", {
+      fill: c.accent,
+    });
+    p.text(bx + GAP, (b2.y + HEAD + b2.bottom) / 2 + 8, "none", {
+      fill: c.accent,
+    });
+    return [
+      SW,
+      b2.bottom + 24,
+      "Two transactions: one with a single instruction, one with three instructions that execute atomically",
+    ];
+  },
+
+  "core/transactions/tx_format@sm": (p) =>
+    chainSm(
+      p,
+      [
+        {
+          title: "Transaction",
+          tag: "struct",
+          rows: [
+            ["signatures", "Vec<Signature>"],
+            ["message", "Message"],
+          ],
+        },
+        {
+          edgeAccent: true,
+          title: "Message",
+          tag: "struct",
+          accent: true,
+          rows: [
+            ["header", "MessageHeader"],
+            ["account_keys", "Vec<Pubkey>"],
+            ["recent_blockhash", "Hash"],
+            ["instructions", "Vec<Instruction>"],
+          ],
+        },
+      ],
+      "A transaction has two parts: the signatures, and the message they sign",
+    ),
+
+  "core/transactions/issues_with_legacy_txs@sm": (p) => {
+    const c = p.c;
+    // The strip turned on its side: one row per field.
+    const x = SX + 24,
+      w = 200,
+      RH = 40;
+    const cells = [
+      ["signatures", "n × 64 bytes"],
+      ["header", "3 bytes"],
+      ["account keys", "n × 32 bytes"],
+      ["blockhash", "32 bytes"],
+      ["instructions", "the rest"],
+    ];
+    const top = 24;
+    p.rect(x, top, w, cells.length * RH);
+    cells.forEach(([t, sz], i) => {
+      const ry = top + i * RH;
+      if (i) p.hline(x + 1, x + w - 1, ry, { stroke: c.line });
+      p.text(x + 12, ry + RH / 2, t, { size: 13, weight: 500 });
+      p.value(x + w - 12, ry + RH / 2, sz, { anchor: "end", fill: c.ink2 });
+    });
+    const bottom = top + cells.length * RH;
+    const bx = x + w + 12;
+    p.span({ x: bx, y1: top + 4, y2: top + RH - 4, label: "Signatures" });
+    p.span({ x: bx, y1: top + RH + 4, y2: bottom - 4, label: "Message" });
+    // The limit: one vertical dimension line beside the whole strip.
+    p.edge(
+      [
+        [SX + 8, top + 1],
+        [SX + 8, bottom - 1],
+      ],
+      { accent: true, both: true },
+    );
+    p.text(SX, bottom + 24, "1,232 bytes in total, the size of one packet", {
+      fill: c.accent,
+    });
+    return [
+      SW,
+      bottom + 24 + 24,
+      "A legacy transaction, signatures and message together, must fit in one 1,232-byte packet",
+    ];
+  },
+
+  "core/transactions/message_header@sm": (p) => {
+    const hdr = p.card({
+      x: SX,
+      y: 24,
+      w: SC,
+      title: "MessageHeader",
+      tag: "3 bytes",
+      accent: true,
+      rows: [
+        ["num_required_signatures", "u8", { sub: "accounts that must sign" }],
+        [
+          "num_readonly_signed_accounts",
+          "u8",
+          { sub: "of those, accounts that are read-only" },
+        ],
+        [
+          "num_readonly_unsigned_accounts",
+          "u8",
+          { sub: "non-signers that are read-only" },
+        ],
+      ],
+    });
+    return [
+      SW,
+      hdr.bottom + 24,
+      "The message header: three one-byte counts that give each account in account_keys its permissions",
+    ];
+  },
+
+  "core/transactions/compat_array_of_account_addresses@sm": (p) => {
+    // Rows carry the header count that covers them as a second line; the
+    // focal count (signers) is the accent bracket.
+    const keys = p.card({
+      x: SX,
+      y: 24,
+      w: SC - 28,
+      title: "Account addresses",
+      tag: "in order",
+      rows: [
+        [
+          "signer, writable",
+          null,
+          { index: 1, sub: "num_required_signatures" },
+        ],
+        [
+          "signer, read-only",
+          null,
+          { index: 2, sub: "and num_readonly_signed_accounts" },
+        ],
+        ["non-signer, writable", null, { index: 3, sub: "neither count" }],
+        [
+          "non-signer, read-only",
+          null,
+          { index: 4, sub: "num_readonly_unsigned_accounts" },
+        ],
+      ],
+    });
+    const [r1, r2] = keys.rows;
+    p.span({
+      x: keys.right + 16,
+      y1: r1.top + 6,
+      y2: r2.bottom - 6,
+      label: "",
+      accent: true,
+    });
+    return [
+      SW,
+      keys.bottom + 24,
+      "Account addresses are ordered signer-writable, signer-read-only, non-signer-writable, non-signer-read-only; the header counts mark the boundaries",
+    ];
+  },
+
+  "core/transactions/compact_array_of_ixs@sm": (p) =>
+    chainSm(
+      p,
+      [
+        {
+          title: "Instructions",
+          tag: "compact array",
+          rows: [
+            ["length", "compact-u16"],
+            ["instruction", "CompiledInstruction", { index: 0 }],
+            ["instruction", "CompiledInstruction", { index: 1 }],
+            ["instruction", "CompiledInstruction", { index: 2 }],
+          ],
+        },
+        {
+          edgeAccent: true,
+          title: "CompiledInstruction",
+          accent: true,
+          rows: [
+            ["program_id_index", "u8"],
+            ["accounts", "Vec<u8>"],
+            ["data", "Vec<u8>"],
+          ],
+        },
+      ],
+      "The instructions field: a length, then each compiled instruction, which names its program and accounts by index into account_keys",
+    ),
+
+  "core/transactions/compact_array_format@sm": (p) => {
+    const s = p.strip({
+      x: SX,
+      y: 24,
+      cells: [
+        { w: 104, title: "length", sub: "compact-u16", accent: true },
+        { w: 72, title: "item 0" },
+        { w: 72, title: "item 1" },
+        { w: 56, title: "…", dim: true },
+      ],
+    });
+    return [
+      SW,
+      s.bottom + 24,
+      "A compact array: a compact-u16 length, then the items",
+    ];
+  },
+
+  "core/transactions/instruction@sm": (p) =>
+    chainSm(
+      p,
+      [
+        {
+          title: "Transaction",
+          rows: [
+            ["signatures", "Vec<Signature>"],
+            ["instruction", "Instruction"],
+          ],
+        },
+        {
+          edgeAccent: true,
+          title: "Instruction",
+          accent: true,
+          rows: [
+            ["program_id", "Pubkey", { sub: "program to call" }],
+            [
+              "accounts",
+              "Vec<AccountMeta>",
+              { sub: "accounts it reads and writes" },
+            ],
+            ["data", "Vec<u8>", { sub: "arguments" }],
+          ],
+        },
+      ],
+      "An instruction names the program to call, the accounts it uses and the data it passes",
+    ),
+
+  "core/transactions/accountmeta@sm": (p) => {
+    const tx = p.card({ x: SX, y: 24, w: SC, title: "Transaction" });
+    const ix = p.card({
+      x: SX,
+      y: tx.bottom + 48,
+      w: SC,
+      title: "Instruction",
+      rows: [
+        ["program_id", "Pubkey"],
+        ["accounts", "Vec<AccountMeta>"],
+        ["data", "Vec<u8>"],
+      ],
+    });
+    p.edge(
+      [
+        [SX + 40, tx.bottom],
+        [SX + 40, ix.y],
+      ],
+      { label: "has" },
+    );
+    const meta = (x, who, signer, accent) =>
+      p.card({
+        x,
+        y: ix.bottom + 56,
+        w: SH,
+        title: "AccountMeta",
+        desc: who,
+        accent,
+        rows: [
+          ["pubkey", "Pubkey"],
+          ["is_signer", signer],
+          ["is_writable", "true"],
+        ],
+      });
+    const a = meta(SX, "sender", "true", true);
+    const b = meta(SX2, "receiver", "false");
+    forkSm(p, ix, ix.cx, a);
+    forkSm(p, ix, ix.cx, b);
+    return [
+      SW,
+      a.bottom + 24,
+      "An instruction's accounts field is a list of AccountMeta: each names an account and whether it signs and is written",
+    ];
+  },
+
+  "core/transactions/sol-transfer@sm": (p) => {
+    const wallet = p.card({ x: SX, y: 24, w: SC, title: "Sender wallet" });
+    const tx = p.card({
+      x: SX,
+      y: wallet.bottom + 48,
+      w: SC,
+      title: "Transaction",
+      rows: [
+        ["signer", "Sender"],
+        ["instruction", "Transfer"],
+        ["blockhash", "Hash"],
+      ],
+    });
+    p.edge(
+      [
+        [SX + 40, wallet.bottom],
+        [SX + 40, tx.y],
+      ],
+      { label: "signs, sends" },
+    );
+    const ix = p.card({
+      x: SX,
+      y: tx.bottom + 48,
+      w: SC,
+      title: "Transfer",
+      tag: "instruction",
+      accent: true,
+      rows: [
+        ["program", "System Program"],
+        ["accounts", "2 AccountMeta", { code: false }],
+        ["data", "amount"],
+      ],
+    });
+    p.edge([
+      [SX + 40, tx.bottom],
+      [SX + 40, ix.y],
+    ]);
+    const meta = (x, who, signer) =>
+      p.card({
+        x,
+        y: ix.bottom + 56,
+        w: SH,
+        title: who,
+        rows: [
+          ["is_signer", signer],
+          ["is_writable", "true"],
+        ],
+      });
+    const a = meta(SX, "Sender", "true");
+    const b = meta(SX2, "Receiver", "false");
+    forkSm(p, ix, ix.cx, a);
+    forkSm(p, ix, ix.cx, b);
+    return [
+      SW,
+      a.bottom + 24,
+      "A SOL transfer: the sender signs a transaction whose transfer instruction lists the sender as a writable signer and the receiver as writable",
+    ];
+  },
+
+  "core/transactions/sol-transfer-process@sm": (p) => {
+    const tx = p.card({
+      x: SX,
+      y: 24,
+      w: SC,
+      title: "Transaction",
+      tag: "signed by the sender",
+      rows: [["instruction", "Transfer"]],
+    });
+    const sys = p.card({
+      x: SX,
+      y: tx.bottom + 48,
+      w: SC,
+      title: "System Program",
+      tag: "program",
+      accent: true,
+    });
+    p.edge(
+      [
+        [SX + 40, tx.bottom],
+        [SX + 40, sys.y],
+      ],
+      { label: "invokes" },
+    );
+    const acct = (x, name, change) =>
+      p.card({
+        x,
+        y: sys.bottom + 64,
+        w: SH,
+        title: name,
+        rows: [["lamports", change]],
+      });
+    const s = acct(SX, "Sender", "− amount");
+    const r = acct(SX2, "Receiver", "+ amount");
+    forkSm(p, sys, sys.cx, s, { label: "debits" });
+    forkSm(p, sys, sys.cx, r, { label: "credits" });
+    return [
+      SW,
+      s.bottom + 24,
+      "Processing a SOL transfer: the System Program debits the sender's lamports and credits the receiver's",
+    ];
+  },
+
+  "core/pda/pda@sm": (p) =>
+    chainSm(
+      p,
+      [
+        {
+          title: "Inputs",
+          desc: "seeds and a program ID",
+          rows: [
+            ["seeds", '"vault", user'],
+            ["program id", "Prog…1111"],
+          ],
+        },
+        {
+          title: "Derive",
+          desc: "findProgramAddress",
+          rows: [
+            ["bump", "255, 254, …"],
+            ["until", "off curve"],
+          ],
+        },
+        {
+          edgeAccent: true,
+          title: "PDA",
+          desc: "off the Ed25519 curve",
+          accent: true,
+          rows: [
+            ["address", "9fXw…k2Qe"],
+            ["bump", "254"],
+          ],
+        },
+        {
+          edge: "address of",
+          dashed: true,
+          title: "Account",
+          rows: [["owner", "the program"]],
+        },
+      ],
+      "A program derived address: seeds and a program ID go through findProgramAddress to produce an off-curve address and bump",
+    ),
+
+  "core/pda/pda-derivation@sm": (p) => {
+    const w = 208;
+    const a = p.card({
+      x: SX,
+      y: 24,
+      w,
+      title: "Start at bump 255",
+      desc: ["findProgramAddress(", "  seeds, programId)"],
+    });
+    const b = p.card({
+      x: SX,
+      y: a.bottom + 40,
+      w,
+      title: "Create a candidate",
+      desc: ["createProgramAddress(", "  seeds, bump,", "  programId)"],
+    });
+    const chk = p.card({
+      x: SX,
+      y: b.bottom + 40,
+      w: 184,
+      title: "Off the Ed25519 curve?",
+      dash: "4 4",
+    });
+    const ret = p.card({
+      x: SX,
+      y: chk.bottom + 40,
+      w,
+      title: "Return",
+      desc: "(pda, bump)",
+      accent: true,
+    });
+    const dec = p.card({
+      x: SW - SX - 88,
+      y: chk.y,
+      w: 88,
+      title: "Next",
+      desc: "bump − 1",
+    });
+    const vx = SX + 40;
+    p.edge([
+      [vx, a.bottom],
+      [vx, b.y],
+    ]);
+    p.edge([
+      [vx, b.bottom],
+      [vx, chk.y],
+    ]);
+    p.edge(
+      [
+        [vx, chk.bottom],
+        [vx, ret.y],
+      ],
+      { label: "yes", accent: true },
+    );
+    p.edge(
+      [
+        [chk.right, chk.headY],
+        [dec.x, chk.headY],
+      ],
+      { label: "no" },
+    );
+    p.edge(
+      [
+        [dec.cx, dec.y],
+        [dec.cx, b.headY],
+        [b.right, b.headY],
+      ],
+      { label: "again", seg: 0, side: "before" },
+    );
+    return [
+      SW,
+      ret.bottom + 24,
+      "Deriving a PDA: start at bump 255 and count down until the address falls off the Ed25519 curve, then return the address and bump",
+    ];
+  },
+
+  "core/pda/address-on-curve@sm": (p) => {
+    const at = ed25519(p, { x0: 32, y0: 32, x1: SW - 32, y1: 344 });
+    const card = (y, title, addr, bal) => {
+      const k = p.card({
+        x: SW - SX - 192,
+        y,
+        w: 192,
+        title,
+        tag: "on curve",
+        rows: [
+          ["address", addr],
+          ["balance", bal],
+        ],
+      });
+      const ty = k.rows[0].y;
+      let lo = 0,
+        hi = 1;
+      for (let i = 0; i < 40; i++) {
+        const mid = (lo + hi) / 2;
+        if (at(mid)[1] < ty) lo = mid;
+        else hi = mid;
+      }
+      const [px, py] = at(lo);
+      p.edge(
+        [
+          [px + 6, py],
+          [k.x, py],
+        ],
+        { head: false },
+      );
+      p.dot(px, py);
+      return k;
+    };
+    card(48, "Alice's wallet", "4Nd1…Bm5a", "15 SOL");
+    card(176, "Bob's wallet", "9WzD…AWWM", "27 SOL");
+    return [
+      SW,
+      376,
+      "Two wallet addresses: public keys that are points on the Ed25519 curve, each with a private key that can sign",
+    ];
+  },
+
+  "core/pda/address-off-curve@sm": (p) => {
+    // The program sits on the curve; seed and program ID feed the
+    // derivation below, which lands off it.
+    const at = ed25519(p, { x0: 32, y0: 32, x1: 184, y1: 160 });
+    const prog = p.card({
+      x: SW - SX - 208,
+      y: 56,
+      w: 208,
+      title: "Counter program",
+      rows: [["address", "Coun…1111"]],
+    });
+    let lo = 0,
+      hi = 1;
+    for (let k = 0; k < 40; k++) {
+      const mid = (lo + hi) / 2;
+      if (at(mid)[1] < prog.rows[0].y) lo = mid;
+      else hi = mid;
+    }
+    const [px, py] = at(lo);
+    p.dot(px, py);
+    p.edge(
+      [
+        [px + 6, prog.rows[0].y],
+        [prog.x, prog.rows[0].y],
+      ],
+      { head: false },
+    );
+    const seed = p.card({
+      x: SX,
+      y: 192,
+      w: SH,
+      title: "Seed",
+      rows: [["string", '"global"']],
+    });
+    const fn = p.card({
+      x: SX,
+      y: seed.bottom + 48,
+      w: SC,
+      title: "Derive",
+      desc: "findProgramAddress",
+    });
+    const pda = p.card({
+      x: SX,
+      y: fn.bottom + 48,
+      w: SC,
+      title: "PDA",
+      tag: "off curve",
+      accent: true,
+      rows: [
+        ["address", "7xKX…gAsU"],
+        ["count", "126"],
+      ],
+    });
+    p.edge(
+      [
+        [SX + 40, seed.bottom],
+        [SX + 40, fn.y],
+      ],
+      { label: "seed" },
+    );
+    const gx = SX2 + 40;
+    p.edge(
+      [
+        [gx, prog.bottom],
+        [gx, fn.y],
+      ],
+      { label: "program ID" },
+    );
+    p.edge(
+      [
+        [SX + 40, fn.bottom],
+        [SX + 40, pda.y],
+      ],
+      { label: "derives" },
+    );
+    return [
+      SW,
+      pda.bottom + 24,
+      "A PDA: derived from a seed and the program's address, it falls off the Ed25519 curve, so no private key exists for it",
+    ];
+  },
+
+  "core/cpi/cpi@sm": (p) =>
+    chainSm(
+      p,
+      [
+        { title: "Wallet", tag: "signer" },
+        {
+          edge: "signs, sends",
+          title: "Transaction",
+          rows: [["instruction", "Program A"]],
+        },
+        { edge: "invokes", title: "Program A", rows: [["stack height", "1"]] },
+        {
+          edge: "CPI",
+          edgeAccent: true,
+          title: "Program B",
+          accent: true,
+          rows: [["stack height", "2"]],
+        },
+      ],
+      "Cross-program invocation: a wallet signs a transaction whose instruction invokes Program A, which invokes Program B",
+    ),
+
+  "diagrams/core-concepts@sm": (p) => {
+    // Two columns, three rows; title-only cards; labelled edges.
+    const cw = 120,
+      ax = SX,
+      bx = SW - SX - cw,
+      ys = [24, 120, 216];
+    const k = (x, y, title, accent) => p.card({ x, y, w: cw, title, accent });
+    const tx = k(ax, ys[0], "Transactions");
+    const fees = k(bx, ys[0], "Fees");
+    const prog = k(ax, ys[1], "Programs", true);
+    const acc = k(bx, ys[1], "Accounts");
+    const pda = k(ax, ys[2], "PDAs");
+    const cpi = k(bx, ys[2], "CPIs");
+    p.edge(
+      [
+        [tx.right, tx.headY],
+        [fees.x, tx.headY],
+      ],
+      { label: "pay" },
+    );
+    p.edge(
+      [
+        [prog.right, prog.headY],
+        [acc.x, prog.headY],
+      ],
+      { both: true, label: "read, write" },
+    );
+    p.edge(
+      [
+        [ax + 24, tx.bottom],
+        [ax + 24, prog.y],
+      ],
+      { label: "call" },
+    );
+    p.edge(
+      [
+        [ax + 24, prog.bottom],
+        [ax + 24, pda.y],
+      ],
+      { label: "derive" },
+    );
+    const band = (prog.bottom + cpi.y) / 2;
+    p.edge(
+      [
+        [ax + cw - 24, prog.bottom],
+        [ax + cw - 24, band],
+        [cpi.cx, band],
+        [cpi.cx, cpi.y],
+      ],
+      { label: "invoke", seg: 2 },
+    );
+    return [
+      SW,
+      pda.bottom + 24,
+      "Core concepts: accounts store state, programs hold logic, transactions carry instructions that call programs and pay fees; programs derive PDAs and invoke other programs through CPIs",
+    ];
+  },
+
+  "core/fees/fees@sm": (p) => {
+    const c = p.c;
+    const col = (y, card, note) => {
+      const k = p.card({ x: SX, y, w: SC, ...card });
+      p.text(SX, k.bottom + 20, note, { fill: c.ink2 });
+      return k.bottom + 20;
+    };
+    let y = col(
+      24,
+      {
+        title: "Base fee",
+        tag: "required",
+        rows: [
+          ["per signature", "5,000 lamports"],
+          ["signatures", "one or more"],
+        ],
+      },
+      "Half burned, half to the validator.",
+    );
+    p.op(SW / 2, y + 28, "+");
+    y = col(
+      y + 56,
+      {
+        title: "Prioritization fee",
+        tag: "optional",
+        rows: [
+          ["CU price", "set by you"],
+          ["CU limit", "set by you"],
+        ],
+      },
+      "All of it to the validator.",
+    );
+    p.op(SW / 2, y + 28, "=");
+    y = col(
+      y + 56,
+      {
+        title: "Transaction fee",
+        accent: true,
+        rows: [
+          ["paid in", "SOL"],
+          ["paid by", "fee payer"],
+        ],
+      },
+      "Charged even if it fails.",
+    );
+    return [
+      SW,
+      y + 24,
+      "A transaction fee is the base fee of 5,000 lamports per signature plus an optional prioritization fee of compute unit price times compute unit limit",
+    ];
+  },
+
+  "core/tokens/token-account-relationship@sm": (p) => {
+    const sys = p.card({ x: SX, y: 24, w: SH, title: "System Program" });
+    const tok = p.card({ x: SX2, y: 24, w: SH, title: "Token Program" });
+    const wallet = p.card({ x: SX, y: 120, w: SH, title: "Wallet Account" });
+    const mint = p.card({ x: SX2, y: 120, w: SH, title: "Mint Account" });
+    const ta = p.card({
+      x: SX,
+      y: 232,
+      w: SC,
+      title: "Token Account",
+      accent: true,
+      rows: [
+        ["mint", "Mint Account"],
+        ["owner", "Wallet Account"],
+        ["amount", "u64"],
+      ],
+    });
+    p.edge(
+      [
+        [SX + 24, sys.bottom],
+        [SX + 24, wallet.y],
+      ],
+      { label: "owns" },
+    );
+    p.edge(
+      [
+        [SX2 + 24, tok.bottom],
+        [SX2 + 24, mint.y],
+      ],
+      { label: "owns" },
+    );
+    // Token Program -> Token Account through the gutter.
+    const gx = SX + SH + 8;
+    p.edge([
+      [tok.x, tok.headY],
+      [gx, tok.headY],
+      [gx, ta.y],
+    ]);
+    p.edge(
+      [
+        [SX + 96, ta.y],
+        [SX + 96, wallet.bottom],
+      ],
+      { dashed: true, label: "owner" },
+    );
+    p.edge(
+      [
+        [SX2 + 96, ta.y],
+        [SX2 + 96, mint.bottom],
+      ],
+      { dashed: true, label: "mint" },
+    );
+    return [
+      SW,
+      ta.bottom + 24,
+      "Account relationships: the System Program owns the wallet; the Token Program owns the token account and the mint; the token account's mint and owner fields point to the mint and the wallet",
+    ];
+  },
+
+  "core/tokens/associated-token-account@sm": (p) => {
+    const wallet = p.card({ x: SX, y: 24, w: SH, title: "Wallet Account" });
+    const mint = p.card({ x: SX2, y: 24, w: SH, title: "Mint Account" });
+    const fx = SX + 56,
+      fw = SC - 112;
+    const fn = p.card({
+      x: fx,
+      y: wallet.bottom + 48,
+      w: fw,
+      title: "Derive",
+      desc: "findProgramAddress",
+    });
+    const ata = p.card({
+      x: fx,
+      y: fn.bottom + 48,
+      w: fw,
+      title: "ATA",
+      tag: "associated",
+      accent: true,
+      rows: [
+        ["mint", "Mint Account"],
+        ["owner", "Wallet"],
+        ["amount", "u64"],
+      ],
+    });
+    p.edge(
+      [
+        [fx + 24, wallet.bottom],
+        [fx + 24, fn.y],
+      ],
+      { label: "seed" },
+    );
+    p.edge(
+      [
+        [fx + fw - 24, mint.bottom],
+        [fx + fw - 24, fn.y],
+      ],
+      { label: "seed", side: "before" },
+    );
+    p.edge(
+      [
+        [fn.cx, fn.bottom],
+        [fn.cx, ata.y],
+      ],
+      { accent: true, label: "address" },
+    );
+    p.edge(
+      [
+        [ata.x, ata.rows[1].y],
+        [SX + 24, ata.rows[1].y],
+        [SX + 24, wallet.bottom],
+      ],
+      { dashed: true },
+    );
+    p.edge(
+      [
+        [ata.right, ata.rows[0].y],
+        [SW - SX - 24, ata.rows[0].y],
+        [SW - SX - 24, mint.bottom],
+      ],
+      { dashed: true },
+    );
+    return [
+      SW,
+      ata.bottom + 24,
+      "Associated token account: its address is a PDA derived from the wallet and the mint; its mint and owner fields point back to them",
+    ];
+  },
+
+  "core/tokens/token-account-relationship-ata@sm": (p) => {
+    // One card per wallet and mint pair, in reading order.
+    let y = 24;
+    for (const [r, wName] of ["Wallet 1", "Wallet 2"].entries())
+      for (const [k, m] of ["Mint A", "Mint B"].entries()) {
+        const card = p.card({
+          x: SX,
+          y,
+          w: SC,
+          title: "Associated Token Account",
+          accent: r === 0 && k === 0,
+          rows: [
+            ["mint", m],
+            ["owner", wName],
+          ],
+        });
+        y = card.bottom + 16;
+      }
+    return [
+      SW,
+      y + 8,
+      "Two wallets and two mints give four associated token accounts, one for each wallet and mint pair",
+    ];
+  },
+
+  "diagrams/assets-overview@sm": (p) => {
+    const wallet = p.card({
+      x: SX,
+      y: 24,
+      w: SC,
+      title: "Wallet or app",
+      desc: "Signs instructions",
+    });
+    const prog = p.card({
+      x: SX,
+      y: wallet.bottom + 48,
+      w: SC,
+      title: "Token Program",
+      desc: "Applies the rules",
+      accent: true,
+    });
+    p.edge(
+      [
+        [SX + 40, wallet.bottom],
+        [SX + 40, prog.y],
+      ],
+      { label: "signs" },
+    );
+    const mint = p.card({
+      x: SX,
+      y: prog.bottom + 56,
+      w: SH,
+      title: "Mint Account",
+      desc: "Supply",
+    });
+    const accts = p.card({
+      x: SX2,
+      y: prog.bottom + 56,
+      w: SH,
+      title: "Token Accounts",
+      desc: "Balances",
+      rows: [
+        ["Alice", "90"],
+        ["Bob", "10"],
+      ],
+    });
+    forkSm(p, prog, prog.cx, mint);
+    forkSm(p, prog, prog.cx, accts);
+    return [
+      SW,
+      accts.bottom + 24,
+      "The Token Program updates a mint and its token accounts while owners authorize balance changes",
+    ];
+  },
+
+  "payments/payment-flow@sm": (p) => {
+    const c = p.c;
+    const ledger = (y, title, rows) => {
+      const x = SX,
+        w = SC,
+        sub = 28;
+      const h = HEAD + sub + rows.length * ROW;
+      p.rect(x, y, w, h);
+      p.text(x + 16, y + HEAD / 2, title, { size: 13, weight: 500 });
+      p.hline(x + 1, x + w - 1, y + HEAD);
+      const bx = x + w - 88,
+        ax = x + w - 16;
+      p.text(x + 16, y + HEAD + 14, "token account", { fill: c.ink3 });
+      p.text(bx, y + HEAD + 14, "before", { fill: c.ink3, anchor: "end" });
+      p.text(ax, y + HEAD + 14, "after", { fill: c.ink3, anchor: "end" });
+      rows.forEach(([label, before, after], i) => {
+        const ry = y + HEAD + sub + i * ROW;
+        if (i > 1) p.hline(x + 1, x + w - 1, ry);
+        p.text(x + 16, ry + ROW / 2, label, { fill: c.ink2 });
+        p.value(bx, ry + ROW / 2, before, {
+          anchor: "end",
+          fill: after == null ? c.ink : c.ink3,
+        });
+        if (after != null)
+          p.value(ax, ry + ROW / 2, after, {
+            anchor: "end",
+            fill: i === 0 ? c.accent : c.ink,
+          });
+      });
+      const top = y + HEAD + sub;
+      p.front.push(
+        `<rect x="${x + 0.625}" y="${top + 0.625}" width="${w - 1.25}" height="${ROW - 1.25}" rx="0" fill="none" stroke="${c.accent}" stroke-width="1.25"/>`,
+      );
+      return { y, bottom: y + h, rowBottom: top + ROW };
+    };
+    const s = ledger(24, "Sender's wallet", [
+      ["USDG", "100", "90"],
+      ["USDC", "50"],
+      ["PYUSD", "200"],
+    ]);
+    const r = ledger(s.bottom + 56, "Receiver's wallet", [
+      ["USDG", "45", "55"],
+    ]);
+    p.edge(
+      [
+        [SX + 40, s.bottom],
+        [SX + 40, r.y],
+      ],
+      { accent: true, label: "10 USDG" },
+    );
+    return [
+      SW,
+      r.bottom + 24,
+      "A stablecoin payment: 10 USDG moves from the sender's USDG token account to the receiver's",
+    ];
+  },
+};
+
+const only = (() => {
+  const i = process.argv.indexOf("--only");
+  return i > 0 ? new Set(process.argv[i + 1].split(",")) : null;
+})();
+const outRoot = (() => {
+  const i = process.argv.indexOf("--out");
+  return i > 0 ? path.resolve(process.argv[i + 1]) : root;
+})();
+
+let count = 0;
+const all = [
+  ...Object.entries(FIGURES),
+  ...Object.entries(SM).map(([k, v]) => [k.replace(/@sm$/, "-sm"), v]),
+];
+for (const [name, draw] of all) {
+  if (only && !only.has(name.replace(/-sm$/, ""))) continue;
+  for (const mode of ["light", "dark"]) {
+    const p = new Pen(mode);
+    const [w, h, label] = draw(p);
+    const file = path.join(
+      outRoot,
+      `${name}${mode === "light" ? "-light" : ""}.svg`,
+    );
+    mkdirSync(path.dirname(file), { recursive: true });
+    writeFileSync(file, p.svg(w, Math.round(h), label));
+    count++;
+  }
+}
+console.log(`draw-concepts: ${count} file(s) written`);

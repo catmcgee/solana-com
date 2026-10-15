@@ -32,8 +32,8 @@ deployed `*.mintlify.site` is listed under "Release gates" below.
 Rules for `apps/docs`:
 
 - Never add `.js`, `.jsx` or `.css` files except the owned globals
-  (`run-examples.js`, `styles/*.css`): Mintlify injects every one of them on
-  every page. `verify-urls` fails on strays.
+  (`run-examples.js`, `ask-ai.js`, `header.js`, `styles/*.css`): Mintlify
+  injects every one of them on every page. `verify-urls` fails on strays.
 - Never add `.md` notes (README, CLAUDE.md, AGENTS.md): they become pages.
   `.mintignore` is defence in depth only.
 - Folder paths are public URLs. Moving a file changes its URL and needs an
@@ -77,6 +77,7 @@ Package scripts (`pnpm --filter @workspace/docs-tooling <script>`):
 | `gen:surfpool [--check\|--sync --ref main]`                               | `src/generators/surfpool-rpc.ts`                                         |
 | `gen:paths`, `gen:concepts`, `gen:addresses` `[--sync] [--check]`         | `src/generators/{paths,concepts,addresses}.ts`                           |
 | `gen:tags [--check]`                                                      | `src/generators/tags.ts`                                                 |
+| `gen:header [--check]`                                                    | `src/header-bundle/build.ts` (solana.com header bundle, see Top bar)     |
 | `gen:manifest`, `gen:llms`, `gen:redirects` `[--check]`                   | `src/manifest/cli.ts`                                                    |
 | `generate` / `generate:check`                                             | every generator, in dependency order                                     |
 | `collections:remove-tools-ai [--dry-run]`                                 | `src/collections/remove-tools-ai.ts`                                     |
@@ -230,9 +231,62 @@ Theme rules:
 - **Colors.** Light mode links use `#7A2FE0` (6.3:1 on white). Dark mode links
   use `#B78AFF` (8.1:1 on black). The dark page background is `#000`, like
   solana.com.
-- **Top bar.** The top row of `#navbar` is ink (`#0a0a0b`) in both modes; the
-  tab row follows the page mode. In light mode the navbar logo is swapped to the
-  white wordmark by CSS. The footer keeps `logo.light` (black wordmark).
+- **Top bar.** The header is the real solana.com component, not a copy:
+  `apps/docs/header.js` is an esbuild bundle of the unmodified
+  `packages/ui-chrome` `Header` (header.tsx and everything it imports, SVGs
+  through SVGR with apps/web's options) plus React 19, ReactDOM and next-intl,
+  rendered as apps/web renders it (`NextIntlClientProvider` > `ThemeProvider` >
+  `<Header showDevelopersNav={false} />`) into `#sol-hdr`, the first child of
+  `<body>`. `styles/header.css` is apps/web's Tailwind 3 (its
+  `tailwind.config.js`, preflight included) over the bundled ui-chrome files,
+  every rule scoped to `#sol-hdr` and keyframes renamed `sol-hdr-*`, plus
+  apps/web's `src/scss` element rules, its `:root` variables and the dark
+  `data-dev-landing` header rule (opaque `#0a0a0b`). Both files are generated in
+  full by `gen:header` (`src/header-bundle/build.ts`): never edit them; change
+  ui-chrome, the web messages or the integration files and rerun it.
+  `gen:header --check` (part of `generate:check` and `verify`) rebuilds in
+  memory and fails when either file differs, so a stale bundle is caught
+  whenever ui-chrome, `packages/i18n/messages/web/<locale>/common.json`,
+  apps/web's Tailwind/SCSS/globals, a bundled dependency or
+  `src/header-bundle/**` changes. The banner of both files carries a hash of
+  every input, so edits that minify away (comments) are caught too.
+  `test/header-bundle.test.ts` edits sources in memory (`runHeader`'s
+  `overrides`, never on disk) to lock this in.
+  - Cost: `header.js` is about 580 KB raw, 165 KB gzipped, on every docs page
+    (the old hand-built header was about 48 KB gzipped). That is React,
+    ReactDOM, next-intl, Radix and ui-chrome's Inkeep config, the price of
+    shipping the real component.
+  - Bundle-only pieces, all in `src/header-bundle/runtime/`: shims for
+    `next/link` (plain `<a>`), `next/navigation` (hooks read `window.location`;
+    history changes are observed), `next/compat/router` (null) and
+    `next/dynamic` (renders nothing: the Inkeep modal is never loaded,
+    `@inkeep/cxkit-react` is external); a `@radix-ui/react-portal` wrapper so
+    the language menu and the mobile sheet portal into `#sol-hdr-portals`
+    (inside the CSS scope) instead of `<body>`; and `adapter.js`, the Mintlify
+    integration: the search button opens Mintlify's search; language items
+    switch through Mintlify's language menu (`MINTLIFY_LANGUAGE_CODE`, URL
+    fallback `/<locale>/<path>`); the theme toggle's change is passed to
+    Mintlify's theme menu and Mintlify stays the owner of the page theme
+    (ThemeProvider's own writes, e.g. the forced dark on `/learn/<slug>`, are
+    undone); links to solana.com pages open `https://solana.com<path>` when the
+    host is not solana.com. `entry.jsx` renames the bar's `id="navbar"`
+    (Mintlify's header id) to `data-sol-navbar`, the only DOM change to the
+    component's output. This is a DOM edit after React commits (React never
+    re-applies an unchanged `id`); a MutationObserver on `#sol-hdr` renames any
+    `nav#navbar` React creates later. Another observer on `<body>`'s direct
+    children (and on `<html>`, in case `<body>` is replaced) puts `#sol-hdr`
+    back if Mintlify removes it. Greek (`el`, not a docs language) is hidden in
+    the language menu by CSS.
+  - Messages: `loadMergedMessages({ app: "web", locale })` for the 18 docs
+    locales (English merged under each, as on solana.com), pruned at build time
+    to the keys named by string literals in the bundled ui-chrome files.
+  - Light mode: ui-chrome's header is dark-only (only its language menu has
+    `light:` variants, which apply), so the bar stays dark in both modes. The
+    white light-mode bar on solana.com/developers is apps/web page CSS
+    (`html.light:has([data-dev-landing])`) and is not used.
+  - Without JS nothing mounts and Mintlify's header (logo and the five
+    `navbar.links`) is the header. The tab row and the Ask AI pill are
+    Mintlify's/`ask-ai.js`, unchanged.
 - **Tab divider and external tab.** The divider after tab 4 (Markets) and
   pushing any `http` tab to the far end are done in CSS. External tabs need an
   absolute `href`. Mintlify renders a relative tab `href` as `/`.
@@ -483,6 +537,21 @@ solana.com) before cutover. `mint dev` cannot answer them:
   run `pnpm --filter @workspace/docs-tooling examples:build`, then
   `import X from "/snippets/examples/<id>.mdx"` and `<X />`. The old
   `file=...#region=` fence syntax is gone.
+- **Terminal panels (job paths).** A recorded output with a `<stem>.run.json`
+  next to its `<stem>.output.txt` renders as a terminal panel
+  (`src/lib/terminal.ts`, styles `apps/docs/styles/demo.css`, behaviour
+  `apps/docs/run-examples.js`) instead of the plain Run block. `run.json`:
+  `{ "title"?, "pending"?: "tx"|"http"|"call", "commands": [{ "at": <output line>, "cmd": "await payStore(customer, order)", "prompt"?: "$" }], "badges": [{ "tone": "ok"|"error"|"warn"|"info", "label": "Confirmed" }] }`.
+  Commands show the call the page teaches (`payStore(...)`, `fetch(...)` with
+  `X-PAYMENT`, a real shell command), never the recording harness's `demo*`
+  helpers, which no page shows; badges summarize what the output shows (decoded
+  errors such as `Failed: Account is frozen (Custom: 17)`, HTTP status). Never
+  edit the output text itself. The whole output is in the server HTML (wrapping,
+  full base58 values); with JS the screen starts at the prompt and Run streams
+  the lines back in, values shorten to `F6ks…JeUg` (full value in `title`, click
+  to copy). Panels show the environment as "Local test network (Surfpool)"; do
+  not label them as a replay or a recorded run, and never claim the code runs in
+  the reader's browser or on a live network.
 - **Collections (WP7).** Bootcamp lessons carry `{/* bootcamp:video */}`; delete
   that block to re-inject after a curriculum video change. Learn order is
   `LEARN_ORDER` in `transforms/learn.ts`. `docs/tools/ai` stays in the Hidden
@@ -522,17 +591,17 @@ the text then exists only in the client payload. Raw `<nav>`, `<details>`,
 `<noscript>` and `<abbr>` are dropped too. Tooltip `tip`/`headline`/`cta`/`href`
 are client-only.
 
-| Want                                     | Write                                                                                                                                                                                                                                                                                                    |
-| ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Concept card                             | `import Accounts from "/snippets/concepts/en/account.mdx"` then `<Accounts />`                                                                                                                                                                                                                           |
-| "In short" on a concept's canonical page | `## In short`, then `<Short />` from `…/<key>.short.mdx`, then `<UsedIn />` from `…/<key>.used-in.mdx`                                                                                                                                                                                                   |
-| Inline concept chip                      | `<span className="sol-chip" data-concept="account">accounts</span>`, then run `gen:concepts --sync`. Sync expands it into a Tooltip plus a `nojs-only` "(Accounts: …)" fallback that contains a real link. The spec form `<Tooltip data-concept="account">accounts</Tooltip>` is accepted and converted. |
-| Coverage table (How Solana works root)   | `import Coverage from "/snippets/concepts/en/coverage.mdx"`                                                                                                                                                                                                                                              |
-| Path stepper                             | `/snippets/paths/en/<path>/stepper-<n>.mdx`: n = 0 on the path intro page, n = step number on step pages                                                                                                                                                                                                 |
-| Next-step card                           | `/snippets/paths/en/<path>/next-<n>.mdx`: n = 0 on the intro page, n = step number on step pages. The last step has one only if `after` is set.                                                                                                                                                          |
-| Path card (job picker, hubs)             | `/snippets/paths/en/<path>/card.mdx`                                                                                                                                                                                                                                                                     |
-| Demo (step 1 pages)                      | `/snippets/paths/en/<path>/demo.mdx`. The static Steps with the recorded Surfpool output are the content. The `snippets/demos/*-demo.jsx` replay above them renders only with JS. A demo with no recorded output gets no replay.                                                                         |
-| Address mention                          | ``<span className="sol-address" data-address="EPjF…Dt1v">`EPjF…Dt1v`</span>``, then run `gen:addresses --sync`. The address must be in `addresses.json`. Never inside code or recorded output. `--report` lists unmarked prose mentions.                                                                 |
+| Want                                     | Write                                                                                                                                                                                                                                                                                                      |
+| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Concept card                             | `import Accounts from "/snippets/concepts/en/account.mdx"` then `<Accounts />`                                                                                                                                                                                                                             |
+| "In short" on a concept's canonical page | `## In short`, then `<Short />` from `…/<key>.short.mdx`, then `<UsedIn />` from `…/<key>.used-in.mdx`                                                                                                                                                                                                     |
+| Inline concept chip                      | `<span className="sol-chip" data-concept="account">accounts</span>`, then run `gen:concepts --sync`. Sync expands it into a Tooltip plus a `nojs-only` "(Accounts: …)" fallback that contains a real link. The spec form `<Tooltip data-concept="account">accounts</Tooltip>` is accepted and converted.   |
+| Coverage table (How Solana works root)   | `import Coverage from "/snippets/concepts/en/coverage.mdx"`                                                                                                                                                                                                                                                |
+| Path stepper                             | `/snippets/paths/en/<path>/stepper-<n>.mdx`: n = 0 on the path intro page, n = step number on step pages                                                                                                                                                                                                   |
+| Next-step card                           | `/snippets/paths/en/<path>/next-<n>.mdx`: n = 0 on the intro page, n = step number on step pages. The last step has one only if `after` is set.                                                                                                                                                            |
+| Path card (job picker, hubs)             | `/snippets/paths/en/<path>/card.mdx`                                                                                                                                                                                                                                                                       |
+| Demo (step 1 pages)                      | `/snippets/paths/en/<path>/demo.mdx`: one server-rendered terminal panel (stage, numbered steps, every step's output with the prompts and badges from its `run.json`). Without JS it reads in full; with JS it runs step by step (Next step / Run all). A demo with a missing output gets no Run controls. |
+| Address mention                          | ``<span className="sol-address" data-address="EPjF…Dt1v">`EPjF…Dt1v`</span>``, then run `gen:addresses --sync`. The address must be in `addresses.json`. Never inside code or recorded output. `--report` lists unmarked prose mentions.                                                                   |
 
 Avoid chips and address mentions inside GFM tables: syncing re-pads the whole
 table (codec behaviour), so the diff is not local. The generators warn when they
@@ -724,25 +793,66 @@ Advanced code blocks with:
 ##### Mermaid Diagrams
 
 Flowcharts and sequence diagrams rendered from markdown. In the Mintlify project
-each fence is pre-rendered to a themed SVG pair (Solana palette, both modes,
+each fence is pre-rendered to a themed SVG pair (diagram system, both modes,
 readable without JS): after adding or editing a fence run
 `pnpm --filter @workspace/docs-tooling convert`, then
 `npx tsx scripts/render-mermaid.ts` and `python3 scripts/embed-diagram-fonts.py`
 (needs `pip install fonttools brotli`). `render-mermaid.ts --check` fails on
 missing or orphaned figures.
 
+Mermaid follows the diagram system below: orthogonal edges with 8px rounded
+corners, open-chevron heads, node labels as a 13px/500 title line plus muted
+12px description lines (write `Title<br/>description`; add your own `<br/>`
+breaks to keep lines short and avoid one-word orphans), and figures sit
+frameless in the column. There is **no default accent**: mark the one focal node
+with `class X focal` (flowcharts; the renderer adds the `focal` classDef). Alt
+text comes from the fence's `title=`, the caption that follows it, or
+`accTitle:` / `accDescr:` lines in the fence (write them), and falls back to
+"<heading> diagram".
+
 ##### Diagrams (SVG)
 
 Diagrams are SVG light/dark pairs (`name-light.svg` + `name.svg`) shown with
 `<img className="block dark:hidden">` / `<img className="hidden dark:block">`.
-Use the docs palette (zinc neutrals, Solana purple `#9945ff`/`#7c3aed`, green
-`#0a8f5a`/`#14f195`, teal `#19d3c5`, 1.5px strokes, 8-10px corners);
-`scripts/sync-diagram-themes.mjs` restyles the generated core diagrams and
-derives their dark pairs. Labels must be SVG `<text>` in Diatype; run
-`scripts/embed-diagram-fonts.py` so they render in Diatype inside `<img>`.
-Linear flows on hub and path pages are HTML
-(`<ol className="sol-flow not-prose">` with
-`<li><b>Step</b><span>caption</span></li>`), not images.
+They follow one illustration system: zinc neutrals with ONE accent (the theme
+link purple, `#7a2fe0` light / `#b78aff` dark) on the focal element only; no
+pastel fills, gradients, shadows or glows; 1px box strokes and 1.25px
+connectors; 8px corners; one open-chevron arrowhead; left-aligned Diatype
+13px/500 titles and 12px labels; transparent canvas; solid connector = acts on /
+owns, dashed = refers to / derives. One type rule (`draw-concepts.mjs` and
+`render-mermaid.ts` both apply it): titles and field labels are names and are
+always Diatype, even when the name is an identifier (`MessageHeader`,
+`num_required_signatures`); values, header tags and description lines follow
+`isCode`: code (`u64`, `Pubkey`, `true`, `5,000`, `"seed"`, `9fXw…k2Qe`,
+`findProgramAddress`, `(pda, bump)`) in Favorit Mono 12px, words (System
+Program, fee payer, one or more) in Diatype 12px. Mermaid node and message text
+sets identifiers (`CreateDvp`, `mint_a`, `PAYMENT-SIGNATURE`) in mono within the
+line. No glyph arrows (→) inside figures: draw the connector or use before/after
+columns. Write numbers that start a phrase as words ("one instruction"). Edge
+labels have one placement: beside the line, 8px off it (above a horizontal
+segment, after a vertical one), never knocked out on it. Don't repeat the Frame
+caption inside the figure. On phones (<640px) the core figures switch to a
+portrait drawing (`<name>-sm-light.svg` / `<name>-sm.svg`, same Frame, listed
+after the desktop pair; `draw-concepts.mjs` draws it, `styles/diagrams.css`
+picks it); other diagram images keep a 560px minimum width and scroll sideways
+with a fading edge. Left-to-right mermaid flowcharts get a top-to-bottom phone
+drawing the same way (`<hash>-sm*.svg`, written by the mermaid transform and
+`render-mermaid.ts`). In sequence diagrams, `%% focal: <message>` marks the one
+message drawn in the accent; flowcharts use `class X focal`. The core-concept
+and token figures are hand-laid-out in `scripts/draw-concepts.mjs` (root
+`data-sol-drawn="hand"`, skipped by the passes below). Pipeline, in order:
+`draw-concepts.mjs` / `draw-diagrams.mjs`, `sync-diagram-themes.mjs` (generated
+core/hub diagrams and their dark pairs), `brand-diagrams.mjs` (folds every other
+colour into the system; `--check`), then `embed-diagram-fonts.py` (`--check`).
+Labels must be SVG `<text>` in Diatype so they render in Diatype inside `<img>`.
+The script passes never spread the accent: `brand-diagrams.mjs` keeps it on one
+shape per file (`FOCAL`, default the first) and turns filled triangle heads into
+open chevrons. Mermaid uses the same system (`render-mermaid.ts`; see above).
+Linear flows on hub and path pages are HTML, not images:
+`<ol className="sol-flow not-prose">` with
+`<li><b>Step</b><span>caption</span></li>` draws a numbered step rail
+(horizontal from 640px, vertical below). The last step's badge carries the
+accent; put `data-accent` on one `<li>` to move it.
 
 ##### AI Chat (Vercel AI SDK)
 

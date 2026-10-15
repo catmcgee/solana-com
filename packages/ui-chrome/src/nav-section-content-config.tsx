@@ -158,6 +158,14 @@ export const buildJobItems: NavItemDefinition[] = [
 
 export const buildStartItems: NavItemDefinition[] = [
   {
+    id: "build-hub",
+    titleKey: "nav.build.start.items.hub.title",
+    descriptionKey: "nav.build.start.items.hub.description",
+    href: "/developers",
+    icon: SchoolIcon,
+    variant: "large",
+  },
+  {
     id: "build-docs",
     titleKey: "nav.build.start.items.docs.title",
     descriptionKey: "nav.build.start.items.docs.description",
@@ -166,43 +174,41 @@ export const buildStartItems: NavItemDefinition[] = [
     variant: "large",
   },
   {
-    id: "build-quickstart",
-    titleKey: "nav.build.start.items.quickstart.title",
-    descriptionKey: "nav.build.start.items.quickstart.description",
-    href: "/docs/intro/quick-start",
-    icon: HandIcon,
+    id: "build-agents",
+    titleKey: "nav.build.start.items.agents.title",
+    descriptionKey: "nav.build.start.items.agents.description",
+    href: "/docs/intro/coding-with-agents",
+    icon: RootingIcon,
     variant: "large",
   },
   {
-    id: "build-installation",
-    titleKey: "nav.build.start.items.installation.title",
-    descriptionKey: "nav.build.start.items.installation.description",
-    href: "/docs/intro/installation",
-    icon: MaintenanceIcon,
-    variant: "large",
-  },
-  {
-    id: "build-hub",
-    titleKey: "nav.build.start.items.hub.title",
-    descriptionKey: "nav.build.start.items.hub.description",
-    href: "/developers",
-    icon: SchoolIcon,
+    id: "build-ethereum",
+    titleKey: "nav.build.start.items.ethereum.title",
+    descriptionKey: "nav.build.start.items.ethereum.description",
+    href: "/developers/migrate-to-solana",
+    icon: EthereumIcon,
     variant: "large",
   },
 ];
 
 export const buildResourceItems: NavItemDefinition[] = [
   {
+    id: "build-rpc-docs",
+    titleKey: "nav.build.resources.items.rpcDocs.title",
+    href: "/docs/rpc",
+    icon: ApiConnectionBuildIcon,
+  },
+  {
+    id: "build-tools",
+    titleKey: "nav.build.resources.items.tools.title",
+    href: "/docs/tools",
+    icon: MaintenanceIcon,
+  },
+  {
     id: "build-cookbook",
     titleKey: "nav.build.resources.items.cookbook.title",
     href: "/developers/cookbook",
-    icon: NewspaperIcon,
-  },
-  {
-    id: "build-chain-migration",
-    titleKey: "nav.developers.tutorials.chain-migration",
-    href: "/developers/migrate-to-solana",
-    icon: EthereumIcon,
+    icon: HandIcon,
   },
   {
     id: "build-templates",
@@ -211,55 +217,16 @@ export const buildResourceItems: NavItemDefinition[] = [
     icon: TemplatesIcon,
   },
   {
-    id: "build-data",
-    titleKey: "nav.build.resources.items.data.title",
-    href: "/data",
-    icon: PulseIcon,
-  },
-  {
-    id: "build-rpc-docs",
-    titleKey: "nav.build.resources.items.rpcDocs.title",
-    href: "/docs/rpc",
-    icon: ApiConnectionBuildIcon,
-  },
-  {
     id: "build-rpc-providers",
     titleKey: "nav.build.resources.items.rpcProviders.title",
     href: "/rpc",
     icon: ApiConnectionNetworkIcon,
   },
   {
-    id: "build-finance-docs",
-    titleKey: "nav.build.resources.items.financeDocs.title",
-    href: "/docs/finance",
-    icon: MoneyIcon,
-  },
-];
-
-export const buildUseCaseItems: NavItemDefinition[] = [
-  {
-    id: "build-payments",
-    titleKey: "nav.build.useCases.items.payments.title",
-    href: "/developers/payments",
-    icon: MoneyIcon,
-  },
-  {
-    id: "build-defi",
-    titleKey: "nav.build.useCases.items.defi.title",
-    href: "/developers/defi",
-    icon: TradingViewIcon,
-  },
-  {
-    id: "build-gaming",
-    titleKey: "nav.build.useCases.items.gaming.title",
-    href: "/developers/gaming",
-    icon: GlobusIcon,
-  },
-  {
-    id: "build-ai",
-    titleKey: "nav.build.useCases.items.ai.title",
-    href: "/solutions/ai",
-    icon: RootingIcon,
+    id: "build-data",
+    titleKey: "nav.build.resources.items.data.title",
+    href: "/data",
+    icon: PulseIcon,
   },
 ];
 

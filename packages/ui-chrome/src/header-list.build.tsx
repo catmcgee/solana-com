@@ -14,7 +14,6 @@ import {
   buildJobItems,
   buildResourceItems,
   buildStartItems,
-  buildUseCaseItems,
 } from "./nav-section-content-config";
 
 const HeaderListBuild = () => {
@@ -34,9 +33,6 @@ const HeaderListBuild = () => {
       <NavDropdownColumn>
         <NavGroup title={t("nav.build.resources.title")}>
           <NavItemsList items={buildResourceItems} />
-        </NavGroup>
-        <NavGroup title={t("nav.build.useCases.title")} className="mt-4">
-          <NavItemsList items={buildUseCaseItems} />
         </NavGroup>
       </NavDropdownColumn>
     </HeaderDropdownLayout>

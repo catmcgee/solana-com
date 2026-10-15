@@ -73,8 +73,6 @@ beforeEach(() => {
     path.join(root, "addresses.json"),
     readFileSync(path.join(realDocsRoot, "addresses.json")),
   );
-  for (const k of ["checkout", "paywall", "asset"])
-    write(`snippets/demos/${k}-demo.jsx`, "export const X = () => null;\n");
   write("docs/payments/checkout/try-it.mdx", TRY_IT);
   write("docs/core/accounts/index.mdx", page("Accounts", "Accounts."));
   write("ja/docs/core/accounts/index.mdx", page("Accounts", "Konten."));
@@ -88,6 +86,14 @@ beforeEach(() => {
   write(
     "paths/payments/checkout/pay.output.txt",
     "Signature: 5h3f {x} <y> ```\nok\n",
+    outputs,
+  );
+  write(
+    "paths/payments/checkout/pay.run.json",
+    JSON.stringify({
+      commands: [{ at: 0, cmd: "await payStore(customer, order)" }],
+      badges: [{ tone: "ok", label: "Confirmed" }],
+    }),
     outputs,
   );
   write(
@@ -245,12 +251,9 @@ describe("generated snippets", () => {
         ),
       ).toBe(true);
       const body = full.replace(/^\{\/\*.*\*\/\}\n/, "");
-      // Only the client-only demo component may take expression props.
-      const withoutDemo = body.replace(
-        /^<(Checkout|Paywall|Asset)Demo .*\/>$/m,
-        "",
-      );
-      expect(withoutDemo, f).not.toMatch(/\{["[{]/);
+      // Inline code (recorded JSON in demo panels) is literal text.
+      const withoutCode = body.replace(/`[^`\n]*`/g, "");
+      expect(withoutCode, f).not.toMatch(/\{["[{]/);
     }
   });
 
@@ -328,23 +331,32 @@ describe("generated snippets", () => {
     );
   });
 
-  it("demo: recorded output inlined for the replay and printed statically", () => {
+  it("demo: one server-rendered terminal panel with every recorded line", () => {
     const r = all();
     const demo = read("snippets/paths/en/checkout/demo.mdx");
+    expect(demo).not.toContain("import ");
     expect(demo).toContain(
-      'import { CheckoutDemo } from "/snippets/demos/checkout-demo.jsx";',
+      '<div className="sol-term not-prose" data-term="paths/checkout/demo" data-kind="checkout" data-steps="2"',
     );
-    expect(demo).toContain('"output":"Signature: 5h3f {x} <y> ```\\nok"');
-    // Static fence must outlive the backticks in the output.
-    expect(demo).toContain("````text\nSignature: 5h3f {x} <y> ```\nok\n````");
-    expect(demo).toContain("<Check>Paid.");
-    expect(demo).not.toContain("<details");
-    // No recordings for the other paths: static steps only, no replay, warned.
+    // Recorded text is escaped (MDX/markdown), quotes go into inline code.
+    expect(demo).toContain(
+      '<div className="sol-term-row sol-term-ln"><span className="sol-term-k">Signature\\:</span> ```` 5h3f {x} <y> ``` ````</div>',
+    );
+    // Prompt and badges from pay.run.json.
+    expect(demo).toContain("\\></span> await payStore(customer, order)</div>");
+    expect(demo).toContain(
+      '<span className="sol-term-badge" data-tone="ok">Confirmed</span>',
+    );
+    expect(demo).toContain('<div className="sol-term-success">');
+    expect(demo).not.toMatch(
+      /<details|<noscript|Replay|replay|\(ok\)|\(blocked\)/,
+    );
+    // No recordings for the other paths: no Run controls, warned.
     const paywall = read("snippets/paths/en/paywall-api/demo.mdx");
-    expect(paywall).not.toContain("PaywallDemo");
     expect(paywall).toContain(
-      '<Step title="Call the API without paying (402)">',
+      '<div data-norun="" className="sol-term not-prose"',
     );
+    expect(paywall).toContain("Call the API without paying</strong>");
     expect(
       r.paths.problems.some(
         (p) => p.level === "warn" && p.message.includes("client.output.txt"),

@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 /**
- * Draws the diagrams that used to be pastel PNGs (transaction format,
- * message header, compact arrays, legacy limits, payment flow, Actions
- * lifecycle, SWQoS peering) as light/dark SVG pairs in the docs palette:
+ * Draws the diagrams that used to be pastel PNGs (Actions lifecycle, SWQoS
+ * peering; the transaction-format and payment figures are in
+ * draw-concepts.mjs) as light/dark SVG pairs in the docs palette:
  * 688px wide (the content column, so 13px labels are 13px on the page),
- * 1.5px strokes, 8px corners, purple / teal / green accents on zinc.
+ * 1.25px strokes, 8px corners, one purple accent on zinc.
  *
  *   node packages/docs-tooling/scripts/draw-diagrams.mjs
  *   python3 packages/docs-tooling/scripts/embed-diagram-fonts.py
@@ -28,12 +28,14 @@ const P = {
     line: "#71717a",
     nFill: "#fafafa",
     nStroke: "#d4d4d8",
-    purple: "#7c3aed",
-    purpleFill: "#f3edff",
-    teal: "#0f9e94",
-    tealFill: "#e6f8f6",
-    green: "#0a8f5a",
-    greenFill: "#e3fbef",
+    // One accent; the former teal/green roles are neutral zinc
+    // (brand-diagrams.mjs folds any leftovers the same way).
+    purple: "#7a2fe0",
+    purpleFill: "#fafafa",
+    teal: "#71717a",
+    tealFill: "#fafafa",
+    green: "#71717a",
+    greenFill: "#fafafa",
   },
   dark: {
     ink: "#f2f2f3",
@@ -42,11 +44,11 @@ const P = {
     nFill: "#111113",
     nStroke: "#3f3f46",
     purple: "#b78aff",
-    purpleFill: "#1c1430",
-    teal: "#19d3c5",
-    tealFill: "#0b2422",
-    green: "#14f195",
-    greenFill: "#0b261b",
+    purpleFill: "#151518",
+    teal: "#a1a1aa",
+    tealFill: "#151518",
+    green: "#a1a1aa",
+    greenFill: "#151518",
   },
 };
 const W = 688;
@@ -130,228 +132,14 @@ function ctx(mode) {
 }
 
 const diagrams = {
-  "docs/core/transactions/tx_format": {
-    title: "A transaction: a compact array of signatures, then the message",
-    draw(d) {
-      d.box(8, 12, 330, 64, "purple");
-      d.text(173, 44, [
-        "Compact array of signatures",
-        [{ t: "64 bytes × number of signatures", c: d.c.muted }],
-      ]);
-      d.box(350, 12, 330, 64, "teal");
-      d.text(515, 44, [
-        "Message",
-        [{ t: "header, accounts, blockhash, instructions", c: d.c.muted }],
-      ]);
-      return 88;
-    },
-  },
-  "docs/core/transactions/message_header": {
-    title: "The message header: three u8 counts",
-    draw(d) {
-      d.box(234, 8, 220, 56, "teal");
-      d.text(344, 36, ["Header", [{ t: "3 bytes", c: d.c.muted }]]);
-      d.arrow([
-        [344, 64],
-        [344, 104],
-      ]);
-      const cols = [
-        ["Required signatures", "(signer accounts)"],
-        ["Read-only accounts", "that sign"],
-        ["Read-only accounts", "that do not sign"],
-      ];
-      cols.forEach((t, i) => {
-        const x = 8 + i * 226;
-        d.box(x, 110, 220, 84, "purple");
-        d.text(x + 110, 152, [t[0], t[1], [{ t: "u8", c: d.c.muted }]], {
-          lh: 1.45,
-        });
-      });
-      return 204;
-    },
-  },
-  "docs/core/transactions/compact_array_format": {
-    title: "Compact array format: a compact-u16 length, then the items",
-    draw(d) {
-      d.box(8, 12, 236, 64, "teal");
-      d.text(126, 44, [
-        "Array length",
-        [{ t: "compact-u16 encoding", c: d.c.muted }],
-      ]);
-      for (let i = 0; i < 6; i++) {
-        const x = 252 + i * 72;
-        d.box(x, 12, 64, 64, i < 4 ? "neutral" : "ghost", { dashed: i >= 4 });
-        d.text(x + 32, 44, "item", { color: i < 4 ? d.c.ink : d.c.muted });
-      }
-      return 88;
-    },
-  },
-  "docs/core/transactions/compat_array_of_account_addresses": {
-    title:
-      "Account addresses: signers first, then non-signers; writable before read-only",
-    draw(d) {
-      d.box(184, 8, 320, 56, "teal");
-      d.text(344, 36, [
-        "Compact array of account addresses",
-        [{ t: "32 bytes × number of accounts", c: d.c.muted }],
-      ]);
-      d.arrow([
-        [344, 64],
-        [344, 100],
-      ]);
-      [
-        ["Accounts that sign", "32 bytes × signers"],
-        ["Accounts that do not sign", "32 bytes × non-signers"],
-      ].forEach((t, i) => {
-        const x = 8 + i * 340;
-        d.box(x, 106, 332, 56, "purple");
-        d.text(x + 166, 134, [t[0], [{ t: t[1], c: d.c.muted }]]);
-        d.box(x, 170, 162, 40, "ghost", { dashed: true });
-        d.text(x + 81, 190, "Writable", { color: d.c.muted, size: 12.5 });
-        d.box(x + 170, 170, 162, 40, "ghost", { dashed: true });
-        d.text(x + 251, 190, "Read-only", { color: d.c.muted, size: 12.5 });
-      });
-      return 220;
-    },
-  },
-  "docs/core/transactions/compact_array_of_ixs": {
-    title:
-      "Compact array of instructions and the three parts of each instruction",
-    draw(d) {
-      d.box(204, 8, 280, 48, "teal");
-      d.text(344, 32, "Compact array of instructions");
-      d.arrow([
-        [344, 56],
-        [344, 88],
-      ]);
-      for (let i = 0; i < 5; i++) {
-        const x = 54 + i * 118;
-        d.box(x, 94, 110, 44, i < 3 ? "neutral" : "ghost", { dashed: i >= 3 });
-        d.text(x + 55, 116, "Instruction", {
-          size: 12.5,
-          color: i < 3 ? d.c.ink : d.c.muted,
-        });
-      }
-      d.arrow([
-        [109, 138],
-        [109, 160],
-        [344, 160],
-        [344, 182],
-      ]);
-      [
-        ["Program ID index", "u8"],
-        ["Account address indexes", "compact array · len × u8"],
-        ["Instruction data", "compact array · len × u8"],
-      ].forEach((t, i) => {
-        const x = 8 + i * 226;
-        d.box(x, 188, 220, 60, "purple");
-        d.text(x + 110, 218, [t[0], [{ t: t[1], c: d.c.muted }]]);
-      });
-      return 258;
-    },
-  },
-  "docs/core/transactions/issues_with_legacy_txs": {
-    title:
-      "Legacy transaction size limits: 1,232 bytes for signatures and message",
-    draw(d) {
-      d.box(8, 10, 300, 64, "purple");
-      d.text(158, 42, [
-        [{ t: "Signatures", b: true }],
-        [{ t: "up to 19 · 64 bytes each", c: d.c.muted }],
-      ]);
-      d.box(316, 10, 364, 64, "teal");
-      d.text(498, 42, [
-        [{ t: "Message", b: true }, { t: ": metadata + accounts" }],
-        [{ t: "up to 35 accounts · 32 bytes each", c: d.c.muted }],
-      ]);
-      d.arrow(
-        [
-          [8, 92],
-          [680, 92],
-        ],
-        { head: true, color: d.c.line },
-      );
-      d.arrow(
-        [
-          [680, 92],
-          [8, 92],
-        ],
-        { head: true, color: d.c.line },
-      );
-      d.box(289, 80, 110, 24, "green", { rx: 12 });
-      d.text(344, 92, "1,232 bytes", {
-        size: 12.5,
-        color: d.c.green,
-        weight: 600,
-      });
-      return 112;
-    },
-  },
-  "docs/payments/payment-flow": {
-    title:
-      "A wallet holds one token account per token; sending 10 USDG moves it between USDG token accounts",
-    draw(d) {
-      // Sender column
-      d.box(8, 8, 270, 40, "neutral");
-      d.text(24, 28, "Sender’s wallet", { anchor: "start", weight: 600 });
-      d.line(28, 48, 28, 300);
-      const acct = (y, lines, t = "neutral", dashed = false) => {
-        d.line(28, y + 28, 44, y + 28);
-        d.box(
-          44,
-          y,
-          234,
-          lines.length > 1 ? 56 + (lines.length - 2) * 18 : 40,
-          t,
-          { dashed },
-        );
-        d.text(
-          58,
-          y + (lines.length > 1 ? 28 + ((lines.length - 2) * 18) / 2 : 20),
-          lines.map((l, i) =>
-            i ? [{ t: l, c: d.c.muted }] : [{ t: l, b: true }],
-          ),
-          { anchor: "start", size: 12.5, lh: 1.45 },
-        );
-      };
-      acct(
-        60,
-        ["USDG token account", "Before: 100 USDG", "After: 90 USDG"],
-        "purple",
-      );
-      acct(144, ["USDC token account", "Balance: 50 USDC"]);
-      acct(208, ["PYUSD token account", "Balance: 200 PYUSD"]);
-      acct(272, ["More token accounts…"], "ghost", true);
-      // Receiver column
-      d.box(410, 8, 270, 40, "neutral");
-      d.text(426, 28, "Receiver’s wallet", { anchor: "start", weight: 600 });
-      d.line(430, 48, 430, 88);
-      d.line(430, 88, 446, 88);
-      d.box(446, 60, 234, 74, "teal");
-      d.text(
-        460,
-        97,
-        [
-          [{ t: "USDG token account", b: true }],
-          [{ t: "Before: 45 USDG", c: d.c.muted }],
-          [{ t: "After: 55 USDG", c: d.c.muted }],
-        ],
-        { anchor: "start", size: 12.5, lh: 1.45 },
-      );
-      d.arrow([
-        [278, 97],
-        [440, 97],
-      ]);
-      d.text(359, 84, "Send 10 USDG", { size: 12.5, color: d.c.muted });
-      return 320;
-    },
-  },
+  // Transaction-format, compact-array and payment-flow figures moved to
+  // draw-concepts.mjs (hand-laid-out field cards).
   "docs/action-execution-and-lifecycle": {
     title:
       "Solana Actions: execution and lifecycle between the user, the Action client, the Action provider and Solana",
     draw(d) {
       const lanes = [
-        ["User", 52, "purple"],
+        ["User", 52, "teal"],
         ["Action client", 268, "purple"],
         ["Action provider", 498, "teal"],
         ["Solana", 636, "green"],

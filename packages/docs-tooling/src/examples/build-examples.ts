@@ -32,6 +32,7 @@ import {
   sliceRegion,
 } from "./include.ts";
 import { renderSnippet, type RenderTab } from "./render.ts";
+import { readRunMeta, type RunMeta } from "../lib/terminal.ts";
 
 export const examplesRoot = path.join(repoRoot, "packages", "docs-examples");
 export const snippetsRoot = path.join(docsRoot, "snippets", "examples");
@@ -161,6 +162,20 @@ function resolveTab(
   }
   if (tab.output && output === undefined)
     errors.push(`${where}: explicit output "${tab.output}" is missing`);
+  let runMeta: RunMeta | undefined;
+  if (output !== undefined && outputRel) {
+    runMeta = readRunMeta(
+      path.join(examplesRoot, outputRel),
+      errors,
+      `${where} (${tab.title})`,
+    );
+    const lines = output.split("\n").length;
+    for (const c of runMeta?.commands ?? [])
+      if (c.at >= lines)
+        errors.push(
+          `${where} (${tab.title}): run.json command at line ${c.at} is past the output (${lines} lines)`,
+        );
+  }
   return {
     title: tab.title,
     lang: tab.lang,
@@ -168,6 +183,7 @@ function resolveTab(
     highlight,
     output,
     outputNote: tab.outputNote,
+    runMeta,
     outputRel,
     fileRel,
   };

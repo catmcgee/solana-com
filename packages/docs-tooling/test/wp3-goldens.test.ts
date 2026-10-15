@@ -24,6 +24,7 @@ import { transform as sideBySide } from "../src/convert/transforms/side-by-side.
 import { transform as scrolly } from "../src/convert/transforms/scrolly.ts";
 import { transform as files } from "../src/convert/transforms/files.ts";
 import {
+  hasPhoneVariant,
   mermaidHash,
   transform as mermaid,
 } from "../src/convert/transforms/mermaid.ts";
@@ -153,7 +154,8 @@ describe("WP3 goldens", () => {
               mermaidHash(String(c.value)),
             );
             const imgs = (next?.children ?? []).filter((k) => k.name === "img");
-            expect(imgs).toHaveLength(2);
+            // Left-to-right flowcharts also carry their phone drawing.
+            expect(imgs).toHaveLength(hasPhoneVariant(String(c.value)) ? 4 : 2);
           });
         });
       });

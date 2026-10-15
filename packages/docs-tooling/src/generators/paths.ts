@@ -15,11 +15,13 @@
  *     "first": 0,                             // 0-based step that is the "first win"
  *     "steps": [["/docs/payments/checkout/try-it", "Pay as a customer", "optional summary"], …],
  *     "after": { "href": "/docs/payments", "title": "…", "summary": "…" },   // optional
- *     "demo": {                              // optional client-side extra
- *       "component": "checkout",             // checkout | paywall | asset
+ *     "demo": {                              // optional run-it-yourself panel
+ *       "component": "checkout",             // checkout | paywall | asset (stage style)
  *       "title": "Demo Sticker Shop",
  *       "success": "…",
- *       "steps": [{ "label": "…", "description": "…", "status": "402",
+ *       "stage": [{ "label": "Holographic sticker", "sub": "1.00 USDC",
+ *                   "states": [["todo", "Not paid yet"], ["warn", "Paid, checking…"], ["ok", "Paid and confirmed"]] }],
+ *       "steps": [{ "label": "…", "description": "…",
  *                   "output": "paths/payments/checkout/pay.output.txt" }]
  *     }
  *   }
@@ -35,14 +37,16 @@
  * - `card.mdx`: the path card for job pickers and hubs.
  * - `start.mdx`: the same card for the path intro, pointing at step 1
  *   (the mockup's "Start building" block under the flow).
- * - `demo.mdx` (when `demo` is set): the client-only `snippets/demos/*.jsx`
- *   component with the recorded outputs inlined as props, followed by the
- *   same steps as static `<Steps>` with each recorded output in a visible
- *   `text` fence. The static part is the content; the component is an
- *   optional extra that only renders with JavaScript. A step whose recorded
- *   output is missing (WP5 has not recorded it yet) is generated without
- *   output and without the interactive component, and is reported (like a
- *   code block without recorded output gets no Run button).
+ * - `demo.mdx` (when `demo` is set): the terminal panel of
+ *   src/lib/terminal.ts, all server-rendered: the stage (one row per
+ *   `stage` entry, one pill per progress value), the numbered steps with
+ *   their descriptions, and every step's recorded output with the prompt
+ *   commands and result badges from the `<stem>.run.json` next to the
+ *   `<stem>.output.txt`. Without JavaScript it reads in full (final stage,
+ *   all output); run-examples.js turns it into a step-by-step run. A step
+ *   whose recorded output is missing (WP5 has not recorded it yet) is
+ *   generated without output, the panel gets no Run controls
+ *   (`data-norun`), and it is reported.
  *
  * `--sync` only re-points `/snippets/paths/<lang>/` imports in locale pages;
  * `--check` runs that in memory and fails when a page would change.
@@ -56,7 +60,6 @@ import {
   applyOutputs,
   checkInlineMarkdown,
   emptyResult,
-  fence,
   finish,
   header,
   isMain,
@@ -78,6 +81,15 @@ import {
   type GeneratorResult,
   type Problem,
 } from "./_lib.ts";
+import {
+  DEFAULT_TERM_LABELS,
+  readRunMeta,
+  renderTerminal,
+  TONES,
+  type TermLabels,
+  type TermStageRow,
+  type Tone,
+} from "../lib/terminal.ts";
 
 export const PATH_UI = {
   step: "Step",
@@ -86,31 +98,27 @@ export const PATH_UI = {
   next: "Next",
   start: "Start the path",
   steps: "steps",
-  demoStatic: "What happens, step by step",
-  demoRecorded: "Recorded on a local Surfpool network",
-  demoBadge: "Replay of a recorded run · test money",
-  demoRun: "Run step",
-  demoRunning: "Running…",
-  demoReset: "Start over",
-  demoFinished: "Finished",
-  demoRequest: "Request",
-  demoResponse: "Response",
-  demoItem: "Holographic sticker",
-  demoNotPaid: "Not paid yet",
-  demoChecking: "Paid, checking…",
-  demoConfirmed: "Paid and confirmed",
-  demoSettled: "Settled",
-  demoRejected: "Rejected by the network",
-  demoNotSent: "Not sent",
+  demoEnv: DEFAULT_TERM_LABELS.env,
+  demoRun: DEFAULT_TERM_LABELS.run,
+  demoRunStep: DEFAULT_TERM_LABELS.runStep,
+  demoNext: DEFAULT_TERM_LABELS.next,
+  demoRunAll: DEFAULT_TERM_LABELS.runAll,
+  demoAgain: DEFAULT_TERM_LABELS.again,
+  demoRunning: DEFAULT_TERM_LABELS.running,
+  demoSending: DEFAULT_TERM_LABELS.sending,
+  demoRequesting: DEFAULT_TERM_LABELS.requesting,
+  demoCalling: DEFAULT_TERM_LABELS.calling,
+  demoConfirming: DEFAULT_TERM_LABELS.confirming,
+  demoDone: DEFAULT_TERM_LABELS.done,
+  demoCopy: DEFAULT_TERM_LABELS.copy,
+  demoCopied: DEFAULT_TERM_LABELS.copied,
+  demoOutput: DEFAULT_TERM_LABELS.output,
 };
 export type PathUi = typeof PATH_UI;
 
-export const DEMO_COMPONENTS = {
-  checkout: "CheckoutDemo",
-  paywall: "PaywallDemo",
-  asset: "AssetDemo",
-} as const;
-export type DemoKind = keyof typeof DEMO_COMPONENTS;
+/** Demo kinds: the stage style (styles/demo.css `[data-stage]`). */
+export const DEMO_KINDS = ["checkout", "paywall", "asset"] as const;
+export type DemoKind = (typeof DEMO_KINDS)[number];
 
 export interface PathStep {
   href: string;
@@ -120,8 +128,10 @@ export interface PathStep {
 export interface DemoStep {
   label: string;
   description?: string;
-  status?: string;
-  /** Path of the recorded output, relative to packages/docs-examples. */
+  /**
+   * Path of the recorded output, relative to packages/docs-examples. Prompt
+   * commands and result badges come from the `.run.json` next to it.
+   */
   output: string;
 }
 export interface PathDef {
@@ -140,6 +150,7 @@ export interface PathDef {
     component: DemoKind;
     title: string;
     success?: string;
+    stage?: TermStageRow[];
     steps: DemoStep[];
   };
 }
@@ -302,10 +313,8 @@ function parseDemo(v: unknown, at: (m: string) => void): PathDef["demo"] {
     return undefined;
   }
   const kind = v.component;
-  if (typeof kind !== "string" || !(kind in DEMO_COMPONENTS)) {
-    at(
-      `demo.component must be one of ${Object.keys(DEMO_COMPONENTS).join(", ")}`,
-    );
+  if (typeof kind !== "string" || !DEMO_KINDS.includes(kind as DemoKind)) {
+    at(`demo.component must be one of ${DEMO_KINDS.join(", ")}`);
     return undefined;
   }
   if (!str(v.title)) at(`demo.title must be a non-empty string`);
@@ -315,7 +324,7 @@ function parseDemo(v: unknown, at: (m: string) => void): PathDef["demo"] {
   else
     v.steps.forEach((s, i) => {
       if (!isRecord(s) || !str(s.label) || !str(s.output)) {
-        at(`demo.steps[${i}] must be { label, output, description?, status? }`);
+        at(`demo.steps[${i}] must be { label, output, description? }`);
         return;
       }
       if (path.isAbsolute(s.output) || s.output.split("/").includes(".."))
@@ -326,19 +335,68 @@ function parseDemo(v: unknown, at: (m: string) => void): PathDef["demo"] {
         const bad = checkInlineMarkdown(s.description);
         if (bad) at(`demo.steps[${i}].description ${bad}`);
       }
+      for (const f of Object.keys(s))
+        if (!["label", "output", "description"].includes(f))
+          at(`demo.steps[${i}]: unknown field "${f}"`);
       steps.push({
         label: s.label,
         output: s.output,
         description: str(s.description) ? s.description : undefined,
-        status: str(s.status) ? s.status : undefined,
       });
     });
+  const stage = parseStage(v.stage, steps.length, at);
   return {
     component: kind as DemoKind,
     title: String(v.title ?? ""),
     success: str(v.success) ? v.success : undefined,
+    ...(stage ? { stage } : {}),
     steps,
   };
+}
+
+const STAGE_TONES = ["todo", ...TONES];
+
+function parseStage(
+  v: unknown,
+  steps: number,
+  at: (m: string) => void,
+): TermStageRow[] | undefined {
+  if (v === undefined) return undefined;
+  if (!Array.isArray(v)) {
+    at(`demo.stage must be an array of { label, sub?, states }`);
+    return undefined;
+  }
+  return v.flatMap((r, i) => {
+    if (!isRecord(r) || !str(r.label) || !Array.isArray(r.states)) {
+      at(`demo.stage[${i}] must be { label, sub?, states }`);
+      return [];
+    }
+    if (r.states.length !== steps + 1)
+      at(
+        `demo.stage[${i}].states needs ${steps + 1} entries (before step 1, then after each step)`,
+      );
+    const states = r.states.flatMap((st, j) => {
+      if (
+        !Array.isArray(st) ||
+        st.length !== 2 ||
+        !STAGE_TONES.includes(st[0]) ||
+        !str(st[1])
+      ) {
+        at(
+          `demo.stage[${i}].states[${j}] must be [${STAGE_TONES.join("|")}, text]`,
+        );
+        return [];
+      }
+      return [[st[0], st[1]] as [Tone | "todo", string]];
+    });
+    return [
+      {
+        label: r.label,
+        ...(str(r.sub) ? { sub: r.sub } : {}),
+        states,
+      },
+    ];
+  });
 }
 
 function mergePath(
@@ -578,67 +636,63 @@ export function renderDemo(
 ) {
   const d = p.demo!;
   const { ui, lang } = src;
+  const file = `snippets/paths/${lang}/${p.key}/demo.mdx`;
   const outputs = d.steps.map((s) => readDemoOutput(s.output, outputsRoot));
   const missing = d.steps.filter((_, i) => outputs[i] === undefined);
   for (const s of missing)
     problems.push({
       level: "warn",
-      file: `snippets/paths/${lang}/${p.key}/demo.mdx`,
-      message: `no recorded output at packages/docs-examples/${s.output} (WP5); demo generated without it and without the interactive replay`,
+      file,
+      message: `no recorded output at packages/docs-examples/${s.output} (WP5); demo generated without it and without Run controls`,
     });
-  const component = DEMO_COMPONENTS[d.component];
-  const props = d.steps.map((s, i) => ({
-    label: s.label,
-    ...(s.status ? { status: s.status } : {}),
-    output: outputs[i] ?? "",
-  }));
-  const interactive = missing.length === 0;
-  const lines: string[] = [hdr(lang).trimEnd()];
-  if (interactive) {
-    lines.push(
-      `import { ${component} } from "/snippets/demos/${d.component}-demo.jsx";`,
-      "",
-    );
-    const uiProp = {
-      run: ui.demoRun,
-      running: ui.demoRunning,
-      reset: ui.demoReset,
-      finished: ui.demoFinished,
-      badge: ui.demoBadge,
-      request: ui.demoRequest,
-      response: ui.demoResponse,
-      item: ui.demoItem,
-      notPaid: ui.demoNotPaid,
-      checking: ui.demoChecking,
-      confirmed: ui.demoConfirmed,
-      settled: ui.demoSettled,
-      rejected: ui.demoRejected,
-      notSent: ui.demoNotSent,
+  const steps = d.steps.map((s, i) => {
+    const errors: string[] = [];
+    const meta =
+      outputs[i] === undefined
+        ? undefined
+        : readRunMeta(path.join(outputsRoot, s.output), errors, s.output);
+    for (const message of errors)
+      problems.push({ level: "error", file, message });
+    return {
+      title: s.label,
+      description: s.description,
+      output: outputs[i] ?? "",
+      meta,
     };
-    lines.push(
-      `<${component} ${attr("title", d.title)}${d.success ? ` ${attr("success", d.success)}` : ""} ui={${JSON.stringify(uiProp)}} steps={${JSON.stringify(props)}} />`,
-    );
-  }
-  lines.push(
-    "",
-    `<div className="sol-demo-static" data-demo="${d.component}">`,
-    `<p className="sol-demo-static-head"><strong>${mdText(d.title)}</strong> <span className="sol-demo-static-note">${mdText(`${ui.demoStatic} · ${ui.demoRecorded}`)}</span></p>`,
-    "",
-    "<Steps>",
-  );
-  d.steps.forEach((s, i) => {
-    lines.push(
-      `<Step ${attr("title", s.status ? `${s.label} (${s.status})` : s.label)}>`,
-    );
-    if (s.description) lines.push(mdInline(s.description), "");
-    const out = outputs[i];
-    if (out !== undefined) lines.push(fence("text", out));
-    lines.push("</Step>");
   });
-  lines.push("</Steps>");
-  if (d.success) lines.push("", `<Check>${mdInline(d.success)}</Check>`);
-  lines.push("</div>", "");
-  return lines.join("\n");
+  const labels: TermLabels = {
+    env: ui.demoEnv,
+    run: ui.demoRun,
+    runStep: ui.demoRunStep,
+    next: ui.demoNext,
+    runAll: ui.demoRunAll,
+    again: ui.demoAgain,
+    running: ui.demoRunning,
+    sending: ui.demoSending,
+    requesting: ui.demoRequesting,
+    calling: ui.demoCalling,
+    confirming: ui.demoConfirming,
+    done: ui.demoDone,
+    copy: ui.demoCopy,
+    copied: ui.demoCopied,
+    output: ui.demoOutput,
+    step: ui.step,
+  };
+  let panel = renderTerminal({
+    id: `paths/${p.key}/demo`,
+    kind: d.component,
+    title: d.title,
+    labels,
+    steps,
+    stage: d.stage,
+    success: d.success,
+  });
+  if (missing.length)
+    panel = panel.replace(
+      /^<div className="sol-term /,
+      '<div data-norun="" className="sol-term ',
+    );
+  return `${hdr(lang).trimEnd()}\n\n${panel}\n`;
 }
 
 /** Every generated file for every language. */
@@ -673,21 +727,6 @@ export function buildPathOutputs(
         renderCard(docsRoot, src, p, "step1"),
       );
       if (p.demo) {
-        if (
-          !existsSync(
-            path.join(
-              docsRoot,
-              "snippets",
-              "demos",
-              `${p.demo.component}-demo.jsx`,
-            ),
-          )
-        )
-          problems.push({
-            level: "error",
-            file: `snippets/demos/${p.demo.component}-demo.jsx`,
-            message: `missing demo component for path "${p.key}"`,
-          });
         files.set(
           path.join(dir, "demo.mdx"),
           renderDemo(src, p, problems, outputsRoot),
