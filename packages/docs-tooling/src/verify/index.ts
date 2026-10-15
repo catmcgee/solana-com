@@ -50,7 +50,6 @@ export const GENERATOR_CHECKS: [string, string[]][] = [
   ["gen:paths --check", ["src/generators/paths.ts", "--check"]],
   ["gen:concepts --check", ["src/generators/concepts.ts", "--check"]],
   ["gen:addresses --check", ["src/generators/addresses.ts", "--check"]],
-  ["gen:header --check", ["src/header-bundle/build.ts", "--check"]],
   ["nav:build --check", ["src/cli.ts", "nav", "build", "--check"]],
   ["gen:tags --check", ["src/generators/tags.ts", "--check"]],
   [

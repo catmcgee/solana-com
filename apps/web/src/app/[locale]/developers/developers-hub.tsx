@@ -10,6 +10,7 @@ import { School } from "@boxicons/react/School";
 import { Server } from "@boxicons/react/Server";
 import { Fragment, type ComponentType, type ReactNode } from "react";
 import { getTranslations } from "@workspace/i18n/server";
+import { isDocsHref } from "@solana-com/ui-chrome/url-config";
 import {
   AGENT_SETUP,
   COST_MODEL,
@@ -34,6 +35,10 @@ import type { DeveloperUpdate } from "@/lib/developer-media";
 import { CostCalculator } from "./cost-calculator.client";
 import { CopyButton } from "./copy-button.client";
 import { NewsletterForm } from "./newsletter-form.client";
+
+/** Docs links always open in a new tab. */
+const newTab = (to: string) =>
+  isDocsHref(to) ? { target: "_blank", rel: "noopener noreferrer" } : {};
 
 type IconComponent = ComponentType<{
   className?: string;
@@ -306,6 +311,7 @@ export async function DevelopersHub({
                 </a>
                 <a
                   href={href(HERO_LINKS.docs)}
+                  {...newTab(href(HERO_LINKS.docs))}
                   className={`inline-flex h-10 items-center rounded-full border border-[var(--dl-line-strong)] px-[18px] text-sm font-medium text-[var(--dl-text)] no-underline transition-colors hover:border-[var(--dl-text)] hover:text-[var(--dl-text)] ${focus}`}
                 >
                   {t("hero.secondaryCta")}
@@ -356,6 +362,7 @@ export async function DevelopersHub({
                 <li key={job.id} className="flex">
                   <a
                     href={href(job.href)}
+                    {...newTab(href(job.href))}
                     data-testid={`job-card-${job.id}`}
                     className={`group flex w-full flex-col overflow-hidden rounded-3xl border border-[var(--dl-line)] bg-[var(--dl-surface)] text-[var(--dl-text)] no-underline transition hover:border-[var(--dl-accent-line)] hover:text-[var(--dl-text)] motion-safe:hover:-translate-y-1 ${focus}`}
                   >
@@ -411,6 +418,7 @@ export async function DevelopersHub({
               <a
                 key={item.id}
                 href={href(item.href)}
+                {...newTab(href(item.href))}
                 className={`rounded-full border border-[var(--dl-line-strong)] px-3.5 py-2 text-[var(--dl-text)] no-underline transition-colors hover:border-[var(--dl-accent-line)] hover:bg-[var(--dl-accent-soft)] hover:text-[var(--dl-text)] ${focus}`}
               >
                 {t(`picker.more.${item.id}`)}
@@ -566,6 +574,7 @@ export async function DevelopersHub({
               feeSource: (chunks) => (
                 <a
                   href={href(COST_MODEL.solana.source.url)}
+                  {...newTab(href(COST_MODEL.solana.source.url))}
                   className={inlineLink}
                 >
                   {chunks}
@@ -649,6 +658,7 @@ export async function DevelopersHub({
                 <li key={route.id} className="flex">
                   <a
                     href={href(route.href)}
+                    {...newTab(href(route.href))}
                     className={`group relative block w-full rounded-[20px] border border-[var(--dl-line)] bg-[var(--dl-surface)] px-6 pb-7 pt-[26px] text-[var(--dl-text)] no-underline transition hover:border-[var(--dl-purple-line)] hover:text-[var(--dl-text)] motion-safe:hover:-translate-y-[3px] ${focus}`}
                   >
                     <span className="grid size-9 place-items-center rounded-[11px] border border-[var(--dl-purple-line)] bg-[var(--dl-purple-soft)] text-[var(--dl-purple-text)]">

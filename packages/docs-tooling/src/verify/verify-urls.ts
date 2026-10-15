@@ -269,9 +269,6 @@ export function strayAssetsInDocsRoot(
     "apps/docs/ask-ai.js",
     // "Open in Playground" on every code block (styles/playground.css).
     "apps/docs/playground.js",
-    // The solana.com header: generated bundle of packages/ui-chrome Header
-    // (gen:header, src/header-bundle).
-    "apps/docs/header.js",
     "apps/docs/styles/",
   ],
 ) {

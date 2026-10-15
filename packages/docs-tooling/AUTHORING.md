@@ -32,9 +32,8 @@ deployed `*.mintlify.site` is listed under "Release gates" below.
 Rules for `apps/docs`:
 
 - Never add `.js`, `.jsx` or `.css` files except the owned globals
-  (`run-examples.js`, `ask-ai.js`, `header.js`, `playground.js`,
-  `styles/*.css`): Mintlify injects every one of them on every page.
-  `verify-urls` fails on strays.
+  (`run-examples.js`, `ask-ai.js`, `playground.js`, `styles/*.css`): Mintlify
+  injects every one of them on every page. `verify-urls` fails on strays.
 - Never add `.md` notes (README, CLAUDE.md, AGENTS.md): they become pages.
   `.mintignore` is defence in depth only.
 - Folder paths are public URLs. Moving a file changes its URL and needs an
@@ -86,7 +85,6 @@ Package scripts (`pnpm --filter @workspace/docs-tooling <script>`):
 | `gen:surfpool [--check\|--sync --ref main]`                               | `src/generators/surfpool-rpc.ts`                                         |
 | `gen:paths`, `gen:concepts`, `gen:addresses` `[--sync] [--check]`         | `src/generators/{paths,concepts,addresses}.ts`                           |
 | `gen:tags [--check]`                                                      | `src/generators/tags.ts`                                                 |
-| `gen:header [--check]`                                                    | `src/header-bundle/build.ts` (solana.com header bundle, see Top bar)     |
 | `gen:manifest`, `gen:llms`, `gen:redirects` `[--check]`                   | `src/manifest/cli.ts`                                                    |
 | `generate` / `generate:check`                                             | every generator, in dependency order                                     |
 | `collections:remove-tools-ai [--dry-run]`                                 | `src/collections/remove-tools-ai.ts`                                     |
@@ -240,62 +238,12 @@ Theme rules:
 - **Colors.** Light mode links use `#7A2FE0` (6.3:1 on white). Dark mode links
   use `#B78AFF` (8.1:1 on black). The dark page background is `#000`, like
   solana.com.
-- **Top bar.** The header is the real solana.com component, not a copy:
-  `apps/docs/header.js` is an esbuild bundle of the unmodified
-  `packages/ui-chrome` `Header` (header.tsx and everything it imports, SVGs
-  through SVGR with apps/web's options) plus React 19, ReactDOM and next-intl,
-  rendered as apps/web renders it (`NextIntlClientProvider` > `ThemeProvider` >
-  `<Header showDevelopersNav={false} />`) into `#sol-hdr`, the first child of
-  `<body>`. `styles/header.css` is apps/web's Tailwind 3 (its
-  `tailwind.config.js`, preflight included) over the bundled ui-chrome files,
-  every rule scoped to `#sol-hdr` and keyframes renamed `sol-hdr-*`, plus
-  apps/web's `src/scss` element rules, its `:root` variables and the dark
-  `data-dev-landing` header rule (opaque `#0a0a0b`). Both files are generated in
-  full by `gen:header` (`src/header-bundle/build.ts`): never edit them; change
-  ui-chrome, the web messages or the integration files and rerun it.
-  `gen:header --check` (part of `generate:check` and `verify`) rebuilds in
-  memory and fails when either file differs, so a stale bundle is caught
-  whenever ui-chrome, `packages/i18n/messages/web/<locale>/common.json`,
-  apps/web's Tailwind/SCSS/globals, a bundled dependency or
-  `src/header-bundle/**` changes. The banner of both files carries a hash of
-  every input, so edits that minify away (comments) are caught too.
-  `test/header-bundle.test.ts` edits sources in memory (`runHeader`'s
-  `overrides`, never on disk) to lock this in.
-  - Cost: `header.js` is about 580 KB raw, 165 KB gzipped, on every docs page
-    (the old hand-built header was about 48 KB gzipped). That is React,
-    ReactDOM, next-intl, Radix and ui-chrome's Inkeep config, the price of
-    shipping the real component.
-  - Bundle-only pieces, all in `src/header-bundle/runtime/`: shims for
-    `next/link` (plain `<a>`), `next/navigation` (hooks read `window.location`;
-    history changes are observed), `next/compat/router` (null) and
-    `next/dynamic` (renders nothing: the Inkeep modal is never loaded,
-    `@inkeep/cxkit-react` is external); a `@radix-ui/react-portal` wrapper so
-    the language menu and the mobile sheet portal into `#sol-hdr-portals`
-    (inside the CSS scope) instead of `<body>`; and `adapter.js`, the Mintlify
-    integration: the search button opens Mintlify's search; language items
-    switch through Mintlify's language menu (`MINTLIFY_LANGUAGE_CODE`, URL
-    fallback `/<locale>/<path>`); the theme toggle's change is passed to
-    Mintlify's theme menu and Mintlify stays the owner of the page theme
-    (ThemeProvider's own writes, e.g. the forced dark on `/learn/<slug>`, are
-    undone); links to solana.com pages open `https://solana.com<path>` when the
-    host is not solana.com. `entry.jsx` renames the bar's `id="navbar"`
-    (Mintlify's header id) to `data-sol-navbar`, the only DOM change to the
-    component's output. This is a DOM edit after React commits (React never
-    re-applies an unchanged `id`); a MutationObserver on `#sol-hdr` renames any
-    `nav#navbar` React creates later. Another observer on `<body>`'s direct
-    children (and on `<html>`, in case `<body>` is replaced) puts `#sol-hdr`
-    back if Mintlify removes it. Greek (`el`, not a docs language) is hidden in
-    the language menu by CSS.
-  - Messages: `loadMergedMessages({ app: "web", locale })` for the 18 docs
-    locales (English merged under each, as on solana.com), pruned at build time
-    to the keys named by string literals in the bundled ui-chrome files.
-  - Light mode: ui-chrome's header is dark-only (only its language menu has
-    `light:` variants, which apply), so the bar stays dark in both modes. The
-    white light-mode bar on solana.com/developers is apps/web page CSS
-    (`html.light:has([data-dev-landing])`) and is not used.
-  - Without JS nothing mounts and Mintlify's header (logo and the five
-    `navbar.links`) is the header. The tab row and the Ask AI pill are
-    Mintlify's/`ask-ai.js`, unchanged.
+- **Top bar.** The docs use Mintlify's own navbar (logo, search, language and
+  theme) with no solana.com links; the solana.com header appears only on
+  solana.com pages such as /developers. (An injected bundle of the ui-chrome
+  header was tried and removed on 2026-10-16; see git history for
+  `src/header-bundle`.) Links from solana.com pages into the docs open in a new
+  tab (`isDocsHref` in packages/ui-chrome/src/url-config.ts).
 - **Tab divider and external tab.** The divider after tab 4 (Markets) and
   pushing any `http` tab to the far end are done in CSS. External tabs need an
   absolute `href`. Mintlify renders a relative tab `href` as `/`.

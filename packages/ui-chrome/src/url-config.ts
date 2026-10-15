@@ -73,3 +73,18 @@ export function shouldUseNextLink(href: string): boolean {
   // On non-web apps: use Link only for internal routes
   return isInternalRoute(href);
 }
+
+/**
+ * True for links into the developer docs (served by Mintlify behind the
+ * apps/web proxy): /docs, /<locale>/docs, the cookbook, the bootcamp and the
+ * /learn lessons (not the /learn landing). These always open in a new tab.
+ */
+export function isDocsHref(href: string): boolean {
+  let path = href;
+  const abs = /^https?:\/\/(www\.)?solana\.com(\/.*)?$/i.exec(href);
+  if (abs) path = abs[2] || "/";
+  if (!path.startsWith("/")) return false;
+  return /^(\/[a-z]{2}(-[A-Za-z]{2,4})?)?\/(docs|learn\/[^/?#]+|developers\/(cookbook|bootcamp))(\/|$|[?#])/.test(
+    path,
+  );
+}
