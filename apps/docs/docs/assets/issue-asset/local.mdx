@@ -12,6 +12,7 @@ import Create from "/snippets/examples/paths/assets/issue-asset/create.mdx";
 import Approve from "/snippets/examples/paths/assets/issue-asset/approve.mdx";
 import Blocked from "/snippets/examples/paths/assets/issue-asset/blocked.mdx";
 import RunScript from "/snippets/examples/paths/assets/issue-asset/run.mdx";
+import Confidential from "/snippets/examples/paths/assets/issue-asset/confidential.mdx";
 import Rpc from "/snippets/concepts/en/rpc.mdx";
 import Rent from "/snippets/concepts/en/rent.mdx";
 import Next from "/snippets/paths/en/issue-asset/next-3.mdx";
@@ -177,5 +178,79 @@ errors and balances, with different addresses and signatures.
   [catmcgee/solana-com](https://github.com/catmcgee/solana-com/tree/mintlify-migration/packages/docs-examples/paths/assets/issue-asset)
   fork until it is merged into `solana-foundation/solana-com`.
 </Note>
+
+## Enable confidentiality (optional)
+
+Use this variant only if balances must be hidden from the public. It doesn't
+change the steps above.
+
+[Confidential Balances](/docs/tokens/extensions/confidential-transfer) hides
+token balances and transfer amounts. Addresses stay public, so anyone can still
+see which accounts hold the asset and which accounts trade with each other. If
+you set an auditor key, whoever holds it (you, or a regulator you give it to)
+can decrypt every confidential transfer amount.
+
+You turn it on with the `ConfidentialTransferMint` extension when you create
+the mint. You can't add it to an existing mint, so decide before you issue. Set
+`autoApproveNewAccounts: false`, so that you approve each holder for
+confidential use after your KYC check, just as you approve them to hold the
+asset. Set the auditor's ElGamal public key too. The auditor derives it from
+their own wallet and sends you only the public key.
+
+The confidential helpers need the ZK SDK, which derives the encryption keys and
+generates the proofs (the example is tested with `@solana/zk-sdk` 0.5):
+
+```bash Terminal
+npm install @solana/zk-sdk
+```
+
+Save this as `create-confidential-asset.ts`:
+
+- `createConfidentialAsset` is `createAsset` with one more extension.
+- `enableConfidentialAccount` is the holder's side. It derives the holder's
+  encryption keys from one wallet signature and sends a proof, generated on the
+  holder's machine, that the key is valid.
+- `approveConfidentialHolder` is your approval. It thaws the account and
+  approves it for confidential use in one transaction.
+
+<Confidential />
+
+The holder can set up the account while it is still frozen, but can't use it
+until you approve it.
+
+How confidentiality works with the asset's other controls:
+
+- **Approval.** A holder needs both approvals: a thaw from the freeze authority
+  and a confidential approval from the confidential transfer authority. There
+  is no instruction to withdraw a confidential approval. To stop a holder,
+  freeze the account. A frozen account can't deposit, withdraw, or send or
+  receive a confidential transfer.
+- **Pause.** Pausing also stops confidential deposits, transfers and
+  withdrawals.
+- **Permanent delegate.** It can still move or burn the public balance of any
+  account, but not the encrypted balance. Confidential transfers and
+  withdrawals need the holder's signature. The `ConfidentialMintBurn`
+  extension, which mints and burns directly into encrypted balances, doesn't
+  change this: its confidential burn needs the holder's signature too. To
+  recover tokens from an encrypted balance, the holder has to withdraw them
+  first. Freezing the account keeps them where they are. Plan your recovery
+  runbook around this.
+- **Auditor.** The confidential transfer authority can change the auditor key
+  later. Transfers made after the change are encrypted to the new key.
+
+Holders also need software that can generate zero-knowledge proofs, in their
+wallet or in your app. Moving tokens into the encrypted balance, applying
+incoming amounts, transferring and withdrawing each need proofs made with the
+holder's keys. The Confidential Balances guides show each step in Rust (with
+the `solana-zk-sdk` crate) and TypeScript:
+[create a token account](/docs/tokens/extensions/confidential-transfer/create-token-account),
+[deposit](/docs/tokens/extensions/confidential-transfer/deposit-tokens),
+[apply the pending balance](/docs/tokens/extensions/confidential-transfer/apply-pending-balance),
+[transfer](/docs/tokens/extensions/confidential-transfer/transfer-tokens) and
+[withdraw](/docs/tokens/extensions/confidential-transfer/withdraw-tokens). For
+the issuer's side, see the
+[issuer guide](/docs/tokens/extensions/confidential-transfer/issuer-guide). The
+[privacy overview](/docs/finance/privacy) explains what Confidential Balances
+hides and who can see it.
 
 <Next />

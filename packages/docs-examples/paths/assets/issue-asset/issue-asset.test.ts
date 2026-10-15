@@ -2,13 +2,27 @@ import {
   generateKeyPairSigner,
   type Address,
   type KeyPairSigner,
+  type Signature,
 } from "@solana/kit";
+import {
+  fetchToken,
+  getConfidentialDepositInstruction,
+  getFreezeAccountInstruction,
+  getMintToCheckedInstruction,
+} from "@solana-program/token-2022";
 import { beforeAll, describe, expect, it } from "vitest";
 import { fundSol } from "../../../test/fixtures/fund";
 import { runExample } from "../../../test/record";
-import { failure } from "./blocked-transfer";
-import { balanceOf, demoApprove, demoBlocked, demoCreate } from "./demo";
-import { approveHolder, openAccount } from "./approve-holder";
+import { clawBack, failure, pause, resume } from "./blocked-transfer";
+import { rpc, send } from "./config";
+import {
+  balanceOf,
+  demoApprove,
+  demoBlocked,
+  demoConfidential,
+  demoCreate,
+} from "./demo";
+import { approveHolder, openAccount, tokenAccountOf } from "./approve-holder";
 import { run } from "./run";
 
 const out = (name: string) => new URL(`./${name}.output.txt`, import.meta.url);
@@ -88,6 +102,109 @@ describe("paths/assets/issue-asset (Token-2022 restricted asset)", () => {
     expect(await balanceOf(approved.address, mint)).toBe(50_000_000n);
     expect(await balanceOf(holder.address, mint)).toBe(900_000_000n);
     expect(await balanceOf(issuer.address, mint)).toBe(50_000_000n);
+  });
+
+  it("confidential: same asset plus ConfidentialTransferMint; the issuer approves each holder", async () => {
+    const [ctIssuer, auditor, ctHolder] = (await Promise.all(
+      [0, 1, 2].map(() => generateKeyPairSigner()),
+    )) as [KeyPairSigner, KeyPairSigner, KeyPairSigner];
+    await fundSol(ctIssuer.address, 2);
+    await fundSol(ctHolder.address);
+    const r = await runExample(
+      () => demoConfidential(ctIssuer, auditor, ctHolder),
+      { output: out("create-confidential-asset") },
+    );
+    expect(r.value.asset.extensions).toEqual(
+      expect.arrayContaining([
+        "MetadataPointer",
+        "TokenMetadata",
+        "PausableConfig",
+        "PermanentDelegate",
+        "DefaultAccountState",
+        "ConfidentialTransferMint",
+      ]),
+    );
+    expect(r.value.autoApprove).toBe(false);
+    expect(r.value.auditor).toEqual({
+      __option: "Some",
+      value: r.value.auditorPubkey,
+    });
+    // Configuring works on a frozen account, but it isn't approved yet.
+    expect(r.value.enabled.state).toBe("Frozen");
+    expect(r.value.enabled.confidentialApproved).toBe(false);
+    expect(r.value.approved.state).toBe("Initialized");
+    expect(r.value.approved.confidentialApproved).toBe(true);
+
+    // Checks behind the page's notes on how the other controls interact (not
+    // printed): pause and freeze block a confidential deposit, and the
+    // permanent delegate moves only the public balance.
+    const mint = r.value.asset.mint;
+    const token = await tokenAccountOf(ctHolder.address, mint);
+    await send(ctIssuer, [
+      getMintToCheckedInstruction({
+        mint,
+        token,
+        mintAuthority: ctIssuer,
+        amount: 10_000_000n,
+        decimals: 6,
+      }),
+    ]);
+    const deposit = (amount: bigint) =>
+      send(
+        ctHolder,
+        [
+          getConfidentialDepositInstruction({
+            token,
+            mint,
+            authority: ctHolder,
+            amount,
+            decimals: 6,
+          }),
+        ],
+        { skipPreflight: true },
+      ).then(
+        (sig) => failure(sig),
+        (e: { signature: Signature }) => failure(e.signature),
+      );
+    const code = (f: Awaited<ReturnType<typeof failure>>) =>
+      JSON.stringify(f.err, (_k, v) => (typeof v === "bigint" ? Number(v) : v));
+    expect((await deposit(4_000_000n)).err).toBeNull();
+    await pause(ctIssuer, mint);
+    // Token-2022 MintPaused = custom error 67.
+    expect(code(await deposit(1_000_000n))).toBe(
+      '{"InstructionError":[0,{"Custom":67}]}',
+    );
+    await resume(ctIssuer, mint);
+    await openAccount(ctIssuer, mint, ctIssuer.address);
+    await approveHolder(ctIssuer, mint, ctIssuer.address);
+    await clawBack(ctIssuer, mint, ctHolder.address, 6_000_000n);
+    const { data } = await fetchToken(rpc, token);
+    expect(data.amount).toBe(0n);
+    const ctAccount =
+      data.extensions.__option === "Some"
+        ? data.extensions.value.find(
+            (e) => e.__kind === "ConfidentialTransferAccount",
+          )
+        : undefined;
+    // The 4 LSF deposit is still in the (encrypted) pending balance.
+    expect(
+      ctAccount?.__kind === "ConfidentialTransferAccount" &&
+        ctAccount.pendingBalanceCreditCounter,
+    ).toBe(1n);
+    // A frozen account can't use confidential instructions: AccountFrozen = 17.
+    await send(ctIssuer, [
+      getMintToCheckedInstruction({
+        mint,
+        token,
+        mintAuthority: ctIssuer,
+        amount: 1_000_000n,
+        decimals: 6,
+      }),
+      getFreezeAccountInstruction({ account: token, mint, owner: ctIssuer }),
+    ]);
+    expect(code(await deposit(1_000_000n))).toBe(
+      '{"InstructionError":[0,{"Custom":17}]}',
+    );
   });
 
   it("run: the page's run.ts script does the whole sequence on a fresh asset", async () => {
