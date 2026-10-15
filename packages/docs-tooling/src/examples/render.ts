@@ -15,8 +15,14 @@
  *   badges) renders as the terminal panel of src/lib/terminal.ts instead:
  *   the full output is in the server HTML, and run-examples.js streams it
  *   back in when the reader presses Run.
+ * - Every code fence is preceded by an empty `<div className="sol-pg">`
+ *   marker carrying the tab's source path (see playground.ts): one per tab,
+ *   in tab order, before a `<CodeGroup>`; inside each `<Tab>` otherwise.
+ *   apps/docs/playground.js reads it for the "Open in Playground" control;
+ *   styles/playground.css keeps it hidden (it has no content anyway).
  */
 import type { Block } from "./blocks.ts";
+import type { PlaygroundSource } from "./playground.ts";
 import {
   DEFAULT_TERM_LABELS,
   renderTerminal,
@@ -37,6 +43,8 @@ export interface RenderTab {
    * (src/lib/terminal.ts) instead of the plain Run block.
    */
   runMeta?: RunMeta;
+  /** Source path for "Open in Playground"; absent for an inline tab. */
+  playground?: PlaygroundSource;
 }
 
 export interface RenderInput {
@@ -91,6 +99,19 @@ function jsxAttr(value: string): string {
     : `{${JSON.stringify(value)}}`;
 }
 
+/** The hidden "Open in Playground" source marker placed before a fence. */
+export function playgroundMarker(pg: PlaygroundSource | undefined): string {
+  const attrs = [`className="sol-pg"`];
+  if (pg)
+    attrs.push(
+      `data-pg-src=${jsxAttr(pg.src)}`,
+      `data-pg-open=${jsxAttr(pg.open)}`,
+      `data-pg-kind=${jsxAttr(pg.kind)}`,
+    );
+  else attrs.push(`data-pg-kind="inline"`);
+  return `<div ${attrs.join(" ")} />`;
+}
+
 function runBlock(input: RenderInput, tab: RenderTab): string {
   const runner = input.block.runner;
   const note =
@@ -142,9 +163,16 @@ export function renderSnippet(input: RenderInput): string {
     // Plain code: no Run button anywhere.
     if (input.tabs.length === 1) {
       const t = input.tabs[0]!;
-      body = codeFence(t.lang, t.code, t.title, t.highlight);
+      body = [
+        playgroundMarker(t.playground),
+        "",
+        codeFence(t.lang, t.code, t.title, t.highlight),
+      ].join("\n");
     } else {
       body = [
+        // One marker per tab, in tab order (a CodeGroup only takes fences).
+        ...input.tabs.map((t) => playgroundMarker(t.playground)),
+        "",
         "<CodeGroup>",
         "",
         ...input.tabs.flatMap((t) => [
@@ -157,6 +185,8 @@ export function renderSnippet(input: RenderInput): string {
   } else if (input.tabs.length === 1) {
     const t = input.tabs[0]!;
     body = [
+      playgroundMarker(t.playground),
+      "",
       codeFence(t.lang, t.code, t.title, t.highlight),
       "",
       runBlock(input, t),
@@ -169,6 +199,7 @@ export function renderSnippet(input: RenderInput): string {
         `<Tab title=${jsxAttr(t.title)}>`,
         // Inactive panels are stacked without JS; this labels each one.
         `<div className="sol-tab-label">${escapeText(t.title)}</div>`,
+        playgroundMarker(t.playground),
         "",
         codeFence(t.lang, t.code, undefined, t.highlight),
         ...(input.block.runnable && t.output !== undefined

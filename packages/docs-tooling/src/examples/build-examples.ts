@@ -33,6 +33,7 @@ import {
 } from "./include.ts";
 import { renderSnippet, type RenderTab } from "./render.ts";
 import { readRunMeta, type RunMeta } from "../lib/terminal.ts";
+import { playgroundSource, type PlaygroundKind } from "./playground.ts";
 
 export const examplesRoot = path.join(repoRoot, "packages", "docs-examples");
 export const snippetsRoot = path.join(docsRoot, "snippets", "examples");
@@ -64,6 +65,8 @@ export interface IndexEntry {
     region?: string;
     output?: string;
     outputSha256?: string;
+    /** "Open in Playground" target (playground.ts) for a file-backed tab. */
+    playground?: { open: string; kind: PlaygroundKind };
   }[];
 }
 
@@ -184,6 +187,7 @@ function resolveTab(
     output,
     outputNote: tab.outputNote,
     runMeta,
+    playground: fileRel ? playgroundSource(fileRel) : undefined,
     outputRel,
     fileRel,
   };
@@ -266,6 +270,14 @@ export function buildExamples(
                 outputSha256: createHash("sha256")
                   .update(t.output!)
                   .digest("hex"),
+              }
+            : {}),
+          ...(t.playground
+            ? {
+                playground: {
+                  open: t.playground.open,
+                  kind: t.playground.kind,
+                },
               }
             : {}),
         })),

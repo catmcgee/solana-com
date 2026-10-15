@@ -56,6 +56,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { repoRoot } from "../lib/paths.ts";
 import { DEFAULT_LOCALE } from "../lib/locales.ts";
+import { playgroundFolderSource } from "../examples/playground.ts";
+import { playgroundMarker } from "../examples/render.ts";
 import {
   applyOutputs,
   checkInlineMarkdown,
@@ -692,7 +694,35 @@ export function renderDemo(
       /^<div className="sol-term /,
       '<div data-norun="" className="sol-term ',
     );
-  return `${hdr(lang).trimEnd()}\n\n${panel}\n`;
+  return `${hdr(lang).trimEnd()}\n\n${demoMarker(d.steps, outputsRoot)}\n${panel}\n`;
+}
+
+const STEP_SOURCE_EXTS = [".ts", ".js", ".rs", ".py"];
+
+/**
+ * The hidden "Open in Playground" marker before a demo terminal
+ * (examples/playground.ts): the folder its steps run from, when they all
+ * share one folder and each has a source file `<stem>.{ts,js,rs,py}` next to
+ * its recorded output. Without one the marker has no source and
+ * playground.js keeps the terminal's control disabled.
+ */
+export function demoMarker(steps: DemoStep[], outputsRoot = examplesRoot) {
+  const dirs = new Set(steps.map((s) => path.posix.dirname(s.output)));
+  const sources = steps.map((s) => {
+    const stem = s.output.replace(/\.output\.txt$/, "");
+    const ext = STEP_SOURCE_EXTS.find((e) =>
+      existsSync(path.join(outputsRoot, stem + e)),
+    );
+    return ext && `packages/docs-examples/${stem}${ext}`;
+  });
+  const dir = [...dirs][0];
+  const pg =
+    dirs.size === 1 && dir && sources.every(Boolean)
+      ? playgroundFolderSource(dir, sources as string[], outputsRoot)
+      : undefined;
+  return playgroundMarker(
+    pg && { ...pg, open: `packages/docs-examples/${pg.open}` },
+  );
 }
 
 /** Every generated file for every language. */
