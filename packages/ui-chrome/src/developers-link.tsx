@@ -8,8 +8,8 @@ import { cn } from "./classnames";
 /**
  * The "Developers" item of the solana.com header (2026-10-16). It replaced
  * the Build dropdown and sits right of Ecosystem. /developers wears the docs
- * chrome, so it opens in a new tab, marked with a small ↗ (the same glyph as
- * the external tab in developers-nav.tsx) and a visually hidden
+ * chrome, so it opens in a new tab, marked with a small up-right arrow icon
+ * sized like the dropdown chevrons, and a visually hidden
  * "(opens in a new tab)".
  */
 export const DEVELOPERS_LINK = {
@@ -26,13 +26,23 @@ export const NEW_TAB_PROPS = {
 export function NewTabMark({ text }: { text: string }) {
   return (
     <>
-      <span
+      {/* Same box, spacing and opacity as the dropdown chevrons
+       * (nav-menu.tsx AngleDown), so the row reads evenly. */}
+      <svg
         aria-hidden="true"
         data-new-tab-mark=""
-        className="ml-1 inline-block text-[0.8em] leading-none opacity-60"
+        className="relative top-px ml-0.5 -mr-1 inline-block size-4 shrink-0 opacity-60"
+        width={16}
+        height={16}
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
       >
-        ↗
-      </span>
+        <path d="M8 16 16 8M9.5 8H16v6.5" />
+      </svg>
       <span className="sr-only"> {text}</span>
     </>
   );
@@ -58,10 +68,8 @@ export function DevelopersLink({
       data-nav-item="developers"
     >
       {icon}
-      <span>
-        {t(DEVELOPERS_LINK.titleKey)}
-        <NewTabMark text={t(DEVELOPERS_LINK.newTabKey)} />
-      </span>
+      <span>{t(DEVELOPERS_LINK.titleKey)}</span>
+      <NewTabMark text={t(DEVELOPERS_LINK.newTabKey)} />
     </Link>
   );
 }
