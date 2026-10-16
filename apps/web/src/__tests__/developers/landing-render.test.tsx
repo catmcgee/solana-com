@@ -108,7 +108,7 @@ describe("/developers landing", () => {
     ).toBe("dark");
   });
 
-  it("links the three job cards to the job-path intros", async () => {
+  it("links the four job cards to the job-path intros", async () => {
     renderWithIntl(await DevelopersHub({ locale: "en", updates: [] }));
     const cards = within(screen.getByTestId("job-cards")).getAllByRole("link");
     expect(cards.map((card) => card.getAttribute("href"))).toEqual(

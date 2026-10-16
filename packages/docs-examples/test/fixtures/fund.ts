@@ -40,3 +40,12 @@ export async function setTokenBalance(
     .setTokenAccount(owner, mint, { amount, state: "initialized" })
     .send();
 }
+
+/**
+ * Drop the surfnet's copy of a mainnet account so the next read clones it
+ * again. Surfpool clones an account the first time it is read and then keeps
+ * that copy, so a price feed read later in a long test run would be stale.
+ */
+export async function refetchFromMainnet(account: Address): Promise<void> {
+  await cheatcodes.resetAccount(account).send();
+}

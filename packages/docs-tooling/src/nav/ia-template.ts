@@ -267,6 +267,23 @@ export const IA_TEMPLATE: TemplateTab[] = [
         pages: ["docs/defi/index"],
       },
       {
+        group: "Market tutorials",
+        pages: [
+          {
+            group: "Settle a trade",
+            root: "docs/defi/settle-trade",
+            tag: "~40 min",
+            expanded: true,
+            pages: [
+              "docs/defi/settle-trade/try-it",
+              "docs/defi/settle-trade/browser",
+              "docs/defi/settle-trade/local",
+              "docs/defi/settle-trade/go-live",
+            ],
+          },
+        ],
+      },
+      {
         group: "Trading guides",
         pages: [
           "docs/defi/exchange",

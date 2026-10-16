@@ -1,4 +1,5 @@
 import { ArrowDown } from "@boxicons/react/ArrowDown";
+import { ArrowLeftRight } from "@boxicons/react/ArrowLeftRight";
 import { ArrowRight } from "@boxicons/react/ArrowRight";
 import { ArrowUpRight } from "@boxicons/react/ArrowUpRight";
 import { BookOpen } from "@boxicons/react/BookOpen";
@@ -58,6 +59,7 @@ const JOB_ICONS: Record<JobPathId, IconComponent> = {
   payments: CreditCard,
   payPerCall: Server,
   asset: Layers,
+  trade: ArrowLeftRight,
 };
 
 const ROUTE_ICONS: Record<LearnRouteId, IconComponent> = {
@@ -156,6 +158,22 @@ function AssetVisual({ t }: { t: (key: string) => string }) {
           <b className="ms-2 text-[var(--dl-danger)]">✕</b>
         </div>
       </div>
+    </div>
+  );
+}
+
+function TradeVisual({ t }: { t: (key: string) => string }) {
+  const leg =
+    "rounded-[10px] border border-[var(--dl-line)] bg-[var(--dl-raised)] px-3 py-[7px] font-brand-mono text-[12.5px] text-[var(--dl-text)] motion-safe:animate-[dl-row_4s_infinite]";
+  return (
+    <div className="flex flex-col items-center gap-2.5">
+      <div dir="ltr" className="flex items-center gap-2.5">
+        <span className={leg}>4 LSF →</span>
+        <span className={`${leg} [animation-delay:2s]`}>← USDC</span>
+      </div>
+      <span className="font-brand-mono text-xs text-[var(--dl-accent-text)]">
+        {t("picker.visuals.tradeTag")}
+      </span>
     </div>
   );
 }
@@ -277,6 +295,7 @@ export async function DevelopersHub({
     payments: <PaymentVisual t={tt} />,
     payPerCall: <ApiVisual />,
     asset: <AssetVisual t={tt} />,
+    trade: <TradeVisual t={tt} />,
   };
 
   return (
@@ -353,7 +372,7 @@ export async function DevelopersHub({
             {t("picker.pauseAnimations")}
           </label>
           <ul
-            className="m-0 grid list-none gap-[18px] p-0 lg:grid-cols-3 peer-checked:[&_*]:![animation:none]"
+            className="m-0 grid list-none gap-[18px] p-0 md:grid-cols-2 xl:grid-cols-4 peer-checked:[&_*]:![animation:none]"
             data-testid="job-cards"
           >
             {JOB_PATHS.map((job) => {

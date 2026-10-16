@@ -28,6 +28,12 @@ export const JOB_PATHS = [
     firstResult: "10 min",
     total: "45 min",
   },
+  {
+    id: "trade",
+    href: "/docs/defi/settle-trade",
+    firstResult: "10 min",
+    total: "40 min",
+  },
 ] as const;
 
 export type JobPathId = (typeof JOB_PATHS)[number]["id"];

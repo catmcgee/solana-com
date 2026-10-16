@@ -84,6 +84,17 @@ JavaScript `run-examples.js` hides it behind a Run button.
   default-frozen accounts and a permanent delegate; a permitted transfer, a
   transfer to a frozen account that FAILS onchain (`Custom: 17`, fee still
   charged), pause/resume and a permanent-delegate transfer.
+- `paths/defi/settle-trade`: a delivery-versus-payment trade of the issue-asset
+  token against USDC. `price.ts` reads the live USDC/USD Pyth price feed account
+  (cloned from mainnet; the test re-clones it first with `refetchFromMainnet` so
+  its age check passes), `trade.ts` creates, funds and settles the trade with
+  the Solana Foundation DvP program (cloned from mainnet), including a settle
+  that FAILS onchain with `Custom: 4` (`LegNotFunded`) while the cash leg is
+  unfunded. `dvp/` is the program's Codama-generated TypeScript client, vendored
+  unchanged from `solana-foundation/dvp` at `df9919e` (MIT, excluded from
+  oxfmt). The `config.ts`, `create-asset.ts`, `approve-holder.ts` and
+  `blocked-transfer.ts` in that folder re-export the issue-asset files, because
+  readers run this tutorial in their issue-asset project.
 
 They read `RPC_URL`, `RPC_SUBSCRIPTIONS_URL` and `USDC_MINT` (devnet defaults,
 as shown to readers); `vitest.config.ts` points them at the local surfnet, and

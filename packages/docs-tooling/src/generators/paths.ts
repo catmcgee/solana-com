@@ -16,7 +16,7 @@
  *     "steps": [["/docs/payments/checkout/try-it", "Pay as a customer", "optional summary"], …],
  *     "after": { "href": "/docs/payments", "title": "…", "summary": "…" },   // optional
  *     "demo": {                              // optional run-it-yourself panel
- *       "component": "checkout",             // checkout | paywall | asset (stage style)
+ *       "component": "checkout",             // checkout | paywall | asset | trade (stage style)
  *       "title": "Demo Sticker Shop",
  *       "success": "…",
  *       "stage": [{ "label": "Holographic sticker", "sub": "1.00 USDC",
@@ -144,7 +144,7 @@ export const PATH_UI = {
 export type PathUi = typeof PATH_UI;
 
 /** Demo kinds: the stage style (styles/demo.css `[data-stage]`). */
-export const DEMO_KINDS = ["checkout", "paywall", "asset"] as const;
+export const DEMO_KINDS = ["checkout", "paywall", "asset", "trade"] as const;
 export type DemoKind = (typeof DEMO_KINDS)[number];
 
 export interface PathStep {
