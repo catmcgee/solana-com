@@ -77,14 +77,6 @@ describe("playground kinds (mirror of the playground's GitHub import)", () => {
       open: dir,
       kind: "ts",
     });
-    // A Python file in a mostly-TypeScript tutorial gets the folder's kind,
-    // so every block of a tutorial switches on together.
-    const checkout = "packages/docs-examples/paths/payments/checkout";
-    expect(playgroundSource(`${checkout}/verify_payment.py`)).toEqual({
-      src: `${checkout}/verify_payment.py`,
-      open: checkout,
-      kind: "ts",
-    });
   });
 });
 

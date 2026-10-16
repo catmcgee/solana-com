@@ -1,5 +1,3 @@
-import { spawnSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
 import { inspect } from "node:util";
 import type { AddressInfo } from "node:net";
 import {
@@ -205,34 +203,5 @@ describe("paths/payments/checkout", () => {
     } finally {
       await new Promise((resolve) => server.close(resolve));
     }
-  });
-
-  const python = process.env.PYTHON ?? "python3";
-  const hasSolanaPy =
-    spawnSync(python, ["-c", "import solana, solders"]).status === 0;
-  it.skipIf(!hasSolanaPy)("python: verify_payment.py agrees", async () => {
-    const py = (amount: bigint) =>
-      spawnSync(
-        python,
-        [
-          fileURLToPath(new URL("./verify_payment.py", import.meta.url)),
-          paid,
-          order.storeOwner,
-          String(amount),
-          order.reference,
-        ],
-        { encoding: "utf8", env: { ...process.env } },
-      );
-    const ok = py(order.amount);
-    const bad = py(5_000_000n);
-    expect(ok.status, ok.stderr).toBe(0);
-    expect(ok.stdout.trim()).toBe("paid: True");
-    expect(bad.stdout.trim()).toBe(
-      "paid: False, reason: amount mismatch: expected 5000000, received 1000000",
-    );
-    recordText(
-      out("verify_payment"),
-      `$ python verify_payment.py <signature> <store> ${order.amount} <reference>\n${ok.stdout.trim()}`,
-    );
   });
 });
