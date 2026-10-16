@@ -122,7 +122,7 @@ export async function DocsHeader({ locale }: { locale: string }) {
           className="dh-logo"
           aria-label={t("home")}
         >
-          <SolanaLogo gradientId="dh-logo-g" />
+          <SolanaLogo gradientId="dh-logo-g" developers />
         </a>
         <Tabs tabs={tabs} label={t("sections")} />
         <div className="dh-tools">
