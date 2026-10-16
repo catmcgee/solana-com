@@ -3,7 +3,7 @@
  * still builds them (it publishes every .mdx file), so this list must stay
  * short and each entry needs an owner to remove the file.
  *
- * Hidden-but-navigable pages (the Learn articles, docs/tags, docs/tools/ai)
+ * Hidden-but-navigable pages (the Learn articles, docs/tags)
  * are NOT here: they sit in `hidden: true` tabs in en.json.
  */
 import type { UnlistedPage } from "./types.ts";

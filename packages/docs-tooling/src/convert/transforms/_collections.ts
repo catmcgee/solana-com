@@ -1,6 +1,6 @@
 /**
  * Shared mdast helpers for the WP7 special-collection transforms
- * (bootcamp, video-guides, learn, tools-ai). Not a transform: files starting
+ * (bootcamp, video-guides, learn). Not a transform: files starting
  * with `_` are skipped by discovery.
  */
 import type { AstNode } from "../../types.ts";

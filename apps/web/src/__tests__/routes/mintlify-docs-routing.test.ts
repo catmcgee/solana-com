@@ -129,7 +129,7 @@ describe("Mintlify rewrites", () => {
     );
     expectRedirect(
       "/docs/tokenization/quickstart.md",
-      "/docs/assets/issue-asset.md",
+      "/developers/cookbook/tokens/create-mint-with-extensions.md",
     );
   });
 
@@ -241,8 +241,8 @@ describe("English fallbacks for untranslated locale pages", () => {
             : "/learn";
       const urlPath = pageToUrlPath(fallback.path);
       const english = urlPath ? `${prefix}/${urlPath}` : prefix;
-      // resolveRewrite: a few legacy redirects (e.g. /:locale/docs/tools/ai)
-      // win over the fallback, exactly as they did before.
+      // resolveRewrite: a legacy redirect, if any, wins over the fallback,
+      // exactly as it did before.
       expect(resolveRewrite(`/${fallback.loc}${english}`)).toMatchObject({
         destination: `${M}${english}`,
       });
@@ -430,9 +430,10 @@ describe("Redirects never hide a published English page", () => {
         }
       ).pages
     : [];
-  // Shadowed before the migration too; the redirect is the intended answer.
-  // (/docs/programs/anchor is now a real page: the catch-all is `:path+`.)
-  const known = new Set(["/docs/tools/ai"]);
+  // No page is shadowed by a redirect. (/docs/tools/ai was until 2026-10-16,
+  // when its unmerged content was restored; /docs/programs/anchor is a real
+  // page: the catch-all is `:path+`.)
+  const known = new Set<string>();
 
   it.skipIf(pages.length === 0)("checks every English manifest page", () => {
     const shadowed = pages

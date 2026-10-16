@@ -1,5 +1,5 @@
 /**
- * WP7 special collections: bootcamp, video-guides, learn, tools-ai
+ * WP7 special collections: bootcamp, video-guides, learn
  * transforms (fixtures + unit checks) and the tags generator.
  *
  * The transforms are imported directly (not via discovery) so these tests do
@@ -33,10 +33,6 @@ import {
   LEARN_ORDER,
 } from "../src/convert/transforms/learn.ts";
 import {
-  transform as toolsAi,
-  retarget,
-} from "../src/convert/transforms/tools-ai.ts";
-import {
   formatTime,
   youtubeId,
   youtubeStart,
@@ -48,8 +44,7 @@ import { docsRoot, repoRoot } from "../src/lib/paths.ts";
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 
-for (const t of [bootcamp, videoGuides, learn, toolsAi])
-  describeTransformFixtures(t);
+for (const t of [bootcamp, videoGuides, learn]) describeTransformFixtures(t);
 
 const run = (
   t: typeof bootcamp,
@@ -169,20 +164,6 @@ describe("learn", () => {
     );
     for (const p of LEARN_ORDER)
       expect(existsSync(path.join(docsRoot, `${p}.mdx`)), p).toBe(true);
-  });
-});
-
-describe("tools-ai", () => {
-  it("retargets only the retired page", () => {
-    expect(retarget("/docs/tools/ai")).toBe("/docs/intro/coding-with-agents");
-    expect(retarget("/fr/docs/tools/ai#x")).toBe(
-      "/fr/docs/intro/coding-with-agents",
-    );
-    expect(retarget("/docs/tools/ai.md")).toBe(
-      "/docs/intro/coding-with-agents.md",
-    );
-    expect(retarget("/docs/tools/aikido")).toBe(null);
-    expect(retarget("/docs/tools/ai/sub")).toBe(null);
   });
 });
 

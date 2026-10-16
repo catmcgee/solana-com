@@ -11,11 +11,20 @@
  * | CourseFacts                    | `**Label:** value · …` paragraph           |
  * | NextUp                         | `<Card title="Next up: …" horizontal>`     |
  * | VideoWithChapters              | `<Frame><iframe/></Frame>` + watch link +  |
+ * |                                | `<div className="sol-chapters">` around an |
  * |                                | ordered list of timestamp links            |
  * | VideoChapterList               | `<Columns cols={2}>` of thumbnail `<Card>` |
  * | ProjectCardGrid                | `<Columns cols={3}>` of thumbnail `<Card>` |
  *
- * `modal` is dropped: cards open the video on YouTube. Thumbnails are the
+ * Interactive behaviour comes from `apps/docs/video-chapters.js` and
+ * `styles/video.css`, keyed on two wrapper classes:
+ * - `sol-chapters` (`data-video` = the embedded video id): a chapter link
+ *   seeks the embedded player in place (its `src` is swapped to
+ *   `?start=<t>&autoplay=1`) instead of leaving the page.
+ * - `sol-video-modal` (the legacy `modal` flag): a card opens its video in
+ *   an autoplaying dialog; closing the dialog stops playback.
+ * Without JavaScript every link is a plain YouTube watch link (`?t=` for
+ * chapters), so the pages still read and play. Thumbnails are the
  * always-present `mqdefault.jpg` (16:9). `Embed` is left to WP2's embed.ts.
  */
 import type { AstNode, ConvertContext, Transform } from "../../types.ts";
@@ -251,15 +260,17 @@ export function convertComponent(
         youtubeFrame(id, title),
         paragraph([link(youtubeWatchUrl(id), `Watch ${title} on YouTube`)]),
         paragraph([strong("Chapters")]),
-        list(
-          chapters.map((c) => [
-            link(
-              youtubeWatchUrl(id, c.start),
-              `${formatTime(c.start)} ${c.title}`,
-            ),
-          ]),
-          true,
-        ),
+        jsx("div", { className: "sol-chapters", "data-video": id }, [
+          list(
+            chapters.map((c) => [
+              link(
+                youtubeWatchUrl(id, c.start),
+                `${formatTime(c.start)} ${c.title}`,
+              ),
+            ]),
+            true,
+          ),
+        ]),
       ];
     }
     case "VideoChapterList":
@@ -275,7 +286,8 @@ export function convertComponent(
       );
       const label = str(getAttr(node, "label"));
       const timestamps = getAttr(node, "timestamps") === true;
-      return videoGrid(items, isList ? 2 : 3, (item, i) => {
+      const modal = getAttr(node, "modal") === true;
+      const grid = videoGrid(items, isList ? 2 : 3, (item, i) => {
         const time =
           timestamps && item.href
             ? formatTime(youtubeStart(item.href))
@@ -290,6 +302,9 @@ export function convertComponent(
           !timestamps,
         );
       });
+      return modal
+        ? [jsx("div", { className: "sol-video-modal" }, grid)]
+        : grid;
     }
     default:
       return [node];

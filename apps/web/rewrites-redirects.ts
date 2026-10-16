@@ -301,10 +301,6 @@ const movedDocsRedirects: RedirectInput[] = withMdVariants([
     destination: "/docs/tools/x402-facilitator",
   },
   {
-    source: "/docs/tools/ai",
-    destination: "/docs/intro/coding-with-agents",
-  },
-  {
     source: "/docs/references",
     destination: "/docs/references/clusters",
   },
@@ -385,8 +381,11 @@ const movedDocsRedirects: RedirectInput[] = withMdVariants([
   // anchor get no automatic `.md` twin (withMdVariants); see
   // anchoredMdTwinRedirects below.
   {
+    // The quickstart launched a plain Token-2022 mint with extensions; its
+    // code, tabs and prose live on this cookbook page (2026-10-16), not on
+    // the compliance-controls issue-asset path.
     source: "/docs/tokenization/quickstart",
-    destination: "/docs/assets/issue-asset",
+    destination: "/developers/cookbook/tokens/create-mint-with-extensions",
   },
   {
     // Exact path only: /docs/tokenization/<page> still exists.

@@ -26,6 +26,7 @@ import { DEFAULT_LOCALE } from "../lib/locales.ts";
 import { LEGACY_REF, docsRoot } from "../lib/paths.ts";
 import { listFilesAtRef, showFileAtRef } from "../lib/git.ts";
 import type { NavEntry, NavGroup, NavPage } from "./types.ts";
+import { isGroup } from "./types.ts";
 
 export interface LegacyMeta {
   title?: string;
@@ -314,7 +315,7 @@ export function expandFolder(ctx: ExpandContext, folder: string): NavEntry[] {
   }
 
   // Drop separator groups that ended up empty.
-  return top.filter((e) => typeof e === "string" || e.pages.length > 0);
+  return top.filter((e) => !isGroup(e) || e.pages.length > 0);
 }
 
 /** Pages whose frontmatter sets `index: true` (Fumadocs DocsCategory). */

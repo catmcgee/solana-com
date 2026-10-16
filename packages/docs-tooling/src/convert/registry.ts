@@ -47,7 +47,7 @@ export const TRANSFORMS_DIR = fileURLToPath(
  *           accordion 250, embed 260, html 270, themed-image 280,
  *           images 290, codetabs 300
  *   600-699 special collections: bootcamp 610, video-guides 620,
- *           learn 630, tools-ai 640
+ *           learn 630
  *   900+    fences 900 (meta + annotations, deliberately last so every
  *           container transform sees raw syntax), web3js-specifier 910,
  *           anchors 920, dedupe-lede 930, dollar-escape 950

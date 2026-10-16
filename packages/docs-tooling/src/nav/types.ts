@@ -23,7 +23,15 @@ export interface NavGroup {
   pages: NavEntry[];
 }
 
-export type NavEntry = NavPage | NavGroup;
+/** An external sidebar link (Mintlify `navigationLinkSchema`). */
+export interface NavLink {
+  type: "link";
+  title: string;
+  /** Absolute http(s) URL. */
+  href: string;
+}
+
+export type NavEntry = NavPage | NavGroup | NavLink;
 
 export interface NavTab {
   tab: string;
@@ -41,7 +49,10 @@ export interface NavFile {
   tabs: NavTab[];
 }
 
-export const isGroup = (e: NavEntry): e is NavGroup => typeof e !== "string";
+export const isGroup = (e: NavEntry): e is NavGroup =>
+  typeof e === "object" && "group" in e;
+export const isLink = (e: NavEntry): e is NavLink =>
+  typeof e === "object" && (e as NavLink).type === "link";
 
 // ---------------------------------------------------------------------------
 // IA template (one-time compile input)

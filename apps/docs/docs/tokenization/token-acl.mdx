@@ -284,6 +284,25 @@ The ABL (Allow Block List) Gate Program supports several modes:
 | `Block`   | All wallets EXCEPT those on block list can thaw | Sanctions compliance |
 | Composite | Combine allow + block lists                     | Full compliance setup |
 
+<Note>
+
+**`AllowAllEoas` mode is no longer available.** Earlier versions of the ABL
+Gate Program had a third mode, `AllowAllEoas`, in which every regular wallet
+(an owner on the ed25519 curve) could thaw its own account, while accounts owned
+by a PDA could thaw only if that PDA was added to the list. It suited open
+tokens that keep smart contracts out unless approved. It was removed in
+[token-acl-gate PR #17](https://github.com/solana-foundation/token-acl-gate/commit/d288c854e1fe0e1ccffec4f7d8b6c4c98d05ca0c).
+In the current program, mode value `1` is a reserved `Unused` placeholder that
+`create_list` rejects
+([`list_config.rs`](https://github.com/solana-foundation/token-acl-gate/blob/main/program/src/state/list_config.rs)),
+`@solana/token-acl-gate-sdk` 0.3.x exports `Mode.Allow`, `Mode.Unused` and
+`Mode.Block` only, and `token-acl-gate-cli create-list` accepts only
+`--mode allow` and `--mode block`. An empty `Block` list lets every account
+thaw, PDAs included; to keep PDAs out you need an `Allow` list or a custom Gate
+Program.
+
+</Note>
+
 <Danger>
 
 **Block List Precedence**
@@ -573,7 +592,9 @@ async function createTokenACLConfig(mintAddress: Address) {
 
 ### Step 4: Setup ABL Gate Program
 
-Create an ABL list and setup extra metas. Use one tab for your mint:
+Create an ABL list and setup extra metas. Use one tab for your mint (the
+former `AllowAllEoas` mode was removed; see
+[ABL Gate Program Modes](#abl-gate-program-modes)):
 
 <Tabs>
 
@@ -961,6 +982,16 @@ Combine **Allow list + Block list** for complete control:
 - Allow list: KYC-verified investors
 - Block list: Sanctioned addresses, terminated employees, etc.
 
+### 4. Open Token with PDA Protection
+
+An open token that lets every regular wallet thaw but keeps PDAs (smart
+contracts) frozen used the `AllowAllEoas` mode. That mode is not available in
+the current ABL Gate Program (see
+[ABL Gate Program Modes](#abl-gate-program-modes)). To get the same behaviour
+today, write a custom Gate Program whose thaw check accepts any owner on the
+ed25519 curve and checks a list only for off-curve owners, as the removed mode
+did.
+
 ## Production Considerations
 
 Before deploying to production:
@@ -1112,6 +1143,10 @@ token-acl-gate-cli create-list --mode allow
 token-acl-gate-cli create-list --mode block
 
 ```
+
+Older versions of the CLI also accepted `--mode allow-all-eoas`. That mode was
+removed from the program (see [ABL Gate Program Modes](#abl-gate-program-modes)),
+so the current CLI rejects it.
 
 The command prints the `list_config` PDA address, the `seed` and the transaction
 signature - **save the first two!**

@@ -148,15 +148,70 @@ takes 30 minutes to an hour.
 
 </Step>
 
-<Step title="Create an escrow instance">
+<Step title="Set up instance management tooling">
 
-Ensure the admin keypair has Devnet SOL for fees, then run the CLI script from
-`scripts/devnet`, which creates the instance and prints its address. Set the
-**Instance Address** as `ESCROW_INSTANCE_ID` in `.env.devnet`.
+You create and configure the escrow instance (`CreateInstance`, `AllowMint`,
+`AddOperator`) with the CLI binaries in
+[`scripts/devnet`](https://github.com/solana-foundation/solana-private-channels/tree/main/scripts/devnet),
+run from the repository root. They read their signers from keypair files, so
+create those first:
 
 ```bash
-cargo run --bin create_instance -- https://api.devnet.solana.com ./keypairs/admin.json
+mkdir -p keypairs
+# Escrow admin (Instance.admin): signs create_instance, allow_mint, add_operator
+solana-keygen new -o ./keypairs/escrow-admin.json -s --no-bip39-passphrase
+# User: holds the whitelisted token, signs deposit and withdraw
+solana-keygen new -o ./keypairs/user.json -s --no-bip39-passphrase
 ```
+
+<Accordion title="Admin UI (removed from the repository in August 2026)">
+
+Earlier versions of this guide used the Admin UI, a browser-based tool for
+creating and configuring the escrow instance: a development and administration
+utility, not a user-facing product and not a required runtime component. All
+operations it performed (`CreateInstance`, `AllowMint`, `AddOperator`) can also
+be run with the CLI scripts above.
+
+The Admin UI was removed upstream in
+[PR #253](https://github.com/solana-foundation/solana-private-channels/commit/6723071ccade9279d3dab0d0b6ff2924646d24bf)
+because it was not part of the deployed stack and, according to that PR, its
+"create instance" flow was unfinished. It no longer exists on `main` and may not
+match the current escrow program, so use the CLI for real deployments. To try
+it, check out the commit before the removal:
+
+```bash
+git checkout 6723071ccade9279d3dab0d0b6ff2924646d24bf~1
+cd admin-ui
+pnpm install
+echo "PRIVATE_CHANNEL_RPC_URL=http://localhost:8899" > .env
+pnpm dev   # opens at http://localhost:5173
+```
+
+</Accordion>
+
+</Step>
+
+<Step title="Create an escrow instance">
+
+Ensure the escrow admin keypair has Devnet SOL for fees (use the
+[Solana Faucet](https://faucet.solana.com/) if needed), then run the CLI script
+from `scripts/devnet`, which creates the instance and prints its address. Set
+the **Instance Address** as `ESCROW_INSTANCE_ID` in `.env.devnet`.
+
+```bash
+cargo run --bin create_instance -- \
+  https://api.devnet.solana.com \
+  ./keypairs/escrow-admin.json
+```
+
+<Accordion title="With the Admin UI (older versions only)">
+
+1. Set your browser wallet to **Devnet** and ensure you have Devnet SOL for fees
+2. In the Admin UI, click **Create New Instance** and approve the transaction
+3. Copy the **Instance Address** and set it as `ESCROW_INSTANCE_ID` in
+   `.env.devnet`
+
+</Accordion>
 
 </Step>
 
@@ -214,16 +269,38 @@ passed, so the trailing `--env-file .env` is required. Without it,
 <Step title="Configure the instance">
 
 With the stack running, whitelist a token mint and add your operator using the
-`scripts/devnet` cargo binaries (check that directory for the binary that allows
-a mint). Add the operator:
+`scripts/devnet` cargo binaries.
 
-```bash
-cargo run --bin add_operator -- \
-  https://api.devnet.solana.com \
-  ./keypairs/admin.json \
-  <INSTANCE_ID> \
-  <OPERATOR_PUBKEY>
-```
+1. **Allow Mint**: whitelist the token mint you want to support (for example
+   Devnet USDC, `4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU`):
+
+   ```bash
+   cargo run --bin allow_mint -- \
+     https://api.devnet.solana.com \
+     ./keypairs/escrow-admin.json \
+     <INSTANCE_ID> \
+     <MINT_ADDRESS>
+   ```
+
+2. **Add Operator**: register the operator public key from the "Generate an
+   operator keypair" step:
+
+   ```bash
+   cargo run --bin add_operator -- \
+     https://api.devnet.solana.com \
+     ./keypairs/escrow-admin.json \
+     <INSTANCE_ID> \
+     <OPERATOR_PUBKEY>
+   ```
+
+<Accordion title="With the Admin UI (older versions only)">
+
+1. **Allow Mint**: Admin Functions -> Mint Management -> enter mint address ->
+   Allow Mint
+2. **Add Operator**: Admin Functions -> Operator Management -> enter operator
+   pubkey -> Add Operator
+
+</Accordion>
 
 </Step>
 

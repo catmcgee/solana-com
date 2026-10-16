@@ -48,8 +48,8 @@ export function navPageRefs(nav: NavFile): NavPage[] {
   const out: NavPage[] = [];
   const walk = (entries: NavEntry[]) => {
     for (const e of entries) {
-      if (!isGroup(e)) out.push(e);
-      else {
+      if (typeof e === "string") out.push(e);
+      else if (isGroup(e)) {
         if (e.root) out.push(e.root);
         walk(e.pages);
       }
@@ -72,7 +72,9 @@ function shape(nav: NavFile): string {
           p: e.pages.map(g),
           x: [e.expanded, e.hidden, e.searchable, e.directory],
         }
-      : 0;
+      : typeof e === "string"
+        ? 0
+        : { l: e.href };
   return JSON.stringify(
     nav.tabs.map((t) => ({
       h: t.href ? 1 : 0,

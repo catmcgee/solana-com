@@ -1687,6 +1687,55 @@ const FIGURES = {
     ];
   },
 
+  "diagrams/solana-overview": (p) => {
+    // Apps on top, each connecting down into the network: one focal card
+    // holding six computers linked in a row (peers, so no heads).
+    const label =
+      "Payment, game, and market apps connect to Solana, a network made up of computers working together.";
+    const aw = 176,
+      xs = [24, 256, 488];
+    const apps = ["Payments", "Games", "Markets"].map((title, i) =>
+      p.card({ x: xs[i], y: 24, w: aw, title, tag: "app" }),
+    );
+    const ny = apps[0].bottom + 48;
+    const net = p.card({
+      x: 24,
+      y: ny,
+      w: W - 48,
+      title: "Solana network",
+      desc: "Computers working together",
+      accent: true,
+      minH: HEAD_DESC + 40 + 24,
+    });
+    apps.forEach((a) =>
+      p.edge([
+        [a.cx, a.bottom],
+        [a.cx, net.y],
+      ]),
+    );
+    const cw = 88,
+      gap = 16,
+      cy = ny + HEAD_DESC;
+    const nodes = [];
+    for (let i = 0; i < 6; i++) {
+      const x = net.x + 16 + i * (cw + gap);
+      p.rect(x, cy, cw, 40);
+      p.text(x + 16, cy + 20, "Computer", { fill: p.c.ink2 });
+      nodes.push(x);
+    }
+    for (let i = 0; i < 5; i++)
+      p.edge(
+        [
+          [nodes[i] + cw, cy + 20],
+          [nodes[i + 1], cy + 20],
+        ],
+        { head: false },
+      );
+    // The links sit inside the network card: lift them above its fill.
+    for (let i = 0; i < 5; i++) p.front.push(p.back.pop());
+    return [W, net.bottom + 24, label];
+  },
+
   "core/fees/fees": (p) => {
     const c = p.c;
     const base = p.card({
@@ -3179,6 +3228,63 @@ const SM = {
       pda.bottom + 24,
       "Core concepts: accounts store state, programs hold logic, transactions carry instructions that call programs and pay fees; programs derive PDAs and invoke other programs through CPIs",
     ];
+  },
+
+  "diagrams/solana-overview@sm": (p) => {
+    const label =
+      "Payment, game, and market apps connect to Solana, a network made up of computers working together.";
+    const aw = (SC - 16) / 3;
+    const apps = ["Payments", "Games", "Markets"].map((title, i) =>
+      p.card({ x: SX + i * (aw + 8), y: 24, w: aw, title }),
+    );
+    const ny = apps[0].bottom + 48;
+    const cw = 80,
+      gap = 16,
+      ch = 40;
+    const net = p.card({
+      x: SX,
+      y: ny,
+      w: SC,
+      title: "Solana network",
+      desc: "Computers working together",
+      accent: true,
+      minH: HEAD_DESC + 2 * ch + gap + 24,
+    });
+    apps.forEach((a) =>
+      p.edge([
+        [a.cx, a.bottom],
+        [a.cx, net.y],
+      ]),
+    );
+    const x0 = SX + (SC - (3 * cw + 2 * gap)) / 2;
+    const ys = [ny + HEAD_DESC, ny + HEAD_DESC + ch + gap];
+    for (const y of ys)
+      for (let i = 0; i < 3; i++) {
+        const x = x0 + i * (cw + gap);
+        p.rect(x, y, cw, ch);
+        p.text(x + 12, y + ch / 2, "Computer", { fill: p.c.ink2 });
+        if (i < 2)
+          p.edge(
+            [
+              [x + cw, y + ch / 2],
+              [x + cw + gap, y + ch / 2],
+            ],
+            { head: false },
+          );
+      }
+    for (let i = 0; i < 3; i++) {
+      const x = x0 + i * (cw + gap) + cw / 2;
+      p.edge(
+        [
+          [x, ys[0] + ch],
+          [x, ys[1]],
+        ],
+        { head: false },
+      );
+    }
+    // The links sit inside the network card: lift them above its fill.
+    for (let i = 0; i < 7; i++) p.front.push(p.back.pop());
+    return [SW, net.bottom + 24, label];
   },
 
   "core/fees/fees@sm": (p) => {

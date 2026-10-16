@@ -380,6 +380,7 @@ export const IA_TEMPLATE: TemplateTab[] = [
         group: "Set up",
         pages: [
           "docs/intro/coding-with-agents",
+          "docs/tools/ai",
           {
             group: "Set up your machine",
             root: "docs/intro/installation/index",
@@ -621,10 +622,6 @@ export const IA_TEMPLATE: TemplateTab[] = [
         searchable: true,
         pages: ["docs/tags/index"],
       },
-      // Not searchable: apps/web redirects /docs/tools/ai to
-      // /docs/intro/coding-with-agents, so the page is shadowed. WP8 merges it
-      // and deletes the file (spec §2.2 notes).
-      { group: "Pending merge", pages: ["docs/tools/ai"] },
     ],
   },
 ];

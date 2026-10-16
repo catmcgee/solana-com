@@ -158,7 +158,9 @@ export function buildLocaleNav(
     if (!p || !have.has(localize(p, loc))) return h;
     return h.slice(0, h.length - local.length) + urlOf(localize(p, loc));
   };
-  const entry = (e: NavEntry): NavEntry => (isGroup(e) ? group(e) : page(e));
+  // External links are copied as they are (their titles are proper nouns).
+  const entry = (e: NavEntry): NavEntry =>
+    isGroup(e) ? group(e) : typeof e === "string" ? page(e) : { ...e };
   // Rebuild objects key by key so the output keeps en.json's key order.
   const group = (g: NavGroup): NavGroup => {
     const out: Record<string, unknown> = {};
