@@ -340,7 +340,7 @@ export function renderTerminal(t: TermInput): string {
   ].join(" ");
   const lines: string[] = [`<div ${rootAttrs}>`];
   lines.push(
-    `<div className="sol-term-head"><span className="sol-term-dots" aria-hidden="true"><i></i><i></i><i></i></span><span className="sol-term-title">${termText(t.title)}</span><span className="sol-term-env">${termText(l.env)}</span><button type="button" className="sol-term-copy" data-act="copy">${termText(l.copy)}</button></div>`,
+    `<div className="sol-term-head"><span className="sol-term-title">${termText(t.title)}</span><span className="sol-term-env">${termText(l.env)}</span><button type="button" className="sol-term-copy" data-act="copy">${termText(l.copy)}</button></div>`,
   );
   if (t.stage?.length)
     lines.push(...renderStage(t.stage, t.kind, t.steps.length));
