@@ -17,7 +17,7 @@ const DARK_BG = "rgb(10, 10, 11)";
 const LIGHT_BG = "rgb(255, 255, 255)";
 const MCP_URL = "https://mcp.solana.com/mcp";
 const COMMANDS = {
-  agent: `npx add-mcp ${MCP_URL}`,
+  agent: `npx add-mcp ${MCP_URL} -n solana-mcp -g -y`,
   install:
     "curl --proto '=https' --tlsv1.2 -sSfL https://solana-install.solana.workers.dev | bash",
 } as const;

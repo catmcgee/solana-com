@@ -171,7 +171,7 @@ describe("set up in one command card", () => {
     // Verbatim from https://mcp.solana.com.
     expect(AGENT_SETUP.serverUrl).toBe("https://mcp.solana.com/mcp");
     expect(AGENT_SETUP.allAgentsCommand).toBe(
-      "npx add-mcp https://mcp.solana.com/mcp",
+      "npx add-mcp https://mcp.solana.com/mcp -n solana-mcp -g -y",
     );
     expect(AGENT_SETUP.clients).toEqual([
       {

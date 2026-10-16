@@ -76,7 +76,7 @@ export const MCP_SERVER_URL = "https://mcp.solana.com/mcp";
 export const AGENT_SETUP = {
   serverUrl: MCP_SERVER_URL,
   /** add-mcp detects the coding agents in use and adds the server to each. */
-  allAgentsCommand: `npx add-mcp ${MCP_SERVER_URL}`,
+  allAgentsCommand: `npx add-mcp ${MCP_SERVER_URL} -n solana-mcp -g -y`,
   /** Per-agent commands, shown on the Build with AI agents page. */
   clients: [
     {
