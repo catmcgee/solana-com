@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { CopyButton } from "./copy-button.client";
 import { AGENT_PROMPT } from "@/data/developers/hub";
 
@@ -32,11 +32,24 @@ export function AgentPrompt({
       <code
         dir="ltr"
         data-testid="agent-prompt"
-        className="min-w-0 flex-1 select-all pt-1 font-[family-name:var(--dl-mono)] !text-[13px] leading-[1.6] text-[var(--dl-text)] [overflow-wrap:anywhere]"
+        className="min-w-0 flex-1 select-all pt-1 font-[family-name:var(--dl-mono)] !text-[13px] leading-[1.6] text-[var(--dl-text)] [overflow-wrap:break-word]"
       >
         {AGENT_PROMPT.lead}{" "}
         <span className="text-[var(--dl-accent-text)]">
-          {text.slice(AGENT_PROMPT.lead.length + 1)}
+          {/* Wrap only after a slash, never mid-word. */}
+          {text
+            .slice(AGENT_PROMPT.lead.length + 1)
+            .split("/")
+            .map((part, i) => (
+              <Fragment key={i}>
+                {i > 0 && (
+                  <>
+                    /<wbr />
+                  </>
+                )}
+                {part}
+              </Fragment>
+            ))}
         </span>
       </code>
       <CopyButton

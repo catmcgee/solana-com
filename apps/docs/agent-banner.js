@@ -54,6 +54,21 @@
       url.textContent = url.textContent.split(PROD + "/").join(origin + "/");
     }
 
+    // Let a long URL wrap only after a slash, never mid-word. <wbr> adds no
+    // text, so Copy still copies the plain line.
+    var span = line.querySelector(".sol-agent-banner-url");
+    if (span && !span.querySelector("wbr")) {
+      var parts = span.textContent.split("/");
+      span.textContent = "";
+      parts.forEach(function (part, i) {
+        if (i) {
+          span.appendChild(document.createTextNode("/"));
+          span.appendChild(document.createElement("wbr"));
+        }
+        span.appendChild(document.createTextNode(part));
+      });
+    }
+
     var box = line.parentElement;
     if (!box || box.querySelector(".sol-agent-banner-btn")) return;
     var label = line.getAttribute("data-copy") || "Copy";
