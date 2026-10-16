@@ -269,6 +269,8 @@ export function strayAssetsInDocsRoot(
     "apps/docs/ask-ai.js",
     // "Open in Playground" on every code block (styles/playground.css).
     "apps/docs/playground.js",
+    // One-click light/dark switch in the header (styles/theme.css).
+    "apps/docs/theme-toggle.js",
     "apps/docs/styles/",
   ],
 ) {

@@ -17,12 +17,9 @@
  * meta.json and was renamed to "Kora guides" in en.json by hand.
  *
  * Deviations from spec §2.2, each forced by decisions.md:
- * - Video tutorials is an external-link tab on the right (`href`,
- *   `align: "end"`) pointing at the Mintlify-served
- *   https://solana.com/docs/video-guides. A tab
- *   with `href` has no sidebar, so the video guides and the Developer
- *   Bootcamp live in Resources (Stripe keeps learning material in Developer
- *   resources too), and the tab link lands there.
+ * - Video tutorials is a regular tab on the right (`align: "end"`) whose
+ *   sidebar holds the video guides; the Developer Bootcamp stays in
+ *   Resources.
  * - Greek is dropped, so there is no `el` branch.
  */
 import type { TemplateTab } from "./types.ts";
@@ -486,37 +483,6 @@ export const IA_TEMPLATE: TemplateTab[] = [
         pages: ["developers/cookbook/index", x("developers/cookbook")],
       },
       {
-        group: "Videos",
-        labelFrom: "message:videoTutorials",
-        pages: [
-          "docs/video-guides/index",
-          {
-            group: "Foundations",
-            labelFrom: "meta:developers/bootcamp/foundations",
-            pages: [
-              "docs/video-guides/solana-crash-course",
-              "docs/video-guides/2026-developer-bootcamp",
-            ],
-          },
-          {
-            group: "Payments",
-            labelFrom: "message:payments",
-            pages: [
-              "docs/video-guides/agent-payments",
-              "docs/video-guides/pay-sh-video-tutorials",
-            ],
-          },
-          {
-            group: "Privacy",
-            pages: ["docs/video-guides/confidential-balances"],
-          },
-          {
-            group: "Hardware & DePIN",
-            pages: ["docs/video-guides/building-depin-projects"],
-          },
-        ],
-      },
-      {
         group: "Developer Bootcamp",
         labelFrom: "meta:developers/bootcamp",
         pages: ["developers/bootcamp/index", x("developers/bootcamp")],
@@ -578,17 +544,46 @@ export const IA_TEMPLATE: TemplateTab[] = [
     ],
   },
 
-  // External-link tab on the right (decisions.md). The pages are served by
-  // this Mintlify project behind the solana.com proxy. The URL is absolute:
-  // Mintlify renders a relative tab href as "/" (checked with mint dev), and
-  // styles/theme.css (WP11) styles external tabs by `href^="http"`. The
-  // locale builder rewrites it to /<loc>/docs/video-guides once translated.
+  // Video tutorials: a regular tab on the right, with the video guides in
+  // its own sidebar. styles/theme.css pushes the last tab to the far end.
   {
     tab: "Video tutorials",
     icon: "play",
-    href: "https://solana.com/docs/video-guides",
     align: "end",
     labelFrom: "message:videoTutorials",
+    groups: [
+      {
+        group: "Videos",
+        labelFrom: "message:videoTutorials",
+        pages: [
+          "docs/video-guides/index",
+          {
+            group: "Foundations",
+            labelFrom: "meta:developers/bootcamp/foundations",
+            pages: [
+              "docs/video-guides/solana-crash-course",
+              "docs/video-guides/2026-developer-bootcamp",
+            ],
+          },
+          {
+            group: "Payments",
+            labelFrom: "message:payments",
+            pages: [
+              "docs/video-guides/agent-payments",
+              "docs/video-guides/pay-sh-video-tutorials",
+            ],
+          },
+          {
+            group: "Privacy",
+            pages: ["docs/video-guides/confidential-balances"],
+          },
+          {
+            group: "Hardware & DePIN",
+            pages: ["docs/video-guides/building-depin-projects"],
+          },
+        ],
+      },
+    ],
   },
 
   // Hidden tabs: published, reachable, not in the tab bar.
