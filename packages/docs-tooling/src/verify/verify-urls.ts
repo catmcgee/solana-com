@@ -271,6 +271,8 @@ export function strayAssetsInDocsRoot(
     "apps/docs/playground.js",
     // One-click light/dark switch in the header (styles/theme.css).
     "apps/docs/theme-toggle.js",
+    // Logo link to /developers as a full page load.
+    "apps/docs/logo-link.js",
     "apps/docs/styles/",
   ],
 ) {
