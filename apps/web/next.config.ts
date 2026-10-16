@@ -207,6 +207,11 @@ const nextConfig: NextConfig = {
         source: "/:path*",
         headers: securityHeaders,
       },
+      // `/:path*` does not cover the bare root, so repeat the rules for "/".
+      {
+        source: "/",
+        headers: securityHeaders,
+      },
     ];
   },
 
