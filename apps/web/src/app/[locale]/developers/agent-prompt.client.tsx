@@ -28,15 +28,16 @@ export function AgentPrompt({
   }, []);
 
   return (
-    <div className="m-0 flex items-center gap-3 rounded-[10px] border border-[var(--dl-line)] bg-[var(--dl-surface-2)] py-1.5 pe-1.5 ps-3.5">
+    <div className="m-0 flex items-start gap-3 rounded-[10px] border border-[var(--dl-line)] bg-[var(--dl-surface-2)] py-1.5 pe-1.5 ps-3.5">
       <code
         dir="ltr"
         data-testid="agent-prompt"
-        title={text}
-        tabIndex={0}
-        className="dl-agent-prompt min-w-0 flex-1 select-all overflow-x-auto whitespace-nowrap font-[family-name:var(--dl-mono)] !text-[13px] leading-[1.6] text-[var(--dl-text)]"
+        className="min-w-0 flex-1 select-all pt-1 font-[family-name:var(--dl-mono)] !text-[13px] leading-[1.6] text-[var(--dl-text)] [overflow-wrap:anywhere]"
       >
-        {text}
+        {AGENT_PROMPT.lead}{" "}
+        <span className="text-[var(--dl-accent-text)]">
+          {text.slice(AGENT_PROMPT.lead.length + 1)}
+        </span>
       </code>
       <CopyButton
         text={text}

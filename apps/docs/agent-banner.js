@@ -49,10 +49,10 @@
       /^https?:\/\//.test(origin) &&
       !/^https?:\/\/(localhost|127\.0\.0\.1)(:|$)/.test(origin) &&
       line.textContent.indexOf(PROD + "/") !== -1
-    )
-      line.textContent = line.textContent.split(PROD + "/").join(origin + "/");
-    // Full line on hover too (the line scrolls sideways in agent-banner.css).
-    line.title = line.textContent;
+    ) {
+      var url = line.querySelector(".sol-agent-banner-url") || line;
+      url.textContent = url.textContent.split(PROD + "/").join(origin + "/");
+    }
 
     var box = line.parentElement;
     if (!box || box.querySelector(".sol-agent-banner-btn")) return;

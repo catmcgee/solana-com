@@ -102,6 +102,7 @@ export const AGENT_SETUP = {
 export const AGENT_PROMPT = {
   origin: "https://solana.com",
   guidePath: "/developers/docs/intro/agent-setup.md",
+  lead: "Set up Solana for me: fetch and follow this guide",
   line: (origin: string) =>
     `Set up Solana for me: fetch and follow this guide ${origin}/developers/docs/intro/agent-setup.md`,
 } as const;

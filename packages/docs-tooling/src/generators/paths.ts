@@ -36,8 +36,8 @@
  * - `stepper-<n>.mdx`, n = 0 (intro page, nothing current) … N (step N
  *   current). A `<div role="navigation">` with an `<ol>`; the current step's
  *   link carries `aria-current="step"`. Raw `<nav>` is dropped by Mintlify.
- * - `next-<n>.mdx`: a horizontal `<Card>` to step n+1 (n = 0 … N-1), and
- *   `next-<N>.mdx` to `after` when it is set.
+ * (No per-step "Next" cards: Mintlify's own previous/next links at the bottom
+ *   of each page are the only page-to-page navigation.)
  * - `card.mdx`: the path card for job pickers and hubs.
  * - `start.mdx`: the same card for the path intro, pointing at step 1
  *   (the mockup's "Start building" block under the flow).
@@ -724,21 +724,6 @@ ${tutorialButton(ui, pg)}
 `;
 }
 
-function nextCard(docsRoot: string, src: PathsSource, p: PathDef, n: number) {
-  const { ui, lang } = src;
-  const target = n < p.steps.length ? p.steps[n]! : p.after!;
-  const body =
-    target.summary !== undefined
-      ? mdInline(target.summary)
-      : n < p.steps.length
-        ? mdText(`${p.name} · ${ui.step} ${n + 1}/${p.steps.length}`)
-        : "";
-  return `${hdr(lang)}
-<Card ${attr("title", `${ui.next}: ${target.title}`)} href="${localizeHref(docsRoot, target.href, lang)}" icon="arrow-right" horizontal>
-${body}
-</Card>
-`;
-}
 
 /**
  * Path card (job pickers, hubs). Mirrors the mockup's `.pcard`: kicker, title,
@@ -949,16 +934,6 @@ export function buildPathOutputs(
         path.join(dir, "playground.mdx"),
         renderPlaygroundBlock(src, p, pg),
       );
-      for (let n = 0; n < p.steps.length; n++)
-        files.set(
-          path.join(dir, `next-${n}.mdx`),
-          nextCard(docsRoot, src, p, n),
-        );
-      if (p.after)
-        files.set(
-          path.join(dir, `next-${p.steps.length}.mdx`),
-          nextCard(docsRoot, src, p, p.steps.length),
-        );
       files.set(path.join(dir, "card.mdx"), renderCard(docsRoot, src, p));
       files.set(
         path.join(dir, "start.mdx"),

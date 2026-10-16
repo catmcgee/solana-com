@@ -384,12 +384,6 @@ describe("generated snippets", () => {
     expect(read("snippets/paths/en/checkout/stepper-0.mdx")).not.toContain(
       "aria-current",
     );
-    expect(read("snippets/paths/en/checkout/next-0.mdx")).toContain(
-      '<Card title="Next: Pay as a customer" href="/developers/docs/payments/checkout/try-it" icon="arrow-right" horizontal>',
-    );
-    expect(read("snippets/paths/en/checkout/next-4.mdx")).toContain(
-      'href="/developers/docs/payments"',
-    );
     const card = read("snippets/paths/en/checkout/card.mdx");
     expect(card).toContain(
       "[Start the tutorial →](/developers/docs/payments/checkout)",
