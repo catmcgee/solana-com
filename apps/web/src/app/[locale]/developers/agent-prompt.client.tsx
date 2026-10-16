@@ -5,8 +5,8 @@ import { CopyButton } from "./copy-button.client";
 import { AGENT_PROMPT } from "@/data/developers/hub";
 
 /**
- * The one line a reader pastes into their coding agent, on one line that is
- * cut off with an ellipsis, with a copy icon button. It shows the URL without
+ * The one line a reader pastes into their coding agent, on one line that
+ * scrolls sideways (with no visible scrollbar), and a Copy button. It shows the URL without
  * "https://"; the button copies the full line. The ">" prompt is CSS, so it
  * is never copied or selected. It is the same line as the docs' Start here
  * banner (apps/docs/snippets/agent-banner.mdx). It points at the production
@@ -38,12 +38,12 @@ export function AgentPrompt({
         dir="ltr"
         data-testid="agent-prompt"
         title={text}
-        className="min-w-0 flex-1 select-all truncate whitespace-nowrap font-[family-name:var(--dl-mono)] !text-[13px] leading-[1.6] text-[var(--dl-text)] before:me-2 before:text-[var(--dl-accent-text)] before:content-['>']"
+        className="min-w-0 flex-1 select-all overflow-x-auto whitespace-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden font-[family-name:var(--dl-mono)] !text-[13px] leading-[1.6] text-[var(--dl-text)] before:me-2 before:text-[var(--dl-accent-text)] before:content-['>']"
       >
         {shown}
       </code>
       <CopyButton
-        tone="icon"
+        tone="accent"
         text={text}
         label={label}
         copyText={copyText}
