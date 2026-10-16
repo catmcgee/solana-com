@@ -28,11 +28,20 @@
  * Rust binaries, Python) gets a language kind (`ts`, `js`, `rust`, `py`) that
  * the script leaves disabled until the playground learns to import it.
  *
- * Granularity: a Rust file inside a crate (`<crate>/src/**.rs` with a
- * `<crate>/Cargo.toml`) opens the crate folder (the playground needs the
- * whole `src/` tree; this is how solana-developers/program-examples links
- * import). Every other file opens on its own. Pure apart from reading the
- * committed example tree; deterministic.
+ * Granularity:
+ *   - A file inside a job tutorial's example folder
+ *     (`packages/docs-examples/paths/<domain>/<tutorial>/**`) opens that whole
+ *     folder: a single tutorial file imports its siblings (config.ts, the
+ *     earlier steps) and does not run on its own. The kind is the folder's
+ *     (`folderKind`), so every block of a tutorial, its demo terminal and the
+ *     generated "Open tutorial in Playground" button (generators/paths.ts)
+ *     agree and switch on together.
+ *   - Any other Rust file inside a crate (`<crate>/src/**.rs` with a
+ *     `<crate>/Cargo.toml`) opens the crate folder (the playground needs the
+ *     whole `src/` tree; this is how solana-developers/program-examples links
+ *     import).
+ *   - Every other file (cookbook, standalone examples) opens on its own.
+ * Pure apart from reading the committed example tree; deterministic.
  */
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
@@ -125,9 +134,66 @@ function languageKind(file: string): PlaygroundKind {
   }
 }
 
+/** Repo-relative root of the job tutorial example folders. */
+export const TUTORIALS_REL = "packages/docs-examples/paths";
+
+/**
+ * The job tutorial folder (`packages/docs-examples/paths/<domain>/<tutorial>`)
+ * that `fileRel` (repo-relative, posix) sits in, or undefined for a file
+ * outside one (cookbook, standalone examples, files directly in a domain).
+ */
+export function tutorialFolder(fileRel: string): string | undefined {
+  const m = /^(packages\/docs-examples\/paths\/[^/]+\/[^/]+)\/./.exec(fileRel);
+  return m?.[1];
+}
+
+const LANG_ORDER: PlaygroundKind[] = ["ts", "js", "rust", "py"];
+const folderKinds = new Map<string, PlaygroundKind>();
+
+/**
+ * The kind of a whole folder (`absDir`), as the playground would import it:
+ * its framework when the folder is a program, else the language most of its
+ * source files are in (ties: ts, js, rust, py), else "other". Cached per
+ * folder (the example tree does not change during a run).
+ */
+export function folderKind(absDir: string): PlaygroundKind {
+  const hit = folderKinds.get(absDir);
+  if (hit) return hit;
+  const files = existsSync(absDir) ? listFiles(absDir) : [];
+  const contents: [string, string][] = files.map((f) => [
+    toPosix(path.relative(absDir, f)),
+    readFileSync(f, "utf8"),
+  ]);
+  let kind = detectProgramKind(contents);
+  if (!kind) {
+    const counts = new Map<PlaygroundKind, number>();
+    for (const f of files) {
+      const k = languageKind(f);
+      if (LANG_ORDER.includes(k)) counts.set(k, (counts.get(k) ?? 0) + 1);
+    }
+    let best = 0;
+    for (const k of LANG_ORDER)
+      if ((counts.get(k) ?? 0) > best) {
+        best = counts.get(k)!;
+        kind = k;
+      }
+  }
+  folderKinds.set(absDir, kind ?? "other");
+  return kind ?? "other";
+}
+
 /** Marker data for a tab sliced from `fileRel` (repo-relative, posix). */
 export function playgroundSource(fileRel: string): PlaygroundSource {
   const abs = path.join(repoRoot, fileRel);
+  const tutorial = tutorialFolder(fileRel);
+  if (tutorial && existsSync(path.join(repoRoot, tutorial)))
+    return {
+      src: fileRel,
+      open: tutorial,
+      kind: PG_PATH.test(tutorial)
+        ? folderKind(path.join(repoRoot, tutorial))
+        : "other",
+    };
   let openAbs = abs;
   const crate = /^(.*)\/src\/.+\.rs$/.exec(fileRel);
   if (crate && existsSync(path.join(repoRoot, crate[1]!, "Cargo.toml")))
@@ -148,11 +214,10 @@ export function playgroundSource(fileRel: string): PlaygroundSource {
 }
 
 /**
- * Marker data for a whole example folder (`dirRel`, repo-relative, posix),
- * e.g. the folder a path demo terminal runs its steps from
+ * Marker data for a whole example folder (`dirRel`, relative to `root`,
+ * posix), e.g. the folder a path demo terminal runs its steps from
  * (generators/paths.ts). `files` are the step sources in that folder, in
- * step order; the kind is the playground's framework when the folder is a
- * program, else the language of the first step source.
+ * step order (the first is `src`); the kind is the folder's (`folderKind`).
  */
 export function playgroundFolderSource(
   dirRel: string,
@@ -161,11 +226,6 @@ export function playgroundFolderSource(
 ): PlaygroundSource | undefined {
   const abs = path.join(root, dirRel);
   if (!files.length || !existsSync(abs)) return undefined;
-  const contents: [string, string][] = listFiles(abs).map((f) => [
-    toPosix(path.relative(abs, f)),
-    readFileSync(f, "utf8"),
-  ]);
-  let kind = detectProgramKind(contents) ?? languageKind(files[0]!);
-  if (!PG_PATH.test(dirRel)) kind = "other";
+  const kind = PG_PATH.test(dirRel) ? folderKind(abs) : "other";
   return { src: files[0]!, open: dirRel, kind };
 }

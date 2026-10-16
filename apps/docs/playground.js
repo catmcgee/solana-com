@@ -32,8 +32,21 @@
  * snippet regeneration needed). Kinds are computed by
  * packages/docs-tooling src/examples/playground.ts.
  *
- * Without JavaScript nothing changes: the markers are empty and hidden, and
- * the code blocks are Mintlify's own.
+ * Job tutorials (docs-tooling gen:paths) also get a server-rendered "Open
+ * tutorial in Playground" button (.sol-pg-tut): one in the header row of
+ * the tutorial stepper on every step page, and a larger one at the top of
+ * the step that runs the code on your machine (snippets/paths/<lang>/<key>/
+ * playground.mdx). It carries its own data-pg-open (the tutorial's whole
+ * example folder, packages/docs-examples/paths/<domain>/<tutorial>) and
+ * data-pg-kind (the folder's kind), plus localized data-pg-label /
+ * data-pg-off. It is generated disabled; scanTutorials() applies the same
+ * enabledKinds rule as the code block markers. Code blocks whose source
+ * sits in a tutorial folder open that same folder (a single tutorial file
+ * does not run on its own); every other block opens its own file or crate.
+ *
+ * Without JavaScript nothing changes: the markers are empty and hidden, the
+ * code blocks are Mintlify's own, and the tutorial buttons stay disabled
+ * (no href, greyed, tooltip).
  */
 (function () {
   if (window.__solPlayground) return;
@@ -128,6 +141,9 @@
   }
 
   function apply(ctl, href) {
+    // Generated tutorial buttons carry their own (localized) wording.
+    var label = ctl.getAttribute("data-pg-label") || LABEL;
+    var off = ctl.getAttribute("data-pg-off") || UNAVAILABLE_TIP;
     if (href) {
       setAttr(ctl, "href", href);
       setAttr(ctl, "target", "_blank");
@@ -135,8 +151,8 @@
       setAttr(ctl, "role", null);
       setAttr(ctl, "tabindex", null);
       setAttr(ctl, "aria-disabled", null);
-      setAttr(ctl, "data-tip", LABEL);
-      setAttr(ctl, "aria-label", LABEL + " (opens in a new tab)");
+      setAttr(ctl, "data-tip", label);
+      setAttr(ctl, "aria-label", label + " (opens in a new tab)");
     } else {
       setAttr(ctl, "href", null);
       setAttr(ctl, "target", null);
@@ -144,8 +160,8 @@
       setAttr(ctl, "role", "link");
       setAttr(ctl, "tabindex", "0");
       setAttr(ctl, "aria-disabled", "true");
-      setAttr(ctl, "data-tip", UNAVAILABLE_TIP);
-      setAttr(ctl, "aria-label", UNAVAILABLE_TIP);
+      setAttr(ctl, "data-tip", off);
+      setAttr(ctl, "aria-label", off);
     }
   }
 
@@ -176,6 +192,12 @@
     }
   }
 
+  /* "Open tutorial in Playground" buttons: the button is its own marker. */
+  function scanTutorials() {
+    var btns = document.querySelectorAll(".sol-pg-tut");
+    for (var i = 0; i < btns.length; i++) apply(btns[i], hrefOf(btns[i]));
+  }
+
   function scan() {
     var copies = document.querySelectorAll(".code-block-copy-button");
     for (var i = 0; i < copies.length; i++) {
@@ -195,6 +217,7 @@
       apply(ctl, hrefFor(box));
     }
     scanTerminals();
+    scanTutorials();
   }
 
   var pending = false;
@@ -224,7 +247,8 @@
     if (!ctl) return;
     var box = boxOf(ctl);
     // Re-resolve at click time so a just-switched tab is never stale.
-    if (box) apply(ctl, hrefFor(box));
+    if (ctl.classList.contains("sol-pg-tut")) apply(ctl, hrefOf(ctl));
+    else if (box) apply(ctl, hrefFor(box));
     else if (ctl.closest(".sol-term"))
       apply(ctl, termHref(ctl.closest(".sol-term")));
     if (ctl.getAttribute("aria-disabled") === "true") {

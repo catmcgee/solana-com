@@ -510,7 +510,23 @@ solana.com) before cutover. `mint dev` cannot answer them:
   `anchor`, `native`, and every current example is greyed out. Add a kind there
   when the playground can import it. Linked files must exist at that ref on
   GitHub. Each import costs one unauthenticated GitHub API call per folder
-  (60/hour per reader IP).
+  (60/hour per reader IP). Blocks whose source sits in a job tutorial folder
+  (`packages/docs-examples/paths/<domain>/<tutorial>/`) open that whole folder,
+  with the folder's kind, because one tutorial file does not run on its own.
+  Every other block opens its own file (or, for Rust, its crate).
+- **Open tutorial in Playground.** `gen:paths` puts the button in the header row
+  of every tutorial stepper (`stepper-<n>.mdx`) and writes
+  `snippets/paths/<lang>/<key>/playground.mdx`, a larger version for the top of
+  the step that runs the code on your machine. Import it right after the intro
+  paragraph there:
+  `import Playground from "/snippets/paths/en/<key>/playground.mdx";` and
+  `<Playground />`. Both open the tutorial's example folder: the folder the demo
+  outputs live in, else the single `packages/docs-examples/paths/*/<key>`
+  folder. Keep a new tutorial's examples in such a folder, named after its key
+  in `paths.en.json`, and the stepper button needs nothing else (gen:paths warns
+  when it finds no folder). The button is generated disabled, with no href and a
+  tooltip; `playground.js` enables it with the same `CONFIG.enabledKinds` rule.
+  Its wording is in `_ui` (`playground`, `playgroundOff`, `playgroundNote`).
 - **Terminal panels (job paths).** A recorded output with a `<stem>.run.json`
   next to its `<stem>.output.txt` renders as a terminal panel
   (`src/lib/terminal.ts`, styles `apps/docs/styles/demo.css`, behaviour

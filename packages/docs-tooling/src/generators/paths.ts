@@ -37,6 +37,16 @@
  * - `card.mdx`: the path card for job pickers and hubs.
  * - `start.mdx`: the same card for the path intro, pointing at step 1
  *   (the mockup's "Start building" block under the flow).
+ * - "Open tutorial in Playground": every `stepper-<n>.mdx` carries the
+ *   compact button in its header row, and `playground.mdx` is the prominent
+ *   block for the step that runs the code on your machine (import it at the
+ *   top of that page). Both open the tutorial's whole example folder
+ *   (`tutorialDir`: the folder the demo outputs live in, else the one
+ *   `packages/docs-examples/paths/<domain>/<key>`), with the folder's kind
+ *   from examples/playground.ts. They are server-rendered disabled (no href,
+ *   greyed, tooltip); apps/docs/playground.js enables them when the kind is
+ *   in its `CONFIG.enabledKinds`. A path without an example folder gets the
+ *   disabled button with no source, and a warning.
  * - `demo.mdx` (when `demo` is set): the terminal panel of
  *   src/lib/terminal.ts, all server-rendered: the stage (one row per
  *   `stage` entry, one pill per progress value), the numbered steps with
@@ -51,12 +61,23 @@
  * `--sync` only re-points `/snippets/paths/<lang>/` imports in locale pages;
  * `--check` runs that in memory and fails when a page would change.
  */
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { repoRoot } from "../lib/paths.ts";
 import { DEFAULT_LOCALE } from "../lib/locales.ts";
-import { playgroundFolderSource } from "../examples/playground.ts";
+import {
+  folderKind,
+  playgroundFolderSource,
+  type PlaygroundKind,
+} from "../examples/playground.ts";
 import { playgroundMarker } from "../examples/render.ts";
 import {
   applyOutputs,
@@ -115,6 +136,10 @@ export const PATH_UI = {
   demoCopy: DEFAULT_TERM_LABELS.copy,
   demoCopied: DEFAULT_TERM_LABELS.copied,
   demoOutput: DEFAULT_TERM_LABELS.output,
+  playground: "Open tutorial in Playground",
+  playgroundOff: "Not available for this tutorial yet",
+  playgroundNote:
+    "The files from every step of this tutorial, together in one project.",
 };
 export type PathUi = typeof PATH_UI;
 
@@ -510,6 +535,7 @@ export function renderStepper(
   src: PathsSource,
   p: PathDef,
   current: number,
+  pg?: TutorialSource,
 ): string {
   const { ui, lang } = src;
   const label = `${p.name} · ${p.time}`;
@@ -534,10 +560,113 @@ export function renderStepper(
     return `<li data-state="${state}"${first}><a href="${href}"${aria}><span className="sol-stepper-n">${mdText(`${ui.step} ${n}`)}${marks.map((m) => sep(", ") + m).join("")}${sep(": ")}</span><span className="sol-stepper-t">${mdText(s.title)}</span></a></li>`;
   });
   return `${hdr(lang)}
-<div className="sol-stepper not-prose" role="navigation" ${attr("aria-label", label)} data-path="${p.key}">
+<div className="sol-stepper not-prose" data-path="${p.key}">
+<div className="sol-stepper-head">${tutorialButton(ui, pg)}</div>
+<div className="sol-stepper-nav" role="navigation" ${attr("aria-label", label)}>
 <ol>
 ${items.join("\n")}
 </ol>
+</div>
+</div>
+`;
+}
+
+/** What "Open tutorial in Playground" opens (repo-relative, posix). */
+export interface TutorialSource {
+  open: string;
+  kind: PlaygroundKind;
+}
+
+/**
+ * A path's example folder, relative to packages/docs-examples: the one
+ * folder its demo outputs live in when that is a `paths/<domain>/<tutorial>`
+ * folder, else the single `paths/<domain>/<key>` folder. Undefined when
+ * neither exists (or the key matches folders in two domains).
+ */
+export function tutorialDir(p: PathDef, root = examplesRoot) {
+  const isDir = (rel: string) => {
+    const abs = path.join(root, rel);
+    return existsSync(abs) && statSync(abs).isDirectory();
+  };
+  const demoDirs = new Set(
+    (p.demo?.steps ?? []).map((s) => path.posix.dirname(s.output)),
+  );
+  const demoDir = [...demoDirs][0];
+  if (
+    demoDirs.size === 1 &&
+    demoDir &&
+    /^paths\/[^/]+\/[^/]+$/.test(demoDir) &&
+    isDir(demoDir)
+  )
+    return demoDir;
+  if (!isDir("paths")) return undefined;
+  const hits = readdirSync(path.join(root, "paths"))
+    .sort()
+    .map((d) => `paths/${d}/${p.key}`)
+    .filter(isDir);
+  return hits.length === 1 ? hits[0] : undefined;
+}
+
+/** The "Open tutorial in Playground" target of a path, if it has a folder. */
+export function tutorialSource(
+  p: PathDef,
+  root = examplesRoot,
+): TutorialSource | undefined {
+  const dir = tutorialDir(p, root);
+  if (!dir) return undefined;
+  const open = `packages/docs-examples/${dir}`;
+  return {
+    open,
+    kind: /^[\w\-/.]+$/.test(open) ? folderKind(path.join(root, dir)) : "other",
+  };
+}
+
+/**
+ * The "Open tutorial in Playground" button, server-rendered DISABLED: no
+ * href, greyed, `aria-disabled`, tooltip in `data-tip` (styles/playground.css
+ * draws it and the icon). `data-pg-open`/`data-pg-kind` are the folder and
+ * its kind; apps/docs/playground.js turns the button into a link when the
+ * kind is enabled, using the localized `data-pg-label`/`data-pg-off`.
+ * Without JavaScript it stays disabled, so it never links to a folder the
+ * playground cannot import.
+ */
+export function tutorialButton(
+  ui: PathUi,
+  pg: TutorialSource | undefined,
+  variant: "compact" | "block" = "compact",
+) {
+  const off = `${ui.playground}: ${ui.playgroundOff.charAt(0).toLowerCase()}${ui.playgroundOff.slice(1)}`;
+  const attrs = [
+    `className="sol-pg-btn sol-pg-tut"`,
+    `data-variant="${variant}"`,
+    ...(pg
+      ? [attr("data-pg-open", pg.open), attr("data-pg-kind", pg.kind)]
+      : [`data-pg-kind="inline"`]),
+    attr("data-pg-label", ui.playground),
+    attr("data-pg-off", off),
+    attr("data-tip", off),
+    attr("aria-label", off),
+    `aria-disabled="true"`,
+    `role="link"`,
+    `tabIndex="0"`,
+  ];
+  return `<a ${attrs.join(" ")}><span className="sol-pg-label">${mdText(ui.playground)}</span></a>`;
+}
+
+/**
+ * `playground.mdx`: the prominent "Open tutorial in Playground" block for
+ * the top of the step that runs the tutorial on your machine.
+ */
+export function renderPlaygroundBlock(
+  src: PathsSource,
+  p: PathDef,
+  pg: TutorialSource | undefined,
+) {
+  const { ui, lang } = src;
+  return `${hdr(lang)}
+<div className="sol-pg-tutorial not-prose" data-path="${p.key}">
+<p className="sol-pg-tutorial-text">${mdText(ui.playgroundNote)}</p>
+${tutorialButton(ui, pg, "block")}
 </div>
 `;
 }
@@ -736,11 +865,22 @@ export function buildPathOutputs(
   for (const src of sources) {
     for (const p of src.paths) {
       const dir = path.join(docsRoot, "snippets", "paths", src.lang, p.key);
+      const pg = tutorialSource(p, outputsRoot);
+      if (!pg && src === sources[0])
+        problems.push({
+          level: "warn",
+          file: "paths/paths.en.json",
+          message: `${p.key}: no example folder packages/docs-examples/paths/<domain>/${p.key}; "Open tutorial in Playground" is generated without a source`,
+        });
       for (let n = 0; n <= p.steps.length; n++)
         files.set(
           path.join(dir, `stepper-${n}.mdx`),
-          renderStepper(docsRoot, src, p, n),
+          renderStepper(docsRoot, src, p, n, pg),
         );
+      files.set(
+        path.join(dir, "playground.mdx"),
+        renderPlaygroundBlock(src, p, pg),
+      );
       for (let n = 0; n < p.steps.length; n++)
         files.set(
           path.join(dir, `next-${n}.mdx`),
