@@ -1,7 +1,6 @@
 import { ArrowDown } from "@boxicons/react/ArrowDown";
 import { ArrowLeftRight } from "@boxicons/react/ArrowLeftRight";
 import { ArrowRight } from "@boxicons/react/ArrowRight";
-import { ArrowUpRight } from "@boxicons/react/ArrowUpRight";
 import { BookOpen } from "@boxicons/react/BookOpen";
 import { CodeAlt } from "@boxicons/react/CodeAlt";
 import { CreditCard } from "@boxicons/react/CreditCard";
@@ -11,7 +10,6 @@ import { School } from "@boxicons/react/School";
 import { Server } from "@boxicons/react/Server";
 import { Fragment, type ComponentType, type ReactNode } from "react";
 import { getTranslations } from "@workspace/i18n/server";
-import { isDocsHref } from "@solana-com/ui-chrome/url-config";
 import {
   AGENT_SETUP,
   COST_MODEL,
@@ -35,11 +33,15 @@ import {
 import type { DeveloperUpdate } from "@/lib/developer-media";
 import { CostCalculator } from "./cost-calculator.client";
 import { CopyButton } from "./copy-button.client";
+import { ExternalArrowIcon } from "./docs-icons";
 import { NewsletterForm } from "./newsletter-form.client";
 
-/** Docs links always open in a new tab. */
-const newTab = (to: string) =>
-  isDocsHref(to) ? { target: "_blank", rel: "noopener noreferrer" } : {};
+/**
+ * Links on this page open in the same tab, docs included: /developers wears
+ * the docs header, so going to /docs is moving within one site. Only
+ * off-site links (hackathons, MCP setup) open a new tab, with the arrow.
+ */
+export const HACKATHONS_URL = "https://hackathons.solana.com";
 
 type IconComponent = ComponentType<{
   className?: string;
@@ -48,11 +50,22 @@ type IconComponent = ComponentType<{
 
 const container = "mx-auto w-full max-w-[1200px] px-5 md:px-8";
 const focus =
-  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--dl-accent-text)]";
+  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--dl-accent)]";
 const h2 =
-  "m-0 mb-3 font-brand text-[28px] font-medium leading-[1.05] tracking-[-0.03em] text-[var(--dl-text)] md:text-[34px]";
-const lead = "m-0 text-[16.5px] leading-[1.55] text-[var(--dl-muted)]";
-const inlineLink = `text-[var(--dl-text)] underline decoration-[var(--dl-line-strong)] underline-offset-4 hover:text-[var(--dl-accent-text)] hover:decoration-[var(--dl-accent-text)] ${focus}`;
+  "m-0 mb-2.5 font-brand text-[26px] font-medium leading-[1.15] tracking-[-0.02em] text-[var(--dl-text)] md:text-[30px]";
+const lead = "m-0 text-base leading-[1.6] text-[var(--dl-muted)]";
+/** Docs link style (apps/docs/styles/theme.css section 8). */
+const inlineLink = `text-[var(--dl-link)] underline decoration-[var(--dl-link-underline)] decoration-1 underline-offset-[3px] hover:text-[var(--dl-link-hover)] hover:decoration-current ${focus}`;
+/** Docs card (styles/stepper.css .sol-dpick > a): hairline, purple lift. */
+const card =
+  "rounded-2xl border border-[var(--dl-line)] bg-[var(--dl-surface)] shadow-[var(--dl-shadow)]";
+const cardLink = `${card} text-[var(--dl-text)] no-underline transition-[border-color,box-shadow,transform] duration-150 hover:border-[var(--dl-purple-line)] hover:text-[var(--dl-text)] hover:shadow-[var(--dl-lift)] motion-safe:hover:-translate-y-px ${focus}`;
+/** Docs buttons (--solui-cta; .sol-term-btn[data-variant=secondary]). */
+const buttonBase = `inline-flex h-10 items-center gap-2 rounded-lg px-4 text-sm font-semibold no-underline transition-colors ${focus}`;
+const primaryButton = `${buttonBase} bg-[var(--dl-accent)] text-[var(--dl-on-accent)] hover:bg-[var(--dl-accent-hover)] hover:text-[var(--dl-on-accent)]`;
+const secondaryButton = `${buttonBase} border border-[var(--dl-line-strong)] bg-transparent text-[var(--dl-text)] hover:border-[var(--dl-dim)] hover:bg-[var(--dl-soft)] hover:text-[var(--dl-text)]`;
+const iconTile =
+  "grid size-9 place-items-center rounded-[10px] bg-[var(--dl-icon-tile)] text-[var(--dl-icon-glyph)]";
 const arrowDir = "rtl:-scale-x-100";
 
 const JOB_ICONS: Record<JobPathId, IconComponent> = {
@@ -100,14 +113,14 @@ function PaymentVisual({ t }: { t: (key: string) => string }) {
     <div className="grid w-[86%] grid-cols-[auto_1fr_auto] items-center gap-2.5">
       <span className={node}>{t("picker.visuals.payFrom")}</span>
       <span className="relative h-0.5 bg-[repeating-linear-gradient(90deg,var(--dl-line-strong)_0_6px,transparent_6px_12px)]">
-        <i className="absolute left-0 top-1/2 -mt-3 h-6 rounded-[7px] border border-[var(--dl-accent-line)] bg-[var(--dl-surface-2)] px-2 font-brand-mono text-[11.5px] font-semibold not-italic leading-[22px] text-[var(--dl-accent-text)] motion-safe:animate-[dl-coin_2.8s_cubic-bezier(.6,0,.3,1)_infinite]">
+        <i className="absolute left-0 top-1/2 -mt-3 h-6 rounded-[7px] border border-[var(--dl-accent-line)] bg-[var(--dl-surface-2)] px-2 font-[family-name:var(--dl-mono)] text-[11.5px] font-semibold not-italic leading-[22px] text-[var(--dl-accent-text)] motion-safe:animate-[dl-coin_2.8s_cubic-bezier(.6,0,.3,1)_infinite]">
           $1.00
         </i>
       </span>
       <span className={`${node} border-[var(--dl-accent-line)]`}>
         {t("picker.visuals.payTo")}
       </span>
-      <span className="col-span-3 mt-4 justify-self-center font-brand-mono text-xs text-[var(--dl-accent-text)] motion-safe:animate-[dl-tag_2.8s_infinite]">
+      <span className="col-span-3 mt-4 justify-self-center font-[family-name:var(--dl-mono)] text-xs text-[var(--dl-accent-text)] motion-safe:animate-[dl-tag_2.8s_infinite]">
         {t("picker.visuals.payTag")}
       </span>
     </div>
@@ -120,7 +133,7 @@ function ApiVisual() {
   return (
     <div
       dir="ltr"
-      className="flex w-[84%] flex-col gap-1.5 font-brand-mono text-[12.5px] leading-normal text-[var(--dl-muted)]"
+      className="flex w-[84%] flex-col gap-1.5 font-[family-name:var(--dl-mono)] text-[12.5px] leading-normal text-[var(--dl-muted)]"
     >
       <div className={line}>
         <b className="font-semibold text-[var(--dl-code-fn)]">GET</b>{" "}
@@ -130,10 +143,10 @@ function ApiVisual() {
         <span className="text-[var(--dl-code-num)]">402</span> price: $0.01
       </div>
       <div className={`${line} [animation-delay:1.2s]`}>
-        <span className="text-[var(--dl-accent-text)]">paid</span> 0.01 USDC
+        <span className="text-[var(--dl-good)]">paid</span> 0.01 USDC
       </div>
       <div className={`${line} [animation-delay:1.8s]`}>
-        <span className="text-[var(--dl-accent-text)]">200</span>{" "}
+        <span className="text-[var(--dl-good)]">200</span>{" "}
         {'{ "sky": "clear" }'}
       </div>
     </div>
@@ -144,14 +157,14 @@ function AssetVisual({ t }: { t: (key: string) => string }) {
   const row =
     "rounded-[10px] border border-[var(--dl-line)] bg-[var(--dl-raised)] px-3 py-[7px] text-[13px] text-[var(--dl-text)] motion-safe:animate-[dl-row_4s_infinite]";
   return (
-    <div className="flex items-center gap-5">
-      <div className="grid size-16 place-items-center rounded-2xl border border-[var(--dl-gold-line)] bg-[var(--dl-gold-soft)] font-brand-mono text-sm font-bold text-[var(--dl-gold)] motion-safe:animate-[dl-bob_4s_ease-in-out_infinite]">
+    <div className="flex items-center gap-3">
+      <div className="grid size-14 shrink-0 place-items-center rounded-2xl border border-[var(--dl-gold-line)] bg-[var(--dl-gold-soft)] font-[family-name:var(--dl-mono)] text-sm font-bold text-[var(--dl-gold)] motion-safe:animate-[dl-bob_4s_ease-in-out_infinite]">
         LSF
       </div>
       <div className="flex flex-col gap-2">
         <div className={row}>
           → {t("picker.visuals.assetApproved")}{" "}
-          <b className="ms-2 text-[var(--dl-accent-text)]">✓</b>
+          <b className="ms-2 text-[var(--dl-good)]">✓</b>
         </div>
         <div className={`${row} [animation-delay:2s]`}>
           → {t("picker.visuals.assetUnknown")}{" "}
@@ -164,14 +177,14 @@ function AssetVisual({ t }: { t: (key: string) => string }) {
 
 function TradeVisual({ t }: { t: (key: string) => string }) {
   const leg =
-    "rounded-[10px] border border-[var(--dl-line)] bg-[var(--dl-raised)] px-3 py-[7px] font-brand-mono text-[12.5px] text-[var(--dl-text)] motion-safe:animate-[dl-row_4s_infinite]";
+    "rounded-[10px] border border-[var(--dl-line)] bg-[var(--dl-raised)] px-3 py-[7px] font-[family-name:var(--dl-mono)] text-[12.5px] text-[var(--dl-text)] motion-safe:animate-[dl-row_4s_infinite]";
   return (
     <div className="flex flex-col items-center gap-2.5">
       <div dir="ltr" className="flex items-center gap-2.5">
         <span className={leg}>4 LSF →</span>
         <span className={`${leg} [animation-delay:2s]`}>← USDC</span>
       </div>
-      <span className="font-brand-mono text-xs text-[var(--dl-accent-text)]">
+      <span className="font-[family-name:var(--dl-mono)] text-xs text-[var(--dl-accent-text)]">
         {t("picker.visuals.tradeTag")}
       </span>
     </div>
@@ -193,81 +206,115 @@ function CommandWords({ command }: { command: string }) {
 
 type Translate = (key: string, values?: Record<string, string>) => string;
 
+/** Visually hidden "(opens in a new tab)" plus the decorative arrow. */
+function NewTabHint({ text }: { text: string }) {
+  return (
+    <>
+      <ExternalArrowIcon size={14} />
+      <span className="sr-only"> {text}</span>
+    </>
+  );
+}
+
 /**
- * "Build with your agent": the Solana MCP server URL and the one-line setup
- * commands from https://mcp.solana.com. Everything is plain, selectable text
- * in the server render; the copy buttons turn on after hydration.
+ * "Build with your agent": the Solana MCP server URL, and the one-line setup
+ * commands from https://mcp.solana.com in a native <details> disclosure, so
+ * the card stays short and works without JavaScript. Everything is plain,
+ * selectable text in the server render; the copy buttons turn on after
+ * hydration. A single all-agents command can go above the server URL later.
  */
-function AgentCard({ t, moreHref }: { t: Translate; moreHref: string }) {
+function AgentCard({
+  t,
+  moreHref,
+  newTabText,
+}: {
+  t: Translate;
+  moreHref: string;
+  newTabText: string;
+}) {
   const row =
-    "m-0 flex items-start gap-3 rounded-xl border bg-[var(--dl-surface)] pe-2 ps-3.5";
+    "m-0 flex items-start gap-3 rounded-[10px] border border-[var(--dl-line)] bg-[var(--dl-surface-2)] pe-1.5 ps-3.5";
   const code =
-    "min-w-0 flex-1 self-center select-all font-brand-mono text-[var(--dl-text)] [overflow-wrap:anywhere]";
-  const label = "mb-2 text-[13px] text-[var(--dl-dim)]";
+    "min-w-0 flex-1 self-center select-all font-[family-name:var(--dl-mono)] text-[var(--dl-text)] [overflow-wrap:anywhere]";
+  const label = "mb-1.5 text-[13px] text-[var(--dl-dim)]";
   const copy = { copyText: t("agent.copy"), copiedText: t("agent.copied") };
 
   return (
     <section
       aria-labelledby="dl-agent-title"
       data-testid="agent-card"
-      className="rounded-2xl border border-[var(--dl-line)] bg-[var(--dl-surface-2)] p-5 md:p-6"
+      className={`${card} p-5 md:p-6`}
     >
       <h2
         id="dl-agent-title"
-        className="m-0 mb-2 font-brand text-[22px] font-medium leading-tight tracking-[-0.02em] text-[var(--dl-text)]"
+        className="m-0 mb-1.5 font-brand text-lg font-medium leading-snug tracking-[-0.015em] text-[var(--dl-text)]"
       >
         {t("agent.title")}
       </h2>
-      <p className="m-0 mb-5 text-[15px] leading-[1.55] text-[var(--dl-muted)]">
+      <p className="m-0 mb-4 text-sm leading-[1.55] text-[var(--dl-muted)]">
         {t("agent.body")}
       </p>
-      <dl className="m-0 flex flex-col gap-4">
-        <div>
-          <dt className={label}>{t("agent.serverUrl")}</dt>
-          <dd className={`${row} border-[var(--dl-line-strong)] py-2.5`}>
-            <code
-              dir="ltr"
-              data-testid="agent-server-url"
-              className={`${code} text-[15px] leading-[1.5]`}
-            >
-              {AGENT_SETUP.serverUrl}
-            </code>
-            <CopyButton
-              text={AGENT_SETUP.serverUrl}
-              label={t("agent.copyServerUrl")}
-              {...copy}
-            />
-          </dd>
-        </div>
-        {AGENT_SETUP.clients.map((client) => (
-          <div key={client.id}>
-            <dt className={label}>{client.name}</dt>
-            <dd className={`${row} border-[var(--dl-line)] py-2`}>
-              <code
-                dir="ltr"
-                data-testid={`agent-command-${client.id}`}
-                className={`${code} text-[13px] leading-[1.6]`}
-              >
-                <CommandWords command={client.command} />
-              </code>
-              <CopyButton
-                text={client.command}
-                label={t("agent.copyCommand", { client: client.name })}
-                {...copy}
-              />
-            </dd>
-          </div>
-        ))}
+      <dl className="m-0">
+        <dt className={label}>{t("agent.serverUrl")}</dt>
+        <dd className={`${row} py-1.5`}>
+          <code
+            dir="ltr"
+            data-testid="agent-server-url"
+            className={`${code} text-xs leading-[1.5] min-[400px]:text-[13px] sm:text-sm`}
+          >
+            {AGENT_SETUP.serverUrl}
+          </code>
+          <CopyButton
+            text={AGENT_SETUP.serverUrl}
+            label={t("agent.copyServerUrl")}
+            {...copy}
+          />
+        </dd>
       </dl>
-      <a
-        href={moreHref}
-        target="_blank"
-        rel="noopener noreferrer"
-        className={`mt-5 inline-flex items-center gap-1.5 text-sm ${inlineLink}`}
+      <details
+        className="group mt-4 border-t border-[var(--dl-line)] pt-3"
+        data-testid="agent-clients"
       >
-        {t("agent.otherClients")}
-        <ArrowRight aria-hidden className={`!size-4 ${arrowDir}`} />
-      </a>
+        <summary
+          className={`flex cursor-pointer list-none items-center gap-1.5 rounded-md text-sm font-medium text-[var(--dl-text)] marker:hidden hover:text-[var(--dl-accent-text)] [&::-webkit-details-marker]:hidden ${focus}`}
+        >
+          <ArrowRight
+            aria-hidden
+            className={`!size-4 text-[var(--dl-dim)] transition-transform group-open:rotate-90 ${arrowDir}`}
+          />
+          {t("agent.oneAgent")}
+        </summary>
+        <dl className="m-0 mt-3 flex flex-col gap-3">
+          {AGENT_SETUP.clients.map((client) => (
+            <div key={client.id}>
+              <dt className={label}>{client.name}</dt>
+              <dd className={`${row} py-1.5`}>
+                <code
+                  dir="ltr"
+                  data-testid={`agent-command-${client.id}`}
+                  className={`${code} text-[13px] leading-[1.6]`}
+                >
+                  <CommandWords command={client.command} />
+                </code>
+                <CopyButton
+                  text={client.command}
+                  label={t("agent.copyCommand", { client: client.name })}
+                  {...copy}
+                />
+              </dd>
+            </div>
+          ))}
+        </dl>
+        <a
+          href={moreHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`mt-3 inline-flex items-center gap-1 text-sm ${inlineLink}`}
+        >
+          {t("agent.otherClients")}
+          <NewTabHint text={newTabText} />
+        </a>
+      </details>
     </section>
   );
 }
@@ -285,6 +332,7 @@ export async function DevelopersHub({
   });
   const href = (path: string) => localizedHref(locale, path);
   const tt = (key: string, values?: Record<string, string>) => t(key, values);
+  const newTabText = t("newTab");
 
   const defaults = COST_MODEL.defaults;
   const defaultCosts = computeCosts(
@@ -300,45 +348,44 @@ export async function DevelopersHub({
 
   return (
     <main
-      data-dev-landing="dark"
-      className="overflow-hidden bg-[var(--dl-bg)] font-brand text-base text-[var(--dl-text)] transition-colors duration-300 motion-reduce:transition-none"
+      id="dl-main"
+      tabIndex={-1}
+      className="overflow-hidden bg-[var(--dl-bg)] font-brand text-base text-[var(--dl-text)] outline-none"
     >
-      {/* Hero */}
+      {/* Hero: headline, lede and buttons on the left; the agent card on the
+          right, top-aligned. Stacked below lg. */}
       <section
         aria-labelledby="dl-hero-title"
-        className="border-b border-[var(--dl-line)] pb-14 pt-14 md:pb-16 md:pt-[88px]"
+        className="border-b border-[var(--dl-line)] pb-14 pt-12 md:pb-16 md:pt-16"
       >
-        <div className={container}>
-          <h1
-            id="dl-hero-title"
-            className="m-0 mb-7 max-w-[1100px] font-brand text-[clamp(2.75rem,8vw,5.75rem)] font-medium leading-[0.98] tracking-[-0.05em] text-[var(--dl-text)]"
-          >
-            {t("hero.title")}
-          </h1>
-          <div className="grid items-start gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,560px)] lg:gap-14">
-            <div>
-              <p className="m-0 mb-6 max-w-[620px] text-[17.5px] leading-[1.6] text-[var(--dl-muted)]">
-                {t("hero.lede")}
-              </p>
-              <div className="flex flex-wrap gap-2.5">
-                <a
-                  href={HERO_LINKS.picker}
-                  className={`inline-flex h-10 items-center gap-2 rounded-full bg-[var(--dl-accent)] px-[18px] text-sm font-medium text-[var(--dl-on-accent)] no-underline transition-colors hover:bg-[#3ff5aa] hover:text-[var(--dl-on-accent)] ${focus}`}
-                >
-                  {t("hero.primaryCta")}
-                  <ArrowDown aria-hidden className="!size-4" />
-                </a>
-                <a
-                  href={href(HERO_LINKS.docs)}
-                  {...newTab(href(HERO_LINKS.docs))}
-                  className={`inline-flex h-10 items-center rounded-full border border-[var(--dl-line-strong)] px-[18px] text-sm font-medium text-[var(--dl-text)] no-underline transition-colors hover:border-[var(--dl-text)] hover:text-[var(--dl-text)] ${focus}`}
-                >
-                  {t("hero.secondaryCta")}
-                </a>
-              </div>
+        <div
+          className={`${container} grid items-start gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,480px)] lg:gap-16`}
+        >
+          <div className="lg:pt-2">
+            <h1
+              id="dl-hero-title"
+              className="m-0 mb-5 font-brand text-[clamp(2.375rem,6vw,3.5rem)] font-medium leading-[1.04] tracking-[-0.035em] text-[var(--dl-text)] [text-wrap:balance]"
+            >
+              {t("hero.title")}
+            </h1>
+            <p className="m-0 mb-7 max-w-[600px] text-lg leading-[1.6] text-[var(--dl-muted)] [text-wrap:pretty]">
+              {t("hero.lede")}
+            </p>
+            <div className="flex flex-wrap gap-2.5">
+              <a href={HERO_LINKS.picker} className={primaryButton}>
+                {t("hero.primaryCta")}
+                <ArrowDown aria-hidden className="!size-4" />
+              </a>
+              <a href={href(HERO_LINKS.docs)} className={secondaryButton}>
+                {t("hero.secondaryCta")}
+              </a>
             </div>
-            <AgentCard t={tt} moreHref={AGENT_SETUP.moreHref} />
           </div>
+          <AgentCard
+            t={tt}
+            moreHref={AGENT_SETUP.moreHref}
+            newTabText={newTabText}
+          />
         </div>
       </section>
 
@@ -346,7 +393,7 @@ export async function DevelopersHub({
       <section
         id="picker"
         aria-labelledby="dl-picker-title"
-        className="scroll-mt-28 py-16 md:py-[72px]"
+        className="scroll-mt-32 py-16 md:py-20"
       >
         <div className={container}>
           <SectionHead
@@ -361,7 +408,7 @@ export async function DevelopersHub({
           />
           <label
             htmlFor="dl-pause-animations"
-            className="mb-4 inline-flex cursor-pointer select-none items-center gap-2 rounded-full border border-[var(--dl-line)] px-3 py-1.5 text-[13px] text-[var(--dl-muted)] hover:border-[var(--dl-line-strong)] peer-checked:border-[var(--dl-accent-line)] peer-checked:text-[var(--dl-text)] peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-[var(--dl-accent-text)] motion-reduce:hidden"
+            className="mb-4 inline-flex cursor-pointer select-none items-center gap-2 rounded-lg border border-[var(--dl-line)] px-3 py-1.5 text-[13px] text-[var(--dl-muted)] hover:border-[var(--dl-line-strong)] hover:text-[var(--dl-text)] peer-checked:border-[var(--dl-accent-line)] peer-checked:text-[var(--dl-text)] peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-[var(--dl-accent)] motion-reduce:hidden"
           >
             <span
               aria-hidden
@@ -372,7 +419,7 @@ export async function DevelopersHub({
             {t("picker.pauseAnimations")}
           </label>
           <ul
-            className="m-0 grid list-none gap-[18px] p-0 md:grid-cols-2 xl:grid-cols-4 peer-checked:[&_*]:![animation:none]"
+            className="m-0 grid list-none gap-3.5 p-0 md:grid-cols-2 xl:grid-cols-4 peer-checked:[&_*]:![animation:none]"
             data-testid="job-cards"
           >
             {JOB_PATHS.map((job) => {
@@ -381,33 +428,32 @@ export async function DevelopersHub({
                 <li key={job.id} className="flex">
                   <a
                     href={href(job.href)}
-                    {...newTab(href(job.href))}
                     data-testid={`job-card-${job.id}`}
-                    className={`group flex w-full flex-col overflow-hidden rounded-3xl border border-[var(--dl-line)] bg-[var(--dl-surface)] text-[var(--dl-text)] no-underline transition hover:border-[var(--dl-accent-line)] hover:text-[var(--dl-text)] motion-safe:hover:-translate-y-1 ${focus}`}
+                    className={`group flex w-full flex-col overflow-hidden ${cardLink}`}
                   >
                     <div
                       aria-hidden
-                      className="relative m-2.5 grid h-[168px] place-items-center overflow-hidden rounded-2xl border border-[var(--dl-line)] [background:var(--dl-vis)]"
+                      className="relative m-2 grid h-[160px] place-items-center overflow-hidden rounded-xl border border-[var(--dl-line)] [background:var(--dl-vis)]"
                     >
                       {visuals[job.id]}
                     </div>
-                    <div className="px-6 pt-[18px]">
-                      <span className="grid size-9 place-items-center rounded-[11px] border border-[var(--dl-accent-line)] bg-[var(--dl-accent-soft)] text-[var(--dl-accent-text)]">
+                    <div className="px-5 pt-4">
+                      <span className={iconTile}>
                         <Icon aria-hidden className="!size-[18px]" />
                       </span>
-                      <h3 className="mb-2.5 mt-4 font-brand text-2xl font-medium leading-[1.15] tracking-[-0.03em] text-[var(--dl-text)]">
+                      <h3 className="mb-2 mt-4 font-brand text-lg font-medium leading-[1.25] tracking-[-0.015em] text-[var(--dl-text)] [text-wrap:pretty]">
                         {t(`picker.cards.${job.id}.title`)}
                       </h3>
-                      <p className="m-0 text-[15px] leading-[1.55] text-[var(--dl-muted)]">
+                      <p className="m-0 text-sm leading-[1.5] text-[var(--dl-muted)]">
                         {t(`picker.cards.${job.id}.body`)}
                       </p>
                     </div>
-                    <div className="mt-auto flex flex-wrap items-center justify-between gap-3 px-6 py-6 text-[13px] text-[var(--dl-dim)]">
+                    <div className="mt-auto flex flex-col items-start gap-1.5 px-5 pb-5 pt-[18px] text-xs text-[var(--dl-dim)]">
                       <span>
                         {t.rich("picker.firstResult", {
                           time: job.firstResult,
                           b: (chunks) => (
-                            <b className="font-medium text-[var(--dl-text)]">
+                            <b className="font-medium text-[var(--dl-muted)]">
                               {chunks}
                             </b>
                           ),
@@ -415,11 +461,11 @@ export async function DevelopersHub({
                         {" · "}
                         {t("picker.totalTime", { time: job.total })}
                       </span>
-                      <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-sm font-medium text-[var(--dl-text)]">
+                      <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-sm font-medium text-[var(--dl-accent-text)] group-hover:underline group-hover:underline-offset-[3px]">
                         {t(`picker.cards.${job.id}.cta`)}
                         <ArrowRight
                           aria-hidden
-                          className={`!size-4 text-[var(--dl-accent-text)] transition-transform motion-safe:group-hover:translate-x-1 ${arrowDir}`}
+                          className={`!size-4 transition-transform motion-safe:group-hover:translate-x-0.5 ${arrowDir}`}
                         />
                       </span>
                     </div>
@@ -430,15 +476,14 @@ export async function DevelopersHub({
           </ul>
           <nav
             aria-label={t("picker.moreLabel")}
-            className="mt-6 flex flex-wrap items-center gap-2.5 text-sm text-[var(--dl-dim)]"
+            className="mt-5 flex flex-wrap items-center gap-2 text-sm text-[var(--dl-dim)]"
           >
             <span>{t("picker.moreLabel")}</span>
             {MORE_USE_CASES.map((item) => (
               <a
                 key={item.id}
                 href={href(item.href)}
-                {...newTab(href(item.href))}
-                className={`rounded-full border border-[var(--dl-line-strong)] px-3.5 py-2 text-[var(--dl-text)] no-underline transition-colors hover:border-[var(--dl-accent-line)] hover:bg-[var(--dl-accent-soft)] hover:text-[var(--dl-text)] ${focus}`}
+                className={`rounded-lg border border-[var(--dl-line)] bg-[var(--dl-surface)] px-3 py-1.5 text-[var(--dl-muted)] no-underline transition-colors hover:border-[var(--dl-purple-line)] hover:bg-[var(--dl-purple-soft)] hover:text-[var(--dl-accent-text)] ${focus}`}
               >
                 {t(`picker.more.${item.id}`)}
               </a>
@@ -451,7 +496,7 @@ export async function DevelopersHub({
       <section
         id="why-solana"
         aria-labelledby="dl-why-title"
-        className="scroll-mt-28 py-16 md:py-[72px]"
+        className="scroll-mt-32 border-t border-[var(--dl-line)] py-16 md:py-20"
       >
         <div className={container}>
           <SectionHead
@@ -460,31 +505,31 @@ export async function DevelopersHub({
             body={t("why.body")}
           />
           <ul
-            className="m-0 grid list-none gap-3.5 p-0 sm:grid-cols-2 lg:grid-cols-4"
+            className="m-0 grid list-none gap-3 p-0 sm:grid-cols-2 lg:grid-cols-4"
             data-testid="stats"
           >
             {HUB_STATS.map((stat) => (
               <li
                 key={stat.id}
                 data-testid={`stat-${stat.id}`}
-                className="flex flex-col gap-1.5 rounded-[18px] border border-[var(--dl-line)] bg-[var(--dl-surface)] px-[22px] py-6"
+                className={`${card} flex flex-col gap-1.5 px-5 py-5`}
               >
-                <b className="text-[40px] font-medium leading-[1.05] tracking-[-0.04em] text-[var(--dl-text)]">
+                <b className="text-[36px] font-medium leading-[1.1] tracking-[-0.03em] text-[var(--dl-text)]">
                   {formatStatValue(stat, locale)}
                 </b>
-                <span className="text-[14.5px] text-[var(--dl-text)]">
+                <span className="text-sm leading-[1.45] text-[var(--dl-muted)]">
                   {t(`why.stats.${stat.labelKey}.label`)}
                 </span>
               </li>
             ))}
           </ul>
-          <ul className="m-0 mt-3.5 grid list-none gap-3.5 p-0 sm:grid-cols-2 lg:grid-cols-4">
+          <ul className="m-0 mt-3 grid list-none gap-3 p-0 sm:grid-cols-2 lg:grid-cols-4">
             {WHY_REASONS.map((id) => (
               <li
                 key={id}
-                className="rounded-[18px] border border-[var(--dl-line)] p-[22px]"
+                className="rounded-2xl border border-[var(--dl-line)] bg-[var(--dl-surface-2)] p-5"
               >
-                <h3 className="m-0 mb-2 font-brand text-[17px] font-medium leading-snug tracking-[-0.015em] text-[var(--dl-text)]">
+                <h3 className="m-0 mb-1.5 font-brand text-base font-medium leading-snug tracking-[-0.01em] text-[var(--dl-text)]">
                   {t(`why.reasons.${id}.title`)}
                 </h3>
                 <p className="m-0 text-sm leading-[1.55] text-[var(--dl-muted)]">
@@ -493,15 +538,15 @@ export async function DevelopersHub({
               </li>
             ))}
           </ul>
-          <div className="mt-8 flex flex-wrap items-center gap-x-7 gap-y-2.5 border-y border-[var(--dl-line)] py-5">
-            <span className="text-[13.5px] text-[var(--dl-dim)]">
+          <div className="mt-8 flex flex-wrap items-center gap-x-7 gap-y-2.5 border-t border-[var(--dl-line)] pt-5">
+            <span className="text-[13px] text-[var(--dl-dim)]">
               {t("why.productionLabel")}
             </span>
             <ul className="m-0 flex list-none flex-wrap gap-x-7 gap-y-2.5 p-0">
               {PRODUCTION_USERS.map((name) => (
                 <li
                   key={name}
-                  className="text-[19px] font-semibold tracking-[-0.02em] text-[var(--dl-muted)]"
+                  className="text-[17px] font-semibold tracking-[-0.015em] text-[var(--dl-muted)]"
                 >
                   {name}
                 </li>
@@ -515,7 +560,7 @@ export async function DevelopersHub({
       <section
         id="cost"
         aria-labelledby="dl-calc-title"
-        className="scroll-mt-28 py-16 md:py-[72px]"
+        className="scroll-mt-32 border-t border-[var(--dl-line)] py-16 md:py-20"
       >
         <div className={container}>
           <SectionHead
@@ -545,7 +590,6 @@ export async function DevelopersHub({
               feeSource: (chunks) => (
                 <a
                   href={href(COST_MODEL.solana.source.url)}
-                  {...newTab(href(COST_MODEL.solana.source.url))}
                   className={inlineLink}
                 >
                   {chunks}
@@ -553,24 +597,24 @@ export async function DevelopersHub({
               ),
             })}
           />
-          <div className="mt-[18px] overflow-x-auto rounded-[20px] border border-[var(--dl-line)]">
+          <div className="mt-3.5 overflow-x-auto rounded-xl border border-[var(--dl-line)] bg-[var(--dl-surface)]">
             <table
               className="w-full border-collapse text-start text-sm"
               data-testid="calc-table"
             >
-              <caption className="px-6 pb-2 pt-4 text-start text-[13px] text-[var(--dl-dim)]">
+              <caption className="px-5 pb-2 pt-4 text-start text-[13px] text-[var(--dl-dim)]">
                 {t("calc.tableCaption", {
                   average: formatUsd(defaults.averagePaymentUsd, locale),
                 })}
               </caption>
               <thead>
-                <tr className="text-[var(--dl-muted)]">
+                <tr className="bg-[var(--dl-surface-2)] text-[var(--dl-muted)]">
                   {(["tableVolume", "tableCard", "tableSolana"] as const).map(
                     (key) => (
                       <th
                         key={key}
                         scope="col"
-                        className="border-b border-[var(--dl-line)] px-6 py-2.5 text-start font-medium"
+                        className="border-y border-[var(--dl-line)] px-5 py-2.5 text-start font-medium"
                       >
                         {t(`calc.${key}`)}
                       </th>
@@ -578,7 +622,7 @@ export async function DevelopersHub({
                   )}
                 </tr>
               </thead>
-              <tbody className="tabular-nums">
+              <tbody>
                 {COST_MODEL.tableVolumes.map((volume) => {
                   const costs = computeCosts(
                     volume,
@@ -591,14 +635,14 @@ export async function DevelopersHub({
                     >
                       <th
                         scope="row"
-                        className="px-6 py-3 text-start font-normal text-[var(--dl-text)]"
+                        className="px-5 py-3 text-start font-normal text-[var(--dl-text)]"
                       >
                         {formatInteger(volume, locale)}
                       </th>
-                      <td className="px-6 py-3 text-[var(--dl-text)]">
+                      <td className="px-5 py-3 text-[var(--dl-text)]">
                         {formatUsd(costs.card, locale)}
                       </td>
-                      <td className="px-6 py-3 text-[var(--dl-accent-text)]">
+                      <td className="px-5 py-3 font-medium text-[var(--dl-good)]">
                         {formatUsd(costs.solana, locale)}
                       </td>
                     </tr>
@@ -614,7 +658,7 @@ export async function DevelopersHub({
       <section
         id="learn"
         aria-labelledby="dl-routes-title"
-        className="scroll-mt-28 py-16 md:py-[72px]"
+        className="scroll-mt-32 border-t border-[var(--dl-line)] py-16 md:py-20"
       >
         <div className={container}>
           <SectionHead
@@ -622,24 +666,23 @@ export async function DevelopersHub({
             title={t("routes.title")}
             body={t("routes.body")}
           />
-          <ul className="m-0 grid list-none gap-4 p-0 sm:grid-cols-2 lg:grid-cols-4">
+          <ul className="m-0 grid list-none gap-3 p-0 sm:grid-cols-2 lg:grid-cols-4">
             {LEARN_ROUTES.map((route) => {
               const Icon = ROUTE_ICONS[route.id];
               return (
                 <li key={route.id} className="flex">
                   <a
                     href={href(route.href)}
-                    {...newTab(href(route.href))}
-                    className={`group relative block w-full rounded-[20px] border border-[var(--dl-line)] bg-[var(--dl-surface)] px-6 pb-7 pt-[26px] text-[var(--dl-text)] no-underline transition hover:border-[var(--dl-purple-line)] hover:text-[var(--dl-text)] motion-safe:hover:-translate-y-[3px] ${focus}`}
+                    className={`group relative block w-full px-5 pb-6 pt-5 ${cardLink}`}
                   >
-                    <span className="grid size-9 place-items-center rounded-[11px] border border-[var(--dl-purple-line)] bg-[var(--dl-purple-soft)] text-[var(--dl-purple-text)]">
+                    <span className="grid size-9 place-items-center rounded-[10px] border border-[var(--dl-purple-line)] bg-[var(--dl-purple-soft)] text-[var(--dl-purple-text)]">
                       <Icon aria-hidden className="!size-[18px]" />
                     </span>
-                    <ArrowUpRight
+                    <ArrowRight
                       aria-hidden
-                      className={`absolute end-[22px] top-7 !size-4 text-[var(--dl-dim)] transition-transform group-hover:text-[var(--dl-text)] motion-safe:group-hover:-translate-y-0.5 motion-safe:group-hover:translate-x-0.5 ${arrowDir}`}
+                      className={`absolute end-5 top-6 !size-4 text-[var(--dl-dim)] transition-transform group-hover:text-[var(--dl-accent-text)] motion-safe:group-hover:translate-x-0.5 ${arrowDir}`}
                     />
-                    <h3 className="mb-1.5 mt-[26px] font-brand text-lg font-medium tracking-[-0.02em] text-[var(--dl-text)]">
+                    <h3 className="mb-1 mt-5 font-brand text-base font-medium tracking-[-0.01em] text-[var(--dl-text)]">
                       {t(`routes.items.${route.id}.title`)}
                     </h3>
                     <p className="m-0 text-sm leading-normal text-[var(--dl-muted)]">
@@ -650,6 +693,28 @@ export async function DevelopersHub({
               );
             })}
           </ul>
+          <div
+            className="mt-3 flex flex-col gap-3 rounded-2xl border border-[var(--dl-line)] bg-[var(--dl-surface-2)] px-5 py-4 sm:flex-row sm:items-center sm:justify-between"
+            data-testid="hackathons"
+          >
+            <div>
+              <h3 className="m-0 font-brand text-base font-medium tracking-[-0.01em] text-[var(--dl-text)]">
+                {t("routes.hackathons.title")}
+              </h3>
+              <p className="m-0 mt-0.5 text-sm text-[var(--dl-muted)]">
+                {t("routes.hackathons.body")}
+              </p>
+            </div>
+            <a
+              href={HACKATHONS_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`${secondaryButton} shrink-0 self-start sm:self-auto`}
+            >
+              {t("routes.hackathons.cta")}
+              <NewTabHint text={newTabText} />
+            </a>
+          </div>
         </div>
       </section>
 
@@ -658,7 +723,7 @@ export async function DevelopersHub({
         <section
           id="updates"
           aria-labelledby="dl-updates-title"
-          className="scroll-mt-28 py-16 md:py-[72px]"
+          className="scroll-mt-32 border-t border-[var(--dl-line)] py-16 md:py-20"
         >
           <div className={container}>
             <SectionHead
@@ -666,12 +731,12 @@ export async function DevelopersHub({
               title={t("updates.title")}
               body={t("updates.body")}
             />
-            <ul className="m-0 grid list-none gap-4 p-0 md:grid-cols-2 lg:grid-cols-4">
+            <ul className="m-0 grid list-none gap-3 p-0 md:grid-cols-2 lg:grid-cols-4">
               {updates.slice(0, 4).map((update) => (
                 <li key={update.href} className="flex">
                   <a
                     href={update.href}
-                    className={`flex w-full flex-col gap-2 rounded-[20px] border border-[var(--dl-line)] p-6 text-[var(--dl-text)] no-underline transition-colors hover:border-[var(--dl-line-strong)] hover:text-[var(--dl-text)] ${focus}`}
+                    className={`group flex w-full flex-col gap-2 p-5 ${cardLink}`}
                   >
                     <span className="text-xs text-[var(--dl-dim)]">
                       {t(`updates.kinds.${update.kind}`)}
@@ -679,17 +744,17 @@ export async function DevelopersHub({
                         ? ` · ${formatAsOf(update.publishedAt.slice(0, 10), locale)}`
                         : ""}
                     </span>
-                    <h3 className="m-0 font-brand text-[17px] font-medium leading-snug text-[var(--dl-text)]">
+                    <h3 className="m-0 font-brand text-base font-medium leading-snug text-[var(--dl-text)]">
                       {update.title}
                     </h3>
                     <p className="m-0 line-clamp-3 text-sm text-[var(--dl-muted)]">
                       {update.description}
                     </p>
-                    <span className="mt-auto inline-flex items-center gap-1.5 pt-2 text-sm font-medium">
+                    <span className="mt-auto inline-flex items-center gap-1.5 pt-2 text-sm font-medium text-[var(--dl-accent-text)]">
                       {t("updates.read")}
                       <ArrowRight
                         aria-hidden
-                        className={`!size-4 text-[var(--dl-accent-text)] ${arrowDir}`}
+                        className={`!size-4 ${arrowDir}`}
                       />
                     </span>
                   </a>
@@ -704,18 +769,18 @@ export async function DevelopersHub({
       <section
         id="newsletter"
         aria-labelledby="dl-news-title"
-        className="pb-[90px] pt-6"
+        className="pb-20 pt-4"
       >
         <div className={container}>
-          <div className="flex flex-col items-start justify-between gap-7 rounded-[26px] border border-[var(--dl-line)] px-6 py-9 [background:var(--dl-news)] md:flex-row md:items-center md:px-11 md:py-10">
+          <div className="flex flex-col items-start justify-between gap-6 rounded-2xl border border-[var(--dl-line)] px-6 py-8 [background:var(--dl-news)] md:flex-row md:items-center md:px-10 md:py-9">
             <div>
               <h2
                 id="dl-news-title"
-                className="m-0 mb-1.5 font-brand text-[26px] font-medium tracking-[-0.025em] text-[var(--dl-text)]"
+                className="m-0 mb-1.5 font-brand text-[22px] font-medium tracking-[-0.02em] text-[var(--dl-text)]"
               >
                 {t("newsletter.title")}
               </h2>
-              <p className="m-0 text-[16px] text-[var(--dl-muted)]">
+              <p className="m-0 text-[15px] text-[var(--dl-muted)]">
                 {t("newsletter.body")}
               </p>
             </div>

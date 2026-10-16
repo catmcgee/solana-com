@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  isDocsChromeRoute,
   isThemeRoute,
   shouldShowDevelopersNav,
   shouldShowDocsSidebarToggle,
@@ -50,12 +51,23 @@ describe("developer route matching", () => {
     expect(isThemeRoute("/fr/learn")).toBe(true);
   });
 
-  it("keeps the /developers landing dark-only, with no theme toggle", () => {
+  it("leaves the /developers landing's theme to its docs chrome", () => {
     expect(isThemeRoute("/developers")).toBe(false);
     expect(isThemeRoute("/developers/")).toBe(false);
     expect(isThemeRoute("/ja/developers")).toBe(false);
     expect(isThemeRoute("/ar/developers")).toBe(false);
     expect(isThemeRoute("/developers?ref=nav")).toBe(false);
+  });
+
+  it("gives only the exact /developers landing the docs chrome", () => {
+    expect(isDocsChromeRoute("/developers")).toBe(true);
+    expect(isDocsChromeRoute("/developers/")).toBe(true);
+    expect(isDocsChromeRoute("/ja/developers")).toBe(true);
+    expect(isDocsChromeRoute("/developers?ref=nav")).toBe(true);
+    expect(isDocsChromeRoute("/developers/templates")).toBe(false);
+    expect(isDocsChromeRoute("/docs")).toBe(false);
+    expect(isDocsChromeRoute("/developership")).toBe(false);
+    expect(isDocsChromeRoute(null)).toBe(false);
   });
 
   it("keeps /developers subpages dark-only", () => {

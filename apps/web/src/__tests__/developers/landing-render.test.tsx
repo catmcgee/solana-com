@@ -61,7 +61,7 @@ describe("/developers landing", () => {
         screen.getByRole("heading", { level: 2, name }),
       ).toBeInTheDocument();
     }
-    expect(container.querySelector("[data-dev-landing]")).not.toBeNull();
+    expect(container.querySelector("main#dl-main")).not.toBeNull();
   });
 
   it("server-renders the MCP URL and commands as plain text", async () => {
@@ -97,15 +97,64 @@ describe("/developers landing", () => {
     }
   });
 
-  it("marks the landing dark-only", async () => {
+  it("opens docs links in the same tab; only off-site links open a new tab", async () => {
     const { container } = renderWithIntl(
       await DevelopersHub({ locale: "en", updates: [] }),
     );
+    for (const link of container.querySelectorAll("a")) {
+      const href = link.getAttribute("href") ?? "";
+      if (href.startsWith("/") || href.startsWith("#")) {
+        expect(link.getAttribute("target"), href).toBeNull();
+      }
+      if (link.getAttribute("target") === "_blank") {
+        expect(href).toMatch(/^https:\/\//);
+        expect(link.getAttribute("rel")).toBe("noopener noreferrer");
+        expect(link.textContent).toContain("(opens in a new tab)");
+      }
+    }
     expect(
-      container
-        .querySelector("[data-dev-landing]")
-        ?.getAttribute("data-dev-landing"),
-    ).toBe("dark");
+      within(screen.getByTestId("job-cards"))
+        .getAllByRole("link")
+        .every((card) => !card.hasAttribute("target")),
+    ).toBe(true);
+  });
+
+  it("links to hackathons in a new tab", async () => {
+    renderWithIntl(await DevelopersHub({ locale: "en", updates: [] }));
+    const link = within(screen.getByTestId("hackathons")).getByRole("link", {
+      name: /Join a hackathon/,
+    });
+    expect(link).toHaveAttribute("href", "https://hackathons.solana.com");
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(link).toHaveAttribute("rel", "noopener noreferrer");
+    expect(link).toHaveAccessibleName("Join a hackathon (opens in a new tab)");
+  });
+
+  it("keeps the hero to the docs' framing, with a purple primary CTA", async () => {
+    renderWithIntl(await DevelopersHub({ locale: "en", updates: [] }));
+    const lede = screen.getByText(/^Solana is the network for internet/);
+    expect(lede.textContent).not.toMatch(/blockchain/i);
+    expect(lede.textContent!.split(/(?<=\.)\s/)).toHaveLength(2);
+    const cta = screen.getByRole("link", { name: "Pick a tutorial" });
+    expect(cta).toHaveAttribute("href", "#picker");
+    expect(cta.className).toContain("bg-[var(--dl-accent)]");
+  });
+
+  it("puts the per-agent commands in a native disclosure", async () => {
+    renderWithIntl(await DevelopersHub({ locale: "en", updates: [] }));
+    const details = screen.getByTestId("agent-clients");
+    expect(details.tagName).toBe("DETAILS");
+    expect(details.hasAttribute("open")).toBe(false);
+    expect(details.querySelector("summary")).toHaveTextContent(
+      "Add it to one agent",
+    );
+    expect(
+      within(details).getByTestId("agent-command-claudeCode"),
+    ).toBeInTheDocument();
+    // The server URL stays outside, always visible.
+    expect(details.contains(screen.getByTestId("agent-server-url"))).toBe(
+      false,
+    );
   });
 
   it("links the four job cards to the job-path intros", async () => {

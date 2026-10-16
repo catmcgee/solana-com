@@ -64,3 +64,4 @@ export {
 } from "./docs-sidebar-toggle";
 export { LanguageSelector } from "./language-selector";
 export * from "./sheet";
+export { isDocsChromeRoute } from "./developer-routes";

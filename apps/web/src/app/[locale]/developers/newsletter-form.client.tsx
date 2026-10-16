@@ -75,12 +75,12 @@ export function NewsletterForm({ formId }: { formId: string }) {
         onChange={onValueChange}
         aria-invalid={invalid || Boolean(error)}
         aria-describedby={message ? `${inputId}-status` : undefined}
-        className="h-12 min-w-0 rounded-full border border-[var(--dl-line-strong)] bg-[var(--dl-bg)] px-5 text-[15px] text-[var(--dl-text)] placeholder:text-[var(--dl-dim)] focus-visible:border-[var(--dl-accent-line)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--dl-accent-text)] md:w-[300px]"
+        className="h-10 min-w-0 rounded-lg border border-[var(--dl-line-strong)] bg-[var(--dl-bg)] px-3.5 text-sm text-[var(--dl-text)] placeholder:text-[var(--dl-dim)] focus-visible:border-[var(--dl-accent)] focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-0 focus-visible:outline-[var(--dl-accent-soft)] md:w-[300px]"
       />
       <button
         type="submit"
         disabled={isLoading}
-        className="h-12 rounded-full border-0 bg-[var(--dl-accent)] px-6 text-[15px] font-medium text-[var(--dl-on-accent)] transition-colors hover:bg-[#3ff5aa] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--dl-accent-text)] disabled:opacity-60"
+        className="h-10 rounded-lg border-0 bg-[var(--dl-accent)] px-4 text-sm font-semibold text-[var(--dl-on-accent)] transition-colors hover:bg-[var(--dl-accent-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--dl-accent)] disabled:opacity-60"
       >
         {t("submit")}
       </button>
@@ -91,7 +91,7 @@ export function NewsletterForm({ formId }: { formId: string }) {
           className={`m-0 text-sm sm:col-span-2 ${
             error || invalid
               ? "text-[var(--dl-danger)]"
-              : "text-[var(--dl-accent-text)]"
+              : "text-[var(--dl-good)]"
           }`}
         >
           {message}

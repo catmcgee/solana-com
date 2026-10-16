@@ -11,7 +11,10 @@ import {
   DEVELOPERS_SOCIAL_IMAGE,
   serializeJsonLd,
 } from "./structured-data";
-import { DarkPrepaint } from "./theme-prepaint";
+import { DocsFooter } from "./docs-footer";
+import { DocsHeader } from "./docs-header";
+import { DocsThemePrepaint } from "./theme-prepaint";
+import "./developers.css";
 
 type Props = { params: Promise<{ locale: string }> };
 
@@ -46,14 +49,20 @@ export default async function Page({ params }: Props) {
     ],
   });
 
+  // The docs chrome replaces the solana.com Header/Footer here
+  // (ChromeWrapper skips them on this route).
   return (
     <>
-      <DarkPrepaint />
+      <DocsThemePrepaint />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(structuredData) }}
       />
-      <DevelopersHub locale={locale} updates={updates} />
+      <div data-dev-landing="docs">
+        <DocsHeader locale={locale} />
+        <DevelopersHub locale={locale} updates={updates} />
+        <DocsFooter locale={locale} />
+      </div>
     </>
   );
 }

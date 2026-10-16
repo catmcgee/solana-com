@@ -44,10 +44,21 @@ export function shouldShowDocsSidebarToggle(
 }
 
 /**
+ * The /developers landing (exact path, any locale) wears the docs chrome:
+ * its own docs-style header and footer instead of the solana.com Header and
+ * Footer, and the docs' light/dark theme, stored where Mintlify stores it
+ * (localStorage "isDarkMode") so one choice applies to both. ThemeProvider
+ * leaves <html> alone there; apps/web's docs header owns the theme.
+ */
+export function isDocsChromeRoute(pathname: string | null | undefined) {
+  return isExactRoute(pathname, "/developers");
+}
+
+/**
  * Landing pages that support light and dark mode on the exact path only.
  * Their subpages stay dark-only, so these deliberately do not use
- * matchesRouteSegment. The /developers landing is dark-only by design (no
- * theme toggle), so it is not listed.
+ * matchesRouteSegment. The /developers landing manages its own theme (see
+ * isDocsChromeRoute), so it is not listed.
  */
 const EXACT_THEME_ROUTES = new Set(["/learn"]);
 

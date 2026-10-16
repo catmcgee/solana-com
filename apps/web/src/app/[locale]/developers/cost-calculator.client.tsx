@@ -61,18 +61,18 @@ export function CostCalculator({
   const label =
     "mb-6 block text-[15px] leading-snug text-[var(--dl-muted)] last-of-type:mb-5";
   const range =
-    "mt-3.5 block h-1 w-full cursor-pointer accent-[var(--dl-accent)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--dl-accent-text)]";
+    "mt-3.5 block h-1 w-full cursor-pointer accent-[var(--dl-accent)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--dl-accent)]";
   const panel =
-    "rounded-[20px] border border-[var(--dl-line)] bg-[var(--dl-surface)] p-6 md:px-7";
+    "rounded-2xl border border-[var(--dl-line)] bg-[var(--dl-surface)] p-6 shadow-[var(--dl-shadow)] md:px-7";
 
   return (
-    <div className="grid gap-[18px] lg:grid-cols-2">
+    <div className="grid gap-3.5 lg:grid-cols-2">
       <div className={panel}>
         <label className={label}>
           <span className="flex items-baseline justify-between gap-4">
             <span>{t("paymentsPerMonth")}</span>
             <b
-              className="font-medium tabular-nums text-[var(--dl-text)]"
+              className="font-medium text-[var(--dl-text)]"
               data-testid="calc-payments"
             >
               {shown.payments}
@@ -96,9 +96,7 @@ export function CostCalculator({
         <label className={label}>
           <span className="flex items-baseline justify-between gap-4">
             <span>{t("averagePayment")}</span>
-            <b className="font-medium tabular-nums text-[var(--dl-text)]">
-              {shown.average}
-            </b>
+            <b className="font-medium text-[var(--dl-text)]">{shown.average}</b>
           </span>
           {enhanced && (
             <input
@@ -128,7 +126,7 @@ export function CostCalculator({
         {(
           [
             ["card", shown.card, "text-[var(--dl-text)]"],
-            ["solana", shown.solana, "text-[var(--dl-accent-text)]"],
+            ["solana", shown.solana, "text-[var(--dl-good)]"],
           ] as const
         ).map(([key, value, color]) => (
           <div
@@ -137,7 +135,7 @@ export function CostCalculator({
           >
             <span className="text-[15px] text-[var(--dl-muted)]">{t(key)}</span>
             <b
-              className={`text-[34px] font-medium tabular-nums leading-tight tracking-[-0.03em] ${color}`}
+              className={`text-[32px] font-medium leading-tight tracking-[-0.025em] ${color}`}
               data-testid={`calc-${key}`}
             >
               {value}

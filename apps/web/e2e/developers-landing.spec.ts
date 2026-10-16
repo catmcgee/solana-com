@@ -2,8 +2,9 @@ import { expect, test, type Page } from "@playwright/test";
 
 /**
  * /developers landing acceptance (spec §7.5): JS off × light|dark × en|ar|ja,
- * plus JS-on passes for the dark-only theme, the copy buttons and hydration.
- * /developers is dark only (no theme toggle); /learn keeps light and dark.
+ * plus JS-on passes for the docs theme (light/dark shared with /docs through
+ * localStorage "isDarkMode"), the docs header (search hand-off, toggle), the
+ * copy buttons and hydration. /learn keeps its own light/dark toggle.
  */
 
 const LOCALES = [
@@ -13,6 +14,7 @@ const LOCALES = [
 ] as const;
 const SCHEMES = ["light", "dark"] as const;
 const DARK_BG = "rgb(10, 10, 11)";
+const LIGHT_BG = "rgb(255, 255, 255)";
 const MCP_URL = "https://mcp.solana.com/mcp";
 const COMMANDS = {
   claudeCode: `claude mcp add --transport http solana-mcp ${MCP_URL}`,
@@ -21,7 +23,7 @@ const COMMANDS = {
 
 async function backgroundOf(page: Page) {
   return page
-    .locator("[data-dev-landing]")
+    .locator('[data-dev-landing="docs"]')
     .evaluate((el) => getComputedStyle(el).backgroundColor);
 }
 
@@ -57,6 +59,8 @@ test.describe("without JavaScript", () => {
           await expect(card.getByTestId("agent-server-url")).toHaveText(
             MCP_URL,
           );
+          // The per-agent commands sit in a native <details>.
+          await card.getByText("Add it to one agent").click();
           for (const [id, command] of Object.entries(COMMANDS)) {
             await expect(card.getByTestId(`agent-command-${id}`)).toHaveText(
               command,
@@ -80,7 +84,7 @@ test.describe("without JavaScript", () => {
           ).toHaveCount(0);
 
           const cards = page.getByTestId("job-cards").getByRole("link");
-          await expect(cards).toHaveCount(3);
+          await expect(cards).toHaveCount(4);
           const hrefs = await cards.evaluateAll((els) =>
             els.map((el) => el.getAttribute("href")),
           );
@@ -114,36 +118,70 @@ test.describe("without JavaScript", () => {
           await expect(page.locator('a[href="#picker"]')).toHaveCount(1);
           await expect(page.locator("#picker")).toHaveCount(1);
 
-          // Shared footer links are present (the ui-chrome Footer is not a
-          // <footer> element, so match its legal links).
+          // Docs links open in the same tab.
+          for (const target of await cards.evaluateAll((els) =>
+            els.map((el) => el.getAttribute("target")),
+          )) {
+            expect(target).toBeNull();
+          }
+
+          // The docs header and footer replace the solana.com chrome.
+          await expect(page.locator("header.dh")).toHaveCount(1);
+          await expect(page.locator("nav#navbar")).toHaveCount(0);
           await expect(
-            page.locator('a[href$="/privacy-policy"]').first(),
+            page.locator(
+              `header.dh .dh-bar nav a[href="${prefix}/docs/payments"]`,
+            ),
+          ).toHaveCount(1);
+          const footer = page.locator("footer.df");
+          await expect(
+            footer.locator('a[href$="/privacy-policy"]'),
           ).toBeAttached();
-          await expect(page.locator('a[href$="/tos"]').first()).toBeAttached();
+          await expect(footer.locator('a[href$="/tos"]')).toBeAttached();
+          // The theme switch needs JS, so it is hidden.
+          await expect(page.locator(".dh-bar .dh-theme")).toBeHidden();
 
           expect(await invisibleElements(page)).toEqual([]);
 
-          // Dark only, whatever the reader's preference.
-          expect(await backgroundOf(page)).toBe(DARK_BG);
+          // The reader's preference, like the docs without JS.
+          expect(await backgroundOf(page)).toBe(
+            colorScheme === "dark" ? DARK_BG : LIGHT_BG,
+          );
           await context.close();
         });
       }
     });
   }
 
-  test("header has a noscript link list with every language", async ({
+  test("docs header menus work as plain <details> and links", async ({
     browser,
   }) => {
     const context = await browser.newContext({ javaScriptEnabled: false });
     const page = await context.newPage();
     await page.goto("/developers");
-    const nav = page.locator('header nav[aria-label="Site"]');
-    await expect(nav).toBeVisible();
-    await expect(nav.locator('a[href="/docs"]')).toHaveCount(1);
-    await expect(nav.locator('a[hreflang="ja"]')).toHaveAttribute(
+    const languages = page.locator(".dh-bar .dh-lang");
+    await languages.locator("summary").click();
+    await expect(languages.locator('a[hreflang="ja"]')).toHaveAttribute(
       "href",
       "/ja/developers",
     );
+    // The search field submits to the docs.
+    const form = page.locator('.dh-bar form[role="search"]');
+    await expect(form).toHaveAttribute("action", "/docs");
+    await context.close();
+  });
+
+  test("solana.com header: Developers right of Ecosystem, in a new tab", async ({
+    browser,
+  }) => {
+    const context = await browser.newContext({ javaScriptEnabled: false });
+    const page = await context.newPage();
+    await page.goto("/ecosystem");
+    const nav = page.locator('header nav[aria-label="Site"]');
+    const links = nav.locator("ul").first().locator("a");
+    await expect(links.last()).toHaveAttribute("href", "/developers");
+    await expect(links.last()).toHaveAttribute("target", "_blank");
+    await expect(links.nth(-2)).toHaveAttribute("href", "/ecosystem");
     await context.close();
   });
 
@@ -160,14 +198,10 @@ test.describe("without JavaScript", () => {
 });
 
 test.describe("with JavaScript", () => {
-  test("stays dark with a light preference, has no toggle, hydrates cleanly", async ({
+  test("follows the system theme, toggles and shares the choice with the docs", async ({
     browser,
   }) => {
     const context = await browser.newContext({ colorScheme: "light" });
-    // A stored light choice (from /learn or the docs) must not apply here.
-    await context.addInitScript(() => {
-      localStorage.setItem("theme", "light");
-    });
     const page = await context.newPage();
     const errors: string[] = [];
     page.on("console", (message) => {
@@ -181,19 +215,24 @@ test.describe("with JavaScript", () => {
     page.on("pageerror", (error) => errors.push(error.message));
 
     await page.goto("/developers");
-    await expect(page.locator("html")).toHaveClass(/\bdark\b/);
-    await expect(page.locator("html")).not.toHaveClass(/\blight\b/);
+    const html = page.locator("html");
+    await expect(html).toHaveClass(/\blight\b/);
+    expect(await backgroundOf(page)).toBe(LIGHT_BG);
+
+    const toggle = page.locator(".dh-bar button[data-theme-toggle]");
+    await expect(toggle).toHaveAttribute("aria-label", "Switch to dark mode");
+    await toggle.click();
+    await expect(html).toHaveClass(/\bdark\b/);
+    await expect(toggle).toHaveAttribute("aria-label", "Switch to light mode");
     expect(await backgroundOf(page)).toBe(DARK_BG);
-    expect(
-      await page.evaluate(
-        () => getComputedStyle(document.body).backgroundColor,
-      ),
-    ).toBe(DARK_BG);
-    await expect(page.getByRole("button", { name: /toggle/i })).toHaveCount(0);
-    // The stored preference is left alone for the light/dark pages.
-    expect(await page.evaluate(() => localStorage.getItem("theme"))).toBe(
-      "light",
+    // Stored where Mintlify keeps it, so /docs opens dark too.
+    expect(await page.evaluate(() => localStorage.getItem("isDarkMode"))).toBe(
+      "dark",
     );
+
+    // A reload paints dark straight away (pre-paint script).
+    await page.reload();
+    await expect(html).toHaveClass(/\bdark\b/);
 
     // Calculator sliders appear after hydration and update the result.
     const range = page
@@ -207,6 +246,43 @@ test.describe("with JavaScript", () => {
     await context.close();
   });
 
+  test("uses a choice made in the docs", async ({ browser }) => {
+    const context = await browser.newContext({ colorScheme: "dark" });
+    // What Mintlify stores after "Switch to light mode" on /docs.
+    await context.addInitScript(() => {
+      localStorage.setItem("isDarkMode", "light");
+    });
+    const page = await context.newPage();
+    await page.goto("/developers");
+    await expect(page.locator("html")).toHaveClass(/\blight\b/);
+    expect(await backgroundOf(page)).toBe(LIGHT_BG);
+    await context.close();
+  });
+
+  test("search hands off to the docs search", async ({ browser }) => {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    // Do not load the docs; only check where the header sends the reader.
+    await page.route(/\/docs(\?|$)/, (route) =>
+      route.fulfill({ status: 200, body: "docs" }),
+    );
+
+    await page.goto("/developers");
+    await page.locator(".dh-bar .dh-search input").click();
+    await expect(page).toHaveURL(/\/docs\?search=1$/);
+
+    await page.goto("/developers");
+    await page.keyboard.press("ControlOrMeta+k");
+    await expect(page).toHaveURL(/\/docs\?search=1$/);
+
+    await page.goto("/developers");
+    await page.locator(".dh-bar .dh-search input").focus();
+    await page.keyboard.type("token extensions");
+    await page.keyboard.press("Enter");
+    await expect(page).toHaveURL(/\/docs\?q=token%20extensions$/);
+    await context.close();
+  });
+
   test("copy buttons copy the exact strings", async ({ browser }) => {
     const context = await browser.newContext({
       permissions: ["clipboard-read", "clipboard-write"],
@@ -214,6 +290,7 @@ test.describe("with JavaScript", () => {
     const page = await context.newPage();
     await page.goto("/developers");
     const card = page.getByTestId("agent-card");
+    await card.getByText("Add it to one agent").click();
     const targets = [
       { name: "Copy the server URL", text: MCP_URL },
       { name: "Copy the Claude Code command", text: COMMANDS.claudeCode },
