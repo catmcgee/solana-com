@@ -352,6 +352,9 @@ export function strayAssetsInDocsRoot(
     // Video chapters seek the embedded player; video cards open a dialog
     // (styles/video.css; markup from the video-guides transform).
     "apps/docs/video-chapters.js",
+    // Copy button and origin swap for the Start here agent banner
+    // (styles/agent-banner.css).
+    "apps/docs/agent-banner.js",
     "apps/docs/styles/",
   ],
 ) {

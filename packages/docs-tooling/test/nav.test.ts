@@ -222,6 +222,33 @@ describe("labels", () => {
     };
     expect(labelSites(nav).map((s) => s.key)).toEqual(["t", "t.x", "t.x~2"]);
   });
+
+  it("walks pages listed straight in a tab (no group header)", () => {
+    const nav: NavFile = {
+      tabs: [
+        {
+          tab: "Start here",
+          pages: [
+            "developers/docs/index",
+            {
+              group: "Quickstart",
+              root: "developers/docs/quickstart",
+              pages: ["developers/docs/quickstart/a"],
+            },
+          ],
+        },
+      ],
+    };
+    expect(labelSites(nav).map((s) => s.key)).toEqual([
+      "start-here",
+      "start-here.quickstart",
+    ]);
+    expect(navPageRefs(nav)).toEqual([
+      "developers/docs/index",
+      "developers/docs/quickstart",
+      "developers/docs/quickstart/a",
+    ]);
+  });
 });
 
 describe("build-locale-nav", () => {

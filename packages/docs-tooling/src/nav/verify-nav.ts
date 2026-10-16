@@ -55,11 +55,13 @@ export function navPageRefs(nav: NavFile): NavPage[] {
       }
     }
   };
-  for (const t of nav.tabs)
+  for (const t of nav.tabs) {
     for (const g of t.groups ?? []) {
       if (g.root) out.push(g.root);
       walk(g.pages);
     }
+    walk(t.pages ?? []);
+  }
   return out;
 }
 
@@ -80,6 +82,7 @@ function shape(nav: NavFile): string {
       h: t.href ? 1 : 0,
       x: [t.icon, t.align, t.hidden, t.searchable],
       g: (t.groups ?? []).map(g),
+      p: (t.pages ?? []).map(g),
     })),
   );
 }

@@ -57,7 +57,7 @@ export function labelSites(nav: NavFile): LabelSite[] {
   for (const t of nav.tabs) {
     const key = uniq("", t.tab, tabSeen);
     out.push({ key, en: t.tab, node: t });
-    walkEntries(t.groups ?? [], key);
+    walkEntries([...(t.groups ?? []), ...(t.pages ?? [])], key);
   }
   return out;
 }

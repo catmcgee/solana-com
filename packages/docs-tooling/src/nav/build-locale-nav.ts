@@ -178,6 +178,7 @@ export function buildLocaleNav(
       if (k === "tab") out[k] = label(t, v as string);
       else if (k === "href") out[k] = href(v as string);
       else if (k === "groups") out[k] = (v as NavGroup[]).map(group);
+      else if (k === "pages") out[k] = (v as NavEntry[]).map(entry);
       else out[k] = v;
     }
     return out as unknown as NavTab;

@@ -9,7 +9,7 @@
   `Accept: text/markdown` header.
 - The full corpus in a single file: https://solana.com/llms-full.txt
 - Scoped indexes exist per section, e.g.
-  https://solana.com/developers/docs/finance/llms.txt,
+  https://solana.com/developers/docs/assets/llms.txt,
   https://solana.com/developers/docs/payments/llms.txt or
   https://solana.com/developers/docs/tokenization/llms.txt - prefer these when
   working on a single task to save context.
@@ -17,9 +17,9 @@
   and conventions:
   `npx skills add https://github.com/solana-foundation/solana-dev-skill` (also
   served at https://solana.com/SKILL.md).
-- Route financial tasks through /developers/docs/finance: asset fundamentals are
-  under /developers/docs/tokens, payments under /developers/docs/payments,
-  stablecoins and tokenized assets under /developers/docs/assets (guides in
+- Route financial tasks by section: asset fundamentals are under
+  /developers/docs/tokens, payments under /developers/docs/payments, stablecoins
+  and tokenized assets under /developers/docs/assets (guides in
   /developers/docs/tokenization), and markets and DeFi under
   /developers/docs/defi. The JSON-RPC reference is under /developers/docs/rpc;
   self-contained code recipes under /developers/cookbook.

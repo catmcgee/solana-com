@@ -26,6 +26,10 @@ search engines without any extra switches. Undo the preview-only bits:
       `https://solana-f31f4a8d.mintlify.site/docs-assets/...`. Point it at the
       production docs host once the custom domain is set.
 - [ ] `MINTLIFY_ORIGIN` on the production Vercel project.
+- [ ] Start here agent banner: on solana.com, fetch
+      `https://solana.com/developers/docs/intro/agent-setup.md` and check it
+      returns the Markdown guide (the banner's copied line points there;
+      `agent-banner.js` swaps in the preview origin before launch).
 
 ## Translations
 

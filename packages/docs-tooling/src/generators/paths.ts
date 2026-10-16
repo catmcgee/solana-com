@@ -15,6 +15,11 @@
  *     "first": 0,                             // 0-based step that is the "first win"
  *     "steps": [["/docs/payments/checkout/try-it", "Pay as a customer", "optional summary"], …],
  *     "after": { "href": "/docs/payments", "title": "…", "summary": "…" },   // optional
+ *     "playground": {                        // optional "Open tutorial in Playground" settings
+ *       "stepper": false,                    // no button in the stepper header (default true)
+ *       "label": "Open in Playground",       // button text (default _ui.playground)
+ *       "note": "…"                          // playground.mdx text (default _ui.playgroundNote)
+ *     },
  *     "demo": {                              // optional run-it-yourself panel
  *       "component": "checkout",             // checkout | paywall | asset | trade (stage style)
  *       "title": "Demo Sticker Shop",
@@ -50,7 +55,10 @@
  *   from examples/playground.ts. They are server-rendered disabled (no href,
  *   greyed, tooltip); apps/docs/playground.js enables them when the kind is
  *   in its `CONFIG.enabledKinds`. A path without an example folder gets the
- *   disabled button with no source, and a warning.
+ *   disabled button with no source, and a warning. `playground.stepper:
+ *   false` drops the stepper button for one tutorial (the Quickstart, whose
+ *   intro page carries the only button), and `playground.label`/`note`
+ *   replace the shared `_ui` wording for that tutorial.
  * - `demo.mdx` (when `demo` is set): the terminal panel of
  *   src/lib/terminal.ts, all server-rendered: the stage (one row per
  *   `stage` entry, one pill per progress value), the numbered steps with
@@ -183,6 +191,7 @@ export interface PathDef {
   first?: number;
   steps: PathStep[];
   after?: PathStep;
+  playground?: PathPlayground;
   demo?: {
     component: DemoKind;
     title: string;
@@ -191,6 +200,15 @@ export interface PathDef {
     steps: DemoStep[];
     checks?: DemoChecks;
   };
+}
+/** Per-tutorial "Open tutorial in Playground" settings. */
+export interface PathPlayground {
+  /** Show the button in the stepper header row. Default true. */
+  stepper: boolean;
+  /** Button text instead of `_ui.playground`. */
+  label?: string;
+  /** playground.mdx text instead of `_ui.playgroundNote`. */
+  note?: string;
 }
 /** A separate panel of refusals next to a demo (no stage, no success). */
 export interface DemoChecks {
@@ -215,6 +233,7 @@ const PATH_FIELDS = new Set([
   "first",
   "steps",
   "after",
+  "playground",
   "demo",
 ]);
 
@@ -307,6 +326,7 @@ export function parsePaths(
       const bad = checkInlineMarkdown(v.summary);
       if (bad) at(`"summary" ${bad}`);
     }
+    const playground = parsePlayground(v.playground, at);
     out.paths.push({
       key,
       tab: String(v.tab ?? ""),
@@ -319,6 +339,7 @@ export function parsePaths(
       first: typeof first === "number" ? first : undefined,
       steps,
       after,
+      ...(playground ? { playground } : {}),
       demo: parseDemo(v.demo, at),
     });
   }
@@ -347,6 +368,30 @@ function parseSteps(v: unknown, at: (m: string) => void): PathStep[] {
     out.push({ href: href!, title: title!, summary: summary || undefined });
   });
   return out;
+}
+
+function parsePlayground(
+  v: unknown,
+  at: (m: string) => void,
+): PathPlayground | undefined {
+  if (v === undefined) return undefined;
+  if (!isRecord(v)) {
+    at(`"playground" must be { stepper?, label?, note? }`);
+    return undefined;
+  }
+  for (const f of Object.keys(v))
+    if (!["stepper", "label", "note"].includes(f))
+      at(`playground: unknown field "${f}"`);
+  if (v.stepper !== undefined && typeof v.stepper !== "boolean")
+    at(`playground.stepper must be true or false`);
+  for (const f of ["label", "note"] as const)
+    if (v[f] !== undefined && !str(v[f]))
+      at(`playground.${f} must be a non-empty string`);
+  return {
+    stepper: v.stepper !== false,
+    label: str(v.label) ? v.label : undefined,
+    note: str(v.note) ? v.note : undefined,
+  };
 }
 
 function parseDemo(v: unknown, at: (m: string) => void): PathDef["demo"] {
@@ -499,6 +544,7 @@ function mergePath(
       : st;
   });
   const ra = isRecord(raw.after) ? raw.after : {};
+  const rp = isRecord(raw.playground) ? raw.playground : {};
   const rd = isRecord(raw.demo) ? raw.demo : {};
   const rds = Array.isArray(rd.steps) ? rd.steps : [];
   const rc = isRecord(rd.checks) ? rd.checks : {};
@@ -524,6 +570,16 @@ function mergePath(
       title: s(ra.title, en.after.title),
       summary: so(ra.summary, en.after.summary),
     },
+    // `stepper` always comes from English; the wording may be translated.
+    ...(en.playground
+      ? {
+          playground: {
+            stepper: en.playground.stepper,
+            label: so(rp.label, en.playground.label),
+            note: so(rp.note, en.playground.note),
+          },
+        }
+      : {}),
     demo: en.demo && {
       ...en.demo,
       title: s(rd.title, en.demo.title),
@@ -618,10 +674,13 @@ export function renderStepper(
     const sep = (t: string) => `<span className="sol-vh">${t}</span>`;
     return `<li data-state="${state}"${first}><a href="${href}"${aria}><span className="sol-stepper-n">${mdText(`${ui.step} ${n}`)}${marks.map((m) => sep(", ") + m).join("")}${sep(": ")}</span><span className="sol-stepper-t">${mdText(s.title)}</span></a></li>`;
   });
+  const head =
+    p.playground?.stepper === false
+      ? ""
+      : `<div className="sol-stepper-head">${tutorialButton(ui, pg, "compact", p.playground?.label)}</div>\n`;
   return `${hdr(lang)}
 <div className="sol-stepper not-prose" data-path="${p.key}">
-<div className="sol-stepper-head">${tutorialButton(ui, pg)}</div>
-<div className="sol-stepper-nav" role="navigation" ${attr("aria-label", label)}>
+${head}<div className="sol-stepper-nav" role="navigation" ${attr("aria-label", label)}>
 <ol>
 ${items.join("\n")}
 </ol>
@@ -693,15 +752,16 @@ export function tutorialButton(
   ui: PathUi,
   pg: TutorialSource | undefined,
   variant: "compact" | "block" = "compact",
+  label = ui.playground,
 ) {
-  const off = `${ui.playground}: ${ui.playgroundOff.charAt(0).toLowerCase()}${ui.playgroundOff.slice(1)}`;
+  const off = `${label}: ${ui.playgroundOff.charAt(0).toLowerCase()}${ui.playgroundOff.slice(1)}`;
   const attrs = [
     `className="sol-pg-btn sol-pg-tut"`,
     `data-variant="${variant}"`,
     ...(pg
       ? [attr("data-pg-open", pg.open), attr("data-pg-kind", pg.kind)]
       : [`data-pg-kind="inline"`]),
-    attr("data-pg-label", ui.playground),
+    attr("data-pg-label", label),
     attr("data-pg-off", off),
     attr("data-tip", off),
     attr("aria-label", off),
@@ -709,7 +769,7 @@ export function tutorialButton(
     `role="link"`,
     `tabIndex="0"`,
   ];
-  return `<a ${attrs.join(" ")}><span className="sol-pg-label">${mdText(ui.playground)}</span></a>`;
+  return `<a ${attrs.join(" ")}><span className="sol-pg-label">${mdText(label)}</span></a>`;
 }
 
 /**
@@ -724,8 +784,8 @@ export function renderPlaygroundBlock(
   const { ui, lang } = src;
   return `${hdr(lang)}
 <div className="sol-pg-tutorial not-prose" data-path="${p.key}">
-<p className="sol-pg-tutorial-text">${mdText(ui.playgroundNote)}</p>
-${tutorialButton(ui, pg, "block")}
+<p className="sol-pg-tutorial-text">${mdText(p.playground?.note ?? ui.playgroundNote)}</p>
+${tutorialButton(ui, pg, "block", p.playground?.label)}
 </div>
 `;
 }

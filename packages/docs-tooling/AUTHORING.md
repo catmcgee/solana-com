@@ -371,12 +371,10 @@ wording changed on purpose, and every original link target is still linked:
   and the overview diagram are kept.
 - `docs/payments/index`: reorganised around the checkout and paywall paths; the
   original intro paragraph is kept.
-- `docs/finance/index`: now the "All use cases" hub. The intro sentence ("Build
-  financial products on Solana. Start with assets, then move through payments
-  and onchain markets…") and the "Issuing and operating assets" H2 with its
-  paragraph were replaced by card text: the "Issuance & tokenization" card
-  carries the same summary (token creation, access controls, DvP, fund
-  operations). All four original card targets and the Core Concepts link remain.
+- `docs/finance/index` (the "All use cases" hub) was removed on 2026-10-16.
+  Start here and the Payments, Assets, and Markets landings link every page it
+  listed, and its overview diagram moved to the Assets landing. `/docs/finance`
+  and `/developers/docs/finance` redirect to `/developers/docs`.
 
 Locale copies of these hubs keep the old structure until the next Lingo run.
 
@@ -568,7 +566,13 @@ solana.com) before cutover. `mint dev` cannot answer them:
   in `paths.en.json`, and the stepper button needs nothing else (gen:paths warns
   when it finds no folder). The button is generated disabled, with no href and a
   tooltip; `playground.js` enables it with the same `CONFIG.enabledKinds` rule.
-  Its wording is in `_ui` (`playground`, `playgroundOff`, `playgroundNote`).
+  Its wording is in `_ui` (`playground`, `playgroundOff`, `playgroundNote`). A
+  tutorial can set `"playground": { "stepper": false, "label", "note" }` in
+  `paths.en.json`: `stepper: false` drops the stepper button (the Quickstart
+  shows only the block on its intro page), and `label`/`note` replace the `_ui`
+  wording for that tutorial. Solana Playground still cannot import TypeScript
+  folders (checked 2026-10-16: "Could not identify framework"), so the
+  Quickstart button stays greyed with its tooltip.
 - **Terminal panels (job paths).** A recorded output with a `<stem>.run.json`
   next to its `<stem>.output.txt` renders as a terminal panel
   (`src/lib/terminal.ts`, styles `apps/docs/styles/demo.css`, behaviour
@@ -610,6 +614,9 @@ solana.com) before cutover. `mint dev` cannot answer them:
   controls and the page's hand-written `.sol-pg-tut` button are live once the
   files are on the `playground.js` source ref.
 - **Navigation (WP6).** Edit `navigation/en.json` by hand, then `nav:build`.
+  A tab can list `pages` directly instead of `groups` (Start here does): its
+  pages render as plain sidebar entries with no group header, and a nested
+  group (the Quickstart box) renders as a collapsible entry.
   Locale label keys are slugs of the English label path (`labels.ts`), not
   stable ids: renaming or moving an English group silently drops its
   translations back to English (listed in `generated/untranslated.json`).

@@ -42,6 +42,12 @@ export interface NavTab {
   hidden?: boolean;
   searchable?: boolean;
   groups?: NavGroup[];
+  /**
+   * Pages (and groups) listed straight in the tab, with no group header
+   * above them (the Start here tab). Mintlify renders a page here as a plain
+   * sidebar entry and a group as a collapsible entry.
+   */
+  pages?: NavEntry[];
 }
 
 /** Contents of apps/docs/navigation/<loc>.json (referenced via $ref). */
