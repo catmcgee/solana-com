@@ -19,6 +19,9 @@
  *   - asserts every mermaid fence has its pre-rendered figure (.sol-mermaid)
  *   - asserts that the 4th tab is "Markets" with a divider pseudo-element
  *   - asserts that an external (http) tab sits at the far end of the tab row
+ *   - on desktop (1440px), asserts the one-row header: #navbar is 4rem tall,
+ *     the tabs and the search share that row, the active-tab underline sits
+ *     on the bar's bottom edge, and the sidebar and TOC start below the bar
  *   - asserts that body links are purple and pass 4.5:1 contrast against the page
  *   - asserts that ABC Diatype and ABC Favorit Mono are the computed families
  *   - for /ar/ paths, asserts that #content-area is rtl and code blocks are ltr
@@ -191,6 +194,30 @@ for (const path of PATHS) {
                           ext.getBoundingClientRect().right,
                   )
                 : null,
+            // One-row header (theme.css 5b, >= 1280px).
+            header: (() => {
+              const nav = q("#navbar")?.getBoundingClientRect();
+              const search = q("#search-bar-entry")?.getBoundingClientRect();
+              const active = q("#navbar .nav-tabs-item > div.bg-primary");
+              const side = q("#sidebar")?.getBoundingClientRect();
+              const toc = q("#table-of-contents")?.getBoundingClientRect();
+              if (!nav || !row || !search) return null;
+              const tabsBox = row.getBoundingClientRect();
+              const mid = (b) => b.top + b.height / 2;
+              return {
+                height: Math.round(nav.height),
+                sameRow: Math.abs(mid(tabsBox) - mid(search)) < 8,
+                underlineGap: active
+                  ? Math.round(
+                      nav.bottom - active.getBoundingClientRect().bottom,
+                    )
+                  : null,
+                sidebarTop: side?.width
+                  ? Math.round(side.top - nav.bottom)
+                  : null,
+                tocTop: toc?.width ? Math.round(toc.top - nav.bottom) : null,
+              };
+            })(),
             linkColor: cs(link)?.color || "",
             pageBg,
             bodyFont: cs(q("#content-area p"))?.fontFamily || "",
@@ -270,6 +297,21 @@ for (const path of PATHS) {
             fail(ctxName, "tab divider missing");
           if (r.extRight !== null && r.extRight > 4)
             fail(ctxName, `external tab not at row end (${r.extRight}px)`);
+        }
+        if (vpName === "desktop" && r.tabsVisible) {
+          const h = r.header;
+          if (!h) fail(ctxName, "header elements missing");
+          else {
+            if (h.height !== 64)
+              fail(ctxName, `header ${h.height}px tall, expected one 64px row`);
+            if (!h.sameRow) fail(ctxName, "tabs and search not on one row");
+            if (h.underlineGap === null || Math.abs(h.underlineGap) > 2)
+              fail(ctxName, `active tab underline off (${h.underlineGap}px)`);
+            if (h.sidebarTop !== null && (h.sidebarTop < 0 || h.sidebarTop > 2))
+              fail(ctxName, `sidebar starts ${h.sidebarTop}px from the header`);
+            if (h.tocTop !== null && h.tocTop < 0)
+              fail(ctxName, `TOC starts under the header (${h.tocTop}px)`);
+          }
         }
         if (r.linkColor) {
           const c = contrast(
