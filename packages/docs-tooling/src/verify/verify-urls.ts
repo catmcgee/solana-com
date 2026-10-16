@@ -273,6 +273,8 @@ export function strayAssetsInDocsRoot(
     "apps/docs/theme-toggle.js",
     // Logo link to /developers as a full page load.
     "apps/docs/logo-link.js",
+    // Live "Try it" on RPC method pages (styles/rpc-try-it.css).
+    "apps/docs/rpc-try-it.js",
     "apps/docs/styles/",
   ],
 ) {

@@ -487,6 +487,20 @@ solana.com) before cutover. `mint dev` cannot answer them:
   needs the default layout). Nested fields: the first level is `defaultOpen`.
   Surfpool snippets are generated (`gen:surfpool`) from `data/surfpool/*.json`;
   `data/surfpool/upstream.json` is the 3-way merge base for `--sync --ref main`.
+- **RPC "Try it".** `apps/docs/rpc-try-it.js` (styles `styles/rpc-try-it.css`)
+  puts a "Try it" bar under the header of every `docs/rpc/http/*` and
+  `docs/rpc/websocket/*Subscribe` page (every locale). It opens a dialog that
+  sends the page's example to devnet, testnet or mainnet-beta straight from the
+  browser (POST, or a WebSocket for subscriptions). There is no marker: the
+  request is read from the first `<RequestExample>` fence (`bash cURL` with
+  `-d '<json>'`, or `json WebSocket`), whose `"method"` must match the page
+  slug. `verify` ("RPC Try it", `src/verify/rpc-try-it.ts`) fails on an English
+  page that breaks this. Mintlify's native API playground is not used: it sends
+  a named-field object built from `<ParamField body>`, not a positional `params`
+  array, has one fixed server per page, and proxies through Mintlify.
+  Mainnet-beta answers browsers only from allowlisted origins (solana.com): on
+  localhost or a `*.mintlify.app` preview it returns 403, which the dialog
+  explains.
 - **Runnable examples (WP5).** Write code with `#region` markers in
   `packages/docs-examples`, add the block to that folder's `blocks.json`, record
   with

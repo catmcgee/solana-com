@@ -18,6 +18,8 @@
  *  4. frontmatter   parses; `type` in the allowed enum (dropped keys are
  *                   residual patterns)
  *  5. assets        every /docs-assets/* reference exists; themed pairs
+ *     + RPC Try it  every RPC method page's first <RequestExample> fence is
+ *                   a request rpc-try-it.js can send (src/verify/rpc-try-it.ts)
  *  6. generators    every generator passes --check
  *  7. convert       `convert --check`: the tree is converted and idempotent
  *
@@ -36,6 +38,7 @@ import { layoutKey, listLayoutPages, runVerifyUrls } from "./verify-urls.ts";
 import { listSnippets, printResidual, scanResidual } from "./residual.ts";
 import { mdxCodec } from "../convert/codec.ts";
 import { findMathRisks } from "../convert/transforms/dollar-escape.ts";
+import { scanRpcTryIt } from "./rpc-try-it.ts";
 
 export const ALLOWED_TYPES = new Set([
   "conceptual",
@@ -256,6 +259,19 @@ export async function runVerify(
     name: "assets",
     ok: assets.length === 0,
     detail: assets.slice(0, 50),
+  });
+
+  const tryIt = scanRpcTryIt();
+  const enTryIt = ["http", "ws"]
+    .map((k) => `${tryIt.counts.get(`en ${k}`) ?? 0} ${k}`)
+    .join(" + ");
+  checks.push({
+    name: `RPC Try it (en: ${enTryIt}; ${tryIt.pages.length} pages in all locales)`,
+    ok: tryIt.failures.length === 0,
+    detail: [
+      ...tryIt.failures.slice(0, 50),
+      `translated pages without a sendable example (reported, not failing): ${tryIt.localeWarnings.length}`,
+    ],
   });
 
   // 6
