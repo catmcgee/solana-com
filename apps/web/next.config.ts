@@ -26,7 +26,13 @@ const securityHeaders: Array<{ key: string; value: string }> = [
   },
 ];
 
-if (process.env.NEXT_PUBLIC_VERCEL_ENV === "preview") {
+// Preview (staging) deployments stay out of search engines. VERCEL_ENV is
+// set by `vercel build`; NEXT_PUBLIC_VERCEL_ENV only when system env vars are
+// exposed. See migration/PRE_PRODUCTION.md.
+if (
+  process.env.VERCEL_ENV === "preview" ||
+  process.env.NEXT_PUBLIC_VERCEL_ENV === "preview"
+) {
   securityHeaders.push({
     key: "X-Robots-Tag",
     value: "noindex",
