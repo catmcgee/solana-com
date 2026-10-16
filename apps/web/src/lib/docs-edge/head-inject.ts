@@ -13,7 +13,8 @@
  *    over the rewrite table that next.config.ts inlines as
  *    DOCS_MINTLIFY_REWRITES);
  * 2. stream the body through `createHeadInjector`, which adds font preloads
- *    right after `<head>` and a render-blocking /docs-head.css (generated
+ *    (and a `rel="expect"` render hint, see DOCS_HEADER_END_SELECTOR) right
+ *    after `<head>` and a render-blocking /docs-head.css (generated
  *    from apps/docs/styles by packages/docs-tooling gen:docs-head) right
  *    before `</head>`, after Mintlify's own stylesheets, so the cascade
  *    order matches the final page;
@@ -46,13 +47,31 @@ export const DOCS_HEAD_CSS_PATH = "/docs-head.css";
 /** Response header that marks an injected document (debugging aid). */
 export const DOCS_HEAD_HEADER = "x-solana-docs-head";
 
-export function docsHeadSnippets(version: string = DOCS_HEAD_CSS_VERSION) {
+/**
+ * The first element after the header markup on every Mintlify docs page
+ * (the sidebar <nav>, which follows `</header>`). With the CSS already cached
+ * the browser may paint while it is still parsing the header, showing half
+ * of it for a frame; `rel="expect"` holds the first paint until this element
+ * is parsed (Chromium 124+; other browsers ignore it). Error pages have no
+ * sidebar, so the hint is only sent with 200 responses: a missing target
+ * would hold the paint until the whole document is parsed.
+ */
+export const DOCS_HEADER_END_SELECTOR = "#sidebar";
+
+export function docsHeadSnippets(
+  version: string = DOCS_HEAD_CSS_VERSION,
+  opts: { expectHeader?: boolean } = {},
+) {
   return {
     /** Goes right after `<head>`. */
-    preloads: DOCS_FONT_PRELOADS.map(
-      (href) =>
-        `<link rel="preload" as="font" type="font/woff2" crossorigin="anonymous" href="${href}"/>`,
-    ).join(""),
+    preloads:
+      (opts.expectHeader
+        ? `<link rel="expect" href="${DOCS_HEADER_END_SELECTOR}" blocking="render"/>`
+        : "") +
+      DOCS_FONT_PRELOADS.map(
+        (href) =>
+          `<link rel="preload" as="font" type="font/woff2" crossorigin="anonymous" href="${href}"/>`,
+      ).join(""),
     /** Goes right before `</head>`. */
     stylesheet: `<link rel="stylesheet" href="${DOCS_HEAD_CSS_PATH}?v=${version}" data-solana-docs-head=""/>`,
   };
@@ -363,7 +382,13 @@ export async function proxyDocsDocument(
     : inject
       ? upstream
           .body!.pipeThrough(new TextDecoderStream())
-          .pipeThrough(createHeadInjector(docsHeadSnippets()))
+          .pipeThrough(
+            createHeadInjector(
+              docsHeadSnippets(DOCS_HEAD_CSS_VERSION, {
+                expectHeader: upstream.status === 200,
+              }),
+            ),
+          )
           .pipeThrough(new TextEncoderStream())
       : upstream.body;
   return new Response(body, {

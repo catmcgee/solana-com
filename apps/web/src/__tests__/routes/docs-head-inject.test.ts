@@ -323,8 +323,14 @@ describe("proxyDocsDocument", () => {
     expect(res!.headers.get("x-robots-tag")).toBe("noindex");
     expect(res!.headers.get(DOCS_HEAD_HEADER)).toBe(DOCS_HEAD_CSS_VERSION);
     const text = await res!.text();
-    expect(text).toContain(`<head>${docsHeadSnippets().preloads}`);
-    expect(text).toContain(`${docsHeadSnippets().stylesheet}</head>`);
+    const snippets = docsHeadSnippets(DOCS_HEAD_CSS_VERSION, {
+      expectHeader: true,
+    });
+    expect(text).toContain(`<head>${snippets.preloads}`);
+    expect(text).toContain(`${snippets.stylesheet}</head>`);
+    expect(text).toContain(
+      '<head><link rel="expect" href="#sidebar" blocking="render"/>',
+    );
   });
 
   it("passes non-HTML bodies through untouched", async () => {
@@ -376,7 +382,10 @@ describe("proxyDocsDocument", () => {
       },
     );
     expect(res!.status).toBe(404);
-    expect(await res!.text()).toContain("/docs-head.css?v=");
+    const text = await res!.text();
+    expect(text).toContain("/docs-head.css?v=");
+    // No sidebar on error pages: the render hint would hold the paint.
+    expect(text).not.toContain('rel="expect"');
   });
 
   it("returns null (static rewrite) when the fetch fails or nothing matches", async () => {
