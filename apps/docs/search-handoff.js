@@ -25,13 +25,17 @@
   } catch (e) {
     return;
   }
-  if (!params.has("q") && !params.has("search")) return;
+  // Only the hand-off's own parameters: ?q=<text>, or ?search=1. Any other
+  // ?search=<text> is Mintlify's own search link (shared or reloaded), which
+  // Mintlify opens and fills itself, so leave it alone.
+  var handoffSearch = params.get("search") === "1";
+  if (!params.has("q") && !handoffSearch) return;
   var query = (params.get("q") || "").trim().slice(0, 200);
-  var nativeValue = params.get("search");
+  var nativeValue = handoffSearch ? "1" : null;
 
   function cleanUrl() {
     params.delete("q");
-    params.delete("search");
+    if (handoffSearch) params.delete("search");
     var rest = params.toString();
     try {
       history.replaceState(

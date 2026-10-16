@@ -202,7 +202,7 @@
     box.setAttribute("data-state", "done");
     box.removeAttribute("aria-busy");
     if (button) {
-      button.disabled = false;
+      button.removeAttribute("aria-disabled");
       button.textContent = record.runner ? "Run again" : "Run";
       button.setAttribute("aria-expanded", "true");
     }
@@ -214,7 +214,8 @@
     box.setAttribute("data-state", "running");
     box.setAttribute("aria-busy", "true");
     ensureAria(box);
-    button.disabled = true;
+    // aria-disabled, not disabled: a disabled button drops keyboard focus.
+    button.setAttribute("aria-disabled", "true");
     button.textContent = "Running\u2026";
 
     var delay = new Promise(function (resolve) {

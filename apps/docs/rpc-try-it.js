@@ -221,6 +221,51 @@
     return null;
   }
 
+  function methodOf(payload) {
+    try {
+      var obj = JSON.parse(payload);
+      return obj && typeof obj.method === "string" ? obj.method : "";
+    } catch {
+      return "";
+    }
+  }
+
+  /**
+   * A short explanation under responses that are correct but would puzzle a
+   * reader: methods public endpoints turn off, airdrop limits, the example's
+   * slot falling out of range, and empty results for example addresses.
+   */
+  // Public endpoints answer methods they turn off (getLargestAccounts,
+  // getTokenLargestAccounts, getTokenAccountsByDelegate, ...) with HTTP 429
+  // "Too many requests for a specific RPC call", which is not a rate limit
+  // that waiting clears.
+  function disabledOnPublic(text) {
+    var err = rpcError(text);
+    return !!(err && /specific RPC call/i.test(String(err.message || "")));
+  }
+
+  function responseNote(method, text, httpStatus, srv) {
+    var m = method.toLowerCase();
+    var err = rpcError(text);
+    var msg = err && err.message ? String(err.message) : "";
+    if (m === "requestairdrop" && (err || httpStatus === 429))
+      return "\n\nPublic airdrops are rate limited and often refused. Get devnet or testnet SOL from https://faucet.solana.com instead.";
+    if (disabledOnPublic(text))
+      return "\n\n" + method + " is disabled on public RPC endpoints because it is expensive to serve. Try it against an RPC provider, or a local validator or Surfpool.";
+    if (m === "getslotleaders" && err)
+      return "\n\nThe example's start slot is outside the range this node serves. Put a recent slot (from getSlot) as the first parameter and send again.";
+    if (err || httpStatus !== 200) return "";
+    try {
+      var r = JSON.parse(text).result;
+      var v = r && typeof r === "object" && "value" in r ? r.value : r;
+      if (v === null || (Array.isArray(v) && v.length === 0))
+        return "\n\nA valid, empty result: the example's address or parameters have no matching data on " + srv.label + ". Replace them with your own and send again.";
+    } catch {
+      /* not JSON */
+    }
+    return "";
+  }
+
   // api.mainnet-beta.solana.com answers browser requests (HTTP and
   // WebSocket) only from allowlisted origins such as https://solana.com, and
   // returns 403 "Access forbidden" to any other page (localhost, mint dev,
@@ -480,7 +525,8 @@
       }, HTTP_TIMEOUT_MS);
       busy = true;
       send.setAttribute("aria-busy", "true");
-      send.disabled = true;
+      // aria-disabled, not disabled: a disabled button drops keyboard focus.
+      send.setAttribute("aria-disabled", "true");
       sendLabel.textContent = "Sending…";
       setStatus("busy", "Sending to " + server().label + "…");
       var t0 = performance.now();
@@ -511,9 +557,11 @@
                 " · " +
                 ms +
                 " ms" +
-                (r.res.status === 429
-                  ? " · rate limited, wait a few seconds"
-                  : ""),
+                (disabledOnPublic(r.text)
+                  ? " · disabled on public RPC endpoints"
+                  : r.res.status === 429
+                    ? " · rate limited, wait a few seconds"
+                    : ""),
             );
           else if (err)
             setStatus(
@@ -530,7 +578,8 @@
           else setStatus("ok", "HTTP " + head + " · " + ms + " ms · " + size);
           showText(
             (r.text ? prettyJson(r.text) : "(empty response body)") +
-              (r.res.status === 403 ? originNote(server()) : ""),
+              (r.res.status === 403 ? originNote(server()) : "") +
+              responseNote(methodOf(payload), r.text, r.res.status, server()),
           );
         })
         .catch(function (e) {
@@ -560,7 +609,7 @@
         .then(function () {
           clearTimeout(timer);
           busy = false;
-          send.disabled = false;
+          send.removeAttribute("aria-disabled");
           send.removeAttribute("aria-busy");
           sendLabel.textContent = "Send request";
         });

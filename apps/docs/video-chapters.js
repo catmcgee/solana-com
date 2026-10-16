@@ -176,8 +176,9 @@
   function openModal(link, video) {
     if (typeof HTMLDialogElement !== "function") return false;
     var d = ensureDialog();
+    var card = link.closest(".card") || link;
     var title =
-      (link.querySelector("h2, h3, [class*='title']") || link).textContent ||
+      (card.querySelector("h2, h3, [class*='title']") || card).textContent ||
       "Video";
     title = title.trim().split("\n")[0];
     var iframe = document.createElement("iframe");
@@ -191,7 +192,8 @@
     box.textContent = "";
     box.appendChild(iframe);
     d.setAttribute("aria-label", title);
-    opener = link;
+    // Back to the focusable card on close (its inner <a> is tabindex=-1).
+    opener = card;
     d.showModal();
     return true;
   }
@@ -209,6 +211,9 @@
       )
         return;
       var link = e.target.closest && e.target.closest("a[href]");
+      // A Mintlify card is a div[role=link] whose image and text sit outside
+      // its inner <a>: a click anywhere on it means its link.
+      if (!link) link = cardLink(e.target);
       if (!link) return;
       if (link.classList.contains("sol-yt")) {
         var v = parse(link.getAttribute("href"));
@@ -222,12 +227,43 @@
       var grid =
         list ||
         link.closest(".sol-video-modal") ||
-        (link.closest("#content-area") && link.classList.contains("card"));
+        (link.closest("#content-area") &&
+          (link.classList.contains("card") || link.closest(".card")));
       if (!list && !grid) return;
       var video = parse(link.getAttribute("href"));
       if (!video) return;
       var handled = list ? seek(list, link, video) : openModal(link, video);
       if (handled) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    },
+    true,
+  );
+
+  /** The single YouTube link of the Mintlify card around `el`, if any. */
+  function cardLink(el) {
+    var card = el && el.closest && el.closest(".card");
+    if (!card) return null;
+    if (!card.closest(".sol-video-modal") && !card.closest("#content-area"))
+      return null;
+    var a = card.querySelector("a[href]");
+    return a && parse(a.getAttribute("href")) ? a : null;
+  }
+
+  // Keyboard: Enter or Space on a focused video card opens the same modal
+  // (Mintlify's own handler would open YouTube in a new tab).
+  document.addEventListener(
+    "keydown",
+    function (e) {
+      if (e.key !== "Enter" && e.key !== " ") return;
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      var t = e.target;
+      if (!t || !t.classList || !t.classList.contains("card")) return;
+      var link = cardLink(t);
+      if (!link) return;
+      var video = parse(link.getAttribute("href"));
+      if (video && openModal(link, video)) {
         e.preventDefault();
         e.stopPropagation();
       }
