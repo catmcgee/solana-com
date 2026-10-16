@@ -1,5 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { inspect } from "node:util";
 import type { AddressInfo } from "node:net";
 import {
   generateKeyPairSigner,
@@ -9,7 +10,7 @@ import {
 import { beforeAll, describe, expect, it } from "vitest";
 import { fundSol, setTokenBalance } from "../../../test/fixtures/fund";
 import { recordText, runExample } from "../../../test/record";
-import { confirm, demoVerify, newOrder } from "./demo";
+import { confirm, newOrder } from "./demo";
 import { getOrder, type Order } from "./orders";
 import { payStore } from "./pay";
 import { run } from "./run";
@@ -40,27 +41,54 @@ describe("paths/payments/checkout", () => {
     ({ order, signature: paid } = r.value);
     expect(r.value.results).toEqual([200, 402]);
     expect([...new Set(r.succeeded)]).toEqual([paid]);
-    // Step 1 and the browser page show the lines run.ts printed around
-    // payStore().
-    const lines = r.text.split("\n");
-    const from = lines.findIndex((l) => l.startsWith("Paid order-1001"));
-    expect(from).toBeGreaterThan(-1);
-    recordText(out("pay"), lines.slice(from, from + 4).join("\n"));
+    // Step 1 of the try-it demo and the pay blocks show what Node prints
+    // for the order and for the signature payStore() returned, as at a REPL
+    // prompt (pay.run.json holds the prompts).
+    expect(order).toEqual({
+      id: "order-1001",
+      storeOwner: r.value.store,
+      amount: 1_000_000n,
+      reference: order.reference,
+    });
+    recordText(out("pay"), `${inspect(order)}\n${inspect(paid)}`);
   });
 
   it("verify: verifyPayment checks amount, mint, recipient and reference", async () => {
+    // The calls the verify block's prompts show (verify-payment.run.json),
+    // printed the way Node prints their results.
     const r = await runExample(
       async () => {
-        const ok = await demoVerify(order, paid);
-        await demoVerify({ ...order, amount: 2_000_000n }, paid);
-        return ok;
+        const signature = paid;
+        const ok = await verifyPayment({
+          ...order,
+          signature,
+          mint: USDC_MINT,
+        });
+        console.log(ok);
+        const wrong = await verifyPayment({
+          ...order,
+          amount: 2_000_000n,
+          signature,
+          mint: USDC_MINT,
+        });
+        console.log(wrong);
+        return { ok, wrong };
       },
       {
         output: out("verify-payment"),
         signatures: "none",
       },
     );
-    expect(r.value).toEqual({ paid: true });
+    expect(r.value.ok).toEqual({ paid: true });
+    expect(r.value.wrong).toEqual({
+      paid: false,
+      reason: "amount mismatch: expected 2000000, received 1000000",
+    });
+    // The try-it demo shows the passing check as the shop's step and the
+    // refused one in its own panel (checks.mdx).
+    expect(r.text).toBe(`${inspect(r.value.ok)}\n${inspect(r.value.wrong)}`);
+    recordText(out("verify-payment.paid"), inspect(r.value.ok));
+    recordText(out("verify-payment.mismatch"), inspect(r.value.wrong));
 
     const base = {
       signature: paid,

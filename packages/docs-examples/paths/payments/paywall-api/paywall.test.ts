@@ -45,13 +45,17 @@ describe("paths/payments/paywall-api (x402-style)", () => {
     );
     expect(credited?.uiTokenAmount.amount).toBe(PRICE.toString());
 
-    // The browser page shows the unpaid request under server.ts, and the
-    // try-it demo shows both halves.
+    // The browser page shows the unpaid request under server.ts. The try-it
+    // demo shows the unpaid and the paid request, and its checks panel the
+    // replay and the over-cap client.
     const lines = r.text.split("\n");
     const paid = lines.findIndex((l) => l.includes("(paid)"));
-    expect(paid).toBe(3);
+    const replay = lines.findIndex((l) => l.includes("(replayed X-PAYMENT)"));
+    expect([paid, replay, lines.length]).toEqual([3, 6, 8]);
     recordText(out("server"), lines.slice(0, paid).join("\n"));
-    recordText(out("client"), lines.slice(paid).join("\n"));
+    recordText(out("client"), lines.slice(paid, replay).join("\n"));
+    recordText(out("client.replay"), lines[replay]!);
+    recordText(out("client.cap"), lines[replay + 1]!);
   });
 
   it("server: malformed X-PAYMENT headers get 402 and the server stays up", async () => {

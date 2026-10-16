@@ -103,8 +103,13 @@ beforeEach(() => {
     outputs,
   );
   write(
-    "paths/payments/checkout/verify-payment.output.txt",
+    "paths/payments/checkout/verify-payment.paid.output.txt",
     "confirmed\n",
+    outputs,
+  );
+  write(
+    "paths/payments/checkout/verify-payment.mismatch.output.txt",
+    "{ paid: false, reason: 'amount mismatch' }\n",
     outputs,
   );
 });
@@ -174,11 +179,24 @@ describe("seeds and registries", () => {
       expect(existsSync(f), f).toBe(true);
       return readFileSync(f, "utf8");
     };
-    expect(rec("checkout", 0)).toContain("Paid order-1001: 1 USDC");
+    expect(rec("checkout", 0)).toContain("amount: 1000000n");
+    expect(rec("checkout", 1)).toBe("{ paid: true }\n");
     expect(rec("paywall-api", 0)).toMatch(/-> 402/);
     expect(rec("paywall-api", 1)).toMatch(/\(paid\) -> 200/);
+    expect(rec("paywall-api", 1)).not.toMatch(/-> 402|refused/);
     expect(rec("issue-asset", 0)).toContain("balance: 1000 LSF");
     expect(rec("issue-asset", 1)).toContain('"Custom":17');
+    expect(rec("issue-asset", 2)).toMatch(/^Paused the asset/);
+    // Refusals live in the separate checks panel, never in the demo.
+    const checks = (key: string, i: number) => {
+      const c = p.paths.find((x) => x.key === key)!.demo!.checks!;
+      const f = path.join(examplesRoot, c.steps[i]!.output);
+      expect(existsSync(f), f).toBe(true);
+      return readFileSync(f, "utf8");
+    };
+    expect(checks("checkout", 0)).toContain("amount mismatch");
+    expect(checks("paywall-api", 0)).toMatch(/-> 402 payment already used/);
+    expect(checks("paywall-api", 1)).toMatch(/^client refused/);
   });
 
   it("concepts.css carries the .nojs-only rules the chip/address output needs", () => {
@@ -355,8 +373,15 @@ describe("generated snippets", () => {
     );
     expect(demo).toContain('<div className="sol-term-success">');
     expect(demo).not.toMatch(
-      /<details|<noscript|Replay|replay|\(ok\)|\(blocked\)/,
+      /<details|<noscript|Replay|replay|\(ok\)|\(blocked\)|mismatch/,
     );
+    // The refusal is a separate panel: no stage, no success message.
+    const checks = read("snippets/paths/en/checkout/checks.mdx");
+    expect(checks).toContain(
+      '<div className="sol-term not-prose" data-term="paths/checkout/checks" data-kind="checkout" data-steps="1"',
+    );
+    expect(checks).toContain("amount mismatch");
+    expect(checks).not.toMatch(/sol-term-success|sol-term-stage/);
     // No recordings for the other paths: no Run controls, warned.
     const paywall = read("snippets/paths/en/paywall-api/demo.mdx");
     expect(paywall).toContain(

@@ -201,12 +201,12 @@ export function lineTone(line: string): Tone | undefined {
   if (
     /\b(failed|rejected|refused|error|mismatch|already used)\b/i.test(line) ||
     /^\s*err:/.test(line) ||
-    /"paid":false|paid: False/.test(line)
+    /"paid":false|\bpaid: [Ff]alse\b/.test(line)
   )
     return "error";
   if (/->\s[45]\d\d\b|\bis paused\b/.test(line)) return "warn";
   if (
-    /\bconfirmed\b|->\s2\d\d\b|"paid":true|paid: True/.test(line) ||
+    /\bconfirmed\b|->\s2\d\d\b|"paid":true|\bpaid: [Tt]rue\b/.test(line) ||
     /^(Approved|Paid|Resumed)\b/.test(line)
   )
     return "ok";

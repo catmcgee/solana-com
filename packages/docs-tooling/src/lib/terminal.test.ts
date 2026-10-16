@@ -69,6 +69,9 @@ describe("terminal panel (src/lib/terminal.ts)", () => {
       "ok",
     );
     expect(lineTone("Fee: 5000 lamports")).toBeUndefined();
+    // What Node prints for verifyPayment()'s result.
+    expect(lineTone("{ paid: true }")).toBe("ok");
+    expect(lineTone("  paid: false,")).toBe("error");
     expect(termInline("GET / -> 200 ok")).toContain(
       '<span className="sol-term-code" data-code="2xx">200</span>',
     );

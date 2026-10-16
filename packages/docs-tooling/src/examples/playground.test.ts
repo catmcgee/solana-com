@@ -290,6 +290,21 @@ describe("playground markers in snippets", () => {
     expect(checkout).toBe(
       '<div className="sol-pg" data-pg-src="packages/docs-examples/paths/payments/checkout/pay.ts" data-pg-open="packages/docs-examples/paths/payments/checkout" data-pg-kind="ts" />',
     );
+    // A variant recording (`<stem>.<variant>.output.txt`) is a slice of
+    // `<stem>`'s run: its source is still `<stem>.ts`.
+    expect(
+      demoMarker([
+        {
+          label: "Verify",
+          output: "paths/payments/checkout/verify-payment.paid.output.txt",
+        },
+      ]),
+    ).toContain(
+      'data-pg-src="packages/docs-examples/paths/payments/checkout/verify-payment.ts"',
+    );
+    expect(
+      demoMarker([{ label: "x", output: "paths/nope/missing.v.output.txt" }]),
+    ).toBe('<div className="sol-pg" data-pg-kind="inline" />');
     // A step without a source file next to its output: no source.
     expect(
       demoMarker([{ label: "x", output: "paths/nope/missing.output.txt" }]),

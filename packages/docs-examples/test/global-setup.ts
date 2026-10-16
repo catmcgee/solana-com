@@ -11,8 +11,10 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { Surfnet } from "@solana/surfpool";
 
-const RPC_PORT = 8899;
-const WS_PORT = 8900;
+// SURFPOOL_RPC_PORT / SURFPOOL_WS_PORT move the proxies off the defaults
+// (vitest.config.ts points RPC_URL at the same ports).
+const RPC_PORT = Number(process.env.SURFPOOL_RPC_PORT ?? 8899);
+const WS_PORT = Number(process.env.SURFPOOL_WS_PORT ?? 8900);
 
 let surfnet: Surfnet | null = null;
 let rpcProxy: Server | null = null;

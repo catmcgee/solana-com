@@ -140,9 +140,10 @@ export async function clawBack(
   holder: Address,
   amount: bigint,
 ) {
+  const source = await tokenAccountOf(holder, mint);
   const signature = await send(issuer, [
     getTransferCheckedInstruction({
-      source: await tokenAccountOf(holder, mint),
+      source,
       mint,
       destination: await tokenAccountOf(issuer.address, mint),
       authority: issuer,
@@ -150,7 +151,9 @@ export async function clawBack(
       decimals: 6,
     }),
   ]);
-  console.log(`Permanent delegate moved ${lsf(amount)} from ${holder}`);
+  console.log(
+    `Permanent delegate moved ${lsf(amount)} from ${source} to the issuer`,
+  );
   console.log("Signature:", signature);
   return signature;
 }

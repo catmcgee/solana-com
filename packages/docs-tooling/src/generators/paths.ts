@@ -22,7 +22,11 @@
  *       "stage": [{ "label": "Holographic sticker", "sub": "1.00 USDC",
  *                   "states": [["todo", "Not paid yet"], ["warn", "Paid, checking…"], ["ok", "Paid and confirmed"]] }],
  *       "steps": [{ "label": "…", "description": "…",
- *                   "output": "paths/payments/checkout/pay.output.txt" }]
+ *                   "output": "paths/payments/checkout/pay.output.txt" }],
+ *       "checks": {                          // optional second panel: refusals
+ *         "title": "…",                      // kept out of the success path
+ *         "steps": [{ "label": "…", "description": "…", "output": "…" }]
+ *       }
  *     }
  *   }
  * }
@@ -57,6 +61,12 @@
  *   whose recorded output is missing (WP5 has not recorded it yet) is
  *   generated without output, the panel gets no Run controls
  *   (`data-norun`), and it is reported.
+ * - `checks.mdx` (when `demo.checks` is set): a second, separate terminal
+ *   panel for what the code refuses (a wrong amount, a reused payment). It
+ *   has no stage and no success message, so a refusal never sits inside the
+ *   demo's success state. Import it under its own heading on the page.
+ * - A step's output may be a variant recording, `<stem>.<variant>.output.txt`
+ *   (one slice of a run): its source file is still `<stem>.<ext>`.
  *
  * `--sync` only re-points `/snippets/paths/<lang>/` imports in locale pages;
  * `--check` runs that in memory and fails when a page would change.
@@ -179,7 +189,13 @@ export interface PathDef {
     success?: string;
     stage?: TermStageRow[];
     steps: DemoStep[];
+    checks?: DemoChecks;
   };
+}
+/** A separate panel of refusals next to a demo (no stage, no success). */
+export interface DemoChecks {
+  title: string;
+  steps: DemoStep[];
 }
 export interface PathsSource {
   lang: string;
@@ -345,40 +361,69 @@ function parseDemo(v: unknown, at: (m: string) => void): PathDef["demo"] {
     return undefined;
   }
   if (!str(v.title)) at(`demo.title must be a non-empty string`);
-  const steps: DemoStep[] = [];
-  if (!Array.isArray(v.steps) || !v.steps.length)
-    at(`demo.steps must be a non-empty array`);
-  else
-    v.steps.forEach((s, i) => {
-      if (!isRecord(s) || !str(s.label) || !str(s.output)) {
-        at(`demo.steps[${i}] must be { label, output, description? }`);
-        return;
-      }
-      if (path.isAbsolute(s.output) || s.output.split("/").includes(".."))
-        at(
-          `demo.steps[${i}].output must be relative to packages/docs-examples`,
-        );
-      if (typeof s.description === "string") {
-        const bad = checkInlineMarkdown(s.description);
-        if (bad) at(`demo.steps[${i}].description ${bad}`);
-      }
-      for (const f of Object.keys(s))
-        if (!["label", "output", "description"].includes(f))
-          at(`demo.steps[${i}]: unknown field "${f}"`);
-      steps.push({
-        label: s.label,
-        output: s.output,
-        description: str(s.description) ? s.description : undefined,
-      });
-    });
+  for (const f of Object.keys(v))
+    if (
+      !["component", "title", "success", "stage", "steps", "checks"].includes(f)
+    )
+      at(`demo: unknown field "${f}"`);
+  const steps = parseDemoSteps(v.steps, "demo.steps", at);
   const stage = parseStage(v.stage, steps.length, at);
+  let checks: DemoChecks | undefined;
+  if (v.checks !== undefined) {
+    const c = v.checks;
+    if (!isRecord(c) || !str(c.title))
+      at(`demo.checks must be { title, steps }`);
+    else {
+      for (const f of Object.keys(c))
+        if (!["title", "steps"].includes(f))
+          at(`demo.checks: unknown field "${f}"`);
+      checks = {
+        title: c.title,
+        steps: parseDemoSteps(c.steps, "demo.checks.steps", at),
+      };
+    }
+  }
   return {
     component: kind as DemoKind,
     title: String(v.title ?? ""),
     success: str(v.success) ? v.success : undefined,
     ...(stage ? { stage } : {}),
     steps,
+    ...(checks ? { checks } : {}),
   };
+}
+
+function parseDemoSteps(
+  v: unknown,
+  where: string,
+  at: (m: string) => void,
+): DemoStep[] {
+  const steps: DemoStep[] = [];
+  if (!Array.isArray(v) || !v.length) {
+    at(`${where} must be a non-empty array`);
+    return steps;
+  }
+  v.forEach((s, i) => {
+    if (!isRecord(s) || !str(s.label) || !str(s.output)) {
+      at(`${where}[${i}] must be { label, output, description? }`);
+      return;
+    }
+    if (path.isAbsolute(s.output) || s.output.split("/").includes(".."))
+      at(`${where}[${i}].output must be relative to packages/docs-examples`);
+    if (typeof s.description === "string") {
+      const bad = checkInlineMarkdown(s.description);
+      if (bad) at(`${where}[${i}].description ${bad}`);
+    }
+    for (const f of Object.keys(s))
+      if (!["label", "output", "description"].includes(f))
+        at(`${where}[${i}]: unknown field "${f}"`);
+    steps.push({
+      label: s.label,
+      output: s.output,
+      description: str(s.description) ? s.description : undefined,
+    });
+  });
+  return steps;
 }
 
 const STAGE_TONES = ["todo", ...TONES];
@@ -456,6 +501,16 @@ function mergePath(
   const ra = isRecord(raw.after) ? raw.after : {};
   const rd = isRecord(raw.demo) ? raw.demo : {};
   const rds = Array.isArray(rd.steps) ? rd.steps : [];
+  const rc = isRecord(rd.checks) ? rd.checks : {};
+  const mergeSteps = (list: DemoStep[], raw: unknown[]) =>
+    list.map((d, i) => {
+      const t = isRecord(raw[i]) ? (raw[i] as Record<string, unknown>) : {};
+      return {
+        ...d,
+        label: s(t.label, d.label),
+        description: so(t.description, d.description),
+      };
+    });
   return {
     ...en,
     label: s(raw.label, en.label),
@@ -473,14 +528,18 @@ function mergePath(
       ...en.demo,
       title: s(rd.title, en.demo.title),
       success: so(rd.success, en.demo.success),
-      steps: en.demo.steps.map((d, i) => {
-        const t = isRecord(rds[i]) ? (rds[i] as Record<string, unknown>) : {};
-        return {
-          ...d,
-          label: s(t.label, d.label),
-          description: so(t.description, d.description),
-        };
-      }),
+      steps: mergeSteps(en.demo.steps, rds),
+      ...(en.demo.checks
+        ? {
+            checks: {
+              title: s(rc.title, en.demo.checks.title),
+              steps: mergeSteps(
+                en.demo.checks.steps,
+                Array.isArray(rc.steps) ? rc.steps : [],
+              ),
+            },
+          }
+        : {}),
     },
   };
 }
@@ -766,17 +825,64 @@ export function renderDemo(
   outputsRoot = examplesRoot,
 ) {
   const d = p.demo!;
+  return renderPanel(src, problems, outputsRoot, {
+    file: `snippets/paths/${src.lang}/${p.key}/demo.mdx`,
+    id: `paths/${p.key}/demo`,
+    kind: d.component,
+    title: d.title,
+    steps: d.steps,
+    stage: d.stage,
+    success: d.success,
+    // The marker names the tutorial folder; checks share the demo's.
+    markerSteps: d.steps,
+  });
+}
+
+/** `checks.mdx`: the refusals panel, kept apart from the demo's success. */
+export function renderChecks(
+  src: PathsSource,
+  p: PathDef,
+  problems: Problem[],
+  outputsRoot = examplesRoot,
+) {
+  const d = p.demo!;
+  const c = d.checks!;
+  return renderPanel(src, problems, outputsRoot, {
+    file: `snippets/paths/${src.lang}/${p.key}/checks.mdx`,
+    id: `paths/${p.key}/checks`,
+    kind: d.component,
+    title: c.title,
+    steps: c.steps,
+    markerSteps: d.steps,
+  });
+}
+
+function renderPanel(
+  src: PathsSource,
+  problems: Problem[],
+  outputsRoot: string,
+  t: {
+    file: string;
+    id: string;
+    kind: string;
+    title: string;
+    steps: DemoStep[];
+    stage?: TermStageRow[];
+    success?: string;
+    markerSteps: DemoStep[];
+  },
+) {
   const { ui, lang } = src;
-  const file = `snippets/paths/${lang}/${p.key}/demo.mdx`;
-  const outputs = d.steps.map((s) => readDemoOutput(s.output, outputsRoot));
-  const missing = d.steps.filter((_, i) => outputs[i] === undefined);
+  const { file } = t;
+  const outputs = t.steps.map((s) => readDemoOutput(s.output, outputsRoot));
+  const missing = t.steps.filter((_, i) => outputs[i] === undefined);
   for (const s of missing)
     problems.push({
       level: "warn",
       file,
       message: `no recorded output at packages/docs-examples/${s.output} (WP5); demo generated without it and without Run controls`,
     });
-  const steps = d.steps.map((s, i) => {
+  const steps = t.steps.map((s, i) => {
     const errors: string[] = [];
     const meta =
       outputs[i] === undefined
@@ -810,20 +916,20 @@ export function renderDemo(
     step: ui.step,
   };
   let panel = renderTerminal({
-    id: `paths/${p.key}/demo`,
-    kind: d.component,
-    title: d.title,
+    id: t.id,
+    kind: t.kind,
+    title: t.title,
     labels,
     steps,
-    stage: d.stage,
-    success: d.success,
+    stage: t.stage,
+    success: t.success,
   });
   if (missing.length)
     panel = panel.replace(
       /^<div className="sol-term /,
       '<div data-norun="" className="sol-term ',
     );
-  return `${hdr(lang).trimEnd()}\n\n${demoMarker(d.steps, outputsRoot)}\n${panel}\n`;
+  return `${hdr(lang).trimEnd()}\n\n${demoMarker(t.markerSteps, outputsRoot)}\n${panel}\n`;
 }
 
 const STEP_SOURCE_EXTS = [".ts", ".js", ".rs", ".py"];
@@ -839,10 +945,15 @@ export function demoMarker(steps: DemoStep[], outputsRoot = examplesRoot) {
   const dirs = new Set(steps.map((s) => path.posix.dirname(s.output)));
   const sources = steps.map((s) => {
     const stem = s.output.replace(/\.output\.txt$/, "");
-    const ext = STEP_SOURCE_EXTS.find((e) =>
-      existsSync(path.join(outputsRoot, stem + e)),
-    );
-    return ext && `packages/docs-examples/${stem}${ext}`;
+    // `<stem>.<variant>.output.txt` is a slice of `<stem>.<ext>`'s run.
+    const variant = stem.replace(/(?<=\/[^/.]+)\.[^/.]+$/, "");
+    for (const base of variant === stem ? [stem] : [stem, variant]) {
+      const ext = STEP_SOURCE_EXTS.find((e) =>
+        existsSync(path.join(outputsRoot, base + e)),
+      );
+      if (ext) return `packages/docs-examples/${base}${ext}`;
+    }
+    return undefined;
   });
   const dir = [...dirs][0];
   const pg =
@@ -901,6 +1012,11 @@ export function buildPathOutputs(
           path.join(dir, "demo.mdx"),
           renderDemo(src, p, problems, outputsRoot),
         );
+        if (p.demo.checks)
+          files.set(
+            path.join(dir, "checks.mdx"),
+            renderChecks(src, p, problems, outputsRoot),
+          );
       }
     }
   }

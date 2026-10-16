@@ -12,7 +12,7 @@ import {
 } from "@solana-program/token-2022";
 import { beforeAll, describe, expect, it } from "vitest";
 import { fundSol } from "../../../test/fixtures/fund";
-import { runExample } from "../../../test/record";
+import { recordText, runExample } from "../../../test/record";
 import {
   clawBack,
   failure,
@@ -129,6 +129,19 @@ describe("paths/assets/issue-asset (Token-2022 restricted asset)", () => {
     );
     const { blocked, rejected, paused } = r.value;
     expect(r.failed).toEqual([blocked.signature]);
+    // The try-it demo shows the two sends (step 2) and the issuer's
+    // controls (step 3) as separate steps.
+    const lines = r.text.split("\n");
+    const controls = lines.findIndex((l) => l.startsWith("Paused the asset"));
+    expect(controls).toBe(10);
+    recordText(
+      out("blocked-transfer.send"),
+      lines.slice(0, controls).join("\n"),
+    );
+    recordText(
+      out("blocked-transfer.controls"),
+      lines.slice(controls).join("\n"),
+    );
     // Token-2022 AccountFrozen = custom error 17 (0x11).
     expect(json(blocked.err)).toBe('{"InstructionError":[0,{"Custom":17}]}');
     expect(blocked.fee).toBeGreaterThan(0n);
