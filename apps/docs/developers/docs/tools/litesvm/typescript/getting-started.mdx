@@ -84,22 +84,19 @@ console.log("Balance:", balance, "lamports");
 
 <Info>
   `createClient()` returns an empty shell — each `.use(plugin)` layers
-  capabilities onto it. The `signer()` plugin must come **before** `litesvm()`
-  because program plugins read `client.payer` while they are being installed. `signer(mySigner)` is
-  shorthand for installing the same keypair as both `payer` and `identity` — use
-  `payer()` or `identity()` from the same package if you want to split those
-  roles. This ordering is the same for `solanaRpc()` when you're on a real
-  network.
+  capabilities onto it. The `signer()` plugin must come **before** `litesvm()`,
+  because `litesvm()` reads `client.payer` when it is installed. `signer(mySigner)` is shorthand for installing the same keypair as
+  both `payer` and `identity` — use `payer()` or `identity()` from the same
+  package if you want to split those roles.
 </Info>
 
 <Info>
-  Prefer a one-line setup for quick experiments? Skip `signer()` and chain
-  `generatedPayerWithSol` from `@solana/kit-plugin-signer` after `litesvm()`:
-  `const client = await createClient().use(litesvm()).use(generatedPayerWithSol(lamports(10_000_000_000n)));`
-  The chain must be awaited because `generatedPayerWithSol` is async. Do not
-  combine it with `signer()` (the payer would be defined twice), and do not put
-  it before `litesvm()` (it needs the airdrop function that `litesvm()`
-  provides).
+  Prefer a one-line setup for quick experiments? Skip `signer()` and use
+  `generatedPayer` and `airdropPayer` from `@solana/kit-plugin-signer`:
+  `const client = await createClient().use(generatedPayer()).use(litesvm()).use(airdropPayer(lamports(10_000_000_000n)));`
+  `generatedPayer()` goes before `litesvm()`, and `airdropPayer()` goes after it
+  because it needs the airdrop function that `litesvm()` provides. Do not
+  combine them with `signer()` (the payer would be defined twice).
 </Info>
 
 </Step>
@@ -130,10 +127,12 @@ Direct access to LiteSVM for:
 - Time manipulation (`warpToSlot`, `getClock`)
 
 ```typescript
-import { address, lamports } from "@solana/kit";
+import { address, generateKeyPairSigner, lamports } from "@solana/kit";
+
+const myAddress = (await generateKeyPairSigner()).address;
 
 // Fund an account
-client.svm.airdrop(address, lamports(1_000_000_000n));
+client.svm.airdrop(myAddress, lamports(1_000_000_000n));
 
 // Set account state directly
 client.svm.setAccount({
@@ -155,15 +154,15 @@ Kit-compatible RPC interface for standard operations:
 
 ```typescript
 // Get account info (returns base64-encoded data)
-const { value: account } = await client.rpc.getAccountInfo(address).send();
+const { value: account } = await client.rpc.getAccountInfo(myAddress).send();
 
 // Get multiple accounts in one call
 const { value: accounts } = await client.rpc
-  .getMultipleAccounts([addr1, addr2, addr3])
+  .getMultipleAccounts([myAddress, client.payer.address])
   .send();
 
 // Get latest blockhash
-const { value: blockhash } = await client.rpc.getLatestBlockhash().send();
+const { value: latestBlockhash } = await client.rpc.getLatestBlockhash().send();
 ```
 
 <Warning>
@@ -182,7 +181,7 @@ const client = createClient().use(signer(mySigner)).use(litesvm());
 client.svm
   .withSigverify(false) // Skip signature verification
   .withBlockhashCheck(false) // Skip blockhash validation
-  .withSysvars() // Enable Clock, Rent, etc.
+  .withSysvars() // Reset Clock, Rent, and other sysvars to their defaults
   .withBuiltins() // Enable ed25519, secp256k1
   .withTransactionHistory(100n); // Store transaction history
 ```

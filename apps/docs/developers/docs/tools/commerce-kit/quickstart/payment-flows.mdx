@@ -219,8 +219,9 @@ confirmations. They require a Solana RPC client from the `@solana/kit` library.
 
 ### `verifyPayment()`
 
-Verifies that a transaction exists onchain and optionally validates the payment
-amount, recipient, and token.
+Checks that a transaction exists onchain. It is meant to also validate the
+payment amount, recipient, and token, but in `@solana-commerce/headless@0.1.1`
+those checks are incomplete (see the warning below).
 
 ```typescript
 async function verifyPayment(
@@ -282,6 +283,10 @@ The function performs these checks:
 
 3. **Confirmation Status:** Checks that the transaction has landed onchain.
 
+Steps 4 and 5 describe the intended behavior. In 0.1.1 the SOL check runs only
+when the recipient appears in the transaction, and the SPL token check never
+runs.
+
 4. **SOL Transfer Validation** (if `expectedRecipient` and `expectedAmount`
    provided, and no `expectedMint`):
    - Finds the recipient's account index in the transaction
@@ -302,11 +307,18 @@ The function performs these checks:
   high-value payments, consider waiting for `finalized` status.
 
 <Warning>
-  `verifyPayment()` checks that the recipient received at least the expected
-  amount. It does not check which order the payment is for (there is no
-  reference check), and it does not remember signatures it has already
-  accepted, so the same payment can be presented for two orders. Before you
-  fulfil an order, also match the payment to the order (for example by a
+  As of `@solana-commerce/headless@0.1.1`, `verifyPayment()` only confirms that
+  the transaction exists and has a `blockTime`. The SPL token check never runs,
+  and the SOL amount check runs only when the recipient appears in the
+  transaction, so a transfer to a different wallet or of a different token can
+  return `verified: true`. Do not use `verified: true` alone to release goods:
+  validate the transfer yourself, for example with `findReference` and
+  `validateTransfer` from `@solana/pay`, or by comparing `preTokenBalances` and
+  `postTokenBalances`.
+
+  It also does not check which order the payment is for (there is no reference
+  check), and it does not remember signatures it has already accepted, so the
+  same payment can be presented for two orders. Before you fulfill an order, also match the payment to the order (for example by a
   [Solana Pay reference](/developers/docs/tools/solana-pay/specification/version1-1#reference))
   and record each signature once. Run the check on your server, never only in
   the browser. [Confirm payments from your

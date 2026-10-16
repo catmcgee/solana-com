@@ -347,43 +347,51 @@ import {
   SOLANA_ERROR__TRANSACTION_ERROR__INSUFFICIENT_FUNDS_FOR_FEE,
   SOLANA_ERROR__TRANSACTION_ERROR__BLOCKHASH_NOT_FOUND,
   SOLANA_ERROR__TRANSACTION_ERROR__ACCOUNT_NOT_FOUND,
-  SOLANA_ERROR__INSTRUCTION_ERROR__INSUFFICIENT_FUNDS
+  SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM,
+  type SolanaErrorCode
 } from "@solana/kit";
 
 function handlePaymentError(error: unknown): {
   message: string;
   retryable: boolean;
 } {
-  // Preflight failures arrive wrapped ("Transaction simulation failed"), with
-  // the specific code on `error.cause`. Unwrap it before matching.
-  const e = isSolanaError(error) && error.cause ? error.cause : error;
+  // Errors arrive wrapped, sometimes several levels deep (for example
+  // "Transaction simulation failed" from client.sendTransaction), with the
+  // specific code further down the `cause` chain. Check every level.
+  const chain: unknown[] = [];
+  for (let c: unknown = error; c; c = isSolanaError(c) ? c.cause : undefined) {
+    chain.push(c);
+  }
+  const has = (code: SolanaErrorCode) =>
+    chain.some((c) => isSolanaError(c, code));
 
   // Blockhash expired—rebuild and retry
   if (
-    isSolanaError(error, SOLANA_ERROR__BLOCK_HEIGHT_EXCEEDED) ||
-    isSolanaError(e, SOLANA_ERROR__TRANSACTION_ERROR__BLOCKHASH_NOT_FOUND)
+    has(SOLANA_ERROR__BLOCK_HEIGHT_EXCEEDED) ||
+    has(SOLANA_ERROR__TRANSACTION_ERROR__BLOCKHASH_NOT_FOUND)
   ) {
     return { message: "Transaction expired—rebuilding", retryable: true };
   }
 
   // Insufficient SOL for fees
-  if (
-    isSolanaError(
-      e,
-      SOLANA_ERROR__TRANSACTION_ERROR__INSUFFICIENT_FUNDS_FOR_FEE
-    )
-  ) {
+  if (has(SOLANA_ERROR__TRANSACTION_ERROR__INSUFFICIENT_FUNDS_FOR_FEE)) {
     return { message: "Not enough SOL for fees", retryable: false };
   }
 
   // Fee payer account has never been funded ("no record of a prior credit")
-  if (isSolanaError(e, SOLANA_ERROR__TRANSACTION_ERROR__ACCOUNT_NOT_FOUND)) {
+  if (has(SOLANA_ERROR__TRANSACTION_ERROR__ACCOUNT_NOT_FOUND)) {
     return { message: "Fee payer account is not funded", retryable: false };
   }
 
-  // Insufficient token balance
+  // Insufficient SOL or token balance: the System Program and the Token
+  // programs both return custom error 1. Other programs use code 1 for
+  // other errors, so check `context.index` if your transaction calls them.
   if (
-    isSolanaError(e, SOLANA_ERROR__INSTRUCTION_ERROR__INSUFFICIENT_FUNDS)
+    chain.some(
+      (c) =>
+        isSolanaError(c, SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM) &&
+        c.context.code === 1
+    )
   ) {
     return { message: "Insufficient balance", retryable: false };
   }
@@ -395,8 +403,9 @@ function handlePaymentError(error: unknown): {
 ```
 
 Preflight simulation errors reject with a top-level `Transaction simulation
-failed` error and carry the specific code on `error.cause`, which is why the
-handler checks `error.cause`. `BLOCK_HEIGHT_EXCEEDED` is thrown at the top level.
+failed` error and carry the specific code further down the `cause` chain, which
+is why the handler checks every level. `BLOCK_HEIGHT_EXCEEDED` is thrown at the
+top level.
 
 **Common Error Codes:**
 
@@ -405,7 +414,7 @@ handler checks `error.cause`. `BLOCK_HEIGHT_EXCEEDED` is thrown at the top level
 | `BLOCK_HEIGHT_EXCEEDED`      | Blockhash expired     | Rebuild with fresh blockhash                                                                             |
 | `BLOCKHASH_NOT_FOUND`        | Blockhash not found   | Rebuild with fresh blockhash                                                                             |
 | `INSUFFICIENT_FUNDS_FOR_FEE` | Not enough SOL        | Fund fee payer or use [fee abstraction](/developers/docs/payments/send-payments/payment-processing/fee-abstraction) |
-| `INSUFFICIENT_FUNDS`         | Not enough tokens     | User needs more balance                                                                                  |
+| `INSTRUCTION_ERROR__CUSTOM` (code 1) | Not enough SOL or tokens for the transfer | User needs more balance                                                          |
 | `ACCOUNT_NOT_FOUND`          | Account missing or unfunded fee payer | Fund the fee payer, or create the ATA in the transaction |
 
 ## Gasless Transactions

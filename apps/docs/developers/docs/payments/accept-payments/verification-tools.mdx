@@ -56,6 +56,13 @@ Subscribe to your token account for real-time payment notifications using the
 `accountNotifications` RPC method:
 
 ```typescript
+import {
+  createSolanaRpcSubscriptions,
+  getBase64Codec,
+  type Address
+} from "@solana/kit";
+import { getTokenCodec } from "@solana-program/token";
+
 const rpcSubscriptions = createSolanaRpcSubscriptions(
   "wss://api.mainnet.solana.com"
 );
@@ -210,16 +217,14 @@ instruction carries just `programId` and base58 `data`, so match on the program
 id and decode the data yourself:
 
 ```typescript
-import { address, getBase58Encoder, getUtf8Decoder } from "@solana/kit";
-import { MEMO_PROGRAM_ADDRESS } from "@solana-program/memo";
+import { getBase58Encoder, getUtf8Decoder } from "@solana/kit";
+import { SUPPORTED_MEMO_PROGRAM_ADDRESSES } from "@solana-program/memo";
 
-// Current Memo program (used by @solana-program/memo) and the legacy v1 program
-const MEMO_PROGRAMS = [
-  MEMO_PROGRAM_ADDRESS,
-  address("MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr")
-];
+// SUPPORTED_MEMO_PROGRAM_ADDRESSES lists the current Memo program (used by
+// @solana-program/memo) and the legacy v1 and v3 programs
 
-function extractMemos(transaction): string {
+// `transaction` is a getTransaction response with jsonParsed encoding
+function extractMemos(transaction: any): string {
   const { instructions } = transaction.transaction.message;
   let memos = "";
   for (const instruction of instructions) {
@@ -227,7 +232,7 @@ function extractMemos(transaction): string {
       // The RPC parsed the instruction for us
       memos += instruction.parsed + "; ";
     } else if (
-      MEMO_PROGRAMS.includes(instruction.programId) &&
+      SUPPORTED_MEMO_PROGRAM_ADDRESSES.includes(instruction.programId) &&
       instruction.data
     ) {
       // Not parsed by the RPC: decode the base58 instruction data as UTF-8
