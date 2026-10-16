@@ -124,9 +124,9 @@ Transaction Signature: 2TVyCEi4bwDw7m9n8y1nbUTq17YHjWre3tyY75EpPBn4e3AQvb1k7i4Wb
 </div>
 
 </Tab>
-<Tab title="Legacy">
-<div className="sol-tab-label">Legacy</div>
-<div className="sol-pg" data-pg-src="packages/docs-examples/cookbook/transactions/calculate-cost/legacy.ts" data-pg-open="packages/docs-examples/cookbook/transactions/calculate-cost/legacy.ts" data-pg-kind="ts" />
+<Tab title="Web3.js v3">
+<div className="sol-tab-label">Web3.js v3</div>
+<div className="sol-pg" data-pg-src="packages/docs-examples/cookbook/transactions/calculate-cost/web3v3.ts" data-pg-open="packages/docs-examples/cookbook/transactions/calculate-cost/web3v3.ts" data-pg-kind="ts" />
 
 ```ts
 import {
@@ -146,8 +146,8 @@ const { blockhash, lastValidBlockHeight } =
   await connection.getLatestBlockhash();
 
 // Create keypairs for transaction
-const sender = Keypair.generate();
-const recipient = Keypair.generate();
+const sender = await Keypair.generate();
+const recipient = await Keypair.generate();
 console.log(`Created sender account: ${sender.publicKey.toString()}`);
 console.log(`Created recipient account: ${recipient.publicKey.toString()}`);
 
@@ -200,7 +200,7 @@ console.log(`Estimated compute units: ${estimatedUnits}`);
 
 // Create final transaction with compute budget instructions
 const computeUnitLimitInstruction = ComputeBudgetProgram.setComputeUnitLimit({
-  units: estimatedUnits!,
+  units: Number(estimatedUnits),
 });
 
 const computeUnitPriceInstruction = ComputeBudgetProgram.setComputeUnitPrice({
@@ -223,23 +223,23 @@ const fees = await connection.getFeeForMessage(messageV0);
 console.log(`Transaction fee: ${fees.value} lamports`);
 
 const transaction = new VersionedTransaction(messageV0);
-transaction.sign([sender]);
+await transaction.sign([sender]);
 
 // Send and confirm transaction
 const signature = await connection.sendTransaction(transaction);
 console.log(`Transaction Signature: ${signature}`);
 ```
 
-<div className="sol-run" data-run="cookbook/transactions/calculate-cost/cost" data-tab="Legacy">
+<div className="sol-run" data-run="cookbook/transactions/calculate-cost/cost" data-tab="Web3.js v3">
 <div className="sol-run-bar"><button type="button" className="sol-run-btn">Run</button><span className="sol-run-note">Output recorded on a local Surfpool network</span></div>
 <div className="sol-run-out">
 
 ```text Output
-Created sender account: 4eWK74S7mC1tpVwm3UVek7TmKacbeoS3WnqM8hFTVqYK
-Created recipient account: D8zLFm3Rt8LyojsmhMAMWBkVqcKiLzaPMzv3JcJd5BuX
+Created sender account: B3NE5BEMXdVcAZz8MCo6y5fBe4QTqUUXfTCjqfFzadpm
+Created recipient account: GBcvRj7uY3wZL4ayQaFSkSiz4kTXkrvAt1JZUnzNugxg
 Estimated compute units: 450
 Transaction fee: 5000 lamports
-Transaction Signature: 2JHCEKRF87Xb8g7G8mM9doYtzF7DfqA4htZrKurwrMjvVNsknqUAMeLbrH8n11zBNuMHdfJZ4k4Pf8ohbDQgqPMQ
+Transaction Signature: 4FqbVrQHNwr2Qo6LZqpG3zx8zULqWn3jhtSFb2UF9enpuvKKEgQ59fqv6ZrdUC5jNPYe7bzjxZ5ddHZSLkB6ksBs
 ```
 
 </div>
@@ -442,6 +442,128 @@ Transaction fee: 5000 lamports
 Transaction fee: 5e-06 SOL
 Total cost: 1000005000 lamports
 Total cost: 1.000005 SOL
+```
+
+</div>
+</div>
+
+</Tab>
+<Tab title="Web3.js (legacy)">
+<div className="sol-tab-label">Web3.js (legacy)</div>
+<div className="sol-pg" data-pg-src="packages/docs-examples/cookbook/transactions/calculate-cost/legacy.ts" data-pg-open="packages/docs-examples/cookbook/transactions/calculate-cost/legacy.ts" data-pg-kind="ts" />
+
+```ts
+import {
+  ComputeBudgetProgram,
+  Connection,
+  Keypair,
+  LAMPORTS_PER_SOL,
+  SystemProgram,
+  TransactionMessage,
+  VersionedTransaction,
+} from "@solana/web3.js";
+
+// Connect to Solana network
+const connection = new Connection("http://localhost:8899", "confirmed");
+
+const { blockhash, lastValidBlockHeight } =
+  await connection.getLatestBlockhash();
+
+// Create keypairs for transaction
+const sender = Keypair.generate();
+const recipient = Keypair.generate();
+console.log(`Created sender account: ${sender.publicKey.toString()}`);
+console.log(`Created recipient account: ${recipient.publicKey.toString()}`);
+
+// Request and confirm airdrop
+const airdropSignature = await connection.requestAirdrop(
+  sender.publicKey,
+  LAMPORTS_PER_SOL,
+);
+
+await connection.confirmTransaction({
+  signature: airdropSignature,
+  blockhash,
+  lastValidBlockHeight,
+});
+
+// Create a transfer instruction
+const transferInstruction = SystemProgram.transfer({
+  fromPubkey: sender.publicKey,
+  toPubkey: recipient.publicKey,
+  lamports: 1000000, // 0.001 SOL
+});
+
+// Create simulation instructions with placeholder compute unit limit
+const simulationInstructions = [
+  ComputeBudgetProgram.setComputeUnitLimit({
+    units: 1_400_000, // High value for simulation
+  }),
+  ComputeBudgetProgram.setComputeUnitPrice({
+    microLamports: 1n,
+  }),
+  transferInstruction,
+];
+
+// Create transaction for simulation
+const simulationTransaction = new VersionedTransaction(
+  new TransactionMessage({
+    instructions: simulationInstructions,
+    payerKey: sender.publicKey,
+    recentBlockhash: blockhash,
+  }).compileToV0Message(),
+);
+
+// Simulate transaction to get compute unit estimate
+const simulationResponse = await connection.simulateTransaction(
+  simulationTransaction,
+);
+
+const estimatedUnits = simulationResponse.value.unitsConsumed;
+console.log(`Estimated compute units: ${estimatedUnits}`);
+
+// Create final transaction with compute budget instructions
+const computeUnitLimitInstruction = ComputeBudgetProgram.setComputeUnitLimit({
+  units: estimatedUnits!,
+});
+
+const computeUnitPriceInstruction = ComputeBudgetProgram.setComputeUnitPrice({
+  microLamports: 1n,
+});
+
+// Build transaction with all instructions
+const messageV0 = new TransactionMessage({
+  payerKey: sender.publicKey,
+  recentBlockhash: blockhash,
+  instructions: [
+    computeUnitPriceInstruction,
+    computeUnitLimitInstruction,
+    transferInstruction,
+  ],
+}).compileToV0Message();
+
+// Calculate fee
+const fees = await connection.getFeeForMessage(messageV0);
+console.log(`Transaction fee: ${fees.value} lamports`);
+
+const transaction = new VersionedTransaction(messageV0);
+transaction.sign([sender]);
+
+// Send and confirm transaction
+const signature = await connection.sendTransaction(transaction);
+console.log(`Transaction Signature: ${signature}`);
+```
+
+<div className="sol-run" data-run="cookbook/transactions/calculate-cost/cost" data-tab="Web3.js (legacy)">
+<div className="sol-run-bar"><button type="button" className="sol-run-btn">Run</button><span className="sol-run-note">Output recorded on a local Surfpool network</span></div>
+<div className="sol-run-out">
+
+```text Output
+Created sender account: 4eWK74S7mC1tpVwm3UVek7TmKacbeoS3WnqM8hFTVqYK
+Created recipient account: D8zLFm3Rt8LyojsmhMAMWBkVqcKiLzaPMzv3JcJd5BuX
+Estimated compute units: 450
+Transaction fee: 5000 lamports
+Transaction Signature: 2JHCEKRF87Xb8g7G8mM9doYtzF7DfqA4htZrKurwrMjvVNsknqUAMeLbrH8n11zBNuMHdfJZ4k4Pf8ohbDQgqPMQ
 ```
 
 </div>

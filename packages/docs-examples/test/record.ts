@@ -45,6 +45,8 @@ export interface RunExampleOptions {
 export interface RunExampleResult<T> {
   value: T;
   text: string;
+  /** The raw arguments of every captured console call, in order. */
+  calls: unknown[][];
   succeeded: Signature[];
   failed: Signature[];
 }
@@ -62,9 +64,11 @@ export async function runExample<T>(
   opts: RunExampleOptions = {},
 ): Promise<RunExampleResult<T>> {
   const lines: string[] = [];
+  const calls: unknown[][] = [];
   const methods = ["log", "info", "warn", "error"] as const;
   const spies = methods.map((m) =>
     vi.spyOn(console, m).mockImplementation((...args: unknown[]) => {
+      calls.push(args);
       lines.push(format(...args));
     }),
   );
@@ -120,7 +124,7 @@ export async function runExample<T>(
       ).toBe(normalizeShape(readFileSync(path, "utf8")));
     }
   }
-  return { value: value!, text, succeeded, failed };
+  return { value: value!, text, calls, succeeded, failed };
 }
 
 function bigintJson(_k: string, v: unknown) {
