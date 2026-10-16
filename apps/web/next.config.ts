@@ -1,49 +1,36 @@
 // trigger preview build
 import createNextIntlPlugin from "next-intl/plugin";
 import { withBotId } from "botid/next/config";
-import rewritesAndRedirectsJson from "./rewrites-redirects";
+import rewritesAndRedirectsJson, {
+  mintlifyRewrites,
+} from "./rewrites-redirects";
 import type { NextConfig } from "next";
 import type { Redirect, Rewrite } from "next/dist/lib/load-custom-routes";
 import withBundleAnalyzer from "@next/bundle-analyzer";
 import { withSentryConfig } from "@sentry/nextjs";
+import { getSecurityHeaders } from "./src/lib/security-headers";
 
-const securityHeaders: Array<{ key: string; value: string }> = [
-  {
-    key: "X-Frame-Options",
-    value: "SAMEORIGIN",
-  },
-  {
-    key: "X-XSS-Protection",
-    value: "1; mode=block",
-  },
-  {
-    key: "X-Content-Type-Options",
-    value: "nosniff",
-  },
-  {
-    key: "Content-Security-Policy",
-    value: "frame-ancestors 'self'",
-  },
-];
-
-// Preview (staging) deployments stay out of search engines. VERCEL_ENV is
-// set by `vercel build`; NEXT_PUBLIC_VERCEL_ENV only when system env vars are
-// exposed. See migration/PRE_PRODUCTION.md.
-if (
-  process.env.VERCEL_ENV === "preview" ||
-  process.env.NEXT_PUBLIC_VERCEL_ENV === "preview"
-) {
-  securityHeaders.push({
-    key: "X-Robots-Tag",
-    value: "noindex",
-  });
-}
+// X-Frame-Options, nosniff, X-XSS-Protection, frame-ancestors, plus
+// X-Robots-Tag: noindex on previews. Shared with the docs head injection in
+// src/middleware.ts, which builds its own docs HTML responses.
+const securityHeaders = getSecurityHeaders();
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   productionBrowserSourceMaps: false,
   trailingSlash: false,
   transpilePackages: ["gsap"],
+  // The Mintlify rewrite table, for the docs head injection in
+  // src/middleware.ts: it fetches a docs page from the same upstream URL the
+  // beforeFiles rewrite would use. Inlined at build time, like the rewrites.
+  env: {
+    DOCS_MINTLIFY_REWRITES: JSON.stringify(
+      mintlifyRewrites.map(({ source, destination }) => ({
+        source,
+        destination,
+      })),
+    ),
+  },
   // The epoch1000 OG card reads font files from disk at request time
   outputFileTracingIncludes: {
     "/api/epoch1000/og": ["./assets/fonts/epoch1000/*.woff"],
@@ -193,6 +180,18 @@ const nextConfig: NextConfig = {
           {
             key: "Content-Type",
             value: "text/markdown; charset=utf-8",
+          },
+        ],
+      },
+      // The docs head stylesheet (src/lib/docs-edge/head-inject.ts) is
+      // requested as /docs-head.css?v=<content hash>, so it can be cached
+      // for a year.
+      {
+        source: "/docs-head.css",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
           },
         ],
       },

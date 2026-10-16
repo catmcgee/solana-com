@@ -59,6 +59,7 @@ export const GENERATOR_CHECKS: [string, string[]][] = [
     "gen:manifest/llms/redirects --check",
     ["src/manifest/cli.ts", "all", "--check"],
   ],
+  ["gen:docs-head --check", ["src/generators/docs-head.ts", "--check"]],
 ];
 
 interface Check {

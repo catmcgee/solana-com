@@ -8,6 +8,10 @@ import {
   getMarkdownRequestSource,
 } from "@/lib/docs-edge/paths";
 import { trackMarkdownRequest } from "@/lib/docs-edge/markdown-analytics";
+import {
+  isDocumentNavigation,
+  proxyDocsDocument,
+} from "@/lib/docs-edge/head-inject";
 
 // The main web app uses routing with locale detection enabled
 // and doesn't need preserveProxiedLocaleCookie since it's the source of truth
@@ -45,6 +49,9 @@ export function isProxiedPath(normalizedPathname: string) {
  * 2. record markdown requests (`.md` or `Accept: text/markdown`) in PostHog
  *    without delaying the response;
  * 3. `NextResponse.next()`, so the rewrite in rewrites-redirects.ts runs.
+ *    For HTML document navigations the default export then serves the page
+ *    itself instead, with our header CSS injected into <head>
+ *    (lib/docs-edge/head-inject.ts); every other request keeps the rewrite.
  * Greek (`/el/...`) docs URLs never get here: next.config redirects run
  * before middleware.
  */
@@ -89,6 +96,14 @@ export default async function middleware(
 
   const docsResponse = handleDocsRequest(req, event);
   if (docsResponse) {
+    if (
+      docsResponse.headers.get("x-middleware-next") === "1" &&
+      isDocumentNavigation(req)
+    ) {
+      // Falls back to the rewrite when no rule matches or Mintlify is down.
+      const injected = await proxyDocsDocument(req);
+      if (injected) return injected;
+    }
     return docsResponse;
   }
 
