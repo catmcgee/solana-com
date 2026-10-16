@@ -13,7 +13,7 @@ const EXPLORE_MENU = {
       label: "Quick Start",
       title: "Start building on Solana",
       ctaText: "Quick Start Guide",
-      ctaHref: "/developers/docs/intro/quick-start",
+      ctaHref: "/developers/docs/quickstart",
     },
     business: {
       label: "Network Dominance",

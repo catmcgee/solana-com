@@ -111,7 +111,7 @@ const dissolvedGuideRedirects: RedirectInput[] = withMdVariants([
   },
   {
     source: "/developers/guides/getstarted",
-    destination: "/developers/docs/intro/quick-start",
+    destination: "/developers/docs/quickstart",
   },
   {
     source: "/developers/guides/dapps",
@@ -433,6 +433,20 @@ const movedDocsRedirects: RedirectInput[] = withMdVariants([
     source: "/developers/docs/intro/quick-start/build-first-program",
     destination: "/developers/docs/programs/build-first-program",
   },
+  // The Playground quick start and its two walkthroughs were merged into the
+  // Quickstart tutorial (2026-10-16): reading -> Check a balance, writing ->
+  // Send SOL. The pages and their locale copies were deleted.
+  ...[
+    ["", "/developers/docs/quickstart"],
+    ["/reading-from-network", "/developers/docs/quickstart/check-balance"],
+    ["/writing-to-network", "/developers/docs/quickstart/send-sol"],
+  ].flatMap(([page, destination]) => [
+    { source: `/docs/intro/quick-start${page}`, destination: destination! },
+    {
+      source: `/developers/docs/intro/quick-start${page}`,
+      destination: destination!,
+    },
+  ]),
 ]);
 
 /**
@@ -1841,23 +1855,23 @@ export default {
     },
     {
       source: "/developers/guides/hello-world-in-your-browser",
-      destination: "/developers/docs/intro/quick-start",
+      destination: "/developers/docs/quickstart",
     },
     {
       source: "/developers/guides/solana-playground",
-      destination: "/developers/docs/intro/quick-start",
+      destination: "/developers/docs/quickstart",
     },
     {
       source: "/developers/guides/solang/solang-getting-started",
-      destination: "/developers/docs/intro/quick-start",
+      destination: "/developers/docs/quickstart",
     },
     {
       source: "/developers/guides/solang-getting-started",
-      destination: "/developers/docs/intro/quick-start",
+      destination: "/developers/docs/quickstart",
     },
     {
       source: "/developers/guides/getstarted/hello-world-in-your-browser",
-      destination: "/developers/docs/intro/quick-start",
+      destination: "/developers/docs/quickstart",
     },
     {
       source: "/developers/guides/local-rust-hello-world",
@@ -1991,7 +2005,7 @@ export default {
     },
     {
       source: "/developers/guides/getstarted/rust-to-solana",
-      destination: "/developers/docs/intro/quick-start",
+      destination: "/developers/docs/quickstart",
     },
     {
       source: "/developers/guides/getstarted/scaffold-nextjs-anchor",

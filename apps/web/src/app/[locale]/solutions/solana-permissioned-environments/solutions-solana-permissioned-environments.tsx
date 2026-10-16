@@ -150,7 +150,7 @@ export function SolutionsSolanaPermissionedEnvironmentsPage() {
               src: DEVELOPER_CARD_IMAGES,
             },
             callToAction: {
-              url: "/developers/docs/intro/quick-start",
+              url: "/developers/docs/quickstart",
               endIcon: "arrow-right",
               hierarchy: "outline",
             },

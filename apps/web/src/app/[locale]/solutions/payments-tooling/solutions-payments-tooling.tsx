@@ -194,7 +194,7 @@ export function SolutionsPaymentsToolingPage() {
               endIcon: "arrow-right",
               size: "lg",
               hierarchy: "outline",
-              url: "/developers/docs/intro/quick-start",
+              url: "/developers/docs/quickstart",
             },
           },
           {

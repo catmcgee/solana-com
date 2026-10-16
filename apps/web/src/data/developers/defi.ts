@@ -9,7 +9,7 @@ export const HERO_BUTTONS = [
   {
     id: "quickstart",
     variant: "primary",
-    href: "/developers/docs/intro/quick-start",
+    href: "/developers/docs/quickstart",
   },
   { id: "defiDocs", variant: "secondary", href: "/developers/docs/defi" },
 ] as const;
