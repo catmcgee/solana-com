@@ -5,7 +5,8 @@
  * apps/web serves on the same domain. This forces a full page load for logo
  * clicks. Modified clicks (new tab, etc.) keep the browser default. Without
  * JavaScript the link is a plain anchor and already does a full load.
- * FRAGILE: finds the logo as the link wrapping img.nav-logo in #navbar.
+ * FRAGILE: finds the logo as the link wrapping img.nav-logo in #navbar or
+ * the mobile drawer (#mobile-nav), as Luma renders it.
  */
 (function () {
   if (window.__solLogoLink) return;
@@ -18,7 +19,7 @@
       if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
       var a = e.target && e.target.closest && e.target.closest("a");
       if (!a || !a.querySelector("img.nav-logo")) return;
-      if (!a.closest("#navbar, #mobile-nav, #sidebar")) return;
+      if (!a.closest("#navbar, #mobile-nav")) return;
       e.preventDefault();
       e.stopImmediatePropagation();
       window.location.assign(a.getAttribute("href") || "/developers");

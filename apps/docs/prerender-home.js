@@ -32,7 +32,6 @@
           selector_matches: [
             "#navbar a:has(img.nav-logo)",
             "#mobile-nav a:has(img.nav-logo)",
-            "#sidebar a:has(img.nav-logo)",
           ].join(", "),
         },
         eagerness: "moderate",

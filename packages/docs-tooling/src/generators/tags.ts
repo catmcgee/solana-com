@@ -244,7 +244,12 @@ export function tabsFromNavigation(
     const page = p.replace(new RegExp(`^${lang}/`), "");
     out.push({
       label: resolveLabel(t.tab, isRecord(labels) ? labels : {}),
-      icon: typeof t.icon === "string" ? t.icon : undefined,
+      // The navigation tabs carry no icons (the Luma header has no room for
+      // them); the tag page's tab cards keep theirs from DEFAULT_TABS.
+      icon:
+        typeof t.icon === "string"
+          ? t.icon
+          : DEFAULT_TABS.find((d) => d.page === page)?.icon,
       page,
     });
   }
