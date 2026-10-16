@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useTranslations } from "next-intl";
 import { Link } from "./link";
 import { cn } from "./classnames";
@@ -40,9 +41,12 @@ export function NewTabMark({ text }: { text: string }) {
 export function DevelopersLink({
   className,
   onClick,
+  icon,
 }: {
   className?: string;
   onClick?: () => void;
+  /** Leading icon (the mobile menu's rows have one). */
+  icon?: ReactNode;
 }) {
   const t = useTranslations();
   return (
@@ -53,8 +57,11 @@ export function DevelopersLink({
       onClick={onClick}
       data-nav-item="developers"
     >
-      {t(DEVELOPERS_LINK.titleKey)}
-      <NewTabMark text={t(DEVELOPERS_LINK.newTabKey)} />
+      {icon}
+      <span>
+        {t(DEVELOPERS_LINK.titleKey)}
+        <NewTabMark text={t(DEVELOPERS_LINK.newTabKey)} />
+      </span>
     </Link>
   );
 }

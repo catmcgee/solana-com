@@ -260,7 +260,7 @@ function AgentCard({
           <code
             dir="ltr"
             data-testid="agent-server-url"
-            className={`${code} text-xs leading-[1.5] min-[400px]:text-[13px] sm:text-sm`}
+            className={`${code} !text-xs leading-[1.5] min-[400px]:!text-[13px] sm:!text-sm`}
           >
             {AGENT_SETUP.serverUrl}
           </code>
@@ -292,7 +292,7 @@ function AgentCard({
                 <code
                   dir="ltr"
                   data-testid={`agent-command-${client.id}`}
-                  className={`${code} text-[13px] leading-[1.6]`}
+                  className={`${code} !text-[13px] leading-[1.6]`}
                 >
                   <CommandWords command={client.command} />
                 </code>

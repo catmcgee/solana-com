@@ -268,14 +268,17 @@ test.describe("with JavaScript", () => {
     );
 
     await page.goto("/developers");
+    await page.locator(".dh-bar .dh-search[data-ready]").waitFor();
     await page.locator(".dh-bar .dh-search input").click();
     await expect(page).toHaveURL(/\/docs\?search=1$/);
 
     await page.goto("/developers");
+    await page.locator(".dh-bar .dh-search[data-ready]").waitFor();
     await page.keyboard.press("ControlOrMeta+k");
     await expect(page).toHaveURL(/\/docs\?search=1$/);
 
     await page.goto("/developers");
+    await page.locator(".dh-bar .dh-search[data-ready]").waitFor();
     await page.locator(".dh-bar .dh-search input").focus();
     await page.keyboard.type("token extensions");
     await page.keyboard.press("Enter");

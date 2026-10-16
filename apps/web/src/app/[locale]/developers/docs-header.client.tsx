@@ -182,8 +182,10 @@ export function DocsSearchField({
 }) {
   const input = useRef<HTMLInputElement>(null);
   const [mac, setMac] = useState(false);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
+    setReady(true);
     setMac(/Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent));
     const onKey = (event: KeyboardEvent) => {
       if (
@@ -206,6 +208,7 @@ export function DocsSearchField({
       action={action}
       method="get"
       className="dh-search"
+      data-ready={ready ? "" : undefined}
       onSubmit={(event) => {
         event.preventDefault();
         window.location.assign(searchUrl(action, input.current?.value ?? ""));
