@@ -39,7 +39,6 @@ export const IA_TEMPLATE: TemplateTab[] = [
           "docs/from-ethereum",
         ],
       },
-      { group: "About these docs", pages: ["docs/research"] },
     ],
   },
 

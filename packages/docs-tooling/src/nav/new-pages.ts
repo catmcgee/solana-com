@@ -53,15 +53,6 @@ export const NEW_PAGES: readonly NewPage[] = [
     brief:
       "Coming from Ethereum; link to /developers/migrate-to-solana/ethereum.",
   },
-  {
-    page: "docs/research",
-    title: "Docs Research",
-    description:
-      "Why the docs are organised the way they are: the brief, the research into docs navigation, and every source.",
-    kind: "research",
-    brief:
-      "Method and findings from docs-nav-research.md, benchmarked against web2/TradFi docs (Stripe, Canton).",
-  },
   // Payments. The pay-per-call hub (docs/payments/pay-per-call) was merged
   // into docs/payments/agentic-payments/index, an existing page
   // (migration/dup-audit.md #4).
