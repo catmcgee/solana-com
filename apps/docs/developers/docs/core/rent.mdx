@@ -38,19 +38,23 @@ account holds.
 
 ## How much it costs
 
-With the current network parameters, the minimum balance is:
+The minimum balance is:
 
 ```text
-(128 + data size in bytes) × 6,960 lamports
+(128 + data size in bytes) × lamports per byte
 ```
 
-The 128 bytes cover the account's own metadata. Some common sizes:
+The 128 bytes cover the account's own metadata. The lamports-per-byte rate is a
+network parameter, stored in the Rent sysvar, and it changes through feature
+activations. [SIMD-0437](https://github.com/solana-foundation/solana-improvement-documents/blob/main/proposals/0437-incremental-rent-reduction.md)
+lowers it in stages. At the time of writing (October 2026), mainnet and devnet
+use 5,080 lamports per byte, which gives:
 
-| Account                             | Data size | Minimum balance                     |
-| ----------------------------------- | --------- | ----------------------------------- |
-| Wallet (system account, no data)    | 0 bytes   | 890,880 lamports (0.00089088 SOL)   |
-| Token account (original Token program) | 165 bytes | 2,039,280 lamports (0.00203928 SOL) |
-| Account with 1,500 bytes of data    | 1,500 bytes | 11,330,880 lamports (0.01133088 SOL) |
+| Account                                | Data size   | Minimum balance                     |
+| -------------------------------------- | ----------- | ----------------------------------- |
+| Wallet (system account, no data)       | 0 bytes     | 650,240 lamports (0.00065024 SOL)   |
+| Token account (original Token program) | 165 bytes   | 1,488,440 lamports (0.00148844 SOL) |
+| Account with 1,500 bytes of data       | 1,500 bytes | 8,270,240 lamports (0.00827024 SOL) |
 
 Don't hard-code these numbers. Ask the network with
 [`getMinimumBalanceForRentExemption`](/developers/docs/rpc/http/getminimumbalanceforrentexemption),
@@ -58,19 +62,25 @@ which returns the current value for a given size:
 
 <CalculateRent />
 
+<Note>
+  Local test networks such as Surfpool and `solana-test-validator` still use the
+  older rate of 6,960 lamports per byte, so the recorded output above
+  (11,330,880 lamports for 1,500 bytes) is higher than what mainnet returns.
+</Note>
+
 ## Who pays, and who gets it back
 
 The account that creates a new account funds its deposit. In practice:
 
 - **Payments.** A customer who has never held USDC has no USDC
   <span className="sol-chip" data-concept="token-account"><Tooltip headline="Token accounts" tip="Wallets don't hold tokens directly. Each token (USDC, or your own asset) gets a small account owned by the wallet, and transfers move between these accounts." cta="Learn more" href="/developers/docs/tokens/basics/create-token-account">token account</Tooltip><span className="nojs-only"> ([Token accounts](/developers/docs/tokens/basics/create-token-account): Wallets don't hold tokens directly. Each token (USDC, or your own asset) gets a small account owned by the wallet, and transfers move between these accounts.)</span></span>.
-  Whoever sends them their first USDC usually creates it and pays about 0.002
-  SOL. Your app can pay this for its users, together with their network fees,
-  through [fee sponsorship](/developers/docs/core/fees/fee-sponsorship).
+  Whoever sends them their first USDC usually creates it and pays about 0.0015
+  SOL at the current rate. Your app can pay this for its users, together with
+  their network fees, through [fee sponsorship](/developers/docs/core/fees/fee-sponsorship).
 - **Assets.** Token-2022 associated token accounts are slightly larger (170
-  bytes, 2,074,080 lamports), because they carry the `ImmutableOwner`
-  extension, and each further extension adds space, so mints and token accounts with
-  extensions need larger deposits. See
+  bytes, 1,513,840 lamports at 5,080 lamports per byte), because they carry the
+  `ImmutableOwner` extension, and each further extension adds space, so mints
+  and token accounts with extensions need larger deposits. See
   [create a token account](/developers/docs/tokens/basics/create-token-account).
 - **Programs.** A program pays for each account it creates, from the payer
   account passed into the instruction.
