@@ -2,8 +2,8 @@
 // run.ts: price an LSF trade from Pyth, then settle it with the DvP program.
 //   npx tsx run.ts
 // The issuer key is read from ISSUER_KEYPAIR, or from the Solana CLI default
-// ~/.config/solana/id.json. It needs SOL for fees and at least 6 USDC, which
-// it sends to the buyer.
+// ~/.config/solana/id.json. It needs SOL for fees and 6 USDC for each run,
+// which it sends to the buyer.
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -95,17 +95,12 @@ export async function run(issuer: TransactionSigner) {
     assetAmount: quote.assetAmount,
     cashAmount: quote.cashAmount,
   });
-  console.log("Trade record:", trade.record);
-  console.log("Cash leg:", String(quote.cashAmount), "USDC base units");
 
   await approveEscrow(issuer, trade);
   await fundAssetLeg(seller, trade);
   const failed = await settleUnfunded(agent, trade);
-  console.log("Settle before the cash leg: failed,", failed.message);
-
   await fundCashLeg(buyer, trade);
   const settled = await settle(agent, trade);
-  console.log("Settled both legs:", settled);
 
   return { trade, failed, settled };
 }

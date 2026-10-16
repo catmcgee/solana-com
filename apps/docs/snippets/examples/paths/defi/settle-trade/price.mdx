@@ -79,11 +79,14 @@ export async function readPrice(
   };
 }
 
-/** Show a raw Pyth value (value × 10^exponent) as a decimal string. */
+/** Show a raw value (value × 10^exponent) as a decimal string. */
 export function decimal(value: bigint, exponent: number) {
   const s = value.toString().padStart(1 - exponent, "0");
   return `${s.slice(0, exponent)}.${s.slice(exponent)}`;
 }
+/** 6-decimal base units as a plain number, e.g. 4000000n -> "4". */
+export const units = (n: bigint) => decimal(n, -6).replace(/\.?0+$/, "");
+const usd = (n: bigint) => `$${decimal(n / 10_000n, -2)}`;
 
 /**
  * Price the cash leg. The asset is quoted in US dollars per share; the buyer
@@ -96,24 +99,28 @@ export async function priceTrade(shares: bigint, navPerShareUsd: bigint) {
   // USDC = USD / (price × 10^exponent), rounded up to the next base unit.
   const scale = 10n ** BigInt(-usdc.exponent);
   const cashAmount = (notionalUsd * scale + usdc.price - 1n) / usdc.price;
+  console.log(
+    "USDC/USD from Pyth:",
+    decimal(usdc.price, usdc.exponent),
+    "±",
+    decimal(usdc.conf, usdc.exponent),
+    `(published ${usdc.ageSeconds} s ago)`,
+  );
+  console.log(
+    `Price: ${units(shares)} LSF × ${usd(navPerShareUsd)} = ${usd(notionalUsd)} = ${units(cashAmount)} USDC`,
+  );
   return { usdc, notionalUsd, assetAmount: shares, cashAmount };
 }
 ```
 
 <div className="sol-term not-prose" data-term="paths/defi/settle-trade/price" data-tab="Kit" data-kind="block" data-steps="1" data-l-run="Run" data-l-run-step="Run step" data-l-next="Next step" data-l-all="Run all" data-l-again="Run again" data-l-running="Running…" data-l-tx="Sending transaction…" data-l-http="Requesting…" data-l-call="Running…" data-l-confirming="Confirming…" data-l-done="Done" data-l-copied="Copied" data-l-step="Step">
-<div className="sol-term-head"><span className="sol-term-dots" aria-hidden="true"><i></i><i></i><i></i></span><span className="sol-term-title">Pricing 4 LSF at \$1.25 from the live USDC/USD feed, then recording the trade</span><span className="sol-term-env">Local test network (Surfpool)</span><button type="button" className="sol-term-copy" data-act="copy">Copy</button></div>
-<div className="sol-term-screen" role="region" tabIndex="0" aria-label="Pricing 4 LSF at $1.25 from the live USDC/USD feed, then recording the trade: Output">
-<div className="sol-term-step" data-step="1" data-pending="tx">
+<div className="sol-term-head"><span className="sol-term-dots" aria-hidden="true"><i></i><i></i><i></i></span><span className="sol-term-title">Output of priceTrade(4\_000\_000n, 1\_250\_000n)</span><span className="sol-term-env">Local test network (Surfpool)</span><button type="button" className="sol-term-copy" data-act="copy">Copy</button></div>
+<div className="sol-term-screen" role="region" tabIndex="0" aria-label="Output of priceTrade(4_000_000n, 1_250_000n): Output">
+<div className="sol-term-step" data-step="1" data-pending="call">
 <div className="sol-term-row sol-term-cmd"><span className="sol-term-ps" aria-hidden="true">\></span> await priceTrade(4\_000\_000n, 1\_250\_000n)</div>
-<div className="sol-term-row sol-term-ln">USDC/USD from Pyth\: 0.99985013 ± 0.00099455 (published 52 s ago)</div>
-<div className="sol-term-row sol-term-ln"><span className="sol-term-k">Price\:</span> 4 LSF × \$1.25 = \$5.00 = 5.00075 USDC</div>
-<div className="sol-term-row sol-term-cmd"><span className="sol-term-ps" aria-hidden="true">\></span> await createTrade(agent, terms)</div>
-<div className="sol-term-row sol-term-ln">Trade record\: <span className="sol-h" title="7f1JrUoq3UT1J61oyPJukwhTY5iSpky9PkPdoC8V54kU"><span className="sol-h-f">7f1JrUoq3UT1J61oyPJukwhTY5iSpky9PkPdoC8V54kU</span><span className="sol-h-s" aria-hidden="true">7f1J…54kU</span></span></div>
-<div className="sol-term-row sol-term-ln" data-indent="2">asset leg\: 4 LSF, escrow <span className="sol-h" title="2ahmFkAN4jYyBVkuwdDXMwm9FHsQFuUtjCTnrpWWSKzA"><span className="sol-h-f">2ahmFkAN4jYyBVkuwdDXMwm9FHsQFuUtjCTnrpWWSKzA</span><span className="sol-h-s" aria-hidden="true">2ahm…SKzA</span></span></div>
-<div className="sol-term-row sol-term-ln" data-indent="2">cash leg\: 5.00075 USDC, escrow <span className="sol-h" title="BELbF5rzFASs4s4FWCqtHe8wAJCxsATWvWyP2WG95dtq"><span className="sol-h-f">BELbF5rzFASs4s4FWCqtHe8wAJCxsATWvWyP2WG95dtq</span><span className="sol-h-s" aria-hidden="true">BELb…5dtq</span></span></div>
-<div className="sol-term-row sol-term-ln">Record checked\: owner, size, address and terms match</div>
-<div className="sol-term-row sol-term-ln"><span className="sol-term-k">Signature\:</span> <span className="sol-h" title="28dwTH6hgEQ2LaKtmDuwwF8nuRVnQ54EGjXRQcAEq1WuLzYgmX5javLsmaAFn4d3F4QGN5WFaXbM1KLLVWrKA3ZS"><span className="sol-h-f">28dwTH6hgEQ2LaKtmDuwwF8nuRVnQ54EGjXRQcAEq1WuLzYgmX5javLsmaAFn4d3F4QGN5WFaXbM1KLLVWrKA3ZS</span><span className="sol-h-s" aria-hidden="true">28dw…A3ZS</span></span></div>
-<div className="sol-term-result"><span className="sol-term-badge" data-tone="info">USDC/USD read from Pyth</span><span className="sol-term-badge" data-tone="ok">Trade created</span></div>
+<div className="sol-term-row sol-term-ln">USDC/USD from Pyth\: 0.99986385 ± 0.00100374 (published 8 s ago)</div>
+<div className="sol-term-row sol-term-ln"><span className="sol-term-k">Price\:</span> 4 LSF × \$1.25 = \$5.00 = 5.000681 USDC</div>
+<div className="sol-term-result"><span className="sol-term-badge" data-tone="info">USDC/USD read from Pyth</span></div>
 </div>
 </div>
 <div className="sol-term-foot"><button type="button" className="sol-term-btn" data-act="run">Run</button><span className="sol-term-status"></span><span className="sol-term-sr" role="status"></span></div>

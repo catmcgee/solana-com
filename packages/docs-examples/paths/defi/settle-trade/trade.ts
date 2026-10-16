@@ -21,6 +21,7 @@ import {
 } from "@solana-program/token-2022";
 import { failure } from "./blocked-transfer";
 import { rpc, send } from "./config";
+import { units } from "./price";
 import {
   DVP_SWAP_PROGRAM_PROGRAM_ADDRESS,
   getDvpSwapProgramErrorMessage,
@@ -108,7 +109,12 @@ export async function createTrade(agent: TransactionSigner, terms: Terms) {
     }),
   ]);
   const trade: Trade = { ...terms, record, escrowA, escrowB };
+  console.log("Trade record:", record);
+  console.log("  asset leg:", units(terms.assetAmount), "LSF, escrow", escrowA);
+  console.log("  cash leg:", units(terms.cashAmount), "USDC, escrow", escrowB);
   await verifyTrade(trade);
+  console.log("Record checked: owner, size, address and terms match");
+  console.log("Signature:", signature);
   return { trade, signature };
 }
 
@@ -138,18 +144,23 @@ export async function verifyTrade(trade: Trade) {
  * new escrow. The issuer approves the escrow the same way it approves a holder.
  */
 export async function approveEscrow(issuer: TransactionSigner, trade: Trade) {
-  return send(issuer, [
+  const signature = await send(issuer, [
     getThawAccountInstruction({
       account: trade.escrowA,
       mint: trade.asset,
       owner: issuer,
     }),
   ]);
+  console.log(
+    "Issuer approved the LSF escrow for the trade. Signature:",
+    signature,
+  );
+  return signature;
 }
 
 /** Each party funds its leg with an ordinary transfer into the escrow. */
 export async function fundAssetLeg(seller: TransactionSigner, trade: Trade) {
-  return send(seller, [
+  const signature = await send(seller, [
     getTransferCheckedInstruction({
       source: await ataOf(
         seller.address,
@@ -163,9 +174,11 @@ export async function fundAssetLeg(seller: TransactionSigner, trade: Trade) {
       decimals: 6,
     }),
   ]);
+  console.log("Seller funded the asset leg. Signature:", signature);
+  return signature;
 }
 export async function fundCashLeg(buyer: TransactionSigner, trade: Trade) {
-  return send(buyer, [
+  const signature = await send(buyer, [
     getUsdcTransferInstruction({
       source: await ataOf(buyer.address, USDC_MINT, TOKEN_PROGRAM_ADDRESS),
       mint: USDC_MINT,
@@ -175,6 +188,8 @@ export async function fundCashLeg(buyer: TransactionSigner, trade: Trade) {
       decimals: 6,
     }),
   ]);
+  console.log("Buyer funded the cash leg. Signature:", signature);
+  return signature;
 }
 
 /**
@@ -213,7 +228,7 @@ export async function settle(
     );
   }
 
-  return send(
+  const signature = await send(
     agent,
     [
       ...createAccounts,
@@ -233,6 +248,33 @@ export async function settle(
     ],
     options,
   );
+  console.log("Settled both legs in one transaction. Signature:", signature);
+  const [buyerLsf, buyerUsdc, sellerLsf, sellerUsdc] = await Promise.all([
+    holding(trade.buyer, trade.asset),
+    holding(trade.buyer, USDC_MINT),
+    holding(trade.seller, trade.asset),
+    holding(trade.seller, USDC_MINT),
+  ]);
+  console.log(
+    `Balances: buyer ${units(buyerLsf)} LSF, ${units(buyerUsdc)} USDC |`,
+    `seller ${units(sellerLsf)} LSF, ${units(sellerUsdc)} USDC`,
+  );
+  const closed = !(await rpc.getAccountInfo(trade.record).send()).value;
+  console.log("Trade record and escrows closed:", closed);
+  return signature;
+}
+
+/** Token balance of an account, or 0 when it doesn't exist (yet, or any more). */
+export async function balance(account: Address) {
+  const info = await rpc.getAccountInfo(account, { encoding: "base64" }).send();
+  if (!info.value) return 0n;
+  const { value } = await rpc.getTokenAccountBalance(account).send();
+  return BigInt(value.amount);
+}
+export async function holding(owner: Address, mint: Address) {
+  const tokenProgram =
+    mint === USDC_MINT ? TOKEN_PROGRAM_ADDRESS : TOKEN_2022_PROGRAM_ADDRESS;
+  return balance(await ataOf(owner, mint, tokenProgram));
 }
 
 /**
@@ -252,13 +294,36 @@ export async function settleUnfunded(agent: TransactionSigner, trade: Trade) {
       err as { InstructionError: [number, { Custom: number }] }
     ).InstructionError;
     const code = Number(Custom) as DvpSwapProgramError;
+    const message = getDvpSwapProgramErrorMessage(code);
+    console.log(
+      "Settle with the cash leg unfunded (skipPreflight): failed onchain",
+    );
+    console.log("Failed signature:", signature);
+    console.log(
+      "  err:",
+      JSON.stringify(err, (_k, v) => (typeof v === "bigint" ? Number(v) : v)),
+    );
+    console.log(`  DvP error ${code}:`, message);
+    console.log("  fee paid anyway:", String(fee), "lamports");
+    const [escrowA, escrowB, buyerLsf, sellerUsdc] = await Promise.all([
+      balance(trade.escrowA),
+      balance(trade.escrowB),
+      holding(trade.buyer, trade.asset),
+      holding(trade.seller, USDC_MINT),
+    ]);
+    console.log(
+      `Nothing moved: asset escrow ${units(escrowA)} LSF | cash escrow`,
+      `${units(escrowB)} USDC | buyer ${units(buyerLsf)} LSF | seller`,
+      `${units(sellerUsdc)} USDC`,
+    );
     return {
       signature,
       err,
       fee,
       instruction,
       code,
-      message: getDvpSwapProgramErrorMessage(code),
+      message,
+      after: { escrowA, escrowB, buyerLsf, sellerUsdc },
     };
   }
 }

@@ -18,8 +18,8 @@ import Next from "/snippets/paths/en/settle-trade/next-3.mdx";
 This step runs the trade from your terminal. It builds on the project from
 [Issue an asset](/docs/assets/issue-asset/local), because the trade needs an
 asset to sell: you add the DvP client and three files to that project. The
-output under each block is what the same code printed on a local Surfpool
-network.
+output under each block is what that code printed on a local Surfpool network
+copying mainnet.
 
 ## 1. Start from your Issue an asset project
 
@@ -57,42 +57,58 @@ cp -r ../dvp-program/clients/typescript/src ./dvp && rm -rf ./dvp/__tests__
 
 The client depends only on `@solana/kit`, which the project already has.
 
-## 3. Pick a network
+## 3. Start a local network
 
-The code reads the network from `RPC_URL` and `RPC_SUBSCRIPTIONS_URL`, and the
-USDC mint from `USDC_MINT`. It uses devnet and devnet USDC when they are unset.
-The issuer's wallet needs SOL for fees and at least 6 USDC: `run.ts` sends 6
-USDC to the buyer.
+Run the trade on a local Surfpool network that copies accounts from mainnet:
+the DvP program, the Pyth price feed account and the USDC mint are the mainnet
+ones, and the test USDC is free. This is how the output on these pages was
+produced.
 
-- **Local:** install the [Surfpool CLI](/docs/tools/surfpool/toolchain/getting-started)
-  and run `surfpool start --network mainnet`. Surfpool copies the DvP program,
-  the Pyth price feed account and the mainnet USDC mint from mainnet the first
-  time your code reads them. Set:
+1. Install the [Surfpool CLI](/docs/tools/surfpool/toolchain/getting-started)
+   and start it from mainnet, airdropping SOL to your issuer (replace
+   `<issuer address>` with the address of your key file):
 
-  ```bash Terminal
-  export RPC_URL=http://127.0.0.1:8899
-  export RPC_SUBSCRIPTIONS_URL=ws://127.0.0.1:8900
-  export USDC_MINT=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v
-  ```
+   ```bash Terminal
+   surfpool start --network mainnet --airdrop <issuer address>
+   ```
 
-  Then give the issuer 10 test USDC with Surfpool's
-  [`surfnet_setTokenAccount`](/docs/tools/surfpool/rpc/cheatcodes) cheatcode
-  (replace `<issuer address>`):
+   Without `--airdrop`, Surfpool only funds the Solana CLI default key file,
+   `~/.config/solana/id.json`.
 
-  ```bash Terminal
-  curl http://127.0.0.1:8899 -s -X POST -H "Content-Type: application/json" -d '
-    {"jsonrpc": "2.0", "id": 1, "method": "surfnet_setTokenAccount",
-     "params": ["<issuer address>", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-                {"amount": 10000000, "state": "initialized"},
-                "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"]}'
-  ```
+2. In the terminal where you run the code, point it at Surfpool and at mainnet
+   USDC. Unset, the code uses devnet and devnet USDC:
 
-- **Devnet:** leave the three variables unset. Get devnet USDC for the issuer's
-  address from [Circle's faucet](https://faucet.circle.com/), and SOL from the
-  [Solana Faucet](https://faucet.solana.com/). The USDC/USD feed account can be
-  updated less often on devnet than on mainnet, so if the price check refuses
-  the price as too old, allow an older one with
+   ```bash Terminal
+   export RPC_URL=http://127.0.0.1:8899
+   export RPC_SUBSCRIPTIONS_URL=ws://127.0.0.1:8900
+   export USDC_MINT=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v
+   ```
+
+3. Give the issuer test USDC with Surfpool's
+   [`surfnet_setTokenAccount`](/docs/tools/surfpool/rpc/cheatcodes)
+   cheatcode. Each run of `run.ts` sends 6 USDC to the buyer, so this sets the
+   balance to 60 USDC, enough for ten runs. Repeat it to top up:
+
+   ```bash Terminal
+   curl http://127.0.0.1:8899 -s -X POST -H "Content-Type: application/json" -d '
+     {"jsonrpc": "2.0", "id": 1, "method": "surfnet_setTokenAccount",
+      "params": ["<issuer address>", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+                 {"amount": 60000000, "state": "initialized"},
+                 "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"]}'
+   ```
+
+<Note>
+  **Devnet.** The same code runs against devnet with the three variables
+  unset, but these pages don't show a devnet run. The examples were tested on
+  a Surfpool network copying devnet, which uses the devnet DvP program, an older
+  build than the commit the client is generated from (see
+  [Program ID](/docs/defi/dvp-program#program-id)). On devnet the issuer needs
+  SOL from the [Solana Faucet](https://faucet.solana.com/) and 6 devnet USDC per
+  run from [Circle's faucet](https://faucet.circle.com/). The USDC/USD feed
+  account can be updated less often on devnet than on mainnet, so
+  if the price check refuses the price as too old, allow an older one with
   `export MAX_PRICE_AGE_SECONDS=600`.
+</Note>
 
 ## 4. Add the price
 

@@ -77,11 +77,14 @@ export async function readPrice(
   };
 }
 
-/** Show a raw Pyth value (value × 10^exponent) as a decimal string. */
+/** Show a raw value (value × 10^exponent) as a decimal string. */
 export function decimal(value: bigint, exponent: number) {
   const s = value.toString().padStart(1 - exponent, "0");
   return `${s.slice(0, exponent)}.${s.slice(exponent)}`;
 }
+/** 6-decimal base units as a plain number, e.g. 4000000n -> "4". */
+export const units = (n: bigint) => decimal(n, -6).replace(/\.?0+$/, "");
+const usd = (n: bigint) => `$${decimal(n / 10_000n, -2)}`;
 
 /**
  * Price the cash leg. The asset is quoted in US dollars per share; the buyer
@@ -94,6 +97,16 @@ export async function priceTrade(shares: bigint, navPerShareUsd: bigint) {
   // USDC = USD / (price × 10^exponent), rounded up to the next base unit.
   const scale = 10n ** BigInt(-usdc.exponent);
   const cashAmount = (notionalUsd * scale + usdc.price - 1n) / usdc.price;
+  console.log(
+    "USDC/USD from Pyth:",
+    decimal(usdc.price, usdc.exponent),
+    "±",
+    decimal(usdc.conf, usdc.exponent),
+    `(published ${usdc.ageSeconds} s ago)`,
+  );
+  console.log(
+    `Price: ${units(shares)} LSF × ${usd(navPerShareUsd)} = ${usd(notionalUsd)} = ${units(cashAmount)} USDC`,
+  );
   return { usdc, notionalUsd, assetAmount: shares, cashAmount };
 }
 // #endregion price

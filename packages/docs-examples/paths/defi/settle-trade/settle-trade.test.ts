@@ -61,6 +61,8 @@ describe("paths/defi/settle-trade (Pyth price + DvP settlement)", () => {
       { output: out("price") },
     );
     trade = r.value;
+    // The price block shows price.ts alone: the two lines priceTrade printed.
+    recordText(out("quote"), r.text.split("\n").slice(0, 2).join("\n"));
     expect(trade.assetAmount).toBe(4_000_000n);
     // $5.00 at a USDC/USD price within 0.5% of par.
     expect(trade.cashAmount).toBeGreaterThan(4_975_000n);
@@ -109,6 +111,7 @@ describe("paths/defi/settle-trade (Pyth price + DvP settlement)", () => {
     await refetchFromMainnet(USDC_USD_FEED);
     const { value: r } = await runExample(() => run(runner), {
       output: out("run"),
+      failedLabel: /Failed signature/,
     });
     expect(json((await failure(r.failed.signature)).err)).toBe(
       '{"InstructionError":[4,{"Custom":4}]}',

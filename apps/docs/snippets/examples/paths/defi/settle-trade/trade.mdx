@@ -23,6 +23,7 @@ import {
 } from "@solana-program/token-2022";
 import { failure } from "./blocked-transfer";
 import { rpc, send } from "./config";
+import { units } from "./price";
 import {
   DVP_SWAP_PROGRAM_PROGRAM_ADDRESS,
   getDvpSwapProgramErrorMessage,
@@ -110,7 +111,12 @@ export async function createTrade(agent: TransactionSigner, terms: Terms) {
     }),
   ]);
   const trade: Trade = { ...terms, record, escrowA, escrowB };
+  console.log("Trade record:", record);
+  console.log("  asset leg:", units(terms.assetAmount), "LSF, escrow", escrowA);
+  console.log("  cash leg:", units(terms.cashAmount), "USDC, escrow", escrowB);
   await verifyTrade(trade);
+  console.log("Record checked: owner, size, address and terms match");
+  console.log("Signature:", signature);
   return { trade, signature };
 }
 
@@ -140,18 +146,23 @@ export async function verifyTrade(trade: Trade) {
  * new escrow. The issuer approves the escrow the same way it approves a holder.
  */
 export async function approveEscrow(issuer: TransactionSigner, trade: Trade) {
-  return send(issuer, [
+  const signature = await send(issuer, [
     getThawAccountInstruction({
       account: trade.escrowA,
       mint: trade.asset,
       owner: issuer,
     }),
   ]);
+  console.log(
+    "Issuer approved the LSF escrow for the trade. Signature:",
+    signature,
+  );
+  return signature;
 }
 
 /** Each party funds its leg with an ordinary transfer into the escrow. */
 export async function fundAssetLeg(seller: TransactionSigner, trade: Trade) {
-  return send(seller, [
+  const signature = await send(seller, [
     getTransferCheckedInstruction({
       source: await ataOf(
         seller.address,
@@ -165,9 +176,11 @@ export async function fundAssetLeg(seller: TransactionSigner, trade: Trade) {
       decimals: 6,
     }),
   ]);
+  console.log("Seller funded the asset leg. Signature:", signature);
+  return signature;
 }
 export async function fundCashLeg(buyer: TransactionSigner, trade: Trade) {
-  return send(buyer, [
+  const signature = await send(buyer, [
     getUsdcTransferInstruction({
       source: await ataOf(buyer.address, USDC_MINT, TOKEN_PROGRAM_ADDRESS),
       mint: USDC_MINT,
@@ -177,6 +190,8 @@ export async function fundCashLeg(buyer: TransactionSigner, trade: Trade) {
       decimals: 6,
     }),
   ]);
+  console.log("Buyer funded the cash leg. Signature:", signature);
+  return signature;
 }
 
 /**
@@ -215,7 +230,7 @@ export async function settle(
     );
   }
 
-  return send(
+  const signature = await send(
     agent,
     [
       ...createAccounts,
@@ -235,6 +250,33 @@ export async function settle(
     ],
     options,
   );
+  console.log("Settled both legs in one transaction. Signature:", signature);
+  const [buyerLsf, buyerUsdc, sellerLsf, sellerUsdc] = await Promise.all([
+    holding(trade.buyer, trade.asset),
+    holding(trade.buyer, USDC_MINT),
+    holding(trade.seller, trade.asset),
+    holding(trade.seller, USDC_MINT),
+  ]);
+  console.log(
+    `Balances: buyer ${units(buyerLsf)} LSF, ${units(buyerUsdc)} USDC |`,
+    `seller ${units(sellerLsf)} LSF, ${units(sellerUsdc)} USDC`,
+  );
+  const closed = !(await rpc.getAccountInfo(trade.record).send()).value;
+  console.log("Trade record and escrows closed:", closed);
+  return signature;
+}
+
+/** Token balance of an account, or 0 when it doesn't exist (yet, or any more). */
+export async function balance(account: Address) {
+  const info = await rpc.getAccountInfo(account, { encoding: "base64" }).send();
+  if (!info.value) return 0n;
+  const { value } = await rpc.getTokenAccountBalance(account).send();
+  return BigInt(value.amount);
+}
+export async function holding(owner: Address, mint: Address) {
+  const tokenProgram =
+    mint === USDC_MINT ? TOKEN_PROGRAM_ADDRESS : TOKEN_2022_PROGRAM_ADDRESS;
+  return balance(await ataOf(owner, mint, tokenProgram));
 }
 
 /**
@@ -254,13 +296,36 @@ export async function settleUnfunded(agent: TransactionSigner, trade: Trade) {
       err as { InstructionError: [number, { Custom: number }] }
     ).InstructionError;
     const code = Number(Custom) as DvpSwapProgramError;
+    const message = getDvpSwapProgramErrorMessage(code);
+    console.log(
+      "Settle with the cash leg unfunded (skipPreflight): failed onchain",
+    );
+    console.log("Failed signature:", signature);
+    console.log(
+      "  err:",
+      JSON.stringify(err, (_k, v) => (typeof v === "bigint" ? Number(v) : v)),
+    );
+    console.log(`  DvP error ${code}:`, message);
+    console.log("  fee paid anyway:", String(fee), "lamports");
+    const [escrowA, escrowB, buyerLsf, sellerUsdc] = await Promise.all([
+      balance(trade.escrowA),
+      balance(trade.escrowB),
+      holding(trade.buyer, trade.asset),
+      holding(trade.seller, USDC_MINT),
+    ]);
+    console.log(
+      `Nothing moved: asset escrow ${units(escrowA)} LSF | cash escrow`,
+      `${units(escrowB)} USDC | buyer ${units(buyerLsf)} LSF | seller`,
+      `${units(sellerUsdc)} USDC`,
+    );
     return {
       signature,
       err,
       fee,
       instruction,
       code,
-      message: getDvpSwapProgramErrorMessage(code),
+      message,
+      after: { escrowA, escrowB, buyerLsf, sellerUsdc },
     };
   }
 }
@@ -271,21 +336,21 @@ export async function settleUnfunded(agent: TransactionSigner, trade: Trade) {
 <div className="sol-term-screen" role="region" tabIndex="0" aria-label="Settle with the cash leg unfunded, then with both legs funded: Output">
 <div className="sol-term-step" data-step="1" data-pending="tx">
 <div className="sol-term-row sol-term-cmd"><span className="sol-term-ps" aria-hidden="true">\></span> await approveEscrow(issuer, trade)</div>
-<div className="sol-term-row sol-term-ln">`Issuer approved the trade's LSF escrow.` <span className="sol-term-k">Signature\:</span> <span className="sol-h" title="sNHNZr14TpP7LmHApCcU1UF8NecrrTUyLmYYVAmaWr2cyucrn5WMWWBheSEBjfXRSBHDnvCnaZdHqCtfLm7DVaR"><span className="sol-h-f">sNHNZr14TpP7LmHApCcU1UF8NecrrTUyLmYYVAmaWr2cyucrn5WMWWBheSEBjfXRSBHDnvCnaZdHqCtfLm7DVaR</span><span className="sol-h-s" aria-hidden="true">sNHN…DVaR</span></span></div>
+<div className="sol-term-row sol-term-ln">Issuer approved the LSF escrow for the trade. <span className="sol-term-k">Signature\:</span> <span className="sol-h" title="67qBaazKcsmQZ7tJYzSJ8deghaJG2DVYPDAeCWPFZJ62vkixfBJvZ5J1GBa5vE77XgtfJWGiLsFSoZ7SXUqzaBPo"><span className="sol-h-f">67qBaazKcsmQZ7tJYzSJ8deghaJG2DVYPDAeCWPFZJ62vkixfBJvZ5J1GBa5vE77XgtfJWGiLsFSoZ7SXUqzaBPo</span><span className="sol-h-s" aria-hidden="true">67qB…aBPo</span></span></div>
 <div className="sol-term-row sol-term-cmd"><span className="sol-term-ps" aria-hidden="true">\></span> await fundAssetLeg(seller, trade)</div>
-<div className="sol-term-row sol-term-ln">Seller funded the asset leg. <span className="sol-term-k">Signature\:</span> <span className="sol-h" title="3ayVhyibATPRsKmZFRArdF1okMoU2CDXNRVisgXYCYf46rSF3ReAk99w6mErbMiv5Yyt38xua8UHKTcK2wutBGxy"><span className="sol-h-f">3ayVhyibATPRsKmZFRArdF1okMoU2CDXNRVisgXYCYf46rSF3ReAk99w6mErbMiv5Yyt38xua8UHKTcK2wutBGxy</span><span className="sol-h-s" aria-hidden="true">3ayV…BGxy</span></span></div>
+<div className="sol-term-row sol-term-ln">Seller funded the asset leg. <span className="sol-term-k">Signature\:</span> <span className="sol-h" title="4vLKrE9DroPqMXzLgufAtfPt2i6Ebds7rS7efaqTGUhZn5ua5MJzZ7ShbZBj1w5PB9e9o9WCxKGoM2tE5sLSSX9m"><span className="sol-h-f">4vLKrE9DroPqMXzLgufAtfPt2i6Ebds7rS7efaqTGUhZn5ua5MJzZ7ShbZBj1w5PB9e9o9WCxKGoM2tE5sLSSX9m</span><span className="sol-h-s" aria-hidden="true">4vLK…SX9m</span></span></div>
 <div className="sol-term-row sol-term-cmd"><span className="sol-term-ps" aria-hidden="true">\></span> await settleUnfunded(agent, trade)</div>
 <div className="sol-term-row sol-term-ln" data-tone="error">Settle with the cash leg unfunded (skipPreflight)\: failed onchain</div>
-<div className="sol-term-row sol-term-ln" data-tone="error">Failed <span className="sol-term-k">signature\:</span> <span className="sol-h" title="5aGMvdTMYymer16ar49Azmw7eVwjd6EvkNZjqZHMKD8bJUayd5cGEieZBQf4iibGNeZW3HhED3m8tb5tQVtFqvSp"><span className="sol-h-f">5aGMvdTMYymer16ar49Azmw7eVwjd6EvkNZjqZHMKD8bJUayd5cGEieZBQf4iibGNeZW3HhED3m8tb5tQVtFqvSp</span><span className="sol-h-s" aria-hidden="true">5aGM…qvSp</span></span></div>
+<div className="sol-term-row sol-term-ln" data-tone="error">Failed <span className="sol-term-k">signature\:</span> <span className="sol-h" title="2vM9aVsHV4gGgNs5GgGyVrCKcy3depDy3R68KDsd5KxkN4s143rEwA7EqiWZtbgCjaxug4qeXEHLNEdQKyZJNFtk"><span className="sol-h-f">2vM9aVsHV4gGgNs5GgGyVrCKcy3depDy3R68KDsd5KxkN4s143rEwA7EqiWZtbgCjaxug4qeXEHLNEdQKyZJNFtk</span><span className="sol-h-s" aria-hidden="true">2vM9…NFtk</span></span></div>
 <div className="sol-term-row sol-term-ln" data-tone="error" data-indent="2"><span className="sol-term-k">err\:</span> `{"InstructionError":[4,{"Custom":4}]}`</div>
 <div className="sol-term-row sol-term-ln" data-tone="error" data-indent="2">DvP error 4\: DvP leg is not funded with the expected amount</div>
 <div className="sol-term-row sol-term-ln" data-indent="2">fee paid anyway\: 5000 lamports</div>
 <div className="sol-term-row sol-term-ln">Nothing moved\: asset escrow 4 LSF \| cash escrow 0 USDC \| buyer 0 LSF \| seller 0 USDC</div>
 <div className="sol-term-row sol-term-cmd"><span className="sol-term-ps" aria-hidden="true">\></span> await fundCashLeg(buyer, trade)</div>
-<div className="sol-term-row sol-term-ln">Buyer funded the cash leg. <span className="sol-term-k">Signature\:</span> <span className="sol-h" title="zQjUXpg3xJNtjCSTjys5weppiV5rDCiyhwnH5R3s8k8k67B7kQ83DTHZPNDByikrQLYX2622uZYYNPrb1uJ5Yiv"><span className="sol-h-f">zQjUXpg3xJNtjCSTjys5weppiV5rDCiyhwnH5R3s8k8k67B7kQ83DTHZPNDByikrQLYX2622uZYYNPrb1uJ5Yiv</span><span className="sol-h-s" aria-hidden="true">zQjU…5Yiv</span></span></div>
+<div className="sol-term-row sol-term-ln">Buyer funded the cash leg. <span className="sol-term-k">Signature\:</span> <span className="sol-h" title="Q2RTxvDcfW5vv7xsi2Tv2NjmDRV7A2tu6xyuPPfBvd4mGQU5TE2jC5BCqtmKQSdGUbhKC4C9vU5YE8w9eS8eutR"><span className="sol-h-f">Q2RTxvDcfW5vv7xsi2Tv2NjmDRV7A2tu6xyuPPfBvd4mGQU5TE2jC5BCqtmKQSdGUbhKC4C9vU5YE8w9eS8eutR</span><span className="sol-h-s" aria-hidden="true">Q2RT…eutR</span></span></div>
 <div className="sol-term-row sol-term-cmd"><span className="sol-term-ps" aria-hidden="true">\></span> await settle(agent, trade)</div>
-<div className="sol-term-row sol-term-ln">Settled both legs in one transaction. <span className="sol-term-k">Signature\:</span> <span className="sol-h" title="F1ycpsxZpv43J4YtPt8duVYZTuzDeTVqYGk6EgwXKKQTpiRcucstyfdP9Vdo3rCYsBNAzoLcaphWpoUE1NG2s2N"><span className="sol-h-f">F1ycpsxZpv43J4YtPt8duVYZTuzDeTVqYGk6EgwXKKQTpiRcucstyfdP9Vdo3rCYsBNAzoLcaphWpoUE1NG2s2N</span><span className="sol-h-s" aria-hidden="true">F1yc…2s2N</span></span></div>
-<div className="sol-term-row sol-term-ln"><span className="sol-term-k">Balances\:</span> buyer 4 LSF, 4.99925 USDC \| seller 996 LSF, 5.00075 USDC</div>
+<div className="sol-term-row sol-term-ln">Settled both legs in one transaction. <span className="sol-term-k">Signature\:</span> <span className="sol-h" title="4M2nL3J3PQnK3FDZXTcsFwyzzDmysvt3KNURX3x7qnvgCyPKhAUbXSGJcRErLKiQGts5g3RdxLJsBfFH9gjW58MS"><span className="sol-h-f">4M2nL3J3PQnK3FDZXTcsFwyzzDmysvt3KNURX3x7qnvgCyPKhAUbXSGJcRErLKiQGts5g3RdxLJsBfFH9gjW58MS</span><span className="sol-h-s" aria-hidden="true">4M2n…58MS</span></span></div>
+<div className="sol-term-row sol-term-ln"><span className="sol-term-k">Balances\:</span> buyer 4 LSF, 4.999319 USDC \| seller 996 LSF, 5.000681 USDC</div>
 <div className="sol-term-row sol-term-ln">Trade record and escrows closed\: true</div>
 <div className="sol-term-result"><span className="sol-term-badge" data-tone="error">Failed\: leg not funded (Custom\: 4)</span><span className="sol-term-badge" data-tone="ok">Settled · both legs in one transaction</span></div>
 </div>
