@@ -275,31 +275,31 @@ export const productToolItems: NavItemDefinition[] = [
   {
     id: "products-developer-tools",
     titleKey: "nav.products.tools.items.developerTools.title",
-    href: "/docs/tools",
+    href: "/developers/docs/tools",
     icon: MaintenanceIcon,
   },
   {
     id: "products-payment-developer-tools",
     titleKey: "nav.products.tools.items.paymentDeveloperTools.title",
-    href: "/docs/payments/developer-tools",
+    href: "/developers/docs/payments/developer-tools",
     icon: MoneyIcon,
   },
   {
     id: "products-commerce-kit",
     titleKey: "nav.products.tools.items.commerceKit.title",
-    href: "/docs/tools/commerce-kit",
+    href: "/developers/docs/tools/commerce-kit",
     icon: StoreIcon,
   },
   {
     id: "products-kora",
     titleKey: "nav.products.tools.items.kora.title",
-    href: "/docs/tools/kora",
+    href: "/developers/docs/tools/kora",
     icon: ApiConnectionBuildIcon,
   },
   {
     id: "products-solana-pay",
     titleKey: "nav.products.tools.items.solanaPay.title",
-    href: "/docs/tools/solana-pay",
+    href: "/developers/docs/tools/solana-pay",
     icon: MoneyIcon,
   },
   {

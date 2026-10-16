@@ -87,7 +87,7 @@ function listContentPages(root: string): string[] {
   return out;
 }
 
-export const TAGS_PAGE = "docs/tags/index.mdx";
+export const TAGS_PAGE = "developers/docs/tags/index.mdx";
 
 export interface TabRoot {
   /** Label shown on the card (tab name), or undefined to use the page title. */
@@ -99,14 +99,26 @@ export interface TabRoot {
 
 /** Spec §2.2 tab roots (D4), used until navigation/<lang>.json exists. */
 export const DEFAULT_TABS: readonly TabRoot[] = [
-  { label: "Start here", icon: "house", page: "docs/index" },
-  { label: "Payments", icon: "credit-card", page: "docs/payments/index" },
-  { label: "Assets", icon: "layers", page: "docs/assets/index" },
-  { label: "Markets", icon: "chart-line", page: "docs/defi/index" },
-  { label: "How Solana works", icon: "box", page: "docs/core/index" },
-  { label: "Resources", icon: "wrench", page: "docs/tools/index" },
-  { label: "API", icon: "book", page: "docs/rpc/index" },
-  { label: "Video tutorials", icon: "play", page: "docs/video-guides/index" },
+  { label: "Start here", icon: "house", page: "developers/docs/index" },
+  {
+    label: "Payments",
+    icon: "credit-card",
+    page: "developers/docs/payments/index",
+  },
+  { label: "Assets", icon: "layers", page: "developers/docs/assets/index" },
+  { label: "Markets", icon: "chart-line", page: "developers/docs/defi/index" },
+  {
+    label: "How Solana works",
+    icon: "box",
+    page: "developers/docs/core/index",
+  },
+  { label: "Resources", icon: "wrench", page: "developers/docs/tools/index" },
+  { label: "API", icon: "book", page: "developers/docs/rpc/index" },
+  {
+    label: "Video tutorials",
+    icon: "play",
+    page: "developers/docs/video-guides/index",
+  },
 ];
 
 /** Same slug rule as the legacy `toDocumentationTagSlug`. */
@@ -251,7 +263,8 @@ export interface Tag {
 
 /** Pages of one language grouped by `documentationTags`. */
 export function collectTags(docsRoot: string, lang: string): Tag[] {
-  const prefix = lang === DEFAULT_LOCALE ? "docs/" : `${lang}/docs/`;
+  const prefix =
+    lang === DEFAULT_LOCALE ? "developers/docs/" : `${lang}/developers/docs/`;
   const tags = new Map<string, Tag>();
   for (const abs of listContentPages(docsRoot)) {
     const rel = toPosix(path.relative(docsRoot, abs));

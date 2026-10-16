@@ -13,6 +13,8 @@ describe("developer route matching", () => {
     expect(shouldShowDevelopersNav("/de/developers/cookbook")).toBe(true);
     expect(shouldShowDevelopersNav("/docs")).toBe(true);
     expect(shouldShowDevelopersNav("/fr/docs/rpc")).toBe(true);
+    expect(shouldShowDevelopersNav("/developers/docs")).toBe(true);
+    expect(shouldShowDevelopersNav("/fr/developers/docs/rpc")).toBe(true);
   });
 
   it("hides the developer nav on the /developers landing itself", () => {
@@ -35,11 +37,16 @@ describe("developer route matching", () => {
     expect(shouldShowDocsSidebarToggle("/docs")).toBe(true);
     expect(shouldShowDocsSidebarToggle("/fr/docs/rpc")).toBe(true);
     expect(shouldShowDocsSidebarToggle("/developers/cookbook")).toBe(true);
+    expect(shouldShowDocsSidebarToggle("/developers/docs")).toBe(true);
+    expect(shouldShowDocsSidebarToggle("/fr/developers/docs/rpc")).toBe(true);
+    expect(shouldShowDocsSidebarToggle("/developers/payments")).toBe(false);
     expect(shouldShowDocsSidebarToggle("/data")).toBe(false);
   });
 
   it("keeps theme support on docs developer routes", () => {
     expect(isThemeRoute("/docs/rpc")).toBe(true);
+    expect(isThemeRoute("/developers/docs/rpc")).toBe(true);
+    expect(isThemeRoute("/ja/developers/docs")).toBe(true);
     expect(isThemeRoute("/developers/bootcamp/foundations")).toBe(true);
     expect(isThemeRoute("/data")).toBe(false);
     expect(isThemeRoute("/database")).toBe(false);

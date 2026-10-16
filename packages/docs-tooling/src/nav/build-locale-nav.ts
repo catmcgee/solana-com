@@ -266,7 +266,11 @@ export function runBuild(opts: BuildOptions = {}): BuildResult {
       .map((p): LocaleFallback | null => {
         const c = collectionOf(p.page);
         if (c === "docs")
-          return { loc: p.loc, path: p.page.slice(5), collection: "docs" };
+          return {
+            loc: p.loc,
+            path: p.page.slice("developers/docs/".length),
+            collection: "docs",
+          };
         if (c === "bootcamp")
           return {
             loc: p.loc,

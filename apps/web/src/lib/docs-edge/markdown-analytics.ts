@@ -11,7 +11,7 @@ const DEFAULT_POSTHOG_HOST = "https://us.i.posthog.com";
 const SOLANA_SITE_ORIGIN = "https://solana.com";
 
 export interface TrackMarkdownRequestInput {
-  /** Path without the locale prefix and without `.md`, e.g. `/docs/core`. */
+  /** Path without the locale prefix and without `.md`, e.g. `/developers/docs/core`. */
   route: string;
   source: MarkdownRequestSource;
   /** Locale prefix of the request, or null for English. */

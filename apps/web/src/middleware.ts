@@ -20,6 +20,7 @@ export function isProxiedPath(normalizedPathname: string) {
     normalizedPathname.startsWith("/developers/templates") ||
     normalizedPathname.startsWith("/developers/cookbook") ||
     normalizedPathname.startsWith("/developers/bootcamp") ||
+    normalizedPathname.startsWith("/developers/docs") ||
     normalizedPathname.startsWith("/docs") ||
     // /learn itself is an apps/web page (WP10); articles are Mintlify.
     normalizedPathname.startsWith("/learn/") ||
@@ -175,12 +176,12 @@ export const config = {
     "/:locale/docs/:path*",
     "/learn/:path+",
     "/:locale/learn/:path+",
-    "/developers/:section(cookbook|bootcamp)",
-    "/developers/:section(cookbook|bootcamp).md",
-    "/developers/:section(cookbook|bootcamp)/:path*",
-    "/:locale/developers/:section(cookbook|bootcamp)",
-    "/:locale/developers/:section(cookbook|bootcamp).md",
-    "/:locale/developers/:section(cookbook|bootcamp)/:path*",
+    "/developers/:section(docs|cookbook|bootcamp)",
+    "/developers/:section(docs|cookbook|bootcamp).md",
+    "/developers/:section(docs|cookbook|bootcamp)/:path*",
+    "/:locale/developers/:section(docs|cookbook|bootcamp)",
+    "/:locale/developers/:section(docs|cookbook|bootcamp).md",
+    "/:locale/developers/:section(docs|cookbook|bootcamp)/:path*",
     "/:path((?:[a-zA-Z]{2}(?:-[a-zA-Z]+)?/)?(?:[dD][oO][cC][sS]|[lL][eE][aA][rR][nN]|[dD][eE][vV][eE][lL][oO][pP][eE][rR][sS])(?:/[^.]*)?\\.[mM][dD])",
   ],
   runtime: "nodejs",

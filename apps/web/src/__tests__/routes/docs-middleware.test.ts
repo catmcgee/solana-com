@@ -41,6 +41,12 @@ function matchesMiddleware(pathname: string) {
 describe("docs path detection", () => {
   it("recognises Mintlify-served paths with and without a locale", () => {
     for (const path of [
+      "/developers/docs",
+      "/developers/docs.md",
+      "/developers/docs/core/accounts",
+      "/fr/developers/docs/core/accounts.md",
+      "/Developers/Docs/Core",
+      // The old prefix (redirected before middleware; kept for mixed case).
       "/docs",
       "/docs.md",
       "/docs/core/accounts",
@@ -64,6 +70,7 @@ describe("docs path detection", () => {
       "/developers",
       "/developers/templates",
       "/developers/payments",
+      "/developers/docsy",
       "/docs-assets/x.svg",
       "/news",
       "/fr/news/x",
@@ -94,11 +101,24 @@ describe("docs path normalisation", () => {
     expect(canonicalDocsPath("/en/docs/core")).toBe("/docs/core");
     expect(canonicalDocsPath("/EN/Docs/core.md")).toBe("/docs/core.md");
     expect(canonicalDocsPath("/en/fr/docs/core")).toBe("/docs/core");
+    expect(canonicalDocsPath("/Developers/Docs/Core")).toBe(
+      "/developers/docs/core",
+    );
+    expect(canonicalDocsPath("/en/developers/docs/core")).toBe(
+      "/developers/docs/core",
+    );
+    expect(canonicalDocsPath("/fr/developers/docs/fr/core")).toBe(
+      "/fr/developers/docs/core",
+    );
   });
 
   it("leaves canonical paths alone", () => {
     expect(canonicalDocsPath("/docs/core/accounts")).toBeNull();
     expect(canonicalDocsPath("/fr/docs/core/accounts.md")).toBeNull();
+    expect(canonicalDocsPath("/developers/docs/core/accounts")).toBeNull();
+    expect(
+      canonicalDocsPath("/ja/developers/docs/core/accounts.md"),
+    ).toBeNull();
   });
 
   it("redirects with 308 and keeps the query string", () => {
@@ -124,9 +144,14 @@ describe("docs path normalisation", () => {
   });
 
   it("passes canonical docs requests through to the Mintlify rewrite", () => {
-    const res = handleDocsRequest(request("/docs/core/accounts"), fakeEvent());
-    expect(res?.status).toBe(200);
-    expect(res?.headers.get("x-middleware-next")).toBe("1");
+    for (const path of [
+      "/developers/docs/core/accounts",
+      "/docs/core/accounts",
+    ]) {
+      const res = handleDocsRequest(request(path), fakeEvent());
+      expect(res?.status, path).toBe(200);
+      expect(res?.headers.get("x-middleware-next"), path).toBe("1");
+    }
   });
 
   it("returns null for non-docs paths", () => {
@@ -245,6 +270,13 @@ describe("markdown request analytics", () => {
 describe("middleware matcher", () => {
   it("runs for docs paths, including .md twins", () => {
     for (const path of [
+      "/developers/docs",
+      "/developers/docs.md",
+      "/developers/docs/core/accounts",
+      "/developers/docs/core/accounts.md",
+      "/fr/developers/docs/core/accounts.md",
+      "/developers/docs/payments/llms.txt",
+      "/Developers/Docs/core/accounts.md",
       "/docs",
       "/docs.md",
       "/docs/core/accounts.md",
@@ -283,6 +315,7 @@ describe("middleware matcher", () => {
     expect(isProxiedPath("/learn")).toBe(false);
     expect(isProxiedPath("/developers")).toBe(false);
     expect(isProxiedPath("/learn/what-is-solana")).toBe(true);
+    expect(isProxiedPath("/developers/docs/core")).toBe(true);
   });
 
   it("skips Mintlify runtime and asset paths", () => {

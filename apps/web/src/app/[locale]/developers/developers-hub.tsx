@@ -38,7 +38,7 @@ import { NewsletterForm } from "./newsletter-form.client";
 
 /**
  * Links on this page open in the same tab, docs included: /developers wears
- * the docs header, so going to /docs is moving within one site. Only
+ * the docs header, so going to /developers/docs is moving within one site. Only
  * off-site links (hackathons, MCP setup) open a new tab, with the arrow.
  */
 export const HACKATHONS_URL = "https://hackathons.solana.com";

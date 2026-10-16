@@ -145,7 +145,7 @@ export function SolutionsGamesToolingPage() {
               src: DEVELOPER_CARD_IMAGE,
             },
             callToAction: {
-              url: "/docs/intro/quick-start",
+              url: "/developers/docs/intro/quick-start",
               label: "",
               endIcon: "arrow-right",
               hierarchy: "outline",

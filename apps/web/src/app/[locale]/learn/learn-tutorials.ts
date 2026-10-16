@@ -19,7 +19,7 @@ export const learnTutorials = [
 export const tutorialOrder = learnTutorials.map((tutorial) => tutorial.slug);
 
 export const LEARN_RESOURCES = [
-  { id: "documentation", href: "/docs", external: false },
+  { id: "documentation", href: "/developers/docs", external: false },
   { id: "cookbook", href: "/developers/cookbook", external: false },
   { id: "courses", href: "https://learn.blueshift.gg/", external: true },
   { id: "wallets", href: "/wallets", external: false },

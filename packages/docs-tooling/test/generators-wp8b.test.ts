@@ -73,11 +73,17 @@ beforeEach(() => {
     path.join(root, "addresses.json"),
     readFileSync(path.join(realDocsRoot, "addresses.json")),
   );
-  write("docs/payments/checkout/try-it.mdx", TRY_IT);
-  write("docs/core/accounts/index.mdx", page("Accounts", "Accounts."));
-  write("ja/docs/core/accounts/index.mdx", page("Accounts", "Konten."));
+  write("developers/docs/payments/checkout/try-it.mdx", TRY_IT);
   write(
-    "ja/docs/payments/checkout/try-it.mdx",
+    "developers/docs/core/accounts/index.mdx",
+    page("Accounts", "Accounts."),
+  );
+  write(
+    "ja/developers/docs/core/accounts/index.mdx",
+    page("Accounts", "Konten."),
+  );
+  write(
+    "ja/developers/docs/payments/checkout/try-it.mdx",
     page(
       "Try",
       `import W from "/snippets/concepts/en/wallet.mdx";\n\n<W />\n\nSiehe <span className="sol-chip" data-concept="account">Konten</span>.`,
@@ -266,29 +272,29 @@ describe("generated snippets", () => {
     expect(card).toContain(
       '**Accounts** <span className="sol-concept-label">New concept</span>',
     );
-    expect(card).toContain("[Learn more →](/docs/core/accounts)");
+    expect(card).toContain("[Learn more →](/developers/docs/core/accounts)");
     expect(read("snippets/concepts/en/mint.short.mdx")).toMatch(
       /\(\*mint authority\*\)/,
     );
     // wallet: card imported on step 1 (intro); clusters: chip (ref); rpc only in code.
     expect(read("snippets/concepts/en/wallet.used-in.mdx")).toContain(
-      '[Payments <span className="sol-usedin-step">Step 1</span>](/docs/payments/checkout/try-it)',
+      '[Payments <span className="sol-usedin-step">Step 1</span>](/developers/docs/payments/checkout/try-it)',
     );
     expect(read("snippets/concepts/en/clusters.used-in.mdx")).toContain(
-      "/docs/payments/checkout/try-it",
+      "/developers/docs/payments/checkout/try-it",
     );
     expect(read("snippets/concepts/en/rpc.used-in.mdx")).toContain(
       "Not used in a path yet.",
     );
     const cov = read("snippets/concepts/en/coverage.mdx");
     expect(cov).toMatch(
-      /Wallets & signatures\]\(\/docs\/core\/wallets\)<\/th><td data-cov="intro">\[Step 1\]/,
+      /Wallets & signatures\]\(\/developers\/docs\/core\/wallets\)<\/th><td data-cov="intro">\[Step 1\]/,
     );
     expect(cov).toMatch(
-      /Devnet & mainnet\]\(\/docs\/references\/clusters\)<\/th><td data-cov="ref">mentioned/,
+      /Devnet & mainnet\]\(\/developers\/docs\/references\/clusters\)<\/th><td data-cov="ref">mentioned/,
     );
     expect(cov).toMatch(
-      /\[RPC\]\(\/docs\/rpc\) <span className="sol-cov-gap">not taught in a path<\/span>/,
+      /\[RPC\]\(\/developers\/docs\/rpc\) <span className="sol-cov-gap">not taught in a path<\/span>/,
     );
   });
 
@@ -300,10 +306,10 @@ describe("generated snippets", () => {
     );
     expect(s2).not.toContain("<nav");
     expect(s2).toMatch(
-      /<li data-state="done"><a href="\/docs\/payments\/checkout\/try-it">/,
+      /<li data-state="done"><a href="\/developers\/docs\/payments\/checkout\/try-it">/,
     );
     expect(s2).toMatch(
-      /<li data-state="current"( data-first="true")?><a href="\/docs\/payments\/checkout\/browser" aria-current="step">/,
+      /<li data-state="current"( data-first="true")?><a href="\/developers\/docs\/payments\/checkout\/browser" aria-current="step">/,
     );
     expect(s2.match(/aria-current/g)).toHaveLength(1);
     // Accessible name reads "Step 1, Done: Title", not "Step 1DoneTitle".
@@ -314,16 +320,18 @@ describe("generated snippets", () => {
       "aria-current",
     );
     expect(read("snippets/paths/en/checkout/next-0.mdx")).toContain(
-      '<Card title="Next: Pay as a customer" href="/docs/payments/checkout/try-it" icon="arrow-right" horizontal>',
+      '<Card title="Next: Pay as a customer" href="/developers/docs/payments/checkout/try-it" icon="arrow-right" horizontal>',
     );
     expect(read("snippets/paths/en/checkout/next-4.mdx")).toContain(
-      'href="/docs/payments"',
+      'href="/developers/docs/payments"',
     );
     const card = read("snippets/paths/en/checkout/card.mdx");
-    expect(card).toContain("[Start the tutorial →](/docs/payments/checkout)");
+    expect(card).toContain(
+      "[Start the tutorial →](/developers/docs/payments/checkout)",
+    );
     // Numbered steps, with no step singled out.
     expect(card).toMatch(
-      /<li>\[[^\]]+\]\(\/docs\/payments\/checkout\/browser\)<\/li>/,
+      /<li>\[[^\]]+\]\(\/developers\/docs\/payments\/checkout\/browser\)<\/li>/,
     );
     expect(card).not.toContain("First win");
     expect(read("styles/paths-sidebar.css")).not.toContain("::after");
@@ -366,9 +374,9 @@ describe("generated snippets", () => {
 describe("--sync", () => {
   it("expands chips and addresses, leaves code alone, and is idempotent", () => {
     all();
-    const out = read("docs/payments/checkout/try-it.mdx");
+    const out = read("developers/docs/payments/checkout/try-it.mdx");
     expect(out).toContain(
-      '<span className="sol-chip" data-concept="clusters"><Tooltip headline="Devnet & mainnet" tip="Devnet is a free public test network that behaves like the real one (mainnet), with play money. Same code, different URL." cta="Learn more" href="/docs/references/clusters">devnet</Tooltip><span className="nojs-only"> ([Devnet & mainnet](/docs/references/clusters): Devnet is a free public',
+      '<span className="sol-chip" data-concept="clusters"><Tooltip headline="Devnet & mainnet" tip="Devnet is a free public test network that behaves like the real one (mainnet), with play money. Same code, different URL." cta="Learn more" href="/developers/docs/references/clusters">devnet</Tooltip><span className="nojs-only"> ([Devnet & mainnet](/developers/docs/references/clusters): Devnet is a free public',
     );
     // Spec form <Tooltip data-concept> is wrapped; the trigger text is kept.
     expect(out).toContain(
@@ -390,7 +398,7 @@ describe("--sync", () => {
     expect(second.concepts.synced).toEqual([]);
     expect(second.addresses.synced).toEqual([]);
     expect(second.concepts.written).toEqual([]);
-    expect(read("docs/payments/checkout/try-it.mdx")).toBe(out);
+    expect(read("developers/docs/payments/checkout/try-it.mdx")).toBe(out);
     const check = all(true);
     expect([check.paths.ok, check.concepts.ok, check.addresses.ok]).toEqual([
       true,
@@ -406,10 +414,12 @@ describe("--sync", () => {
     write("concepts/concepts.en.json", JSON.stringify(src));
     const check = runConcepts({ docsRoot: root, check: true, sync: true });
     expect(check.ok).toBe(false);
-    expect(check.synced).toContain("docs/payments/checkout/try-it.mdx");
+    expect(check.synced).toContain(
+      "developers/docs/payments/checkout/try-it.mdx",
+    );
     expect(check.written).toContain("snippets/concepts/en/clusters.mdx");
     runConcepts({ docsRoot: root, sync: true });
-    const out = read("docs/payments/checkout/try-it.mdx");
+    const out = read("developers/docs/payments/checkout/try-it.mdx");
     expect(out).toContain('tip="Changed text."');
     expect(out).toContain(": Changed text.)</span>");
   });
@@ -418,10 +428,14 @@ describe("--sync", () => {
     all();
     // No concepts.ja.json yet: English text, English snippet imports, but
     // links still go to the translated page when it exists.
-    const before = read("ja/docs/payments/checkout/try-it.mdx");
+    const before = read("ja/developers/docs/payments/checkout/try-it.mdx");
     expect(before).toContain('"/snippets/concepts/en/wallet.mdx"');
-    expect(before).toContain('cta="Learn more" href="/ja/docs/core/accounts"');
-    expect(before).toContain("([Accounts](/ja/docs/core/accounts): ");
+    expect(before).toContain(
+      'cta="Learn more" href="/ja/developers/docs/core/accounts"',
+    );
+    expect(before).toContain(
+      "([Accounts](/ja/developers/docs/core/accounts): ",
+    );
     write(
       "concepts/concepts.ja.json",
       JSON.stringify({
@@ -430,16 +444,16 @@ describe("--sync", () => {
       }),
     );
     all();
-    const ja = read("ja/docs/payments/checkout/try-it.mdx");
+    const ja = read("ja/developers/docs/payments/checkout/try-it.mdx");
     expect(ja).toContain('"/snippets/concepts/ja/wallet.mdx"');
     expect(ja).toContain('headline="アカウント"');
-    expect(ja).toContain('cta="詳細" href="/ja/docs/core/accounts"');
+    expect(ja).toContain('cta="詳細" href="/ja/developers/docs/core/accounts"');
     // Untranslated fields fall back to English; missing locale pages link to English.
     const card = read("snippets/concepts/ja/wallet.mdx");
     expect(card).toContain("A wallet is a keypair");
-    expect(card).toContain("](/docs/core/wallets)");
+    expect(card).toContain("](/developers/docs/core/wallets)");
     expect(read("snippets/concepts/ja/account.mdx")).toContain(
-      "](/ja/docs/core/accounts)",
+      "](/ja/developers/docs/core/accounts)",
     );
   });
 
@@ -450,12 +464,14 @@ describe("--sync", () => {
     src.clusters.short = "Changed too.";
     write("concepts/concepts.en.json", JSON.stringify(src));
     runConcepts({ docsRoot: root }); // regenerates snippets only
-    const before = read("docs/payments/checkout/try-it.mdx");
+    const before = read("developers/docs/payments/checkout/try-it.mdx");
     const check = runConcepts({ docsRoot: root, check: true });
     expect(check.written).toEqual([]);
-    expect(check.synced).toEqual(["docs/payments/checkout/try-it.mdx"]);
+    expect(check.synced).toEqual([
+      "developers/docs/payments/checkout/try-it.mdx",
+    ]);
     expect(check.ok).toBe(false);
-    expect(read("docs/payments/checkout/try-it.mdx")).toBe(before);
+    expect(read("developers/docs/payments/checkout/try-it.mdx")).toBe(before);
     runConcepts({ docsRoot: root, sync: true });
     expect(runConcepts({ docsRoot: root, check: true }).ok).toBe(true);
   });
@@ -464,7 +480,7 @@ describe("--sync", () => {
     write("paths/paths.ja.json", JSON.stringify({ _ui: { step: "ステップ" } }));
     all();
     write(
-      "ja/docs/payments/checkout/browser.mdx",
+      "ja/developers/docs/payments/checkout/browser.mdx",
       page(
         "B",
         'import S from "/snippets/paths/en/checkout/stepper-2.mdx";\n\n<S />',
@@ -475,7 +491,9 @@ describe("--sync", () => {
       check: true,
       outputsRoot: outputs,
     });
-    expect(check.synced).toEqual(["ja/docs/payments/checkout/browser.mdx"]);
+    expect(check.synced).toEqual([
+      "ja/developers/docs/payments/checkout/browser.mdx",
+    ]);
     expect(check.ok).toBe(false);
   });
 
@@ -488,7 +506,7 @@ describe("--sync", () => {
       }),
     );
     write(
-      "ja/docs/x.mdx",
+      "ja/developers/docs/x.mdx",
       page(
         "X",
         'Mint <span className="sol-address" data-address="EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v">`EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v`</span>.',
@@ -496,12 +514,12 @@ describe("--sync", () => {
     );
     const r = runAddresses({ docsRoot: root, sync: true });
     expect(errors(r.problems)).toEqual([]);
-    const ja = read("ja/docs/x.mdx");
+    const ja = read("ja/developers/docs/x.mdx");
     expect(ja).toContain('headline="USDC ミント"');
     expect(ja).toContain('cta="エクスプローラーで見る"');
     expect(ja).toContain("([USDC ミント](https://explorer.solana.com/address/");
     // English pages keep the English strings.
-    expect(read("docs/payments/checkout/try-it.mdx")).toContain(
+    expect(read("developers/docs/payments/checkout/try-it.mdx")).toContain(
       'cta="View on Solana Explorer"',
     );
     write(
@@ -519,7 +537,7 @@ describe("--sync", () => {
 
   it("warns when a chip sits in a table cell (codec re-pads tables)", () => {
     write(
-      "docs/t.mdx",
+      "developers/docs/t.mdx",
       page(
         "T",
         '| a | b |\n| - | - |\n| <span className="sol-chip" data-concept="rent">rent</span> | x |',
@@ -530,7 +548,7 @@ describe("--sync", () => {
       r.problems.some(
         (p) =>
           p.level === "warn" &&
-          p.file === "docs/t.mdx" &&
+          p.file === "developers/docs/t.mdx" &&
           p.message.includes("table cell"),
       ),
     ).toBe(true);
@@ -538,7 +556,7 @@ describe("--sync", () => {
 
   it("reports unknown concepts and addresses", () => {
     write(
-      "docs/x.mdx",
+      "developers/docs/x.mdx",
       page(
         "X",
         'A <span className="sol-chip" data-concept="nope">x</span> <span className="sol-address" data-address="So11111111111111111111111111111111111111113">y</span>',
@@ -562,11 +580,11 @@ describe("--sync", () => {
     const r = runAddresses({ docsRoot: root, report: true });
     expect(r.candidates).toEqual([
       {
-        file: "docs/payments/checkout/try-it.mdx",
+        file: "developers/docs/payments/checkout/try-it.mdx",
         address: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
       },
     ]);
-    expect(read("docs/payments/checkout/try-it.mdx")).toBe(TRY_IT);
+    expect(read("developers/docs/payments/checkout/try-it.mdx")).toBe(TRY_IT);
   });
 });
 

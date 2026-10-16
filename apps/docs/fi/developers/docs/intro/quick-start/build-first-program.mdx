@@ -1,0 +1,1721 @@
+---
+title: Rakenna ensimmäinen Solana-ohjelmasi
+description:
+  Luo paikallinen Anchor-ohjelma, rakenna ja testaa se sekä käy läpi jokainen
+  tiedosto oletusarvoisen laskuriohjelman projektissa.
+sidebarTitle: Rakenna ensimmäinen ohjelmasi
+---
+
+Tämä pikakäynnistysopas käyttää
+[Anchor-sovelluskehyksen](https://www.anchor-lang.com/docs) aloitusprojektia,
+jonka `anchor init` luo. Luot projektin paikallisesti, suoritat sen testit,
+rakennat ohjelman ja käyt läpi ohjelmakoodin, jonka Anchor generoi.
+
+## Edellytykset
+
+Ennen kuin aloitat, [asenna Solana-kehitystyökalut](/developers/docs/intro/installation).
+Asennus sisältää Rustin, Solana CLI:n ja Anchor CLI:n.
+
+Käytä tähän malliin Anchor CLI -versiota 1.1.2 tai uudempaa. Tarkista asennettu
+versio:
+
+```bash Terminal
+anchor --version
+```
+
+<Steps titleSize="h3">
+
+<Step title="Luo projekti">
+
+Suorita seuraavat komennot terminaalissasi:
+
+```bash Terminal
+anchor init my-program
+cd my-program
+```
+
+Aloitusprojekti sisältää yhden Solana-ohjelman hakemistossa
+`programs/my-program`. Ohjelma sisältää kaksi käskyä: yhden laskuritilin
+alustamiseen ja yhden laskurin kasvattamiseen.
+
+Osa mallin osioista havainnollistaa yleisiä Solana-ohjelmointimalleja:
+[PDA](/developers/docs/core/pda)-tilin osoitteiden johtaminen, Cross Program Invocation
+([CPI](/developers/docs/core/cpi)) SOL:n siirtämiseksi sekä mukautettujen
+virheentarkistusten käyttö käskyn pysäyttämiseksi, kun ehto ei täyty.
+
+<Tree>
+  <Tree.Folder name="my-program" defaultOpen>
+    <Tree.File name="Anchor.toml" />
+    <Tree.File name="Cargo.toml" />
+    <Tree.Folder name="programs" defaultOpen>
+      <Tree.Folder name="my-program" defaultOpen>
+        <Tree.File name="Cargo.toml" />
+        <Tree.Folder name="src" defaultOpen>
+          <Tree.File name="lib.rs" />
+          <Tree.File name="constants.rs" />
+          <Tree.File name="error.rs" />
+          <Tree.File name="instructions.rs" />
+          <Tree.Folder name="instructions" defaultOpen>
+            <Tree.File name="initialize.rs" />
+            <Tree.File name="increment.rs" />
+          </Tree.Folder>
+          <Tree.File name="state.rs" />
+        </Tree.Folder>
+        <Tree.Folder name="tests" defaultOpen>
+          <Tree.File name="test_initialize.rs" />
+        </Tree.Folder>
+      </Tree.Folder>
+    </Tree.Folder>
+  </Tree.Folder>
+</Tree>
+
+</Step>
+
+<Step title="Rakenna ohjelma">
+
+Suorita `anchor build` kääntääksesi aloitusohjelman:
+
+```bash Terminal
+anchor build
+```
+
+Käännetty ohjelma kirjoitetaan kohteeseen `target/deploy/my_program.so`. Kun
+ohjelma otetaan käyttöön, tämän `.so`-tiedoston sisältö tallennetaan ketjussa
+olevalle tilille.
+
+</Step>
+
+<Step title="Suorita testi">
+
+Suorita oletustesti:
+
+```bash Terminal
+anchor test
+```
+
+Tämän mallin `Anchor.toml` käyttää Rust-testikomentoa:
+
+```toml Anchor.toml
+skip_local_validator = true
+
+[scripts]
+test = "cargo test"
+```
+
+Testi lataa käännetyn ohjelman [LiteSVM](https://www.litesvm.com/)-ympäristöön,
+luo maksajan, lähettää `initialize`- ja `increment`-käskyt, jonka
+jälkeen tarkistaa laskuritilin tilan.
+
+`anchor test`-komennon suorittaminen kääntää myös ohjelman, joten sinun ei
+tarvitse ajaa `anchor build`-komentoa ensin paikallista testausta varten.
+
+</Step>
+
+<Step title="Ota ohjelma käyttöön">
+
+Paikalliset testit tarjoavat nopeimman palautesilmukan. Kun olet valmis ottamaan
+käyttöön verkossa, esimerkiksi devnetissä, käännä ensin ja ota sitten käyttöön
+klusterissa.
+
+Solana-ohjelman käyttöönottovaatimuksena on SOL, koska ohjelma tallennetaan
+program account -tilille, jonka täytyy maksaa käyttämästään tilasta. Devnetissä
+voit pyytää ilmaista devnet-SOL:ia
+[Solana Faucetista](https://faucet.solana.com/) tai Solana CLI:llä:
+
+```bash Terminal
+solana airdrop 2 --url devnet
+```
+
+```bash Terminal
+anchor build
+anchor deploy --provider.cluster devnet
+```
+
+</Step>
+
+</Steps>
+
+## Lähdetiedostot
+
+`src`-hakemisto sisältää Solana-ohjelman. Anchor'in
+[Ohjelmarakenne](https://www.anchor-lang.com/docs/basics/program-structure)
+-dokumentaatio selittää tässä käytetyt keskeiset makrot, mukaan lukien
+`declare_id!`, `#[program]`, `#[derive(Accounts)]` ja
+`#[account]`. Tässä osiossa käydään läpi mallin tiedostot.
+
+### lib.rs
+
+`lib.rs` on ohjelman sisääntulopiste. Se yhdistää lähdetiedostot, määrittelee
+ohjelman osoitteen ja määrittelee ohjelmakomennot, joita käyttäjät voivat
+kutsua.
+
+```rust programs/my-program/src/lib.rs wrap
+pub mod constants;
+pub mod error;
+pub mod instructions;
+pub mod state;
+
+use anchor_lang::prelude::*;
+
+pub use constants::*;
+pub use instructions::*;
+pub use state::*;
+
+declare_id!("82sFkffP9wxwpyfZyeaKHH2chQoJPUGsJZSPi9mrUuXd");
+
+#[program]
+pub mod my_program {
+    use super::*;
+
+    pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
+        crate::instructions::initialize::handle_initialize(ctx)
+    }
+
+    pub fn increment(ctx: Context<Increment>) -> Result<()> {
+        crate::instructions::increment::handle_increment(ctx)
+    }
+}
+```
+
+<Note>
+  **`pub mod constants`**
+
+  `pub mod constants` lisää `constants.rs` osaksi ohjelmacratea. Tänne malli
+  tallentaa jaetut ohjelma-arvot, kuten PDA seed, siirtosumma ja laskurin
+  enimmäisarvo.
+
+  **`pub mod error`**
+
+  `pub mod error` lisää `error.rs` osaksi ohjelmacratea. Tämä tiedosto
+  määrittelee mukautetut virheet, jotka ohjelma voi palauttaa, kun käsky on
+  virheellinen.
+
+  **`pub mod instructions`**
+
+  `pub mod instructions` lisää `instructions.rs` osaksi ohjelmacratea. Tämä
+  tiedosto toimii hakemistona käskykohtaisille tiedostoille
+  `src/instructions/`-kansiossa.
+
+  **`pub mod state`**
+
+  `pub mod state` lisää `state.rs` osaksi ohjelmacratea. Tämä tiedosto
+  määrittelee tietopohjan tämän ohjelman omistamille tileille, mukaan lukien
+  `Counter` tilin.
+
+  **`anchor_lang::prelude`**
+
+  `anchor_lang::prelude::*` tuo Anchor-tyypit ja makrot, joita käytetään
+  Solana-ohjelman määrittelemiseen, mukaan lukien `Context`, `Result`,
+  `Pubkey`, `Account`, `Signer` sekä Anchor-tilimääritteet.
+
+  `pub use`-rivit tekevät alimoduulien julkiset kohteet saataville craten
+  juuresta. Tämä pitää käskyjen sisääntulopisteet lyhyinä, kuten
+  `Context<Initialize>` pitkän moduulipolun sijaan.
+
+  **`declare_id!`**
+
+  `declare_id!` määrittelee ohjelman osoitteen. Sen tulee vastata osoitetta
+  `Anchor.toml`-tiedostossa, käyttöönotetulla program account -tilillä sekä
+  kaikilla käyttäjillä tai testeillä, jotka kutsuvat ohjelmaa.
+
+  **`#[program]`**
+
+  `#[program]` käskee Anchoria generoimaan Solana-ohjelman sisääntulopisteen
+  ja käskyjen reitityksen. Tämän moduulin julkisista funktioista tulee käskyjä,
+  joita käyttäjät voivat kutsua.
+
+  **`pub fn initialize`, `pub fn increment`**
+
+  `initialize` ja `increment` ovat kaksi käskyä, joita käyttäjät voivat
+  kutsua. Kumpikin vastaanottaa `Context<T>`-arvon. `Context`-sisällä
+  oleva tyyppi määrittelee käskyn vaatimat tilit, ja Anchor validoi nämä tilit
+  ennen käskyn suoritusta.
+
+  **`handle_initialize`, `handle_increment`**
+
+  Käsittelijäfunktio sisältää instruktion logiikan.
+</Note>
+
+<Columns cols={2}>
+  <div>
+    ```toml Anchor.toml highlight={2} wrap
+    [programs.localnet]
+    my_program = "82sFkffP9wxwpyfZyeaKHH2chQoJPUGsJZSPi9mrUuXd"
+    ```
+  </div>
+
+  <div>
+    ```rust lib.rs highlight={1} wrap
+    declare_id!("82sFkffP9wxwpyfZyeaKHH2chQoJPUGsJZSPi9mrUuXd");
+    ```
+  </div>
+</Columns>
+
+Sama ohjelma-osoite esiintyy sekä konfiguraatiossa että koodissa. `Anchor.toml`
+kertoo Anchorille, mihin osoitteeseen ohjelma otetaan käyttöön tai kutsutaan
+klusterissa. `declare_id!` määrittää ohjelma-osoitteen ohjelmassa
+turvatarkistuksia varten.
+
+### constants.rs
+
+`constants.rs` pitää jaetut arvot yhdessä paikassa. Tässä mallissa
+`COUNTER_SEED` johtaa laskurin PDA:n, `HELLO_WORLD_LAMPORTS` siirretään
+alustuksen aikana ja `MAX_COUNT` tarkistetaan ennen kasvattamista.
+
+```rust programs/my-program/src/constants.rs wrap
+use anchor_lang::prelude::*;
+
+#[constant]
+pub const COUNTER_SEED: &[u8] = b"counter";
+
+#[constant]
+pub const HELLO_WORLD_LAMPORTS: u64 = 1;
+
+#[constant]
+pub const MAX_COUNT: u64 = 10;
+```
+
+<Note>
+  **`#[constant]`**
+
+  `#[constant]` käskee Anchoria sisällyttämään arvon ohjelman IDL:ään. Tämä
+  tekee tärkeistä ohjelmakonstanteista näkyviä generoitujen asiakkaiden ja
+  työkalujen käyttöön.
+
+  **`COUNTER_SEED`**
+
+  `COUNTER_SEED` on tavumerkkijono, jota käytetään laskurin PDA:n johtamiseen.
+  Sekä ohjelma että testi käyttävät tätä seed-arvoa, joten ne ovat yksimielisiä
+  tilin osoitteesta ilman erillisen keypair-arvon tallentamista. Tämä malli
+  käyttää yhtä kiinteää seed-arvoa, joten ohjelmalla on yksi laskuriosoite. Oikeat
+  ohjelmat sisällyttävät usein käyttäjän osoitteen tai muun tunnisteen
+  seed-arvoihin luodakseen monia toisiinsa liittyviä tilejä.
+
+  **`HELLO_WORLD_LAMPORTS`**
+
+  `HELLO_WORLD_LAMPORTS` on lamport-määrä, joka siirretään maksajalta
+  laskuritilille `initialize`-funktion sisällä. Se on tarkoituksellisesti
+  pieni, koska malli havainnollistaa CPI:tä System Programille.
+
+  **`MAX_COUNT`**
+
+  `MAX_COUNT` on yläraja, jonka `increment` tarkistaa. Sen pitäminen
+  täällä antaa ohjelmalle, testeille ja generoidulle IDL:lle yhteisen nimen
+  säännölle.
+</Note>
+
+<Columns cols={2}>
+  <div>
+    ```rust initialize.rs highlight={8,18} wrap
+    #[derive(Accounts)]
+    pub struct Initialize<'info> {
+        // ...
+        #[account(
+            init,
+            payer = payer,
+            space = 8 + Counter::INIT_SPACE,
+            seeds = [COUNTER_SEED],
+            bump
+        )]
+        pub counter: Account<'info, Counter>,
+        // ...
+    }
+
+    pub fn handle_initialize(ctx: Context<Initialize>) -> Result<()> {
+        // ...
+
+        anchor_lang::system_program::transfer(cpi_ctx, HELLO_WORLD_LAMPORTS)?;
+
+        Ok(())
+    }
+    ```
+  </div>
+
+  <div>
+    `initialize.rs` käyttää kahta vakiota:
+
+    - `COUNTER_SEED` johtaa laskurin PDA-osoitteen.
+    - `HELLO_WORLD_LAMPORTS` määrittää summan,
+      joka siirretään maksajalta laskuritilille.
+  </div>
+</Columns>
+
+<Columns cols={2}>
+  <div>
+    ```rust increment.rs highlight={5} wrap
+    pub fn handle_increment(ctx: Context<Increment>) -> Result<()> {
+        // ...
+
+        require!(
+            ctx.accounts.counter.count < MAX_COUNT,
+            ErrorCode::CounterOverflow,
+        );
+
+        ctx.accounts.counter.count += 1;
+        Ok(())
+    }
+    ```
+  </div>
+
+  <div>
+    `increment.rs` käyttää `MAX_COUNT` laskurin ylänä
+    rajana. Jos nykyinen arvo on jo maksimissa, `require!` palauttaa
+    `CounterOverflow` eikä tilin tietoja muuteta.
+  </div>
+</Columns>
+
+### state.rs
+
+`state.rs` määrittää mukautetut tietotyypit tileille, jotka ohjelma luo ja
+omistaa. Ohjelma määrittää ohjeet tietojen luomiseen, alustamiseen ja
+päivittämiseen, mutta laskuridata ei ole tallennettu itse ohjelmaan. Se on
+tallennettu erilliselle tilille, jolla on oma osoitteensa.
+
+```rust programs/my-program/src/state.rs wrap
+use anchor_lang::prelude::*;
+
+#[account]
+#[derive(InitSpace)]
+pub struct Counter {
+    pub count: u64,
+    pub authority: Pubkey,
+}
+```
+
+<Note>
+  **`#[account]`**
+
+  `#[account]` kertoo Anchorille, että tämä struct on dataa, joka voidaan
+  tallentaa tämän ohjelman omistamalle ketjussa olevalle tilille. Anchor käyttää
+  sitä sarjallistamiseen, purkamiseen ja `Counter`-tilien validointiin.
+
+  **`InitSpace`**
+
+  `InitSpace` antaa Anchorin laskea `Counter::INIT_SPACE`, eli tarvittavan
+  tavumäärän tämän structin kentille. 8-tavuinen Anchor-tilin erottelija lisätään
+  erikseen tilin luomisen yhteydessä.
+
+  **`count`**
+
+  `count` on tilin dataan tallennettu laskuriarvo.
+
+  **`authority`**
+
+  `authority` tallentaa osoitteen, jolla on oikeus kasvattaa laskuria.
+  `initialize` kirjoittaa tämän osoitteen, ja `increment` vaatii saman
+  osoitteen allekirjoituksen.
+</Note>
+
+<Columns cols={2}>
+  <div>
+    ```rust initialize.rs highlight={4,12-13} wrap
+    #[account(
+        init,
+        payer = payer,
+        space = 8 + Counter::INIT_SPACE,
+        seeds = [COUNTER_SEED],
+        bump
+    )]
+    pub counter: Account<'info, Counter>,
+    // ...
+
+    pub fn handle_initialize(ctx: Context<Initialize>) -> Result<()> {
+        ctx.accounts.counter.count = 0;
+        ctx.accounts.counter.authority = ctx.accounts.payer.key();
+
+        Ok(())
+    }
+    ```
+
+    ```rust increment.rs highlight={4} wrap
+    pub fn handle_increment(ctx: Context<Increment>) -> Result<()> {
+        // ...
+
+        ctx.accounts.counter.count += 1;
+        Ok(())
+    }
+    ```
+  </div>
+
+  <div>
+    `state.rs` määrittelee `Counter`-tilin tiedot. Ohjetiedostot käyttävät tätä
+    tyyppiä luodessaan ja päivittäessään tilin:
+
+    - `Counter::INIT_SPACE` määrittää tilin koon
+      `state.rs`:ssä määriteltyjen kenttien mukaan.
+    - `count` ja `authority` ovat kenttien
+      arvoja, jotka kirjoitetaan tilin alustuksen yhteydessä.
+    - `count += 1` päivittää tallennetun laskuriarvon
+      validoinnin läpäisemisen jälkeen.
+  </div>
+</Columns>
+
+### error.rs
+
+`error.rs` määrittelee ohjelman mukautetut virheet. Tässä mallissa virheet
+havainnollistavat, kuinka ohjetoiminnot pysähtyvät, kun kutsujalla ei ole
+oikeutta päivittää laskuria tai laskuri on jo saavuttanut `MAX_COUNT`-arvon.
+
+```rust programs/my-program/src/error.rs wrap
+use anchor_lang::prelude::*;
+
+#[error_code]
+pub enum ErrorCode {
+    #[msg("Only the counter authority can update this counter")]
+    Unauthorized,
+    #[msg("Counter has reached the maximum value")]
+    CounterOverflow,
+}
+```
+
+<Note>
+  **`#[error_code]`**
+
+  `#[error_code]` käskee Anchoria muuttamaan nämä variantit mukautetuiksi
+  ohjelmavirheiksi. Asiakkaat ja testit voivat käyttää näitä virheitä sen sijaan,
+  että arvailtaisiin raakojen virhekoodien perusteella.
+
+  **`Unauthorized`**
+
+  `Unauthorized` palautetaan, kun tapahtuman allekirjoittaja ei ole
+  laskuritiliin tallennettu auktoriteetti.
+
+  **`CounterOverflow`**
+
+  `CounterOverflow` palautetaan, kun laskurin kasvattaminen rikkoisi ohjelman
+  `MAX_COUNT`-säännön.
+</Note>
+
+<Columns cols={2}>
+  <div>
+    ```rust increment.rs highlight={5,9} wrap
+    pub fn handle_increment(ctx: Context<Increment>) -> Result<()> {
+        require_keys_eq!(
+            ctx.accounts.counter.authority,
+            ctx.accounts.authority.key(),
+            ErrorCode::Unauthorized,
+        );
+        require!(
+            ctx.accounts.counter.count < MAX_COUNT,
+            ErrorCode::CounterOverflow,
+        );
+
+        ctx.accounts.counter.count += 1;
+        msg!("Hello, world! Counter is now {}", ctx.accounts.counter.count);
+        Ok(())
+    }
+    ```
+  </div>
+
+  <div>
+    `error.rs` nimeää virheet, joita ohje voi palauttaa:
+
+    - `ErrorCode::Unauthorized` palautetaan, kun
+      allekirjoittaja ei ole laskuritiliin tallennettu auktoriteetti.
+    - `ErrorCode::CounterOverflow` palautetaan, kun
+      laskuri on jo saavuttanut `MAX_COUNT`-arvon.
+  </div>
+</Columns>
+
+### instructions.rs
+
+`instructions.rs` yhdistää ohjetiedostot ohjelmapaketille, jotta `lib.rs` voi
+käyttää `initialize`- ja `increment`-ohjeistuksen koodia. Jokainen
+ohjetiedosto määrittelee kyseisen ohjeen vaatimat tilit sekä
+käsittelijälogiikan, joka suoritetaan sen jälkeen, kun Anchor on vahvistanut
+nämä tilit.
+
+```rust programs/my-program/src/instructions.rs wrap
+pub mod initialize;
+pub mod increment;
+
+pub use initialize::*;
+pub use increment::*;
+```
+
+<Note>
+  **`pub mod initialize`**
+
+  `pub mod`-rivit tekevät `src/instructions/initialize.rs`:sta ja
+  `src/instructions/increment.rs`:sta osan ohjelmapakettia.
+
+  **`pub use initialize`**
+
+  `pub use`-rivit vievät julkiset kohteet uudelleen näistä tiedostoista. Tämä
+  tekee ohjeen tilirakenteet ja käsittelijäfunktiot saataville
+  `instructions`-moduulin kautta.
+</Note>
+
+### initialize.rs
+
+`initialize.rs` määrittelee laskuritilin luomiseen tarvittavat tilit ja
+kirjoittaa sitten tilin ensimmäiset arvot. `#[derive(Accounts)]`-rakenne
+käyttää Anchorin
+[tiliehtojen](https://www.anchor-lang.com/docs/references/account-constraints)
+määrityksiä ilmaisemaan, mitkä tilit vaaditaan ja miten uusi laskuritili
+luodaan.
+
+```rust programs/my-program/src/instructions/initialize.rs wrap
+use anchor_lang::prelude::*;
+
+use crate::{constants::*, state::Counter};
+
+#[derive(Accounts)]
+pub struct Initialize<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    #[account(
+        init,
+        payer = payer,
+        space = 8 + Counter::INIT_SPACE,
+        seeds = [COUNTER_SEED],
+        bump
+    )]
+    pub counter: Account<'info, Counter>,
+    pub system_program: Program<'info, System>,
+}
+
+pub fn handle_initialize(ctx: Context<Initialize>) -> Result<()> {
+    ctx.accounts.counter.count = 0;
+    ctx.accounts.counter.authority = ctx.accounts.payer.key();
+
+    let cpi_accounts = anchor_lang::system_program::Transfer {
+        from: ctx.accounts.payer.to_account_info(),
+        to: ctx.accounts.counter.to_account_info(),
+    };
+    let cpi_ctx = CpiContext::new(anchor_lang::system_program::ID, cpi_accounts);
+    anchor_lang::system_program::transfer(cpi_ctx, HELLO_WORLD_LAMPORTS)?;
+
+    msg!("Hello, world! Counter initialized");
+    Ok(())
+}
+```
+
+<Note>
+  Tämä tiedosto tuo jaetut vakiot ja `Counter`-tilin tyypin. Ohje käyttää
+  näitä määritelmiä PDA:n johtamiseen, siirtosumman valintaan ja tilin varaamiseen
+  oikealla datatilan koolla.
+
+  **`derive(Accounts)`**
+
+  `Initialize` on `initialize`-ohjeen tilirakenne. Jokainen kentän arvo
+  rakenteessa edustaa erillistä tiliä, joka on sisällytettävä ohjetta
+  kutsuttaessa. Anchor käyttää rakennetta saapuvien tilien validointiin ennen kuin
+  käsittelijä suoritetaan.
+
+  **`#[account(mut)]`**
+
+  `#[account(mut)]` kertoo Anchorille, että maksajan tilin täytyy olla
+  kirjoitettavissa. Tämä vaaditaan, koska sekä tilin luominen että siirto-CPI
+  vähentävät lamporteja maksajalta.
+
+  **`Signer<'info>`**
+
+  `Signer<'info>` kertoo Anchorille, että maksajan on allekirjoitettava
+  transaktio.
+
+  **`#[account(`**
+
+  `#[account(...)]`-lohko kertoo Anchorille, miten laskuritili luodaan ja
+  validoidaan ennen kuin käsittelijä suoritetaan.
+
+  **`init`**
+
+  `init` käskee Anchorin luomaan `counter`-tilin ennen kuin käsittelijä
+  suoritetaan. Uusi tili on tämän ohjelman omistama, joten tämä ohjelma voi
+  tallentaa `Counter`-dataa siihen.
+
+  **`payer = payer`**
+
+  `payer = payer` määrittää `payer`-tilin maksajaksi uuden laskuritilin
+  luomiselle.
+
+  **`space = 8 + Counter::INIT_SPACE`**
+
+  `space = 8 + Counter::INIT_SPACE` varaa tavuja Anchorin tilien erottimelle
+  sekä `state.rs`:n `Counter`-kentille. Erotin auttaa Anchoria vahvistamaan,
+  että tili sisältää odotetun tyypin ennen sen lukemista.
+
+  **`seeds = [COUNTER_SEED]`**
+
+  `seeds = [COUNTER_SEED]` määrää, että laskuritilin osoitteen täytyy olla
+  PDA, joka on johdettu tästä seed-arvosta ja ohjelmatunnuksesta. Yhdellä
+  kiinteällä seed-arvolla on yksi laskuri-PDA tälle ohjelmalle. Erillisten
+  laskureiden luomiseksi oikeassa ohjelmassa lisäisit yleensä toisen seed-arvon,
+  kuten käyttäjän osoitteen.
+
+  **`bump`**
+
+  `bump` käskee Anchoria etsimään ja vahvistamaan PDA-bump-arvon, joka on
+  ylimääräinen tavu, joka tekee johdetusta osoitteesta kelvollisen PDA:na.
+
+  **`Account<'info, Counter>`**
+
+  `Account<'info, Counter>` käskee Anchoria käsittelemään tilin dataa
+  `state.rs`:n `Counter`-tyyppinä. Anchor tarkistaa myös, että tili on tämän
+  ohjelman omistama.
+
+  **`Program<'info, System>`**
+
+  `Program<'info, System>` edellyttää, että kutsuja toimittaa System Program
+  -ohjelman. Anchor käyttää sitä `init`-tilin luontirajoitteeseen.
+  Käsittelijän siirto-CPI käynnistää myös System Program -ohjelman.
+
+  **`handle_initialize`**
+
+  Käsittelijä suoritetaan sen jälkeen, kun Anchor on vahvistanut tilit ja luonut
+  laskuritilin, joten se voi turvallisesti kirjoittaa tilin alkuperäiset tiedot.
+
+  **`counter.count = 0`**
+
+  Asettaa `count`-kentän laskuritilissä arvoon `0`.
+
+  **`counter.authority = ctx.accounts.payer.key()`**
+
+  Asettaa `authority`-kentän laskuritilissä maksajan osoitteeseen.
+
+  **`system_program::Transfer`**
+
+  Nämä ovat tilit, jotka välitetään System Program -siirtoinstruktiolle. Tämä
+  siirto-CPI on mukana vain havainnollistamaan, miten CPI välittää tilejä toiselle
+  ohjelmalle.
+
+  **`CpiContext::new`**
+
+  `CpiContext` paketoii kohdeohjelman ja tarvittavat tilit Cross Program
+  Invocation -kutsua varten. Kontekstin luominen valmistelee CPI:n yhdistämällä
+  kutsuttavan ohjelman sen odottamiin tileihin.
+
+  **`system_program::transfer`**
+
+  Tämä CPI käynnistää System Program -siirtoinstruktion ja siirtää
+  `HELLO_WORLD_LAMPORTS` maksajalta laskuritilille.
+
+  **`msg!`**
+
+  `msg!` kirjoittaa viestin ohjelman lokeihin, kun ohjelma käynnistetään.
+</Note>
+
+<Steps>
+  <Step title="Account Context">
+    `Initialize`-rakenne määrittelee tilit, jotka on sisällytettävä, kun
+    käyttäjä kutsuu `initialize`-ohjetta. Anchor tarkistaa nämä tilit ennen
+    käsittelijän suorittamista.
+
+    ```rust initialize.rs focus={1-2}
+    #[derive(Accounts)]
+    pub struct Initialize<'info> {
+        #[account(mut)]
+        pub payer: Signer<'info>,
+        #[account(
+            init,
+            payer = payer,
+            space = 8 + Counter::INIT_SPACE,
+            seeds = [COUNTER_SEED],
+            bump
+        )]
+        pub counter: Account<'info, Counter>,
+        pub system_program: Program<'info, System>,
+    }
+    ```
+  </Step>
+
+  <Step title="Payer Account">
+    `payer`-tili maksaa laskuritilin luomisesta. `Signer<'info>`-tyyppi
+    tarkoittaa, että maksajan on allekirjoitettava transaktio, ja
+    `#[account(mut)]` tarkoittaa, että maksajatiliä voidaan muuttaa, koska
+    lamport-yksiköitä vähennetään siitä.
+
+    ```rust initialize.rs focus={3-4}
+    #[derive(Accounts)]
+    pub struct Initialize<'info> {
+        #[account(mut)]
+        pub payer: Signer<'info>,
+        #[account(
+            init,
+            payer = payer,
+            space = 8 + Counter::INIT_SPACE,
+            seeds = [COUNTER_SEED],
+            bump
+        )]
+        pub counter: Account<'info, Counter>,
+        pub system_program: Program<'info, System>,
+    }
+    ```
+  </Step>
+
+  <Step title="Counter Account">
+    `counter`-tili tallentaa `state.rs`:n `Counter`-datan. `init` käskee
+    Anchoria luomaan tämän tilin ennen käsittelijän suorittamista, ja
+    `payer = payer` kertoo Anchorille, mikä tili maksaa luomisesta.
+
+    ```rust initialize.rs focus={5-12}
+    #[derive(Accounts)]
+    pub struct Initialize<'info> {
+        #[account(mut)]
+        pub payer: Signer<'info>,
+        #[account(
+            init,
+            payer = payer,
+            space = 8 + Counter::INIT_SPACE,
+            seeds = [COUNTER_SEED],
+            bump
+        )]
+        pub counter: Account<'info, Counter>,
+        pub system_program: Program<'info, System>,
+    }
+    ```
+  </Step>
+
+  <Step title="Tilin koko">
+    `space` -rajoite kertoo Anchorille, kuinka paljon tilidataa varataan. Anchor
+    tallentaa ensin 8-tavuisen erottelijan, sitten `Counter` -kenttien
+    tarvitsemat tavut. Erottelija antaa Anchorille mahdollisuuden tunnistaa tämä
+    tili `Counter` -tiliksi ennen kuin tilin data deserialisoidaan.
+
+    ```rust initialize.rs focus={8}
+    #[derive(Accounts)]
+    pub struct Initialize<'info> {
+        #[account(mut)]
+        pub payer: Signer<'info>,
+        #[account(
+            init,
+            payer = payer,
+            space = 8 + Counter::INIT_SPACE,
+            seeds = [COUNTER_SEED],
+            bump
+        )]
+        pub counter: Account<'info, Counter>,
+        pub system_program: Program<'info, System>,
+    }
+    ```
+  </Step>
+
+  <Step title="Laskurin osoite">
+    `seeds` ja `bump` -rajoitteet määrittävät odotetun PDA-osoitteen
+    laskuritilille. Anchor varmistaa, että annettu `counter` -tili vastaa
+    kyseistä osoitetta. Malli käyttää PDA:ta, jotta käyttäjät voivat johtaa laskurin
+    osoitteen ohjelmatunnuksesta ja seed-arvosta, mikä tekee laskurin osoitteesta
+    deterministisen.
+
+    ```rust initialize.rs focus={9-10}
+    #[derive(Accounts)]
+    pub struct Initialize<'info> {
+        #[account(mut)]
+        pub payer: Signer<'info>,
+        #[account(
+            init,
+            payer = payer,
+            space = 8 + Counter::INIT_SPACE,
+            seeds = [COUNTER_SEED],
+            bump
+        )]
+        pub counter: Account<'info, Counter>,
+        pub system_program: Program<'info, System>,
+    }
+    ```
+  </Step>
+
+  <Step title="System Program">
+    `system_program` -tili vaaditaan, koska uuden tilin luominen käyttää System
+    Program -ohjelmaa.
+
+    ```rust initialize.rs focus={13}
+    #[derive(Accounts)]
+    pub struct Initialize<'info> {
+        #[account(mut)]
+        pub payer: Signer<'info>,
+        #[account(
+            init,
+            payer = payer,
+            space = 8 + Counter::INIT_SPACE,
+            seeds = [COUNTER_SEED],
+            bump
+        )]
+        pub counter: Account<'info, Counter>,
+        pub system_program: Program<'info, System>,
+    }
+    ```
+  </Step>
+
+  <Step title="Käsittelijäfunktio">
+    `handle_initialize` -funktio suoritetaan sen jälkeen, kun Anchor on
+    validoinut tilit `Initialize`:ssa. `ctx` -arvo antaa käsittelijälle
+    pääsyn näihin tarkistettuihin tileihin.
+
+    ```rust initialize.rs focus={16}
+    #[derive(Accounts)]
+    pub struct Initialize<'info> {
+        #[account(mut)]
+        pub payer: Signer<'info>,
+        #[account(
+            init,
+            payer = payer,
+            space = 8 + Counter::INIT_SPACE,
+            seeds = [COUNTER_SEED],
+            bump
+        )]
+        pub counter: Account<'info, Counter>,
+        pub system_program: Program<'info, System>,
+    }
+
+    pub fn handle_initialize(ctx: Context<Initialize>) -> Result<()> {
+        ctx.accounts.counter.count = 0;
+        ctx.accounts.counter.authority = ctx.accounts.payer.key();
+
+        let cpi_accounts = anchor_lang::system_program::Transfer {
+            from: ctx.accounts.payer.to_account_info(),
+            to: ctx.accounts.counter.to_account_info(),
+        };
+        let cpi_ctx = CpiContext::new(anchor_lang::system_program::ID, cpi_accounts);
+        anchor_lang::system_program::transfer(cpi_ctx, HELLO_WORLD_LAMPORTS)?;
+
+        msg!("Hello, world! Counter initialized");
+        Ok(())
+    }
+    ```
+  </Step>
+
+  <Step title="Alkudata">
+    Käsittelijä kirjoittaa ensimmäiset arvot uudelle laskuritilille. Laskuri alkaa
+    arvosta `0`, ja maksajasta tulee valtuutettu, jolla on oikeus kasvattaa
+    laskuria myöhemmin.
+
+    ```rust initialize.rs focus={17-18}
+    #[derive(Accounts)]
+    pub struct Initialize<'info> {
+        #[account(mut)]
+        pub payer: Signer<'info>,
+        #[account(
+            init,
+            payer = payer,
+            space = 8 + Counter::INIT_SPACE,
+            seeds = [COUNTER_SEED],
+            bump
+        )]
+        pub counter: Account<'info, Counter>,
+        pub system_program: Program<'info, System>,
+    }
+
+    pub fn handle_initialize(ctx: Context<Initialize>) -> Result<()> {
+        ctx.accounts.counter.count = 0;
+        ctx.accounts.counter.authority = ctx.accounts.payer.key();
+
+        let cpi_accounts = anchor_lang::system_program::Transfer {
+            from: ctx.accounts.payer.to_account_info(),
+            to: ctx.accounts.counter.to_account_info(),
+        };
+        let cpi_ctx = CpiContext::new(anchor_lang::system_program::ID, cpi_accounts);
+        anchor_lang::system_program::transfer(cpi_ctx, HELLO_WORLD_LAMPORTS)?;
+
+        msg!("Hello, world! Counter initialized");
+        Ok(())
+    }
+    ```
+  </Step>
+
+  <Step title="Siirtotilit">
+    Tämä siirto-CPI on sisällytetty vain havainnollistamaan, kuinka CPI välittää
+    tilejä toiselle ohjelmalle. `Transfer` -rakenne luettelee System Program
+    -siirron käyttämät tilit.
+
+    ```rust initialize.rs focus={20-23}
+    #[derive(Accounts)]
+    pub struct Initialize<'info> {
+        #[account(mut)]
+        pub payer: Signer<'info>,
+        #[account(
+            init,
+            payer = payer,
+            space = 8 + Counter::INIT_SPACE,
+            seeds = [COUNTER_SEED],
+            bump
+        )]
+        pub counter: Account<'info, Counter>,
+        pub system_program: Program<'info, System>,
+    }
+
+    pub fn handle_initialize(ctx: Context<Initialize>) -> Result<()> {
+        ctx.accounts.counter.count = 0;
+        ctx.accounts.counter.authority = ctx.accounts.payer.key();
+
+        let cpi_accounts = anchor_lang::system_program::Transfer {
+            from: ctx.accounts.payer.to_account_info(),
+            to: ctx.accounts.counter.to_account_info(),
+        };
+        let cpi_ctx = CpiContext::new(anchor_lang::system_program::ID, cpi_accounts);
+        anchor_lang::system_program::transfer(cpi_ctx, HELLO_WORLD_LAMPORTS)?;
+
+        msg!("Hello, world! Counter initialized");
+        Ok(())
+    }
+    ```
+  </Step>
+
+  <Step title="CPI-konteksti">
+    `CpiContext::new` yhdistää kutsuttavan ohjelman ja sille välitetyt tilit.
+    Tämä on CPI:n perusrakenne: valitaan kutsuttava ohjelma, kerätään kyseisen
+    ohjelman odottamat tilit ja välitetään molemmat kutsulle. Tässä kutsuttava
+    ohjelma on System Program.
+
+    ```rust initialize.rs focus={24}
+    #[derive(Accounts)]
+    pub struct Initialize<'info> {
+        #[account(mut)]
+        pub payer: Signer<'info>,
+        #[account(
+            init,
+            payer = payer,
+            space = 8 + Counter::INIT_SPACE,
+            seeds = [COUNTER_SEED],
+            bump
+        )]
+        pub counter: Account<'info, Counter>,
+        pub system_program: Program<'info, System>,
+    }
+
+    pub fn handle_initialize(ctx: Context<Initialize>) -> Result<()> {
+        ctx.accounts.counter.count = 0;
+        ctx.accounts.counter.authority = ctx.accounts.payer.key();
+
+        let cpi_accounts = anchor_lang::system_program::Transfer {
+            from: ctx.accounts.payer.to_account_info(),
+            to: ctx.accounts.counter.to_account_info(),
+        };
+        let cpi_ctx = CpiContext::new(anchor_lang::system_program::ID, cpi_accounts);
+        anchor_lang::system_program::transfer(cpi_ctx, HELLO_WORLD_LAMPORTS)?;
+
+        msg!("Hello, world! Counter initialized");
+        Ok(())
+    }
+    ```
+  </Step>
+
+  <Step title="Invoke Transfer">
+    `anchor_lang::system_program::transfer` kutsuu System Program
+    -siirto-ohjetta. Tässä mallissa siirto on pieni esimerkki toisen ohjelman
+    kutsumisesta omasta ohjelmastasi. Jos siirto-CPI epäonnistuu, myös
+    `initialize`-ohje epäonnistuu.
+
+    ```rust initialize.rs focus={25}
+    #[derive(Accounts)]
+    pub struct Initialize<'info> {
+        #[account(mut)]
+        pub payer: Signer<'info>,
+        #[account(
+            init,
+            payer = payer,
+            space = 8 + Counter::INIT_SPACE,
+            seeds = [COUNTER_SEED],
+            bump
+        )]
+        pub counter: Account<'info, Counter>,
+        pub system_program: Program<'info, System>,
+    }
+
+    pub fn handle_initialize(ctx: Context<Initialize>) -> Result<()> {
+        ctx.accounts.counter.count = 0;
+        ctx.accounts.counter.authority = ctx.accounts.payer.key();
+
+        let cpi_accounts = anchor_lang::system_program::Transfer {
+            from: ctx.accounts.payer.to_account_info(),
+            to: ctx.accounts.counter.to_account_info(),
+        };
+        let cpi_ctx = CpiContext::new(anchor_lang::system_program::ID, cpi_accounts);
+        anchor_lang::system_program::transfer(cpi_ctx, HELLO_WORLD_LAMPORTS)?;
+
+        msg!("Hello, world! Counter initialized");
+        Ok(())
+    }
+    ```
+  </Step>
+
+  <Step title="Log Message">
+    `msg!` kirjoittaa viestin ohjelman lokeihin. `Ok(())` ilmaisee, että
+    ohje palautui onnistuneesti.
+
+    ```rust initialize.rs focus={27-28}
+    #[derive(Accounts)]
+    pub struct Initialize<'info> {
+        #[account(mut)]
+        pub payer: Signer<'info>,
+        #[account(
+            init,
+            payer = payer,
+            space = 8 + Counter::INIT_SPACE,
+            seeds = [COUNTER_SEED],
+            bump
+        )]
+        pub counter: Account<'info, Counter>,
+        pub system_program: Program<'info, System>,
+    }
+
+    pub fn handle_initialize(ctx: Context<Initialize>) -> Result<()> {
+        ctx.accounts.counter.count = 0;
+        ctx.accounts.counter.authority = ctx.accounts.payer.key();
+
+        let cpi_accounts = anchor_lang::system_program::Transfer {
+            from: ctx.accounts.payer.to_account_info(),
+            to: ctx.accounts.counter.to_account_info(),
+        };
+        let cpi_ctx = CpiContext::new(anchor_lang::system_program::ID, cpi_accounts);
+        anchor_lang::system_program::transfer(cpi_ctx, HELLO_WORLD_LAMPORTS)?;
+
+        msg!("Hello, world! Counter initialized");
+        Ok(())
+    }
+    ```
+  </Step>
+</Steps>
+
+### increment.rs
+
+`increment.rs` määrittelee tilit, joita tarvitaan olemassa olevan laskuritilin
+päivittämiseen. Käsittelijä tarkistaa, että allekirjoittaja on tallennettu
+auktoriteetti, tarkistaa, että laskuri ei ole saavuttanut määritettyä
+`MAX_COUNT`-arvoa, ja kasvattaa sitten laskuria.
+
+```rust programs/my-program/src/instructions/increment.rs wrap
+use anchor_lang::prelude::*;
+
+use crate::{constants::*, error::ErrorCode, state::Counter};
+
+#[derive(Accounts)]
+pub struct Increment<'info> {
+    #[account(
+        mut,
+        seeds = [COUNTER_SEED],
+        bump
+    )]
+    pub counter: Account<'info, Counter>,
+    pub authority: Signer<'info>,
+}
+
+pub fn handle_increment(ctx: Context<Increment>) -> Result<()> {
+    require_keys_eq!(
+        ctx.accounts.counter.authority,
+        ctx.accounts.authority.key(),
+        ErrorCode::Unauthorized,
+    );
+    require!(
+        ctx.accounts.counter.count < MAX_COUNT,
+        ErrorCode::CounterOverflow,
+    );
+
+    ctx.accounts.counter.count += 1;
+    msg!("Hello, world! Counter is now {}", ctx.accounts.counter.count);
+    Ok(())
+}
+```
+
+<Note>
+  **`derive(Accounts)`**
+
+  `Increment` on `increment`-ohjeen tilikonteksti. Anchor käyttää sitä
+  muuttuvan laskuritilin ja vaaditun allekirjoittajan validointiin.
+
+  **`mut`**
+
+  `mut` kertoo Anchorille, että laskuritili on oltava kirjoitettavissa, koska
+  käsittelijä päivittää tallennettua `count`-arvoa.
+
+  **`seeds = [COUNTER_SEED]`**
+
+  `seeds = [COUNTER_SEED]` varmistaa, että annettu laskuritili on tästä
+  seed:stä ja ohjelmatunnuksesta johdettu PDA.
+
+  **`bump`**
+
+  `bump` käskee Anchoria etsimään ja vahvistamaan laskuritilin PDA-bumpin.
+
+  **`Account<'info, Counter>`**
+
+  `Account<'info, Counter>` käskee Anchoria deserialisoimaan tilin datan
+  `Counter`-tyypiksi `state.rs`:stä. Anchor tarkistaa myös, että tili on tämän
+  ohjelman omistama.
+
+  **`Signer`**
+
+  `Signer` vaatii auktoriteetin allekirjoituksen. Käsittelijä vertaa tämän
+  allekirjoittajan osoitetta laskuritilille tallennettuun auktoriteetin
+  osoitteeseen.
+
+  **`handle_increment`**
+
+  Käsittelijä suoritetaan sen jälkeen, kun Anchor on vahvistanut tililuettelon,
+  tarkistanut omistajuuden ja deserialisoinut laskuritilin.
+
+  **`require_keys_eq!`**
+
+  `require_keys_eq!` vertaa kahta julkista avainta ja keskeyttää ohjeen
+  suorituksen, ellei allekirjoittajan osoite vastaa laskuritilille tallennettua
+  auktoriteettia. Tämä on mallin sovellustason valtuutussääntö.
+
+  **`require!`**
+
+  `require!` tarkistaa boolean-säännön ja keskeyttää ohjeen suorituksen
+  virheellä `CounterOverflow`, jos laskuri on jo saavuttanut arvon
+  `MAX_COUNT`. Tämä mallisääntö havainnollistaa mukautettuja virheitä ja
+  epäonnistumista ennen muutosta.
+
+  **`count += 1`**
+
+  Käsittelijä päivittää laskuritilin datan vasta, kun molemmat tarkistukset ovat
+  läpäisty. Jos kumpi tahansa tarkistus epäonnistuu, transaktio epäonnistuu eikä
+  tiliä muuteta.
+
+  **`msg!`**
+
+  `msg!` kirjoittaa viestin ohjelman lokeihin, kun ohjelma käynnistetään.
+</Note>
+
+<Steps>
+  <Step title="Tilikonteksti">
+    `Increment` -rakenne määrittelee tilit, jotka on sisällytettävä, kun
+    käyttäjä kutsuu `increment` -instruktiota. Anchor tarkistaa nämä tilit ennen
+    kuin käsittelijä suoritetaan.
+
+    ```rust increment.rs focus={1-2}
+    #[derive(Accounts)]
+    pub struct Increment<'info> {
+        #[account(
+            mut,
+            seeds = [COUNTER_SEED],
+            bump
+        )]
+        pub counter: Account<'info, Counter>,
+        pub authority: Signer<'info>,
+    }
+    ```
+  </Step>
+
+  <Step title="Laskuritili">
+    `counter` -tili tallentaa `Counter` -datan. `mut` -rajoite sallii
+    käsittelijän päivittää tallennetun laskurin, ja `seeds` sekä `bump`
+    -rajoitteet varmistavat laskurin PDA-osoitteen.
+
+    ```rust increment.rs focus={3-8}
+    #[derive(Accounts)]
+    pub struct Increment<'info> {
+        #[account(
+            mut,
+            seeds = [COUNTER_SEED],
+            bump
+        )]
+        pub counter: Account<'info, Counter>,
+        pub authority: Signer<'info>,
+    }
+    ```
+  </Step>
+
+  <Step title="Auktoriteettiallekirjoittaja">
+    `authority` -tilin on allekirjoitettava transaktio. Käsittelijä tarkistaa
+    myöhemmin, että tämä allekirjoittaja vastaa laskuritilille tallennettua
+    auktoriteettia.
+
+    ```rust increment.rs focus={9}
+    #[derive(Accounts)]
+    pub struct Increment<'info> {
+        #[account(
+            mut,
+            seeds = [COUNTER_SEED],
+            bump
+        )]
+        pub counter: Account<'info, Counter>,
+        pub authority: Signer<'info>,
+    }
+    ```
+  </Step>
+
+  <Step title="Käsittelijäfunktio">
+    Funktio `handle_increment` suoritetaan sen jälkeen, kun Anchor on validoinut
+    tilit `Increment`-rakenteessa. Arvo `ctx` antaa käsittelijälle pääsyn
+    näihin tarkistettuihin tileihin.
+
+    ```rust increment.rs focus={12}
+    #[derive(Accounts)]
+    pub struct Increment<'info> {
+        #[account(
+            mut,
+            seeds = [COUNTER_SEED],
+            bump
+        )]
+        pub counter: Account<'info, Counter>,
+        pub authority: Signer<'info>,
+    }
+
+    pub fn handle_increment(ctx: Context<Increment>) -> Result<()> {
+        require_keys_eq!(
+            ctx.accounts.counter.authority,
+            ctx.accounts.authority.key(),
+            ErrorCode::Unauthorized,
+        );
+        require!(
+            ctx.accounts.counter.count < MAX_COUNT,
+            ErrorCode::CounterOverflow,
+        );
+
+        ctx.accounts.counter.count += 1;
+        msg!("Hello, world! Counter is now {}", ctx.accounts.counter.count);
+        Ok(())
+    }
+    ```
+  </Step>
+
+  <Step title="Valtuutustarkistus">
+    Ensimmäinen tarkistus varmistaa, että allekirjoittajalla on oikeus päivittää
+    tätä laskuria. Jos allekirjoittajan osoite ei vastaa arvoa
+    `counter.authority`, ohje pysähtyy virheeseen `ErrorCode::Unauthorized`.
+    Tämä havainnollistaa sovellustason valtuutusta: ohjelma omistaa laskurin tiedot,
+    mutta se toteuttaa säännön siitä, kuka allekirjoittaja saa muuttaa kyseisiä
+    tietoja.
+
+    ```rust increment.rs focus={13-17}
+    #[derive(Accounts)]
+    pub struct Increment<'info> {
+        #[account(
+            mut,
+            seeds = [COUNTER_SEED],
+            bump
+        )]
+        pub counter: Account<'info, Counter>,
+        pub authority: Signer<'info>,
+    }
+
+    pub fn handle_increment(ctx: Context<Increment>) -> Result<()> {
+        require_keys_eq!(
+            ctx.accounts.counter.authority,
+            ctx.accounts.authority.key(),
+            ErrorCode::Unauthorized,
+        );
+        require!(
+            ctx.accounts.counter.count < MAX_COUNT,
+            ErrorCode::CounterOverflow,
+        );
+
+        ctx.accounts.counter.count += 1;
+        msg!("Hello, world! Counter is now {}", ctx.accounts.counter.count);
+        Ok(())
+    }
+    ```
+  </Step>
+
+  <Step title="Maksimilukeman tarkistus">
+    Toinen tarkistus estää laskuria ylittämästä arvoa `MAX_COUNT`. Jos laskuri
+    on jo saavuttanut rajan, ohje pysähtyy virheeseen
+    `ErrorCode::CounterOverflow`. Tämä raja on mallipohjaan lisätty
+    keinotekoinen sääntö, jotta näet, miten mukautetut virheet pysäyttävät ohjeen
+    ennen kuin tilitiedot muuttuvat.
+
+    ```rust increment.rs focus={18-21}
+    #[derive(Accounts)]
+    pub struct Increment<'info> {
+        #[account(
+            mut,
+            seeds = [COUNTER_SEED],
+            bump
+        )]
+        pub counter: Account<'info, Counter>,
+        pub authority: Signer<'info>,
+    }
+
+    pub fn handle_increment(ctx: Context<Increment>) -> Result<()> {
+        require_keys_eq!(
+            ctx.accounts.counter.authority,
+            ctx.accounts.authority.key(),
+            ErrorCode::Unauthorized,
+        );
+        require!(
+            ctx.accounts.counter.count < MAX_COUNT,
+            ErrorCode::CounterOverflow,
+        );
+
+        ctx.accounts.counter.count += 1;
+        msg!("Hello, world! Counter is now {}", ctx.accounts.counter.count);
+        Ok(())
+    }
+    ```
+  </Step>
+
+  <Step title="Lukeman päivitys">
+    Vasta kun molemmat tarkistukset läpäistään, käsittelijä päivittää tilitiedot.
+    Tämä rivi lisää yhden tallennettuun laskurin arvoon.
+
+    ```rust increment.rs focus={23}
+    #[derive(Accounts)]
+    pub struct Increment<'info> {
+        #[account(
+            mut,
+            seeds = [COUNTER_SEED],
+            bump
+        )]
+        pub counter: Account<'info, Counter>,
+        pub authority: Signer<'info>,
+    }
+
+    pub fn handle_increment(ctx: Context<Increment>) -> Result<()> {
+        require_keys_eq!(
+            ctx.accounts.counter.authority,
+            ctx.accounts.authority.key(),
+            ErrorCode::Unauthorized,
+        );
+        require!(
+            ctx.accounts.counter.count < MAX_COUNT,
+            ErrorCode::CounterOverflow,
+        );
+
+        ctx.accounts.counter.count += 1;
+        msg!("Hello, world! Counter is now {}", ctx.accounts.counter.count);
+        Ok(())
+    }
+    ```
+  </Step>
+
+  <Step title="Lokiviesti">
+    `msg!` kirjoittaa päivitetyn lukeman ohjelmalokiin. `Ok(())` ilmaisee,
+    että ohje palautui onnistuneesti.
+
+    ```rust increment.rs focus={24-25}
+    #[derive(Accounts)]
+    pub struct Increment<'info> {
+        #[account(
+            mut,
+            seeds = [COUNTER_SEED],
+            bump
+        )]
+        pub counter: Account<'info, Counter>,
+        pub authority: Signer<'info>,
+    }
+
+    pub fn handle_increment(ctx: Context<Increment>) -> Result<()> {
+        require_keys_eq!(
+            ctx.accounts.counter.authority,
+            ctx.accounts.authority.key(),
+            ErrorCode::Unauthorized,
+        );
+        require!(
+            ctx.accounts.counter.count < MAX_COUNT,
+            ErrorCode::CounterOverflow,
+        );
+
+        ctx.accounts.counter.count += 1;
+        msg!("Hello, world! Counter is now {}", ctx.accounts.counter.count);
+        Ok(())
+    }
+    ```
+  </Step>
+</Steps>
+
+## Testitiedosto
+
+`programs/my-program/tests/test_initialize.rs` on Rustin integraatiotesti. Se ei
+käynnistä paikallista validator:ia. Sen sijaan se lataa käännetyn
+`.so`-tiedoston LiteSVM:ään, rakentaa transaktioita, jotka kutsuvat ohjelmaa, ja
+lukee laskuritilin jokaisen transaktion jälkeen. Testi rakentaa ohjeet
+Solana-transaktiota varten määrittelemällä kutsuttavan ohjelman tunnuksen,
+antamalla instruction data ja välittämällä vaaditut tilit.
+
+<Columns cols={2}>
+  <div>
+    ```rust initialize.rs highlight={4,12-13} wrap
+    #[derive(Accounts)]
+    pub struct Initialize<'info> {
+        #[account(mut)]
+        pub payer: Signer<'info>,
+        #[account(
+            init,
+            payer = payer,
+            space = 8 + Counter::INIT_SPACE,
+            seeds = [COUNTER_SEED],
+            bump
+        )]
+        pub counter: Account<'info, Counter>,
+        pub system_program: Program<'info, System>,
+    }
+    ```
+
+    ```rust test_initialize.rs highlight={5-7} wrap
+    let instruction = Instruction::new_with_bytes(
+        program_id,
+        &my_program::instruction::Initialize {}.data(),
+        my_program::accounts::Initialize {
+            payer: payer.pubkey(),
+            counter,
+            system_program: system_program::ID,
+        }
+        .to_account_metas(None),
+    );
+    ```
+  </div>
+
+  <div>
+    `Initialize`-tilirakenne määrittelee tilit, joita
+    `initialize`-instruktio vaatii. Testi välittää samat tilit generoidulle
+    `my_program::accounts::Initialize`-apufunktiolle:
+
+    - `payer` välitetään
+      `payer: payer.pubkey()`-parametrina.
+    - `counter` välitetään
+      `counter`-parametrina.
+    - `system_program` välitetään
+      `system_program::ID`-parametrina.
+
+    `my_program::instruction::Initialize {}.data()`
+    luo instruction data. Tänne koodattaisiin instruktion argumentit, mutta tämä
+    `initialize`-instruktio ei vaadi yhtään argumenttia.
+  </div>
+</Columns>
+
+<Columns cols={2}>
+  <div>
+    ```rust increment.rs highlight={8-9} wrap
+    #[derive(Accounts)]
+    pub struct Increment<'info> {
+        #[account(
+            mut,
+            seeds = [COUNTER_SEED],
+            bump
+        )]
+        pub counter: Account<'info, Counter>,
+        pub authority: Signer<'info>,
+    }
+    ```
+
+    ```rust test_initialize.rs highlight={5-6} wrap
+    let instruction = Instruction::new_with_bytes(
+        program_id,
+        &my_program::instruction::Increment {}.data(),
+        my_program::accounts::Increment {
+            counter,
+            authority: payer.pubkey(),
+        }
+        .to_account_metas(None),
+    );
+    ```
+  </div>
+
+  <div>
+    `Increment`-tilirakenne määrittelee tilit, joita `increment`-instruktio
+    vaatii. Testi välittää samat tilit generoidulle
+    `my_program::accounts::Increment`-apufunktiolle:
+
+    - `counter` välitetään
+      `counter`-parametrina.
+    - `authority` välitetään
+      `authority: payer.pubkey()`-parametrina.
+
+    `my_program::instruction::Increment {}.data()`
+    luo instruction data. Tänne koodattaisiin instruktion argumentit, mutta tämä
+    `increment`-instruktio ei vaadi yhtään argumenttia.
+  </div>
+</Columns>
+
+```rust programs/my-program/tests/test_initialize.rs wrap
+use {
+    anchor_lang::{
+        prelude::Pubkey,
+        solana_program::{instruction::Instruction, system_program},
+        AccountDeserialize, InstructionData, ToAccountMetas,
+    },
+    litesvm::LiteSVM,
+    solana_keypair::Keypair,
+    solana_message::{Message, VersionedMessage},
+    solana_signer::Signer,
+    solana_transaction::versioned::VersionedTransaction,
+};
+
+#[test]
+fn test_initialize() {
+    let program_id = my_program::id();
+    let payer = Keypair::new();
+    let counter = Pubkey::find_program_address(
+        &[my_program::constants::COUNTER_SEED],
+        &program_id,
+    )
+    .0;
+    let mut svm = LiteSVM::new();
+    let bytes = include_bytes!(concat!(
+        env!("CARGO_TARGET_TMPDIR"),
+        "/../deploy/my_program.so"
+    ));
+    svm.add_program(program_id, bytes).unwrap();
+    svm.airdrop(&payer.pubkey(), 1_000_000_000).unwrap();
+
+    let instruction = Instruction::new_with_bytes(
+        program_id,
+        &my_program::instruction::Initialize {}.data(),
+        my_program::accounts::Initialize {
+            payer: payer.pubkey(),
+            counter,
+            system_program: system_program::ID,
+        }
+        .to_account_metas(None),
+    );
+
+    let blockhash = svm.latest_blockhash();
+    let msg = Message::new_with_blockhash(&[instruction], Some(&payer.pubkey()), &blockhash);
+    let tx = VersionedTransaction::try_new(VersionedMessage::Legacy(msg), &[&payer]).unwrap();
+
+    let res = svm.send_transaction(tx);
+    assert!(res.is_ok());
+
+    let counter_account = svm.get_account(&counter).unwrap();
+    let mut data: &[u8] = &counter_account.data;
+    let counter_state = my_program::state::Counter::try_deserialize(&mut data).unwrap();
+    assert_eq!(counter_state.count, 0);
+    assert_eq!(counter_state.authority, payer.pubkey());
+
+    let instruction = Instruction::new_with_bytes(
+        program_id,
+        &my_program::instruction::Increment {}.data(),
+        my_program::accounts::Increment {
+            counter,
+            authority: payer.pubkey(),
+        }
+        .to_account_metas(None),
+    );
+
+    let blockhash = svm.latest_blockhash();
+    let msg = Message::new_with_blockhash(&[instruction], Some(&payer.pubkey()), &blockhash);
+    let tx = VersionedTransaction::try_new(VersionedMessage::Legacy(msg), &[&payer]).unwrap();
+
+    let res = svm.send_transaction(tx);
+    assert!(res.is_ok());
+
+    let counter_account = svm.get_account(&counter).unwrap();
+    let mut data: &[u8] = &counter_account.data;
+    let counter_state = my_program::state::Counter::try_deserialize(&mut data).unwrap();
+    assert_eq!(counter_state.count, 1);
+    assert_eq!(counter_state.authority, payer.pubkey());
+}
+```
+
+<Note>
+  **`litesvm::LiteSVM`**
+
+  `LiteSVM` on prosessinsisäinen Solana-virtuaalikone testausta varten. Se
+  mahdollistaa käännetyn ohjelman rekisteröinnin, tilien luomisen, transaktioiden
+  lähettämisen ja tilitilan tarkastamisen ilman validator-prosessin
+  käynnistämistä.
+
+  **`let program_id`**
+
+  Testi hakee ohjelman osoitteen `declare_id!`-arvosta
+  `my_program::id()`-funktion kautta ja luo uuden payer keypair -avaimen
+  testitransaktiota varten.
+
+  **`Pubkey::find_program_address`**
+
+  Laskurin osoite johdetaan samasta `COUNTER_SEED` ohjelman käyttämästä. Tämä
+  tekee testistä kohdennetun siihen PDA:han, jota `initialize.rs` odottaa.
+
+  **`include_bytes!`**
+
+  `include_bytes!` lukee buildin tuottaman käännetyn `my_program.so`
+  tiedoston. Nämä tavut ovat suoritettava ohjelmakoodi, jota LiteSVM ajaa
+  testissä.
+
+  **`svm.add_program`**
+
+  `svm.add_program` rekisteröi käännetyt ohjelmatavut ohjelmaosoitteeseen
+  LiteSVM:ssä. Airdrop antaa maksajalle riittävästi paikallista SOL:ia transaktion
+  ja tilin luomisen kattamiseen.
+
+  **`let instruction`**
+
+  `Instruction::new_with_bytes` luo käskyn ohjelman kutsumiseksi. Se sisältää
+  ohjelmatunnuksen, instruction data:n ja käskyn tilit.
+
+  **`svm.latest_blockhash`**
+
+  Jokainen Solana-transaktio tarvitsee tuoreen lohkohashin. Tässä testissä LiteSVM
+  tarjoaa käytettävän lohkohashin transaktiota varten.
+
+  **`Message::new_with_blockhash`**
+
+  Viesti sisältää käskyn, maksajan ja lohkohashin. Tämä on transaktiotieto, joka
+  allekirjoitetaan.
+
+  **`VersionedTransaction::try_new`**
+
+  `VersionedTransaction::try_new` allekirjoittaa viestin maksajan keypair:lla.
+  Maksaja allekirjoittaa, koska se maksaa transaktiomaksun ja rahoittaa uuden
+  laskuritilin.
+
+  **`svm.send_transaction`**
+
+  `svm.send_transaction` suorittaa transaktion LiteSVM:ssä.
+
+  **`svm.get_account`**
+
+  Transaktion suorittamisen jälkeen testi lukee laskuritilin suoraan LiteSVM:stä,
+  jotta se voi tarkastella tilin tietoja.
+
+  **`Counter::try_deserialize`**
+
+  Laskuritili tallentaa sarjallistetun datan. `Counter::try_deserialize`
+  tarkistaa Anchor:n tilien erottelijan ja muuntaa tilin datan takaisin
+  `Counter` tyypiksi `state.rs`:stä.
+
+  **`assert_eq!(counter_state.count, 0)`**
+
+  Kun `initialize` onnistuu, testi sarjatulkitsee laskuritilin ja tarkistaa,
+  että alkutila vastaa sitä, mitä `handle_initialize` kirjoitti.
+
+  **`assert_eq!(counter_state.count, 1)`**
+
+  Kun `increment` onnistuu, samalla laskuritilillä pitäisi olla `count`
+  asetettuna arvoon `1` samalla säilyttäen sama valtuutus.
+</Note>
+
+## Projektin konfigurointi
+
+Projektin juuritiedostot kertovat Anchorille ja Cargolle, miten ohjelma
+rakennetaan, testataan ja otetaan käyttöön. Täydellinen viite löytyy Anchorin
+dokumentaatiosta:
+[Anchor.toml-konfigurointi](https://www.anchor-lang.com/docs/references/anchor-toml)
+ja [Anchor CLI](https://www.anchor-lang.com/docs/references/cli).
+
+```toml Anchor.toml
+skip_local_validator = true
+
+[toolchain]
+
+[features]
+resolution = true
+skip-lint = false
+
+[programs.localnet]
+my_program = "82sFkffP9wxwpyfZyeaKHH2chQoJPUGsJZSPi9mrUuXd"
+
+[provider]
+cluster = "localnet"
+wallet = "~/.config/solana/id.json"
+
+[scripts]
+test = "cargo test"
+
+[hooks]
+```
+
+<Note>
+  **`skip_local_validator`**
+
+  `skip_local_validator = true` käskee Anchoria olemaan käynnistämättä validatoria
+  `anchor test`-komentoa varten. Rust-testi käyttää sen sijaan LiteSVM:ää.
+
+  **`programs.localnet`**
+
+  `[programs.localnet]` yhdistää Rust-pakkaimen nimen paikallisissa buildeissa ja
+  testeissä käytettävään program accountin osoitteeseen.
+
+  **`provider`**
+
+  `[provider]` asettaa oletusklusterin ja lompakon komennoille, kuten
+  `anchor deploy`.
+
+  **`scripts`**
+
+  `[scripts]` muuttaa sitä, mitä `anchor test` suorittaa. Tässä mallissa
+  `anchor test` suorittaa `cargo test`.
+</Note>

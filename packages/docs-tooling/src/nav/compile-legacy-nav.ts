@@ -85,7 +85,7 @@ function collectClaimed(tabs: TemplateTab[]): Set<NavPage> {
   return claimed;
 }
 
-/** All English meta.json folders (docs/, developers/). */
+/** All English meta.json folders (developers/docs/, developers/...). */
 function metaFolders(root: string): string[] {
   const out: string[] = [];
   const walk = (rel: string) => {
@@ -97,7 +97,6 @@ function metaFolders(root: string): string[] {
       if (statSync(path.join(abs, n)).isDirectory()) walk(`${rel}/${n}`);
     }
   };
-  walk("docs");
   walk("developers");
   return out;
 }

@@ -1,0 +1,137 @@
+---
+title: signatureSubscribe RPC-Methode
+sidebarTitle: signatureSubscribe
+---
+
+Abonnieren Sie, um eine Benachrichtigung zu erhalten, wenn die Transaktion mit
+der angegebenen Signatur die festgelegte Commitment-Stufe erreicht.
+
+<Warning>
+  Dies ist ein Abonnement für eine einzelne Benachrichtigung. Es wird
+  automatisch vom Server gekündigt, sobald die Benachrichtigung,
+  `signatureNotification`, vom RPC gesendet wird.
+</Warning>
+
+<RequestExample>
+  ```json WebSocket
+  {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "signatureSubscribe",
+    "params": [
+      "2EBVM6cB8vAAD93Ktr6Vd8p67XPbQzCJX47MpReuiCXJAtcjaxpvWpcg9Ege1Nr5Tk3a2GFrByT7WPBjdsTycY9b",
+      {
+        "commitment": "finalized",
+        "enableReceivedNotification": false
+      }
+    ]
+  }
+  ```
+</RequestExample>
+
+<ResponseExample>
+  ```json Response
+  {
+    "jsonrpc": "2.0",
+    "result": 0,
+    "id": 1
+  }
+  ```
+</ResponseExample>
+
+### Parameters
+
+<ParamField body="0" type="string" required>
+  Transaktionssignatur als Base-58-kodierte Zeichenfolge
+
+  <Info>
+    Die Transaktionssignatur muss die erste Signatur der Transaktion sein (siehe
+    [Transaktions-ID](/developers/docs/references/terminology#transaction-id) für weitere
+    Details).
+  </Info>
+</ParamField>
+
+<ParamField body="1" type="object">
+  Konfigurationsobjekt mit den folgenden Feldern:
+
+  <Expandable title="properties" defaultOpen>
+    <ParamField body="commitment" type="string">
+      Das Commitment beschreibt, wie endgültig ein Block zu diesem Zeitpunkt ist.
+      Siehe
+      [Konfiguration des State Commitment](/developers/docs/rpc#configuring-state-commitment).
+    </ParamField>
+
+    <ParamField body="enableReceivedNotification" type="boolean">
+      Ob Benachrichtigungen abonniert werden sollen, wenn Signaturen vom RPC empfangen
+      werden, zusätzlich zu Benachrichtigungen, wenn sie verarbeitet werden.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+### Result
+
+<ResponseField name="result" type="integer">
+  Abonnement-ID (wird zum Abbestellen benötigt)
+</ResponseField>
+
+#### Benachrichtigungsformat:
+
+Die Benachrichtigung wird ein RpcResponse JSON-Objekt sein, dessen Wert ein
+Objekt mit folgenden Elementen enthält:
+
+- `slot: <u64>` - Der entsprechende slot.
+- `value: <object|string>` - ein Benachrichtigungswert von
+  [`RpcSignatureResult`](https://github.com/solana-labs/solana/blob/6d28fd455b07e3557fc6c0c3ddf3ba03e3fe8482/rpc-client-api/src/response.rs#L265-L268),
+  was zu einem der folgenden Ergebnisse führt:
+  - wenn `enableReceivedNotification` auf `true` gesetzt ist und die Signatur
+    empfangen wird: der wörtliche String
+    [`"receivedSignature"`](https://github.com/solana-labs/solana/blob/6d28fd455b07e3557fc6c0c3ddf3ba03e3fe8482/rpc-client-api/src/response.rs#L286-L288),
+    oder
+  - wenn die Signatur verarbeitet wird: `err: <object|null>`:
+    - `null` wenn die Transaktion erfolgreich auf der angegebenen
+      Commitment-Ebene verarbeitet wurde, oder
+    - ein
+      [`TransactionError`](https://github.com/solana-labs/solana/blob/6d28fd455b07e3557fc6c0c3ddf3ba03e3fe8482/sdk/src/transaction/error.rs#L15-L164),
+      wenn die Transaktion fehlgeschlagen ist
+
+#### Beispielantworten:
+
+Das Folgende ist ein Beispiel für eine Benachrichtigung von einer erfolgreich
+**verarbeiteten** Transaktion:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "signatureNotification",
+  "params": {
+    "result": {
+      "context": {
+        "slot": 5207624
+      },
+      "value": {
+        "err": null
+      }
+    },
+    "subscription": 24006
+  }
+}
+```
+
+Das Folgende ist ein Beispiel für eine Benachrichtigung von einer erfolgreich
+**empfangenen** Transaktionssignatur:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "signatureNotification",
+  "params": {
+    "result": {
+      "context": {
+        "slot": 5207624
+      },
+      "value": "receivedSignature"
+    },
+    "subscription": 24006
+  }
+}
+```

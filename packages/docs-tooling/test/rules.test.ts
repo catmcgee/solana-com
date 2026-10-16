@@ -18,15 +18,15 @@ const C = "apps/docs/content/";
 
 describe("path rules", () => {
   it.each([
-    [`${C}docs/en/index.mdx`, "apps/docs/docs/index.mdx", "/docs"],
+    [`${C}docs/en/index.mdx`, "apps/docs/developers/docs/index.mdx", "/docs"],
     [
       `${C}docs/en/core/accounts/index.mdx`,
-      "apps/docs/docs/core/accounts/index.mdx",
+      "apps/docs/developers/docs/core/accounts/index.mdx",
       "/docs/core/accounts",
     ],
     [
       `${C}docs/fr/core/fees.mdx`,
-      "apps/docs/fr/docs/core/fees.mdx",
+      "apps/docs/fr/developers/docs/core/fees.mdx",
       "/fr/docs/core/fees",
     ],
     [
@@ -63,8 +63,10 @@ describe("path rules", () => {
     const e = parseLegacyPath(src)!;
     expect(newPath(e)).toBe(dest);
     expect(legacyUrl(e)).toBe(url);
-    // The new layout mirrors the URL, so the URL resolves to the dest file.
-    expect(candidateFilesForUrl(url)).toContain(dest);
+    // The new layout mirrors the URL (docs moved under /developers/docs,
+    // LAYOUT_BASE), so the current URL resolves to the dest file.
+    const current = url.replace(/^(\/fr)?\/docs(?=\/|$)/, "$1/developers/docs");
+    expect(candidateFilesForUrl(current)).toContain(dest);
   });
 
   it("maps index files to folder URLs", () => {
@@ -98,7 +100,7 @@ describe("classify", () => {
     });
     expect(by(`${C}docs/fr/clients/index.mdx`)).toMatchObject({
       rule: "R2",
-      dest: "apps/docs/fr/docs/clients/index.mdx",
+      dest: "apps/docs/fr/developers/docs/clients/index.mdx",
     });
     expect(by(`${C}docs/en/tools/kora/assets/kora.svg`)).toMatchObject({
       rule: "R9",
@@ -107,7 +109,7 @@ describe("classify", () => {
     expect(by(`${C}docs/en/meta.json`)).toMatchObject({
       rule: "META",
       status: "moved-meta",
-      dest: "apps/docs/docs/meta.json",
+      dest: "apps/docs/developers/docs/meta.json",
     });
   });
 
@@ -119,7 +121,7 @@ describe("classify", () => {
     expect(by(`${C}docs/fr/tools/private-channels.mdx`)).toMatchObject({
       rule: "R8",
       status: "removed-collision",
-      dest: "apps/docs/fr/docs/tools/private-channels/index.mdx",
+      dest: "apps/docs/fr/developers/docs/tools/private-channels/index.mdx",
     });
   });
 
@@ -203,19 +205,74 @@ describe("legacy URLs", () => {
     ]);
   });
 
+  /** Index for redirect rules given as [from, to]; `*` = rest of the path. */
+  const rules = (...pairs: [string, string][]): RedirectIndex => ({
+    redirects: pairs.map(([source, destination]) => ({ source, destination })),
+    match(url) {
+      for (const [from, to] of pairs) {
+        if (from.endsWith("*")) {
+          const base = from.slice(0, -1);
+          if (url.startsWith(base))
+            return {
+              source: from,
+              destination: to,
+              resolved: to.replace(/\*$/, url.slice(base.length)),
+            };
+        } else if (url === from)
+          return { source: from, destination: to, resolved: to };
+      }
+      return null;
+    },
+  });
+  // The 2026-10-16 move: /docs/x -> /developers/docs/x (and locale twins).
+  const docsMove: [string, string][] = [
+    ["/docs/*", "/developers/docs/*"],
+    ["/fr/docs/*", "/fr/developers/docs/*"],
+  ];
+
   it("resolves URLs against the new layout", () => {
     const pages = new Set([
-      "apps/docs/docs/a.mdx",
-      "apps/docs/docs/b.mdx",
-      "apps/docs/fr/docs/a.mdx",
+      "apps/docs/developers/docs/a.mdx",
+      "apps/docs/developers/docs/b.mdx",
+      "apps/docs/fr/developers/docs/a.mdx",
       "apps/docs/developers/cookbook/x.mdx",
     ]);
-    const res = resolveUrls(urls, pages, []);
-    const cls = Object.fromEntries(res.map((r) => [r.url, r.cls]));
-    expect(cls["/fr/docs/a"]).toBe("exact");
-    expect(cls["/fr/docs/b"]).toBe("fallback-en");
-    expect(cls["/fr/developers/cookbook/x"]).toBe("cookbook-rewrite");
-    expect(cls["/learn/what-is-solana"]).toBe("unmapped");
+    const res = resolveUrls(urls, pages, [], { web: rules(...docsMove) });
+    const by = Object.fromEntries(res.map((r) => [r.url, r]));
+    expect(by["/fr/docs/a"]).toMatchObject({
+      cls: "redirect",
+      target: "/fr/developers/docs/a",
+    });
+    // Missing translation: the redirect lands on the English fallback.
+    expect(by["/fr/docs/b"]).toMatchObject({
+      cls: "redirect",
+      target: "/fr/developers/docs/b",
+    });
+    expect(by["/fr/developers/cookbook/x"]!.cls).toBe("cookbook-rewrite");
+    expect(by["/learn/what-is-solana"]!.cls).toBe("unmapped");
+    // Without the move redirects the old URLs have nothing to serve them.
+    const bare = resolveUrls(urls, pages, []);
+    expect(bare.find((r) => r.url === "/fr/docs/a")!.cls).toBe("unmapped");
+  });
+
+  it("follows redirect chains and fails long or dead ones", () => {
+    const pages = new Set(["apps/docs/developers/docs/a.mdx"]);
+    const two = resolveUrls(urls, pages, [], {
+      web: rules(["/docs/b", "/docs/a"], ...docsMove),
+    });
+    expect(two.find((r) => r.url === "/docs/b")).toMatchObject({
+      cls: "redirect",
+      target: "/developers/docs/a (2 hops)",
+    });
+    const three = resolveUrls(urls, pages, [], {
+      web: rules(["/docs/b", "/docs/c"], ["/docs/c", "/docs/a"], ...docsMove),
+    });
+    expect(three.find((r) => r.url === "/docs/b")!.cls).toBe("redirect-chain");
+    const dead = resolveUrls(urls, pages, [], { web: rules(...docsMove) });
+    expect(dead.find((r) => r.url === "/docs/b")).toMatchObject({
+      cls: "redirect-dead",
+      target: "/developers/docs/b",
+    });
   });
 
   it("classes redirected paths before files", () => {

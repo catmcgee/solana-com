@@ -35,6 +35,8 @@ export interface MintlifyRedirect {
 }
 
 const MINTLIFY_PREFIXES = [
+  "/developers/docs",
+  // Old docs prefix: only redirects live there now (to /developers/docs).
   "/docs",
   "/developers/cookbook",
   "/developers/bootcamp",
@@ -57,6 +59,7 @@ export function isMintlifyPath(p: string) {
 /** Exact Greek collection roots, kept (no catch-all covers them). */
 const GREEK_EXACT_ROOTS = new Set([
   "/el/docs",
+  "/el/developers/docs",
   "/el/developers/cookbook",
   "/el/developers/bootcamp",
 ]);
@@ -67,8 +70,14 @@ const GREEK_EXACT_ROOTS = new Set([
  * the rest of /el/... never reaches the docs host.
  */
 const GREEK_MIRROR: NextRedirect[] = [
-  { source: "/el/docs", destination: "/docs" },
+  { source: "/el/docs", destination: "/developers/docs" },
+  // Via /docs/:path*, so moved pages still reach their new URL (two hops).
   { source: "/el/docs/:path*", destination: "/docs/:path*" },
+  { source: "/el/developers/docs", destination: "/developers/docs" },
+  {
+    source: "/el/developers/docs/:path*",
+    destination: "/developers/docs/:path*",
+  },
   { source: "/el/learn/:path+", destination: "/learn/:path+" },
   { source: "/el/developers/cookbook", destination: "/developers/cookbook" },
   {

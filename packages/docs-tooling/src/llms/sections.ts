@@ -1,6 +1,6 @@
 /**
  * One-line routing hints shown to agents at the top of each per-section
- * index (/docs/<section>/llms.txt). Ported verbatim from the deleted
+ * index (/developers/docs/<section>/llms.txt). Ported verbatim from the deleted
  * apps/docs/src/app/docs/[section]/llms.txt/route.ts.
  */
 export const SECTION_NOTES: Record<string, string> = {
@@ -20,7 +20,7 @@ export const SECTION_NOTES: Record<string, string> = {
 
 /** Sections of the site-wide /llms.txt, in order (old route's SECTIONS). */
 export const INDEX_SECTIONS: { heading: string; prefix: string }[] = [
-  { heading: "Core documentation", prefix: "/docs" },
+  { heading: "Core documentation", prefix: "/developers/docs" },
   { heading: "Cookbook", prefix: "/developers/cookbook" },
   { heading: "Bootcamp", prefix: "/developers/bootcamp" },
   { heading: "Learn", prefix: "/learn" },

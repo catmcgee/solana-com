@@ -28,7 +28,7 @@ export const PAGES_MANIFEST_REL = "packages/docs-tooling/generated/pages.json";
 export const GENERATED_BY = "packages/docs-tooling src/manifest (gen:manifest)";
 
 /** Top-level folders of apps/docs that hold pages (besides <locale>/...). */
-export const CONTENT_ROOTS = ["docs", "developers", "learn"] as const;
+export const CONTENT_ROOTS = ["developers", "learn"] as const;
 
 /**
  * pages.json entry. Extends the WP0 schema with the frontmatter flags the
@@ -75,7 +75,10 @@ export function listPageFiles(root = docsRoot): string[] {
     .sort();
 }
 
-/** `apps/docs/fr/docs/core/index.mdx` -> { lang: "fr", url: "/fr/docs/core" } */
+/**
+ * `apps/docs/fr/developers/docs/core/index.mdx` ->
+ * { lang: "fr", url: "/fr/developers/docs/core" }
+ */
 export function fileToUrl(repoRelFile: string): { url: string; lang: string } {
   const rel = repoRelFile.replace(/^apps\/docs\//, "").replace(/\.mdx?$/, "");
   const first = rel.split("/")[0]!;
@@ -84,7 +87,7 @@ export function fileToUrl(repoRelFile: string): { url: string; lang: string } {
   return { url: `/${withoutIndex}`, lang };
 }
 
-/** Mintlify navigation page id (`fr/docs/core/index`) for a file. */
+/** Mintlify navigation page id (`fr/developers/docs/core/index`) for a file. */
 export function fileToNavPage(repoRelFile: string) {
   return repoRelFile.replace(/^apps\/docs\//, "").replace(/\.mdx?$/, "");
 }

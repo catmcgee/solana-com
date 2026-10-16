@@ -11,7 +11,7 @@ import { convertSource } from "../src/convert/run.ts";
 import { transform as codetabs } from "../src/convert/transforms/codetabs.ts";
 
 const FILE = {
-  path: "apps/docs/docs/x/page.mdx",
+  path: "apps/docs/developers/docs/x/page.mdx",
   locale: "en",
   collection: "docs" as const,
 };

@@ -131,9 +131,14 @@ function routeExists(pathname) {
       existsSync(`${base}.mdx`) || existsSync(path.join(base, "index.mdx"))
     );
   }
-  if (pathname.startsWith("/docs/")) {
-    const slug = pathname.slice("/docs/".length);
-    const base = path.join(repoRoot, "apps/docs/docs", slug);
+  // The docs live at /developers/docs; old /docs/<slug> URLs redirect to the
+  // same slug there (exact legacy redirects were matched above).
+  const docsPrefix = ["/developers/docs/", "/docs/"].find((prefix) =>
+    pathname.startsWith(prefix),
+  );
+  if (docsPrefix) {
+    const slug = pathname.slice(docsPrefix.length);
+    const base = path.join(repoRoot, "apps/docs/developers/docs", slug);
     return (
       existsSync(`${base}.mdx`) || existsSync(path.join(base, "index.mdx"))
     );
@@ -156,7 +161,7 @@ function routeExists(pathname) {
     );
   }
   // Checked after content-backed prefixes so a catch-all rewrite such as
-  // /docs/:path* cannot hide a missing page.
+  // /developers/docs/:path* cannot hide a missing page.
   if (redirectPatterns.some((pattern) => pattern.test(pathname))) return true;
   for (const app of ["web", "docs", "media"]) {
     const base = path.join(repoRoot, `apps/${app}/src/app/[locale]`, pathname);

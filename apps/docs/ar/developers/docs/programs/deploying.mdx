@@ -1,0 +1,457 @@
+---
+title: نشر البرامج
+description:
+  Complete guide to building, deploying, and managing Solana programs using the
+  Solana CLI.
+---
+
+يشرح هذا القسم العملية الأساسية لنشر برنامج سولانا باستخدام واجهة سطر أوامر
+سولانا.
+
+## مرجع أوامر واجهة سطر الأوامر
+
+| المهمة                               | الأمر                                                                                       |
+| ---------------------------------- | --------------------------------------------------------------------------------------------- |
+| بناء البرنامج                      | `cargo build-sbf`                                                                             |
+| نشر برنامج جديد                 | `solana program deploy <path_to_program.so>`                                                  |
+| تحديث برنامج موجود            | `solana program deploy <path_to_program.so>` (نفس أمر النشر)                                 |
+| عرض معلومات البرنامج                  | `solana program show <program-id>`                                                            |
+| نقل صلاحية البرنامج         | `solana program set-upgrade-authority <program-id> --new-upgrade-authority <path_to_keypair>` |
+| جعل البرنامج غير قابل للتعديل             | `solana program set-upgrade-authority <program-id> --final`                                   |
+| إغلاق البرنامج                      | `solana program close <program-id> --bypass-warning`                                          |
+| التحقق من رصيد المحفظة               | `solana balance`                                                                              |
+| طلب إسقاط جوي (devnet/localhost) | `solana airdrop 2`                                                                            |
+
+## المفاهيم الأساسية
+
+قبل الغوص في التفاصيل، دعنا نوضح بعض المصطلحات:
+
+- **معرّف البرنامج**: العنوان على السلسلة لبرنامجك. يتفاعل المستخدمون مع برنامجك
+  من خلال الإشارة إلى معرّف البرنامج.
+- **حساب البرنامج (program account)**: الحساب على السلسلة الذي يخزن البيانات
+  الوصفية لبرنامجك. عنوان حساب البرنامج هو معرّف البرنامج. يخزن حساب البرنامج
+  أيضًا عنوان حساب بيانات البرنامج (programdata account).
+- **حساب بيانات البرنامج (programdata account)**: الحساب على السلسلة الذي يخزن
+  الكود القابل للتنفيذ المنشور لبرنامجك.
+- **صلاحية البرنامج**: الحساب الذي يمتلك إذن تحديث أو إغلاق البرنامج. افتراضيًا،
+  هذه هي محفظة واجهة سطر الأوامر الخاصة بك.
+
+## المتطلبات الأساسية
+
+<Steps titleSize="h3">
+
+<Step title="تثبيت واجهة سطر أوامر سولانا">
+
+أولاً، [قم بتثبيت واجهة سطر أوامر سولانا](/developers/docs/intro/installation).
+
+</Step>
+
+<Step title="إعداد المحفظة">
+
+بعد التثبيت، قم بإنشاء محفظة زوج مفاتيح محلية. يتم تعيين عنوان هذه المحفظة
+كصلاحية افتراضية للبرنامج عند نشر البرامج:
+
+```bash Terminal
+solana-keygen new
+```
+
+هذا ينشئ زوج مفاتيح في `~/.config/solana/id.json` بشكل افتراضي.
+
+</Step>
+
+<Step title="تكوين العنقود">
+
+اختر مجموعة سولانا التي تريد النشر عليها. استخدم الأمر `solana config get`
+للتحقق من الإعدادات الحالية:
+
+```bash Terminal
+solana config get
+```
+
+```text Output
+Config File: ~/.config/solana/cli/config.yml
+RPC URL: http://localhost:8899
+WebSocket URL: ws://localhost:8900/ (computed)
+Keypair Path: ~/.config/solana/id.json
+Commitment: confirmed
+```
+
+قم بالتبديل بين العناقيد حسب الحاجة:
+
+```bash Terminal
+solana config set --url mainnet-beta
+solana config set --url devnet
+solana config set --url localhost
+solana config set --url testnet
+solana config set --url "https://your-rpc-url.com"
+```
+
+</Step>
+
+<Step title="تمويل المحفظة">
+
+ستحتاج إلى SOL لدفع تكاليف نشر البرنامج. يعتمد المبلغ على حجم البرنامج الخاص بك.
+
+بالنسبة لـ devnet أو localhost، قم بتمويل محفظتك باستخدام الأمر
+`solana airdrop`:
+
+```bash Terminal
+solana airdrop 2
+```
+
+```text Output
+Requesting airdrop of 2 SOL
+Signature: 5zQKxvRdgJDA8fRGPdKfGxRLnLpwmNnMXGYxfBqFSUPqc5BTmFPrTG8vnC4HvKDVY8zQ8aQxZxcEE7WFpGhZGVAA
+2 SOL
+```
+
+تحقق من رصيد محفظتك:
+
+```bash Terminal
+solana balance
+```
+
+```text Output
+2 SOL
+```
+
+</Step>
+
+</Steps>
+
+## العمليات الأساسية
+
+### بناء البرنامج
+
+لبناء برنامج، استخدم الأمر `cargo build-sbf`:
+
+```bash Terminal
+cargo build-sbf
+```
+
+<Steps>
+  <Step title="مثال على البرنامج">
+    هنا برنامج سولانا بسيط يطبع "Hello, Solana!" في سجلات البرنامج.
+
+    ```rs src/lib.rs
+    use solana_program::{
+        account_info::AccountInfo, entrypoint, entrypoint::ProgramResult, msg, pubkey::Pubkey,
+    };
+
+    entrypoint!(process_instruction);
+
+    pub fn process_instruction(
+        _program_id: &Pubkey,
+        _accounts: &[AccountInfo],
+        _instruction_data: &[u8],
+    ) -> ProgramResult {
+        msg!("Hello, Solana!");
+        Ok(())
+    }
+    ```
+
+    ```toml Cargo.toml
+    [package]
+    name = "hello_world"
+    version = "0.1.0"
+    edition = "2021"
+
+    [lib]
+    crate-type = ["cdylib", "lib"]
+
+    [dependencies]
+    solana-program = "2.2.0"
+    ```
+  </Step>
+
+  <Step title="مخرجات البناء">
+    قم ببناء برنامجك باستخدام الأمر `cargo build-sbf`:
+
+    ```bash Terminal
+    cargo build-sbf
+    ```
+
+    هذا ينشئ ملفين مهمين في `target/deploy/`:
+
+    1. `hello_world-keypair.json`: ملف زوج مفاتيح سيتم استخدام مفتاحه العام كمعرف
+       برنامجك
+    2. `hello_world.so`: الملف التنفيذي للبرنامج المترجم
+
+    ```json target/deploy/hello_world-keypair.json
+    [
+      203, 253, 43, 62, 165, 111, 94, 222, 105, 225, 218, 85, 143, 9, 114, 96, 243,
+      181, 114, 89, 72, 230, 124, 85, 59, 165, 198, 23, 240, 212, 23, 154, 229, 241,
+      153, 61, 153, 105, 79, 204, 193, 163, 33, 65, 82, 183, 49, 240, 224, 137, 248,
+      24, 128, 25, 192, 197, 118, 235, 239, 67, 85, 156, 219, 231
+    ]
+    ```
+
+    ```txt target/deploy/hello_world.so
+    [binary executable file]
+    ```
+  </Step>
+</Steps>
+
+### التحقق من حجم البرنامج والتكلفة
+
+يتطلب نشر البرنامج تخصيص SOL لحساب البرنامج بناءً على حجم البرنامج. البرامج
+الأكبر حجمًا تكلف المزيد من SOL للنشر.
+
+تحقق من حجم برنامجك:
+
+```bash Terminal
+wc -c < ./target/deploy/hello_world.so
+```
+
+```text Output
+18504
+```
+
+احسب كمية SOL المطلوبة لهذا الحجم (بالبايت):
+
+```bash Terminal
+solana rent 18504
+```
+
+```text Output
+Rent-exempt minimum: 0.12967872 SOL
+```
+
+<Info>
+  ستحتاج إلى SOL أكثر قليلاً مما هو موضح لتغطية رسوم معاملات النشر.
+</Info>
+
+### نشر البرنامج
+
+استخدم الأمر `solana program deploy` لنشر برنامجك:
+
+```bash Terminal
+solana program deploy ./target/deploy/hello_world.so
+```
+
+```text Output
+Program Id: 7NxQjW8H8hVcqBKgXbVDWqGQCovHbqDW9p1SJJwUyTpE
+Signature: 2BYwsqRP7ZwBNQvJp3S8bphTJ4zKW5JBPVMqCTE5KyLkP8xHzAyUEeC4LdTgjJdGBKHWNCkRF8Mf1T1WkLFyEu8W
+```
+
+**معرف البرنامج** المعروض هو عنوان برنامجك الدائم على الشبكة.
+
+<Note>
+
+للنشر باستخدام معرف برنامج محدد (بدلاً من المعرف المُنشأ تلقائيًا)، استخدم:
+
+```bash Terminal
+solana program deploy ./target/deploy/hello_world.so --program-id ./custom-keypair.json
+```
+
+يمكنك إنشاء أزواج مفاتيح جديدة باستخدام الأمر `solana-keygen`:
+
+```bash Terminal
+solana-keygen new -o ./custom-keypair.json
+```
+
+</Note>
+
+### تحديث البرنامج
+
+قم بتحديث برنامجك باستخدام نفس الأمر `solana program deploy`:
+
+1. قم بإجراء تغييرات على كود برنامجك
+2. أعد بناء برنامجك: `cargo build-sbf`
+3. انشر التحديث:
+
+```bash Terminal
+solana program deploy ./target/deploy/hello_world.so
+```
+
+```text Output
+Program Id: 7NxQjW8H8hVcqBKgXbVDWqGQCovHbqDW9p1SJJwUyTpE
+Signature: 3zKnXDfEm1R8hVcEmTnNFYUaFjVVbLJrKdFj5hBMXoBRfz8xGyDhCYgKr9YY5KxKYPEUQQVfwEPNz9hQGvYhLNBJ
+```
+
+<Info>
+
+إذا كان برنامجك المحدث يتطلب مساحة أكبر (بايت) مما هو مخصص حاليًا، فسيقوم النشر
+تلقائيًا بتوسيع حساب البرنامج. يحدث هذا عندما يكون برنامجك الجديد أكبر من
+الإصدار السابق. يحتاج حساب البرنامج إلى بايتات إضافية لتخزين البرنامج الجديد.
+ستقوم واجهة سطر الأوامر بحساب كمية SOL المطلوبة وخصمها من محفظتك تلقائيًا.
+
+يمكنك أيضًا توسيع البرنامج يدويًا لتخصيص المزيد من البايتات:
+
+```bash Terminal
+solana program extend 7NxQjW8H8hVcqBKgXbVDWqGQCovHbqDW9p1SJJwUyTpE 1000
+```
+
+```text Output
+Extended Program Id 7NxQjW8H8hVcqBKgXbVDWqGQCovHbqDW9p1SJJwUyTpE by 1000 bytes
+```
+
+</Info>
+
+## إدارة البرنامج
+
+بمجرد نشر برنامجك، هناك عدة أوامر شائعة لإدارة حساب البرنامج.
+
+### عرض بيانات تعريف البرنامج
+
+للتحقق من البيانات الوصفية لبرنامجك، استخدم الأمر `solana program show`:
+
+```bash Terminal
+solana program show 7NxQjW8H8hVcqBKgXbVDWqGQCovHbqDW9p1SJJwUyTpE
+```
+
+مثال للمخرجات:
+
+```txt
+$ solana program show 7283x8k8fyBcfaFLyPsxbd2VV1AMmZFP7FNoyTXVKJw7
+Program Id: 7283x8k8fyBcfaFLyPsxbd2VV1AMmZFP7FNoyTXVKJw7
+Owner: BPFLoaderUpgradeab1e11111111111111111111111
+ProgramData Address: Gqn7YQVCP8NtYV1qkEqR4Udhj8EJ3fkikvS7HskCNQ7c
+Authority: 5kh6HxYZiAebF8HWLsUWod2EaQQ6iWHpHYCz8UcmFbM1
+Last Deployed In Slot: 6573
+Data Length: 18504 (0x4848) bytes
+Balance: 0.12999192 SOL
+```
+
+<Note>
+  **`Program Id`**
+
+  معرّف البرنامج هو العنوان على السلسلة لحساب برنامجك. يستدعي المستخدمون والبرامج
+  الأخرى برنامجك من خلال الإشارة إلى هذا المعرّف في معاملاتهم.
+
+  **`Owner`**
+
+  المالك يحدد أي محمّل تم استخدامه لنشر هذا البرنامج. بالنسبة لمعظم البرامج، سيكون
+  هذا هو محمّل BPF القابل للترقية.
+
+  **`ProgramData Address`**
+
+  عنوان بيانات البرنامج يشير إلى الحساب المنفصل الذي يخزن الكود القابل للتنفيذ
+  لبرنامجك.
+
+  **`Authority`**
+
+  السلطة هي الحساب الذي يملك صلاحية ترقية أو إغلاق هذا البرنامج. فقط السلطة يمكنها
+  نشر التحديثات أو إغلاق البرنامج لاسترداد عملات SOL المخصصة للبرنامج.
+
+  **`Last Deployed In Slot`**
+
+  آخر نشر في الـslot يشير إلى آخر مرة تم فيها تحديث هذا البرنامج.
+
+  **`Data Length`**
+
+  طول البيانات يوضح إجمالي البايتات المخصصة لهذا البرنامج. يمكن لهذه المساحة
+  استيعاب التحديثات المستقبلية التي قد تكون أكبر من حجم البرنامج الحالي.
+
+  **`Balance`**
+
+  الرصيد يعرض عملات SOL المخصصة لحساب البرنامج لتخزين بياناته.
+</Note>
+
+### نقل سلطة البرنامج
+
+لنقل صلاحية البرنامج إلى حساب مختلف، استخدم الأمر
+`solana program set-upgrade-authority`:
+
+```bash Terminal
+solana program set-upgrade-authority 7NxQjW8H8hVcqBKgXbVDWqGQCovHbqDW9p1SJJwUyTpE --new-upgrade-authority ./new-authority-keypair.json
+```
+
+<Warning>
+  بعد نقل سلطة البرنامج، لن تتمكن من تحديث البرنامج ما لم يكن لديك وصول إلى زوج
+  المفاتيح الخاص بالسلطة الجديدة.
+</Warning>
+
+### جعل برنامجك غير قابل للتغيير
+
+لجعل برنامجك غير قابل للتغيير، استخدم الأمر
+`solana program set-upgrade-authority` مع العلامة `--final` لإزالة صلاحية
+البرنامج:
+
+```bash Terminal
+solana program set-upgrade-authority 7NxQjW8H8hVcqBKgXbVDWqGQCovHbqDW9p1SJJwUyTpE --final
+```
+
+```text Output
+Account Type: Program
+Authority: none
+```
+
+<Warning>
+  بمجرد أن يصبح البرنامج غير قابل للتغيير، لا يمكن تحديثه أو إغلاقه أبدًا.
+</Warning>
+
+### إغلاق برنامجك
+
+لإغلاق برنامجك واستعادة SOL المخصص لحساب البرنامج، استخدم الأمر
+`solana program close`:
+
+```bash Terminal
+solana program close 7NxQjW8H8hVcqBKgXbVDWqGQCovHbqDW9p1SJJwUyTpE --bypass-warning
+```
+
+```text Output
+Closed Program Id 7NxQjW8H8hVcqBKgXbVDWqGQCovHbqDW9p1SJJwUyTpE, 0.12999192 SOL reclaimed
+```
+
+<Warning>
+  بمجرد الإغلاق، لا يمكن إعادة استخدام معرف البرنامج. لا يمكنك نشر برنامج جديد
+  على نفس العنوان.
+</Warning>
+
+## أوامر المساعدة
+
+### عرض جميع البرامج
+
+عرض جميع البرامج التي تكون محفظتك الحالية هي السلطة عليها:
+
+```bash Terminal
+solana program show --programs
+```
+
+مثال على المخرجات:
+
+```txt
+Program Id                                       | Slot       | Authority                                      | Balance
+-------------------------------------------------|------------|------------------------------------------------|-------------
+7NxQjW8H8hVcqBKgXbVDWqGQCovHbqDW9p1SJJwUyTpE     | 249885434  | 5kh6HxYZiAebF8HWLsUWod2EaQQ6iWHpHYCz8UcmFbM1   | 0.12999192
+3KSGCk4m5hqJkTjPHBXUCPcqMwJnK3VmkqEsFUKKGJPK     | 249883212  | 5kh6HxYZiAebF8HWLsUWod2EaQQ6iWHpHYCz8UcmFbM1   | 0.28654328
+```
+
+### تنزيل برنامج منشور
+
+لتنزيل برنامج منشور، استخدم الأمر `solana program dump`:
+
+```bash Terminal
+solana program dump 7NxQjW8H8hVcqBKgXbVDWqGQCovHbqDW9p1SJJwUyTpE ./downloaded_program.so
+```
+
+```text Output
+Wrote program to ./downloaded_program.so
+```
+
+## خيارات متقدمة
+
+### علامات النشر
+
+عندما تكون شبكة سولانا مزدحمة، استخدم هذه العلامات للمساعدة في نشر البرنامج.
+
+مثال على الاستخدام:
+
+```bash Terminal
+solana program deploy ./target/deploy/hello_world.so \
+    --with-compute-unit-price 10000 \
+    --max-sign-attempts 10 \
+    --use-rpc
+```
+
+شرح الخيارات:
+
+- **`--with-compute-unit-price`**: تعيين رسوم الأولوية بالميكرو لامبورت
+  (0.000001 SOL) لكل وحدة حوسبة. تحقق من
+  [Helius Priority Fee API](https://docs.helius.dev/guides/priority-fee-api)
+  للحصول على الأسعار الحالية. رسوم الأولوية هي رسوم إضافية تُدفع للقائد الحالي
+  لإعطاء الأولوية لمعاملتك.
+- **`--max-sign-attempts`**: عدد مرات إعادة المحاولة باستخدام blockhash جديد إذا
+  انتهت صلاحية المعاملات. (الافتراضي: 5)
+- **`--use-rpc`**: إرسال المعاملات إلى RPC المُكوَّن. يتطلب هذا العلم اتصال RPC [مرجَّحًا بالحصة](/developers/docs/defi/stake-weighted-qos) من مزودين مثل [Triton](https://triton.one/) أو [Helius](https://www.helius.dev/).

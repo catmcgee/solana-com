@@ -34,9 +34,9 @@ export const IA_TEMPLATE: TemplateTab[] = [
       {
         group: "Get started",
         pages: [
-          "docs/index",
-          "docs/finance/index", // sidebarTitle: All use cases
-          "docs/from-ethereum",
+          "developers/docs/index",
+          "developers/docs/finance/index", // sidebarTitle: All use cases
+          "developers/docs/from-ethereum",
         ],
       },
     ],
@@ -49,9 +49,9 @@ export const IA_TEMPLATE: TemplateTab[] = [
       {
         group: "Payment basics",
         pages: [
-          "docs/payments/index",
-          "docs/payments/how-payments-work",
-          "docs/payments/interacting-with-solana",
+          "developers/docs/payments/index",
+          "developers/docs/payments/how-payments-work",
+          "developers/docs/payments/interacting-with-solana",
         ],
       },
       {
@@ -59,26 +59,26 @@ export const IA_TEMPLATE: TemplateTab[] = [
         pages: [
           {
             group: "Build a checkout",
-            root: "docs/payments/checkout",
+            root: "developers/docs/payments/checkout",
             tag: "~30 min",
             expanded: true,
             pages: [
-              "docs/payments/checkout/try-it",
-              "docs/payments/checkout/browser",
-              "docs/payments/checkout/backend",
-              "docs/payments/checkout/go-live",
+              "developers/docs/payments/checkout/try-it",
+              "developers/docs/payments/checkout/browser",
+              "developers/docs/payments/checkout/backend",
+              "developers/docs/payments/checkout/go-live",
             ],
           },
           {
             group: "Paywall an endpoint",
-            root: "docs/payments/paywall-api",
+            root: "developers/docs/payments/paywall-api",
             tag: "~30 min",
             expanded: true,
             pages: [
-              "docs/payments/paywall-api/try-it",
-              "docs/payments/paywall-api/browser",
-              "docs/payments/paywall-api/server",
-              "docs/payments/paywall-api/go-live",
+              "developers/docs/payments/paywall-api/try-it",
+              "developers/docs/payments/paywall-api/browser",
+              "developers/docs/payments/paywall-api/server",
+              "developers/docs/payments/paywall-api/go-live",
             ],
           },
           // docs/payments/quickstart was merged into checkout/browser
@@ -90,58 +90,58 @@ export const IA_TEMPLATE: TemplateTab[] = [
         pages: [
           {
             group: "Send payments",
-            root: "docs/payments/send-payments/index",
+            root: "developers/docs/payments/send-payments/index",
             pages: [
-              "docs/payments/send-payments/basic-payment",
-              "docs/payments/send-payments/payment-with-memo",
-              "docs/payments/send-payments/verify-address",
+              "developers/docs/payments/send-payments/basic-payment",
+              "developers/docs/payments/send-payments/payment-with-memo",
+              "developers/docs/payments/send-payments/verify-address",
               {
                 group: "Payment processing",
-                root: "docs/payments/send-payments/payment-processing/index",
+                root: "developers/docs/payments/send-payments/payment-processing/index",
                 pages: [
-                  "docs/payments/send-payments/payment-processing/fee-abstraction",
+                  "developers/docs/payments/send-payments/payment-processing/fee-abstraction",
                   // sidebarTitle: Payouts & disbursements (moved into its own
                   // group, dup-audit nav clean-up)
-                  "docs/payments/send-payments/payment-processing/batch-payments",
+                  "developers/docs/payments/send-payments/payment-processing/batch-payments",
                 ],
               },
             ],
           },
           {
             group: "Accept payments",
-            root: "docs/payments/accept-payments/index",
+            root: "developers/docs/payments/accept-payments/index",
             // accept-payments/solana-pay was merged into
             // tools/commerce-kit/quickstart/solana-pay (dup-audit #3).
             pages: [
-              "docs/payments/accept-payments/verification-tools",
-              "docs/payments/accept-payments/indexing",
+              "developers/docs/payments/accept-payments/verification-tools",
+              "developers/docs/payments/accept-payments/indexing",
             ],
           },
           {
             group: "Subscriptions",
-            root: "docs/payments/subscriptions/overview",
-            pages: [x("docs/payments/subscriptions")],
+            root: "developers/docs/payments/subscriptions/overview",
+            pages: [x("developers/docs/payments/subscriptions")],
           },
           {
             // docs/payments/pay-per-call was merged into agentic-payments
             // (now titled "Pay-per-call & agents", dup-audit #4), and
             // x402/making-a-payment into pay-sh (#5).
             group: "Pay-per-call & agents",
-            root: "docs/payments/agentic-payments/index",
+            root: "developers/docs/payments/agentic-payments/index",
             labelFrom: "none",
             pages: [
-              "docs/payments/agentic-payments/x402/index", // sidebarTitle: How x402 works
-              "docs/payments/agentic-payments/mpp",
-              "docs/payments/pay-sh",
+              "developers/docs/payments/agentic-payments/x402/index", // sidebarTitle: How x402 works
+              "developers/docs/payments/agentic-payments/mpp",
+              "developers/docs/payments/pay-sh",
             ],
           },
-          "docs/finance/privacy", // sidebarTitle: Private payments
+          "developers/docs/finance/privacy", // sidebarTitle: Private payments
           {
             group: "Advanced payments",
             labelFrom: "none",
             pages: [
-              "docs/payments/advanced-payments/deferred-execution",
-              "docs/payments/advanced-payments/spend-permissions",
+              "developers/docs/payments/advanced-payments/deferred-execution",
+              "developers/docs/payments/advanced-payments/spend-permissions",
             ],
           },
         ],
@@ -149,27 +149,27 @@ export const IA_TEMPLATE: TemplateTab[] = [
       {
         group: "Tools",
         pages: [
-          "docs/payments/developer-tools",
+          "developers/docs/payments/developer-tools",
           {
             group: "Commerce Kit",
-            root: "docs/tools/commerce-kit/index",
-            pages: [x("docs/tools/commerce-kit/quickstart")],
+            root: "developers/docs/tools/commerce-kit/index",
+            pages: [x("developers/docs/tools/commerce-kit/quickstart")],
           },
           {
             group: "Kora (fee sponsorship)",
-            root: "docs/tools/kora/index",
+            root: "developers/docs/tools/kora/index",
             labelFrom: "none",
-            pages: [x("docs/tools/kora")],
+            pages: [x("developers/docs/tools/kora")],
           },
           {
             // tools/solana-pay/quickstart/index was merged into the index's
             // Quick Start section (dup-audit #8); the Quick Start group is
             // rootless in en.json.
             group: "Solana Pay",
-            root: "docs/tools/solana-pay/index",
-            pages: [x("docs/tools/solana-pay")],
+            root: "developers/docs/tools/solana-pay/index",
+            pages: [x("developers/docs/tools/solana-pay")],
           },
-          "docs/tools/x402-facilitator",
+          "developers/docs/tools/x402-facilitator",
         ],
       },
     ],
@@ -182,21 +182,21 @@ export const IA_TEMPLATE: TemplateTab[] = [
       {
         group: "Asset basics",
         labelFrom: "none",
-        pages: ["docs/assets/index"],
+        pages: ["developers/docs/assets/index"],
       },
       {
         group: "Asset tutorials",
         pages: [
           {
             group: "Issue an asset",
-            root: "docs/assets/issue-asset",
+            root: "developers/docs/assets/issue-asset",
             tag: "~45 min",
             expanded: true,
             pages: [
-              "docs/assets/issue-asset/try-it",
-              "docs/assets/issue-asset/browser",
-              "docs/assets/issue-asset/local",
-              "docs/assets/issue-asset/go-live",
+              "developers/docs/assets/issue-asset/try-it",
+              "developers/docs/assets/issue-asset/browser",
+              "developers/docs/assets/issue-asset/local",
+              "developers/docs/assets/issue-asset/go-live",
             ],
           },
           // docs/tokenization/quickstart was merged into the issue-asset path;
@@ -210,45 +210,48 @@ export const IA_TEMPLATE: TemplateTab[] = [
         // Rootless: the tokenization index was merged into
         // docs/assets#tokenization (dup-audit #7).
         pages: [
-          "docs/tokenization/token-acl",
+          "developers/docs/tokenization/token-acl",
           {
             group: "KYC with Attestations",
-            root: "docs/tools/attestations/index",
+            root: "developers/docs/tools/attestations/index",
             labelFrom: "none",
-            pages: [x("docs/tools/attestations")],
+            pages: [x("developers/docs/tools/attestations")],
           },
-          "docs/tokenization/nav-strikes",
+          "developers/docs/tokenization/nav-strikes",
         ],
       },
       {
         group: "Tokens",
         labelFrom: "message:tokenization",
         pages: [
-          "docs/tokens/index",
-          "docs/tokens/quickstart",
+          "developers/docs/tokens/index",
+          "developers/docs/tokens/quickstart",
           {
             group: "Token basics",
-            root: "docs/tokens/basics/index",
+            root: "developers/docs/tokens/basics/index",
             labelFrom: "meta:docs/tokens/basics",
-            pages: [x("docs/tokens/basics")],
+            pages: [x("developers/docs/tokens/basics")],
           },
           {
             group: "Token extensions",
-            root: "docs/tokens/extensions/index",
+            root: "developers/docs/tokens/extensions/index",
             labelFrom: "meta:docs/tokens/extensions",
-            pages: [x("docs/tokens/extensions")],
+            pages: [x("developers/docs/tokens/extensions")],
           },
           {
             group: "Advanced tokens",
-            root: "docs/tokens/advanced/index",
-            pages: [x("docs/tokens/advanced")],
+            root: "developers/docs/tokens/advanced/index",
+            pages: [x("developers/docs/tokens/advanced")],
           },
-          "docs/tokens/how-to-verify-a-token",
+          "developers/docs/tokens/how-to-verify-a-token",
         ],
       },
       {
         group: "NFTs & game items",
-        pages: ["docs/tokens/metaplex", "docs/assets/games"],
+        pages: [
+          "developers/docs/tokens/metaplex",
+          "developers/docs/assets/games",
+        ],
       },
     ],
   },
@@ -260,21 +263,21 @@ export const IA_TEMPLATE: TemplateTab[] = [
       {
         group: "Market basics",
         labelFrom: "meta:docs/defi",
-        pages: ["docs/defi/index"],
+        pages: ["developers/docs/defi/index"],
       },
       {
         group: "Market tutorials",
         pages: [
           {
             group: "Settle a trade",
-            root: "docs/defi/settle-trade",
+            root: "developers/docs/defi/settle-trade",
             tag: "~40 min",
             expanded: true,
             pages: [
-              "docs/defi/settle-trade/try-it",
-              "docs/defi/settle-trade/browser",
-              "docs/defi/settle-trade/local",
-              "docs/defi/settle-trade/go-live",
+              "developers/docs/defi/settle-trade/try-it",
+              "developers/docs/defi/settle-trade/browser",
+              "developers/docs/defi/settle-trade/local",
+              "developers/docs/defi/settle-trade/go-live",
             ],
           },
         ],
@@ -282,15 +285,18 @@ export const IA_TEMPLATE: TemplateTab[] = [
       {
         group: "Trading guides",
         pages: [
-          "docs/defi/exchange",
+          "developers/docs/defi/exchange",
           {
             group: "Delivery vs payment",
-            root: "docs/tokenization/dvp",
+            root: "developers/docs/tokenization/dvp",
             labelFrom: "none",
-            pages: ["docs/defi/dvp-program/index", x("docs/defi/dvp-program")],
+            pages: [
+              "developers/docs/defi/dvp-program/index",
+              x("developers/docs/defi/dvp-program"),
+            ],
           },
-          "docs/defi/mev-protection",
-          "docs/defi/stake-weighted-qos",
+          "developers/docs/defi/mev-protection",
+          "developers/docs/defi/stake-weighted-qos",
         ],
       },
     ],
@@ -300,25 +306,25 @@ export const IA_TEMPLATE: TemplateTab[] = [
     tab: "How Solana works",
     icon: "box",
     groups: [
-      { group: "Introduction", pages: ["docs/core/index"] },
+      { group: "Introduction", pages: ["developers/docs/core/index"] },
       {
         group: "The basics",
         pages: [
-          "docs/core/wallets",
+          "developers/docs/core/wallets",
           {
             group: "Accounts",
-            root: "docs/core/accounts/index",
-            pages: [x("docs/core/accounts")],
+            root: "developers/docs/core/accounts/index",
+            pages: [x("developers/docs/core/accounts")],
           },
           {
             group: "Transactions",
-            root: "docs/core/transactions/index",
+            root: "developers/docs/core/transactions/index",
             pages: [
-              x("docs/core/transactions"),
-              "docs/core/transactions/confirmation",
+              x("developers/docs/core/transactions"),
+              "developers/docs/core/transactions/confirmation",
             ],
           },
-          "docs/references/clusters",
+          "developers/docs/references/clusters",
         ],
       },
       {
@@ -326,10 +332,13 @@ export const IA_TEMPLATE: TemplateTab[] = [
         pages: [
           {
             group: "Fees",
-            root: "docs/core/fees/index",
-            pages: [x("docs/core/fees"), "docs/core/fees/fee-sponsorship"],
+            root: "developers/docs/core/fees/index",
+            pages: [
+              x("developers/docs/core/fees"),
+              "developers/docs/core/fees/fee-sponsorship",
+            ],
           },
-          "docs/core/rent",
+          "developers/docs/core/rent",
         ],
       },
       {
@@ -337,36 +346,39 @@ export const IA_TEMPLATE: TemplateTab[] = [
         pages: [
           {
             group: "Programs",
-            root: "docs/core/programs/index",
-            pages: [x("docs/core/programs")],
+            root: "developers/docs/core/programs/index",
+            pages: [x("developers/docs/core/programs")],
           },
           {
             group: "Instructions",
-            root: "docs/core/instructions/index",
-            pages: [x("docs/core/instructions")],
+            root: "developers/docs/core/instructions/index",
+            pages: [x("developers/docs/core/instructions")],
           },
           {
             group: "Program-derived addresses",
-            root: "docs/core/pda/index",
+            root: "developers/docs/core/pda/index",
             labelFrom: "meta:docs/core/pda",
-            pages: [x("docs/core/pda")],
+            pages: [x("developers/docs/core/pda")],
           },
           {
             group: "Cross-program calls",
-            root: "docs/core/cpi/index",
+            root: "developers/docs/core/cpi/index",
             labelFrom: "meta:docs/core/cpi",
-            pages: [x("docs/core/cpi")],
+            pages: [x("developers/docs/core/cpi")],
           },
         ],
       },
       {
         group: "Staking",
-        pages: ["docs/references/staking/index", x("docs/references/staking")],
+        pages: [
+          "developers/docs/references/staking/index",
+          x("developers/docs/references/staking"),
+        ],
       },
       {
         group: "Glossary",
         labelFrom: "message:terminology",
-        pages: ["docs/references/terminology"],
+        pages: ["developers/docs/references/terminology"],
       },
     ],
   },
@@ -375,21 +387,21 @@ export const IA_TEMPLATE: TemplateTab[] = [
     tab: "Resources",
     icon: "wrench",
     groups: [
-      { group: "Browse resources", pages: ["docs/tools/index"] },
+      { group: "Browse resources", pages: ["developers/docs/tools/index"] },
       {
         group: "Set up",
         pages: [
-          "docs/intro/coding-with-agents",
-          "docs/tools/ai",
+          "developers/docs/intro/coding-with-agents",
+          "developers/docs/tools/ai",
           {
             group: "Set up your machine",
-            root: "docs/intro/installation/index",
+            root: "developers/docs/intro/installation/index",
             labelFrom: "meta:docs/intro/installation",
             pages: [
-              "docs/intro/installation/dependencies",
-              "docs/intro/installation/solana-cli-basics",
-              "docs/intro/installation/anchor-cli-basics",
-              "docs/intro/installation/surfpool-cli-basics",
+              "developers/docs/intro/installation/dependencies",
+              "developers/docs/intro/installation/solana-cli-basics",
+              "developers/docs/intro/installation/anchor-cli-basics",
+              "developers/docs/intro/installation/surfpool-cli-basics",
             ],
           },
         ],
@@ -398,43 +410,43 @@ export const IA_TEMPLATE: TemplateTab[] = [
         group: "Write programs",
         labelFrom: "meta:docs/core/programs",
         pages: [
-          "docs/programs/index",
+          "developers/docs/programs/index",
           {
             group: "First program in the browser",
-            root: "docs/intro/quick-start/index",
+            root: "developers/docs/intro/quick-start/index",
             labelFrom: "none",
-            pages: [x("docs/intro/quick-start")],
+            pages: [x("developers/docs/intro/quick-start")],
           },
           {
             group: "Rust programs",
-            root: "docs/programs/rust/index",
-            pages: [x("docs/programs/rust")],
+            root: "developers/docs/programs/rust/index",
+            pages: [x("developers/docs/programs/rust")],
           },
           {
             group: "Anchor framework",
-            root: "docs/programs/anchor",
+            root: "developers/docs/programs/anchor",
             labelFrom: "none",
-            pages: ["docs/programs/anchor-events"],
+            pages: ["developers/docs/programs/anchor-events"],
           },
           {
             group: "Testing programs",
             labelFrom: "meta:docs/programs/testing",
-            pages: [x("docs/programs/testing")],
+            pages: [x("developers/docs/programs/testing")],
           },
           {
             group: "Deploying",
-            root: "docs/programs/deploying",
+            root: "developers/docs/programs/deploying",
             labelFrom: "none",
-            pages: ["docs/programs/verified-builds"],
+            pages: ["developers/docs/programs/verified-builds"],
           },
           {
             group: "IDLs & Codama clients",
-            root: "docs/programs/idls",
+            root: "developers/docs/programs/idls",
             labelFrom: "none",
-            pages: [x("docs/programs/codama")],
+            pages: [x("developers/docs/programs/codama")],
           },
-          "docs/programs/examples",
-          "docs/programs/limitations",
+          "developers/docs/programs/examples",
+          "developers/docs/programs/limitations",
         ],
       },
       {
@@ -442,9 +454,9 @@ export const IA_TEMPLATE: TemplateTab[] = [
         pages: [
           {
             group: "React & Next.js",
-            root: "docs/frontend/index",
+            root: "developers/docs/frontend/index",
             labelFrom: "meta:docs/frontend",
-            pages: [x("docs/frontend")],
+            pages: [x("developers/docs/frontend")],
           },
           {
             group: "Developer tools",
@@ -452,31 +464,31 @@ export const IA_TEMPLATE: TemplateTab[] = [
             pages: [
               {
                 group: "Surfpool",
-                root: "docs/tools/surfpool/index",
-                pages: [x("docs/tools/surfpool")],
+                root: "developers/docs/tools/surfpool/index",
+                pages: [x("developers/docs/tools/surfpool")],
               },
               {
                 group: "LiteSVM",
-                root: "docs/tools/litesvm/index",
-                pages: [x("docs/tools/litesvm")],
+                root: "developers/docs/tools/litesvm/index",
+                pages: [x("developers/docs/tools/litesvm")],
               },
-              "docs/tools/microscope",
+              "developers/docs/tools/microscope",
               {
                 group: "Keychain",
-                root: "docs/tools/keychain/index",
-                pages: [x("docs/tools/keychain")],
+                root: "developers/docs/tools/keychain/index",
+                pages: [x("developers/docs/tools/keychain")],
               },
               {
                 group: "Private Channels",
-                root: "docs/tools/private-channels/index",
-                pages: [x("docs/tools/private-channels")],
+                root: "developers/docs/tools/private-channels/index",
+                pages: [x("developers/docs/tools/private-channels")],
               },
-              "docs/tools/actions",
+              "developers/docs/tools/actions",
             ],
           },
         ],
       },
-      { group: "Ship", pages: ["docs/tools/production-readiness"] },
+      { group: "Ship", pages: ["developers/docs/tools/production-readiness"] },
       {
         group: "Cookbook",
         labelFrom: "message:cookbook",
@@ -498,24 +510,24 @@ export const IA_TEMPLATE: TemplateTab[] = [
         group: "RPC methods",
         labelFrom: "meta:docs/rpc",
         pages: [
-          "docs/rpc/index",
-          "docs/rpc/providers",
-          "docs/rpc/json-structures",
+          "developers/docs/rpc/index",
+          "developers/docs/rpc/providers",
+          "developers/docs/rpc/json-structures",
           {
             group: "HTTP methods",
-            root: "docs/rpc/http/index",
-            pages: [x("docs/rpc/http")],
+            root: "developers/docs/rpc/http/index",
+            pages: [x("developers/docs/rpc/http")],
           },
           {
             group: "WebSocket methods",
-            root: "docs/rpc/websocket/index",
-            pages: [x("docs/rpc/websocket")],
+            root: "developers/docs/rpc/websocket/index",
+            pages: [x("developers/docs/rpc/websocket")],
           },
           {
             group: "Removed methods",
-            root: "docs/rpc/deprecated/index",
+            root: "developers/docs/rpc/deprecated/index",
             expanded: false,
-            pages: [x("docs/rpc/deprecated")],
+            pages: [x("developers/docs/rpc/deprecated")],
           },
         ],
       },
@@ -523,23 +535,26 @@ export const IA_TEMPLATE: TemplateTab[] = [
         group: "SDKs",
         labelFrom: "meta:docs/clients",
         pages: [
-          "docs/clients/index",
-          "docs/clients/official/javascript",
-          "docs/clients/official/rust",
+          "developers/docs/clients/index",
+          "developers/docs/clients/official/javascript",
+          "developers/docs/clients/official/rust",
           {
             group: "Python & community",
             labelFrom: "meta:docs/clients/community",
-            pages: [x("docs/clients/community")],
+            pages: [x("developers/docs/clients/community")],
           },
         ],
       },
       {
         group: "CLI reference",
-        pages: ["docs/references/solana-cli", "docs/references/spl-token-cli"],
+        pages: [
+          "developers/docs/references/solana-cli",
+          "developers/docs/references/spl-token-cli",
+        ],
       },
       {
         group: "Network constants",
-        pages: ["docs/core/constants-reference"],
+        pages: ["developers/docs/core/constants-reference"],
       },
     ],
   },
@@ -556,30 +571,30 @@ export const IA_TEMPLATE: TemplateTab[] = [
         group: "Videos",
         labelFrom: "message:videoTutorials",
         pages: [
-          "docs/video-guides/index",
+          "developers/docs/video-guides/index",
           {
             group: "Foundations",
             labelFrom: "meta:developers/bootcamp/foundations",
             pages: [
-              "docs/video-guides/solana-crash-course",
-              "docs/video-guides/2026-developer-bootcamp",
+              "developers/docs/video-guides/solana-crash-course",
+              "developers/docs/video-guides/2026-developer-bootcamp",
             ],
           },
           {
             group: "Payments",
             labelFrom: "message:payments",
             pages: [
-              "docs/video-guides/agent-payments",
-              "docs/video-guides/pay-sh-video-tutorials",
+              "developers/docs/video-guides/agent-payments",
+              "developers/docs/video-guides/pay-sh-video-tutorials",
             ],
           },
           {
             group: "Privacy",
-            pages: ["docs/video-guides/confidential-balances"],
+            pages: ["developers/docs/video-guides/confidential-balances"],
           },
           {
             group: "Hardware & DePIN",
-            pages: ["docs/video-guides/building-depin-projects"],
+            pages: ["developers/docs/video-guides/building-depin-projects"],
           },
         ],
       },
@@ -620,7 +635,7 @@ export const IA_TEMPLATE: TemplateTab[] = [
       {
         group: "Documentation tags",
         searchable: true,
-        pages: ["docs/tags/index"],
+        pages: ["developers/docs/tags/index"],
       },
     ],
   },

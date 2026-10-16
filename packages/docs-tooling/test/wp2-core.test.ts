@@ -34,7 +34,7 @@ import {
 import type { Transform } from "../src/types.ts";
 
 const FILE = {
-  path: "apps/docs/docs/x/page.mdx",
+  path: "apps/docs/developers/docs/x/page.mdx",
   locale: "en",
   collection: "docs" as const,
 };
@@ -303,7 +303,7 @@ describe("all WP2 transforms together", () => {
     "</Tabs>",
     "",
     "<Cards>",
-    '  <Card title="Next" href="/docs/next" description="Go on" />',
+    '  <Card title="Next" href="/developers/docs/next" description="Go on" />',
     "</Cards>",
     "",
     '<Embed url="https://youtu.be/Bqs95tFcRIU" />',

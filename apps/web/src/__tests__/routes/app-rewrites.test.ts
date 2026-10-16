@@ -56,8 +56,8 @@ describe("Cross-app rewrites", () => {
       `${MEDIA_APP_URL}/podcasts/:path*`,
     );
     expectBeforeFileRewrite(
-      "/docs/:path((?![^/]+/llms\\.txt$).*)",
-      `${MINTLIFY_ORIGIN}/docs/:path`,
+      "/developers/docs/:path((?![^/]+/llms\\.txt$).*)",
+      `${MINTLIFY_ORIGIN}/developers/docs/:path`,
     );
     expectBeforeFileRewrite(
       "/developers/cookbook/:path*",

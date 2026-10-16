@@ -1,0 +1,482 @@
+---
+title: Programme deployen
+description:
+  Complete guide to building, deploying, and managing Solana programs using the
+  Solana CLI.
+---
+
+Dieser Abschnitt führt durch den grundlegenden Prozess der Bereitstellung eines
+Solana-Programms mit der Solana CLI.
+
+## CLI-Befehlsreferenz
+
+| Aufgabe                               | Befehl                                                                                       |
+| ---------------------------------- | --------------------------------------------------------------------------------------------- |
+| Programm erstellen                      | `cargo build-sbf`                                                                             |
+| Neues Programm bereitstellen                 | `solana program deploy <path_to_program.so>`                                                  |
+| Bestehendes Programm aktualisieren            | `solana program deploy <path_to_program.so>` (wie bei Bereitstellung)                                 |
+| Programminformationen anzeigen                  | `solana program show <program-id>`                                                            |
+| Programmberechtigung übertragen         | `solana program set-upgrade-authority <program-id> --new-upgrade-authority <path_to_keypair>` |
+| Programm unveränderlich machen             | `solana program set-upgrade-authority <program-id> --final`                                   |
+| Programm schließen                      | `solana program close <program-id> --bypass-warning`                                          |
+| Wallet-Guthaben prüfen               | `solana balance`                                                                              |
+| Airdrop anfordern (devnet/localhost) | `solana airdrop 2`                                                                            |
+
+## Schlüsselkonzepte
+
+Bevor wir beginnen, klären wir einige Begriffe:
+
+- **Programm-ID**: Die Onchain-Adresse Ihres Programms. Benutzer interagieren
+  mit Ihrem Programm, indem sie die Programm-ID referenzieren.
+- **Program Account**: Das Onchain-Konto, das die Metadaten Ihres Programms
+  speichert. Die Adresse des Program Accounts ist die Programm-ID. Das Program
+  Account speichert auch die Adresse des ProgramData Accounts.
+- **ProgramData Account**: Das Onchain-Konto, das den bereitgestellten
+  ausführbaren Code Ihres Programms speichert.
+- **Programmberechtigung**: Das Konto, das die Erlaubnis hat, das Programm zu
+  aktualisieren oder zu schließen. Standardmäßig ist dies Ihr CLI-Wallet.
+
+## Voraussetzungen
+
+<Steps titleSize="h3">
+
+<Step title="Installation der Solana CLI">
+
+Zuerst [installiere die Solana CLI](/developers/docs/intro/installation).
+
+</Step>
+
+<Step title="Wallet einrichten">
+
+Nach der Installation erstelle ein lokales Keypair-Wallet. Die Adresse dieses
+Wallets wird bei der Bereitstellung von Programmen als
+Standard-Programmautorität festgelegt:
+
+```bash Terminal
+solana-keygen new
+```
+
+Dies erstellt standardmäßig ein keypair unter `~/.config/solana/id.json`.
+
+</Step>
+
+<Step title="Cluster konfigurieren">
+
+Wählen Sie aus, auf welchem Solana-Cluster bereitgestellt werden soll. Verwenden
+Sie den Befehl `solana config get`, um Ihre aktuelle Konfiguration zu
+überprüfen:
+
+```bash Terminal
+solana config get
+```
+
+```text Output
+Config File: ~/.config/solana/cli/config.yml
+RPC URL: http://localhost:8899
+WebSocket URL: ws://localhost:8900/ (computed)
+Keypair Path: ~/.config/solana/id.json
+Commitment: confirmed
+```
+
+Wechseln Sie bei Bedarf zwischen den Clustern:
+
+```bash Terminal
+solana config set --url mainnet-beta
+solana config set --url devnet
+solana config set --url localhost
+solana config set --url testnet
+solana config set --url "https://your-rpc-url.com"
+```
+
+</Step>
+
+<Step title="Wallet aufladen">
+
+Sie benötigen SOL, um für Programm-Deployments zu bezahlen. Die Menge hängt von
+der Größe Ihres Programms ab.
+
+Für devnet oder localhost laden Sie Ihr Wallet mit dem Befehl `solana airdrop`
+auf:
+
+```bash Terminal
+solana airdrop 2
+```
+
+```text Output
+Requesting airdrop of 2 SOL
+Signature: 5zQKxvRdgJDA8fRGPdKfGxRLnLpwmNnMXGYxfBqFSUPqc5BTmFPrTG8vnC4HvKDVY8zQ8aQxZxcEE7WFpGhZGVAA
+2 SOL
+```
+
+Überprüfen Sie Ihren Wallet-Kontostand:
+
+```bash Terminal
+solana balance
+```
+
+```text Output
+2 SOL
+```
+
+</Step>
+
+</Steps>
+
+## Grundlegende Operationen
+
+### Programm bauen
+
+Um ein Programm zu erstellen, verwenden Sie den Befehl `cargo build-sbf`:
+
+```bash Terminal
+cargo build-sbf
+```
+
+<Steps>
+  <Step title="Beispielprogramm">
+    Hier ist ein minimales Solana-Programm, das "Hello, Solana!" in die Programm-
+    Logs ausgibt.
+
+    ```rs src/lib.rs
+    use solana_program::{
+        account_info::AccountInfo, entrypoint, entrypoint::ProgramResult, msg, pubkey::Pubkey,
+    };
+
+    entrypoint!(process_instruction);
+
+    pub fn process_instruction(
+        _program_id: &Pubkey,
+        _accounts: &[AccountInfo],
+        _instruction_data: &[u8],
+    ) -> ProgramResult {
+        msg!("Hello, Solana!");
+        Ok(())
+    }
+    ```
+
+    ```toml Cargo.toml
+    [package]
+    name = "hello_world"
+    version = "0.1.0"
+    edition = "2021"
+
+    [lib]
+    crate-type = ["cdylib", "lib"]
+
+    [dependencies]
+    solana-program = "2.2.0"
+    ```
+  </Step>
+
+  <Step title="Build-Ausgabe">
+    Erstellen Sie Ihr Programm mit dem Befehl `cargo build-sbf`:
+
+    ```bash Terminal
+    cargo build-sbf
+    ```
+
+    Dies erstellt zwei wichtige Dateien in `target/deploy/`:
+
+    1. `hello_world-keypair.json`: Eine keypair-Datei, deren öffentlicher Schlüssel
+       als Ihre Programm-ID verwendet wird
+    2. `hello_world.so`: Die kompilierte ausführbare Programmdatei
+
+    ```json target/deploy/hello_world-keypair.json
+    [
+      203, 253, 43, 62, 165, 111, 94, 222, 105, 225, 218, 85, 143, 9, 114, 96, 243,
+      181, 114, 89, 72, 230, 124, 85, 59, 165, 198, 23, 240, 212, 23, 154, 229, 241,
+      153, 61, 153, 105, 79, 204, 193, 163, 33, 65, 82, 183, 49, 240, 224, 137, 248,
+      24, 128, 25, 192, 197, 118, 235, 239, 67, 85, 156, 219, 231
+    ]
+    ```
+
+    ```txt target/deploy/hello_world.so
+    [binary executable file]
+    ```
+  </Step>
+</Steps>
+
+### Programmgröße und -kosten prüfen
+
+Das Deployen eines Programms erfordert SOL, das basierend auf der Größe des
+Programms dem Programmkonto zugewiesen wird. Größere Programme kosten mehr SOL
+für das Deployment.
+
+Überprüfen Sie die Größe Ihres Programms:
+
+```bash Terminal
+wc -c < ./target/deploy/hello_world.so
+```
+
+```text Output
+18504
+```
+
+Berechnen Sie das erforderliche SOL für diese Größe (Bytes):
+
+```bash Terminal
+solana rent 18504
+```
+
+```text Output
+Rent-exempt minimum: 0.12967872 SOL
+```
+
+<Info>
+  Sie benötigen etwas mehr SOL als angezeigt, um die Transaktionsgebühren für
+  das Deployment zu decken.
+</Info>
+
+### Programm deployen
+
+Verwenden Sie den Befehl `solana program deploy`, um Ihr Programm
+bereitzustellen:
+
+```bash Terminal
+solana program deploy ./target/deploy/hello_world.so
+```
+
+```text Output
+Program Id: 7NxQjW8H8hVcqBKgXbVDWqGQCovHbqDW9p1SJJwUyTpE
+Signature: 2BYwsqRP7ZwBNQvJp3S8bphTJ4zKW5JBPVMqCTE5KyLkP8xHzAyUEeC4LdTgjJdGBKHWNCkRF8Mf1T1WkLFyEu8W
+```
+
+Die angezeigte **Program Id** ist die permanente Adresse Ihres Programms im
+Netzwerk.
+
+<Note>
+
+Um mit einer bestimmten Programm-ID zu deployen (anstelle der automatisch
+generierten), verwenden Sie:
+
+```bash Terminal
+solana program deploy ./target/deploy/hello_world.so --program-id ./custom-keypair.json
+```
+
+Sie können neue keypairs mit dem Befehl `solana-keygen` generieren:
+
+```bash Terminal
+solana-keygen new -o ./custom-keypair.json
+```
+
+</Note>
+
+### Programm aktualisieren
+
+Aktualisieren Sie Ihr Programm mit demselben `solana program deploy` Befehl:
+
+1. Nehmen Sie Änderungen an Ihrem Programmcode vor
+2. Erstellen Sie Ihr Programm neu: `cargo build-sbf`
+3. Deployen Sie das Update:
+
+```bash Terminal
+solana program deploy ./target/deploy/hello_world.so
+```
+
+```text Output
+Program Id: 7NxQjW8H8hVcqBKgXbVDWqGQCovHbqDW9p1SJJwUyTpE
+Signature: 3zKnXDfEm1R8hVcEmTnNFYUaFjVVbLJrKdFj5hBMXoBRfz8xGyDhCYgKr9YY5KxKYPEUQQVfwEPNz9hQGvYhLNBJ
+```
+
+<Info>
+
+Wenn Ihr aktualisiertes Programm mehr Speicherplatz (Bytes) benötigt als derzeit
+zugewiesen, wird das Deployment automatisch das Programmkonto erweitern. Dies
+geschieht, wenn Ihr neues Programm größer ist als die vorherige Version. Das
+Programmkonto benötigt zusätzliche Bytes, um das neue Programm zu speichern. Die
+CLI berechnet automatisch die erforderlichen SOL und zieht sie von Ihrer Wallet
+ab.
+
+Sie können ein Programm auch manuell erweitern, um mehr Bytes zuzuweisen:
+
+```bash Terminal
+solana program extend 7NxQjW8H8hVcqBKgXbVDWqGQCovHbqDW9p1SJJwUyTpE 1000
+```
+
+```text Output
+Extended Program Id 7NxQjW8H8hVcqBKgXbVDWqGQCovHbqDW9p1SJJwUyTpE by 1000 bytes
+```
+
+</Info>
+
+## Programmverwaltung
+
+Sobald Ihr Programm deployed ist, gibt es mehrere gängige Befehle zur Verwaltung
+des Programmkontos.
+
+### Programm-Metadaten anzeigen
+
+Um Ihre Programm-Metadaten zu überprüfen, verwenden Sie den
+`solana program show` Befehl:
+
+```bash Terminal
+solana program show 7NxQjW8H8hVcqBKgXbVDWqGQCovHbqDW9p1SJJwUyTpE
+```
+
+Beispielausgabe:
+
+```txt
+$ solana program show 7283x8k8fyBcfaFLyPsxbd2VV1AMmZFP7FNoyTXVKJw7
+Program Id: 7283x8k8fyBcfaFLyPsxbd2VV1AMmZFP7FNoyTXVKJw7
+Owner: BPFLoaderUpgradeab1e11111111111111111111111
+ProgramData Address: Gqn7YQVCP8NtYV1qkEqR4Udhj8EJ3fkikvS7HskCNQ7c
+Authority: 5kh6HxYZiAebF8HWLsUWod2EaQQ6iWHpHYCz8UcmFbM1
+Last Deployed In Slot: 6573
+Data Length: 18504 (0x4848) bytes
+Balance: 0.12999192 SOL
+```
+
+<Note>
+  **`Program Id`**
+
+  Die Programm-ID ist die Onchain-Adresse Ihres Program Accounts. Benutzer und
+  andere Programme rufen Ihr Programm auf, indem sie diese ID in ihren
+  Transaktionen referenzieren.
+
+  **`Owner`**
+
+  Der Owner identifiziert, welcher Loader für das Deployment dieses Programms
+  verwendet wurde. Bei den meisten Programmen wird dies der BPF Upgradeable Loader
+  sein.
+
+  **`ProgramData Address`**
+
+  Die ProgramData Address verweist auf das separate Konto, das den ausführbaren
+  Code Ihres Programms speichert.
+
+  **`Authority`**
+
+  Die Authority ist das Konto, das die Berechtigung hat, dieses Programm zu
+  aktualisieren oder zu schließen. Nur die Authority kann Updates bereitstellen
+  oder das Programm schließen, um das zugewiesene SOL des Programms
+  zurückzufordern.
+
+  **`Last Deployed In Slot`**
+
+  Der Last Deployed In Slot zeigt an, wann dieses Programm zuletzt aktualisiert
+  wurde.
+
+  **`Data Length`**
+
+  Die Data Length zeigt die Gesamtanzahl der Bytes an, die diesem Programm
+  zugewiesen sind. Dieser Speicherplatz kann zukünftige Updates aufnehmen, die
+  möglicherweise größer sind als die aktuelle Programmgröße.
+
+  **`Balance`**
+
+  Das Balance zeigt das SOL an, das dem Programmkonto zugewiesen wurde, um seine
+  Daten zu speichern.
+</Note>
+
+### Programm-Authority übertragen
+
+Um die Programm-Autorität auf ein anderes Konto zu übertragen, verwenden Sie den
+`solana program set-upgrade-authority` Befehl:
+
+```bash Terminal
+solana program set-upgrade-authority 7NxQjW8H8hVcqBKgXbVDWqGQCovHbqDW9p1SJJwUyTpE --new-upgrade-authority ./new-authority-keypair.json
+```
+
+<Warning>
+  Nach der Übertragung der Programm-Authority können Sie das Programm nicht mehr
+  aktualisieren, es sei denn, Sie haben Zugriff auf das neue Authority-keypair.
+</Warning>
+
+### Ihr Programm unveränderlich machen
+
+Um Ihr Programm unveränderlich zu machen, verwenden Sie den
+`solana program set-upgrade-authority` Befehl mit dem `--final` Flag, um die
+Programm-Autorität zu entfernen:
+
+```bash Terminal
+solana program set-upgrade-authority 7NxQjW8H8hVcqBKgXbVDWqGQCovHbqDW9p1SJJwUyTpE --final
+```
+
+```text Output
+Account Type: Program
+Authority: none
+```
+
+<Warning>
+  Sobald ein Programm unveränderlich ist, kann es nie mehr aktualisiert oder
+  geschlossen werden.
+</Warning>
+
+### Ihr Programm schließen
+
+Um Ihr Programm zu schließen und die dem Programm-Konto zugewiesenen SOL
+zurückzufordern, verwenden Sie den `solana program close` Befehl:
+
+```bash Terminal
+solana program close 7NxQjW8H8hVcqBKgXbVDWqGQCovHbqDW9p1SJJwUyTpE --bypass-warning
+```
+
+```text Output
+Closed Program Id 7NxQjW8H8hVcqBKgXbVDWqGQCovHbqDW9p1SJJwUyTpE, 0.12999192 SOL reclaimed
+```
+
+<Warning>
+  Nach dem Schließen kann die Programm-ID nicht wiederverwendet werden. Sie
+  können kein neues Programm an dieselbe Adresse bereitstellen.
+</Warning>
+
+## Dienstprogramm-Befehle
+
+### Alle Programme auflisten
+
+Zeigen Sie alle Programme an, bei denen Ihre aktuelle Wallet die Authority ist:
+
+```bash Terminal
+solana program show --programs
+```
+
+Beispielausgabe:
+
+```txt
+Program Id                                       | Slot       | Authority                                      | Balance
+-------------------------------------------------|------------|------------------------------------------------|-------------
+7NxQjW8H8hVcqBKgXbVDWqGQCovHbqDW9p1SJJwUyTpE     | 249885434  | 5kh6HxYZiAebF8HWLsUWod2EaQQ6iWHpHYCz8UcmFbM1   | 0.12999192
+3KSGCk4m5hqJkTjPHBXUCPcqMwJnK3VmkqEsFUKKGJPK     | 249883212  | 5kh6HxYZiAebF8HWLsUWod2EaQQ6iWHpHYCz8UcmFbM1   | 0.28654328
+```
+
+### Ein Deployed Programm herunterladen
+
+Um ein deploytes Programm herunterzuladen, verwenden Sie den
+`solana program dump` Befehl:
+
+```bash Terminal
+solana program dump 7NxQjW8H8hVcqBKgXbVDWqGQCovHbqDW9p1SJJwUyTpE ./downloaded_program.so
+```
+
+```text Output
+Wrote program to ./downloaded_program.so
+```
+
+## Erweiterte Optionen
+
+### Deployment-Flags
+
+Wenn das Solana-Netzwerk überlastet ist, verwenden Sie diese Flags, um bei dem
+Programm-Deployment zu helfen.
+
+Beispielanwendung:
+
+```bash Terminal
+solana program deploy ./target/deploy/hello_world.so \
+    --with-compute-unit-price 10000 \
+    --max-sign-attempts 10 \
+    --use-rpc
+```
+
+Erklärung der Optionen:
+
+- **`--with-compute-unit-price`**: Legt die priority fee in Micro-Lamports
+  (0,000001 SOL) pro Compute Unit fest. Prüfen Sie die
+  [Helius Priority Fee API](https://docs.helius.dev/guides/priority-fee-api) für
+  aktuelle Tarife. Eine priority fee ist eine zusätzliche Gebühr, die an den
+  aktuellen Leader gezahlt wird, um Ihre Transaktion zu priorisieren.
+- **`--max-sign-attempts`**: Anzahl der Wiederholungsversuche mit einem neuen
+  Blockhash, falls Transaktionen ablaufen. (Standard: 5)
+- **`--use-rpc`**: Sendet Transaktionen an den konfigurierten RPC. Dieses Flag erfordert eine
+  [stake-gewichtete](/developers/docs/defi/stake-weighted-qos) RPC-Verbindung von Anbietern
+  wie [Triton](https://triton.one/) oder [Helius](https://www.helius.dev/).

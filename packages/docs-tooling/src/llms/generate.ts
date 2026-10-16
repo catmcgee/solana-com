@@ -69,11 +69,11 @@ export function renderLlmsTxt(pages: ManifestPage[], header = readHeader()) {
   return lines.join("\n");
 }
 
-/** First-level sections of /docs that have at least one page. */
+/** First-level sections of /developers/docs that have at least one page. */
 export function docsSections(pages: ManifestPage[]) {
   const set = new Set<string>();
   for (const p of englishIndexable(pages)) {
-    const m = /^\/docs\/([^/]+)/.exec(p.url);
+    const m = /^\/developers\/docs\/([^/]+)/.exec(p.url);
     if (m) set.add(m[1]!);
   }
   return [...set].sort();
@@ -83,7 +83,7 @@ export function renderSectionLlmsTxt(
   pages: ManifestPage[],
   section: string,
 ): string | null {
-  const prefix = `/docs/${section}`;
+  const prefix = `/developers/docs/${section}`;
   const inSection = englishIndexable(pages).filter((p) => under(p.url, prefix));
   if (inSection.length === 0) return null;
   const title = inSection.find((p) => p.url === prefix)?.title ?? section;

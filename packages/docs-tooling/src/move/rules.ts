@@ -20,6 +20,17 @@ export const COLLECTION_BASE: Record<Collection, string> = {
   learn: "/learn",
 };
 
+/**
+ * Public URL prefix (= folder under apps/docs) of each collection in the
+ * CURRENT layout. The docs moved from /docs to /developers/docs on
+ * 2026-10-16; apps/web redirects every /docs URL (and its locale twins).
+ * COLLECTION_BASE above stays the legacy (Fumadocs) URL prefix.
+ */
+export const LAYOUT_BASE: Record<Collection, string> = {
+  ...COLLECTION_BASE,
+  docs: "/developers/docs",
+};
+
 /** Legacy content folder of each collection. */
 export const COLLECTION_DIR: Record<Collection, string> = {
   docs: "docs",
@@ -103,10 +114,12 @@ export function legacyUrl(entry: LegacyEntry): string {
 /**
  * New repo-relative path under apps/docs (R1-R7, R9). Folder layout mirrors
  * the public URL so Mintlify (root-hosted, no base path) serves the same URL.
+ * Docs files are under developers/docs (LAYOUT_BASE), so their URL changed:
+ * apps/web redirects the legacy /docs URL.
  */
 export function newPath(entry: LegacyEntry): string {
   const lp = entry.locale === DEFAULT_LOCALE ? "" : `${entry.locale}/`;
-  const base = COLLECTION_BASE[entry.collection].slice(1); // drop leading "/"
+  const base = LAYOUT_BASE[entry.collection].slice(1); // drop leading "/"
   return `${DOCS_PREFIX}${lp}${base}/${entry.rel}`;
 }
 
@@ -238,8 +251,8 @@ export function classify(files: readonly string[]): ClassifyResult {
 }
 
 /**
- * Inverse of `newPath` + routing: the file in the NEW layout that serves a
- * URL, if the URL is in a Mintlify-served namespace. Returns both candidates
+ * The files in the NEW layout that would serve a URL, if the URL is in a
+ * Mintlify-served namespace (folder layout = URL). Returns both candidates
  * (`x.mdx`, `x/index.mdx`); callers check which exist.
  */
 export function candidateFilesForUrl(url: string): string[] {

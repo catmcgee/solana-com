@@ -1,0 +1,89 @@
+---
+title: "Rent (storage deposit)"
+sidebarTitle: "Rent"
+description:
+  "Every Solana account holds a refundable deposit, proportional to its size,
+  for the space it takes up. How much it is, who pays it and how to get it
+  back."
+type: conceptual
+related:
+  - /developers/docs/core/accounts/account-structure
+  - /developers/cookbook/accounts/calculate-rent
+  - /developers/docs/tokens/basics/close-account
+---
+
+import Short from "/snippets/concepts/en/rent.short.mdx";
+import UsedIn from "/snippets/concepts/en/rent.used-in.mdx";
+import CalculateRent from "/snippets/examples/cookbook/accounts/calculate-rent/calc.mdx";
+
+## In short
+
+<Short />
+
+<UsedIn />
+
+## What the deposit is
+
+Every <span className="sol-chip" data-concept="account"><Tooltip headline="Accounts" tip="Everything on Solana (balances, tokens, programs, app data) lives in accounts: records at an address, each with an owner that is allowed to change it." cta="Learn more" href="/developers/docs/core/accounts">account</Tooltip><span className="nojs-only"> ([Accounts](/developers/docs/core/accounts): Everything on Solana (balances, tokens, programs, app data) lives in accounts: records at an address, each with an owner that is allowed to change it.)</span></span> must hold
+a minimum balance of lamports (1 SOL = 1,000,000,000 lamports) to keep its data
+stored on the network. The amount depends only on the account's size. It is a
+deposit, not a fee: nothing is deducted over time, and the full balance comes
+back when the account is closed.
+
+The runtime and the RPC methods still call this the **rent-exempt minimum**,
+and the field that tracked rent payments, `rent_epoch`, is deprecated. Ongoing
+rent collection is disabled. See
+[account structure](/developers/docs/core/accounts/account-structure) for the fields every
+account holds.
+
+## How much it costs
+
+With the current network parameters, the minimum balance is:
+
+```text
+(128 + data size in bytes) × 6,960 lamports
+```
+
+The 128 bytes cover the account's own metadata. Some common sizes:
+
+| Account                             | Data size | Minimum balance                     |
+| ----------------------------------- | --------- | ----------------------------------- |
+| Wallet (system account, no data)    | 0 bytes   | 890,880 lamports (0.00089088 SOL)   |
+| Token account (original Token program) | 165 bytes | 2,039,280 lamports (0.00203928 SOL) |
+| Account with 1,500 bytes of data    | 1,500 bytes | 11,330,880 lamports (0.01133088 SOL) |
+
+Don't hard-code these numbers. Ask the network with
+[`getMinimumBalanceForRentExemption`](/developers/docs/rpc/http/getminimumbalanceforrentexemption),
+which returns the current value for a given size:
+
+<CalculateRent />
+
+## Who pays, and who gets it back
+
+The account that creates a new account funds its deposit. In practice:
+
+- **Payments.** A customer who has never held USDC has no USDC
+  <span className="sol-chip" data-concept="token-account"><Tooltip headline="Token accounts" tip="Wallets don't hold tokens directly. Each token (USDC, or your own asset) gets a small account owned by the wallet, and transfers move between these accounts." cta="Learn more" href="/developers/docs/tokens/basics/create-token-account">token account</Tooltip><span className="nojs-only"> ([Token accounts](/developers/docs/tokens/basics/create-token-account): Wallets don't hold tokens directly. Each token (USDC, or your own asset) gets a small account owned by the wallet, and transfers move between these accounts.)</span></span>.
+  Whoever sends them their first USDC usually creates it and pays about 0.002
+  SOL. Your app can pay this for its users, together with their network fees,
+  through [fee sponsorship](/developers/docs/core/fees/fee-sponsorship).
+- **Assets.** Token-2022 associated token accounts are slightly larger (170
+  bytes, 2,074,080 lamports), because they carry the `ImmutableOwner`
+  extension, and each further extension adds space, so mints and token accounts with
+  extensions need larger deposits. See
+  [create a token account](/developers/docs/tokens/basics/create-token-account).
+- **Programs.** A program pays for each account it creates, from the payer
+  account passed into the instruction.
+
+When an account is closed, its whole balance moves to an address chosen by the
+account's owner or close authority. For token accounts, see
+[close a token account](/developers/docs/tokens/basics/close-account). An account whose
+balance drops to zero is removed by the network.
+
+## Related
+
+- [How to calculate account creation cost](/developers/cookbook/accounts/calculate-rent)
+  in the cookbook.
+- [Rent state transitions](/developers/docs/core/accounts/modification-rules#rent-state-transitions):
+  the rules the runtime enforces when an account's balance changes. New
+  accounts must always hold at least the minimum balance.

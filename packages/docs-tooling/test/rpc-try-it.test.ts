@@ -21,15 +21,19 @@ const api = loadTryItScript();
 
 describe("rpc-try-it.js page matching", () => {
   it("matches HTTP methods and subscriptions, with or without a locale", () => {
-    expect(api.pageInfo("/docs/rpc/http/getbalance")).toMatchObject({
+    expect(api.pageInfo("/developers/docs/rpc/http/getbalance")).toMatchObject({
       kind: "http",
       slug: "getbalance",
     });
-    expect(api.pageInfo("/ja/docs/rpc/http/getBalance/")).toMatchObject({
+    expect(
+      api.pageInfo("/ja/developers/docs/rpc/http/getBalance/"),
+    ).toMatchObject({
       kind: "http",
       slug: "getbalance",
     });
-    expect(api.pageInfo("/docs/rpc/websocket/slotsubscribe")).toMatchObject({
+    expect(
+      api.pageInfo("/developers/docs/rpc/websocket/slotsubscribe"),
+    ).toMatchObject({
       kind: "ws",
       slug: "slotsubscribe",
     });
@@ -37,11 +41,11 @@ describe("rpc-try-it.js page matching", () => {
 
   it("skips unsubscribe, index, deprecated and non-RPC pages", () => {
     for (const p of [
-      "/docs/rpc/websocket/slotunsubscribe",
-      "/docs/rpc/http",
-      "/docs/rpc",
-      "/docs/rpc/deprecated/getfees",
-      "/docs/core/accounts",
+      "/developers/docs/rpc/websocket/slotunsubscribe",
+      "/developers/docs/rpc/http",
+      "/developers/docs/rpc",
+      "/developers/docs/rpc/deprecated/getfees",
+      "/developers/docs/core/accounts",
       "/developers/cookbook/rpc/http/getbalance",
     ])
       expect(api.pageInfo(p), p).toBeNull();
@@ -147,10 +151,16 @@ describe("RPC Try it corpus", () => {
   it("English has the old site's 62 panels: 53 HTTP + 9 subscriptions", () => {
     expect(scan.counts.get("en http")).toBe(53);
     expect(scan.counts.get("en ws")).toBe(9);
-    const en = scan.pages.filter((p) => p.startsWith("apps/docs/docs/"));
-    expect(en).toContain("apps/docs/docs/rpc/http/getbalance.mdx");
-    expect(en).toContain("apps/docs/docs/rpc/http/sendtransaction.mdx");
-    expect(en).toContain("apps/docs/docs/rpc/websocket/accountsubscribe.mdx");
+    const en = scan.pages.filter((p) =>
+      p.startsWith("apps/docs/developers/docs/"),
+    );
+    expect(en).toContain("apps/docs/developers/docs/rpc/http/getbalance.mdx");
+    expect(en).toContain(
+      "apps/docs/developers/docs/rpc/http/sendtransaction.mdx",
+    );
+    expect(en).toContain(
+      "apps/docs/developers/docs/rpc/websocket/accountsubscribe.mdx",
+    );
     expect(en.some((p) => /unsubscribe\.mdx$/.test(p))).toBe(false);
   });
 });

@@ -15,6 +15,12 @@
  * - `route-pending`     React route moving to apps/web (/learn, /developers)
  * Anything else (`unmapped`, `ambiguous`) fails.
  *
+ * Redirects are followed: the chain must end, within MAX_REDIRECT_HOPS (2),
+ * on a file, a translation fallback, an apps/web landing or an external
+ * URL. A longer chain is `redirect-chain`, a dead end `redirect-dead`; both
+ * fail. Since 2026-10-16 every legacy /docs URL redirects (the docs moved to
+ * /developers/docs), so the docs pages class as `redirect`.
+ *
  * Precedence follows Next.js: redirects run before rewrites, so a URL that a
  * redirect matches is a redirect even when a file in the new layout has the
  * same path. The legacy docs app's own redirects (docs-app-redirects.json)
@@ -36,7 +42,11 @@ import {
   LEGACY_LOCALES,
 } from "../lib/locales.ts";
 import { migrationDir, repoRoot } from "../lib/paths.ts";
-import { candidateFilesForUrl, COLLECTION_BASE } from "../move/rules.ts";
+import {
+  candidateFilesForUrl,
+  COLLECTION_BASE,
+  LAYOUT_BASE,
+} from "../move/rules.ts";
 import {
   DEVELOPERS_BASE,
   enumerateLegacyUrls,
@@ -58,7 +68,9 @@ export type UrlClass =
   | "fallback-en"
   | "route-pending"
   | "unmapped"
-  | "ambiguous";
+  | "ambiguous"
+  | "redirect-chain"
+  | "redirect-dead";
 
 export interface UrlResolution {
   url: string;
@@ -67,6 +79,8 @@ export interface UrlResolution {
   legacyKind: LegacyUrl["kind"];
   cls: UrlClass;
   target: string;
+  /** For redirects: what answers the final URL (`exact`, `fallback-en`, ...). */
+  landing?: string;
 }
 
 export function parseMoveMap(text: string): MoveRow[] {
@@ -129,6 +143,13 @@ export interface ResolveOptions {
   pending?: RedirectIndex;
 }
 
+/** Most redirects a legacy URL may take before it must answer 200. */
+export const MAX_REDIRECT_HOPS = 2;
+
+const LOCALE_SEGMENT = new RegExp(
+  `^/(${LEGACY_LOCALES.filter((l) => l !== DEFAULT_LOCALE).join("|")})(?=/|$)`,
+);
+
 export function resolveUrls(
   legacy: readonly LegacyUrl[],
   pages: ReadonlySet<string>,
@@ -145,6 +166,50 @@ export function resolveUrls(
     candidateFilesForUrl(url).filter((f) => pages.has(f));
   const stripLocale = (url: string, loc: string) => url.slice(loc.length + 1);
 
+  /**
+   * What answers a URL with no redirect in front of it: a file (`exact`),
+   * the English file for a missing translation (`fallback-en`, an apps/web
+   * rewrite), the English cookbook (`cookbook-rewrite`), or an apps/web
+   * landing (`route`). Null when nothing would answer 200.
+   */
+  const served = (
+    url: string,
+  ): { cls: UrlClass | "route"; target: string } | null => {
+    const files = fileFor(url);
+    if (files.length > 1)
+      return { cls: "ambiguous", target: files.join(" | ") };
+    if (files.length === 1) return { cls: "exact", target: files[0]! };
+    const loc = LOCALE_SEGMENT.exec(url)?.[1];
+    const bare = loc ? stripLocale(url, loc) || "/" : url;
+    if (bare === COLLECTION_BASE.learn || bare === DEVELOPERS_BASE)
+      return { cls: "route", target: url };
+    if (loc && !DROPPED_LOCALES.includes(loc)) {
+      const en = fileFor(bare);
+      if (en.length === 1)
+        return {
+          cls: bare.startsWith(`${LAYOUT_BASE.cookbook}`)
+            ? "cookbook-rewrite"
+            : "fallback-en",
+          target: en[0]!,
+        };
+    }
+    return null;
+  };
+
+  /** Follow apps/web redirects from `url` (Next.js: redirects run first). */
+  const follow = (url: string, index: RedirectIndex) => {
+    let cur = url;
+    let hops = 0;
+    for (;;) {
+      const m = index.match(cur);
+      if (!m) return { final: cur, hops };
+      hops += 1;
+      cur = m.resolved.replace(/[#?].*$/, "") || "/";
+      if (/^https?:\/\//.test(m.resolved)) return { final: m.resolved, hops };
+      if (hops > MAX_REDIRECT_HOPS) return { final: cur, hops };
+    }
+  };
+
   return legacy.map((u) => {
     const base = {
       url: u.url,
@@ -157,16 +222,36 @@ export function resolveUrls(
     const route = rows.find((r) => r.status === "route-pending");
     if (route) return { ...base, cls: "route-pending", target: route.dest };
 
-    const live = opts.web?.match(u.url);
-    if (live) return { ...base, cls: "redirect", target: live.resolved };
-    const pending = opts.pending?.match(u.url);
-    if (pending)
-      return { ...base, cls: "redirect-pending", target: pending.resolved };
+    // A redirect must land, within MAX_REDIRECT_HOPS, on something that
+    // answers 200 (a page, a translation fallback, an apps/web landing or an
+    // external site). The final URL is the target.
+    for (const [index, cls] of [
+      [opts.web, "redirect"],
+      [opts.pending, "redirect-pending"],
+    ] as const) {
+      if (!index?.match(u.url)) continue;
+      const { final, hops } = follow(u.url, index);
+      if (hops > MAX_REDIRECT_HOPS)
+        return {
+          ...base,
+          cls: "redirect-chain",
+          target: `${final} (${hops} hops)`,
+        };
+      if (/^https?:\/\//.test(final)) return { ...base, cls, target: final };
+      const end = served(final);
+      if (!end || end.cls === "ambiguous")
+        return { ...base, cls: "redirect-dead", target: final };
+      return {
+        ...base,
+        cls,
+        target: hops > 1 ? `${final} (${hops} hops)` : final,
+        landing: end.cls,
+      };
+    }
 
-    const files = fileFor(u.url);
-    if (files.length > 1)
-      return { ...base, cls: "ambiguous", target: files.join(" | ") };
-    if (files.length === 1) return { ...base, cls: "exact", target: files[0]! };
+    const direct = served(u.url);
+    if (direct && direct.cls !== "route")
+      return { ...base, cls: direct.cls as UrlClass, target: direct.target };
 
     // Recorded redirects that apps/web does not have yet (R8 removals not
     // covered by an apps/web rule, Greek pages and the Greek wildcard).
@@ -179,23 +264,7 @@ export function resolveUrls(
       // /el/<collection>/* -> /<collection>/* (decisions.md). Covers Greek
       // URLs that served English via fallback and so have no move-map row.
       const target = stripLocale(u.url, u.locale);
-      if (
-        fileFor(target).length === 1 ||
-        target === COLLECTION_BASE.learn ||
-        target === DEVELOPERS_BASE
-      )
-        return { ...base, cls: "redirect-pending", target };
-    }
-
-    if (u.locale !== DEFAULT_LOCALE) {
-      const en = fileFor(stripLocale(u.url, u.locale));
-      if (en.length === 1) {
-        return {
-          ...base,
-          cls: u.collection === "cookbook" ? "cookbook-rewrite" : "fallback-en",
-          target: en[0]!,
-        };
-      }
+      if (served(target)) return { ...base, cls: "redirect-pending", target };
     }
     return { ...base, cls: "unmapped", target: "" };
   });
@@ -252,7 +321,8 @@ export function layoutKey(
   let locale = DEFAULT_LOCALE;
   if (LEGACY_LOCALES.includes(parts[0]!) && parts[0] !== DEFAULT_LOCALE)
     locale = parts.shift()!;
-  if (parts[0] === "docs") return { collection: "docs", locale };
+  if (parts[0] === "developers" && parts[1] === "docs")
+    return { collection: "docs", locale };
   if (parts[0] === "learn") return { collection: "learn", locale };
   if (parts[0] === "developers" && parts[1] === "cookbook")
     return { collection: "cookbook", locale };
@@ -275,7 +345,7 @@ export function strayAssetsInDocsRoot(
     "apps/docs/logo-link.js",
     // Live "Try it" on RPC method pages (styles/rpc-try-it.css).
     "apps/docs/rpc-try-it.js",
-    // Opens the docs search for /docs?q= links from the /developers header.
+    // Opens the docs search for /developers/docs?q= links from the /developers header.
     "apps/docs/search-handoff.js",
     // Video chapters seek the embedded player; video cards open a dialog
     // (styles/video.css; markup from the video-guides transform).
@@ -351,10 +421,14 @@ export function runVerifyUrls(
   }
 
   const failures = resolutions.filter(
-    (r) => r.cls === "unmapped" || r.cls === "ambiguous",
+    (r) =>
+      r.cls === "unmapped" ||
+      r.cls === "ambiguous" ||
+      r.cls === "redirect-chain" ||
+      r.cls === "redirect-dead",
   );
   const missingTranslations = resolutions.filter(
-    (r) => r.cls === "fallback-en",
+    (r) => r.cls === "fallback-en" || r.landing === "fallback-en",
   );
   const redirectPending = resolutions.filter(
     (r) => r.cls === "redirect-pending",

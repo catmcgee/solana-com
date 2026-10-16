@@ -1,0 +1,199 @@
+---
+title: Метод RPC getSignaturesForAddress
+sidebarTitle: getSignaturesForAddress
+---
+
+Возвращает подписи для подтверждённых транзакций, которые включают указанный
+адрес в их `accountKeys` список. Подписи возвращаются в обратном хронологическом
+порядке, начиная с предоставленной подписи или самого последнего подтверждённого
+блока.
+
+<RequestExample>
+  ```bash cURL
+  curl https://api.devnet.solana.com -s -X POST \
+    -H "Content-Type: application/json" \
+    -d '
+    {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "getSignaturesForAddress",
+      "params": [
+        "Vote111111111111111111111111111111111111111",
+        {
+          "commitment": "finalized",
+          "limit": 1
+        }
+      ]
+    }
+  '
+  ```
+
+  ```ts Kit
+  import { address, createSolanaRpc } from "@solana/kit";
+
+  const rpc_url = "https://api.devnet.solana.com";
+  const rpc = createSolanaRpc(rpc_url);
+
+  let addr = address("Vote111111111111111111111111111111111111111");
+
+  let signaturesForConfig = {
+    limit: 1
+  };
+
+  let signatures = await rpc
+    .getSignaturesForAddress(addr, signaturesForConfig)
+    .send();
+
+  console.log(signatures);
+  ```
+
+  ```ts web3.js
+  import {
+    Connection,
+    PublicKey,
+    clusterApiUrl,
+    type SignaturesForAddressOptions
+  } from "@solana/web3.js";
+
+  const connection = new Connection(clusterApiUrl("devnet"), "confirmed");
+
+  let signaturesOptions: SignaturesForAddressOptions = {
+    limit: 1
+  };
+
+  let address = new PublicKey("Vote111111111111111111111111111111111111111");
+  let signatures = await connection.getSignaturesForAddress(
+    address,
+    signaturesOptions
+  );
+
+  console.log(signatures);
+  ```
+
+  ```rs Rust
+  use anyhow::Result;
+  use solana_client::{
+      nonblocking::rpc_client::RpcClient, rpc_client::GetConfirmedSignaturesForAddress2Config,
+  };
+  use solana_sdk::{commitment_config::CommitmentConfig, pubkey};
+
+  #[tokio::main]
+  async fn main() -> Result<()> {
+      let client = RpcClient::new_with_commitment(
+          String::from("https://api.devnet.solana.com"),
+          CommitmentConfig::confirmed(),
+      );
+
+      let address = pubkey!("Vote111111111111111111111111111111111111111");
+
+      let signatures_for_config = GetConfirmedSignaturesForAddress2Config {
+          before: None,
+          until: None,
+          limit: Some(1),
+          commitment: CommitmentConfig::finalized().into(),
+      };
+
+      let signatures = client
+          .get_signatures_for_address_with_config(&address, signatures_for_config)
+          .await?;
+
+      println!("{:#?}", signatures);
+
+      Ok(())
+  }
+  ```
+</RequestExample>
+
+<ResponseExample>
+  ```json Response
+  {
+    "jsonrpc": "2.0",
+    "result": [
+      {
+        "signature": "5h6xBEauJ3PK6SWCZ1PGjBvj8vDdWG3KpwATGy1ARAXFSDwt8GFXM7W5Ncn16wmqokgpiKRLuS83KUxyZyv2sUYv",
+        "slot": 114,
+        "err": null,
+        "memo": null,
+        "blockTime": null,
+        "confirmationStatus": "finalized"
+      }
+    ],
+    "id": 1
+  }
+  ```
+</ResponseExample>
+
+## Parameters
+
+<ParamField body="адрес" type="string" required>
+  Адрес аккаунта в виде строки, закодированной в base-58
+</ParamField>
+
+<ParamField body="1" type="object">
+  Объект конфигурации, содержащий следующие поля:
+
+  <Expandable title="properties" defaultOpen>
+    <ParamField body="commitment" type="string">
+      Commitment описывает, насколько завершённым является блок на данный момент
+      времени. См.
+      [Настройка состояния Commitment](/developers/docs/rpc#configuring-state-commitment).
+    </ParamField>
+
+    <ParamField body="minContextSlot" type="number">
+      Минимальный слот, на котором может быть выполнен запрос.
+    </ParamField>
+
+    <ParamField body="limit" type="number">
+      Максимальное количество возвращаемых подписей транзакций (от 1 до 1 000).
+
+      По умолчанию: `1000`
+    </ParamField>
+
+    <ParamField body="до" type="string">
+      Начните поиск в обратном порядке, начиная с этой подписи транзакции. Если не
+      указано, поиск начинается с вершины самого высокого подтвержденного блока.
+    </ParamField>
+
+    <ParamField body="до" type="string">
+      Ищите до этой подписи транзакции, если она найдена до достижения лимита.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Result
+
+<ResponseField name="result" type="array">
+  Массив объектов информации о подписях транзакций, упорядоченных от **новейшей**
+  до **старейшей** транзакции, содержащий:
+
+  <Expandable title="properties" defaultOpen>
+    <ResponseField name="подпись" type="string">
+      Подпись транзакции в виде строки, закодированной в base-58
+    </ResponseField>
+
+    <ResponseField name="slot" type="u64">
+      Slot, содержащий блок с транзакцией
+    </ResponseField>
+
+    <ResponseField name="ошибка" type="object | null">
+      Ошибка, если транзакция не удалась, null, если транзакция прошла успешно.
+      Подробнее см.
+      [определения ошибок транзакций](https://github.com/solana-labs/solana/blob/c0c60386544ec9a9ec7119229f37386d9f070523/sdk/src/transaction/error.rs#L13).
+    </ResponseField>
+
+    <ResponseField name="заметка" type="string | null">
+      Заметка, связанная с транзакцией, null, если заметка отсутствует.
+    </ResponseField>
+
+    <ResponseField name="времяБлока" type="i64 | null">
+      Предполагаемое время создания, в виде Unix-метки времени (секунды с момента
+      Unix-эпохи), когда транзакция была обработана. null, если недоступно.
+    </ResponseField>
+
+    <ResponseField name="confirmationStatus" type="string | null">
+      Статус подтверждения транзакции в кластере; может быть `processed`, `confirmed`
+      или `finalized`. Подробнее о подтверждении с оптимистичной фиксацией см. в
+      разделе [Commitment](/developers/docs/rpc/#configuring-state-commitment).
+    </ResponseField>
+  </Expandable>
+</ResponseField>

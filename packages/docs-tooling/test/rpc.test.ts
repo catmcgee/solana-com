@@ -226,13 +226,14 @@ describe("WP4 corpus conversion (read-only)", () => {
   });
 
   it("drops hideTableOfContents / mode: wide on API method pages only", () => {
+    // Corpus files are read at CORPUS_REF, before the /developers/docs move.
     const rel = "apps/docs/docs/rpc/http/getbalance.mdx";
     const out = convertSource(corpus.get(rel)!, fileMeta(rel), wp4).output;
     expect(out).not.toMatch(/hideTableOfContents|mode: wide/);
     const wide = convertSource(
       "---\ntitle: x\nmode: wide\n---\n\n<APIMethod>\n\n```jsonc !!request curl\n{}\n```\n\n### !params\n\n</APIMethod>\n",
       {
-        path: "apps/docs/docs/rpc/http/x.mdx",
+        path: "apps/docs/developers/docs/rpc/http/x.mdx",
         locale: "en",
         collection: "docs",
       },
@@ -242,8 +243,8 @@ describe("WP4 corpus conversion (read-only)", () => {
   });
 
   it("shows WebSocket requests as messages, HTTP requests as cURL", () => {
-    const ws = "apps/docs/docs/rpc/websocket/accountsubscribe.mdx";
-    const http = "apps/docs/docs/rpc/http/getbalance.mdx";
+    const ws = "apps/docs/developers/docs/rpc/websocket/accountsubscribe.mdx";
+    const http = "apps/docs/developers/docs/rpc/http/getbalance.mdx";
     const w = convertSource(
       readFileSync(path.join(repoRoot, ws), "utf8"),
       fileMeta(ws),

@@ -1,0 +1,402 @@
+---
+title: Getting Started
+description: Install LiteSVM and write your first tests.
+---
+
+# Quick Start Guide
+
+This guide covers the basics: how to create an account, fund an account, and
+send a transaction.
+
+<Steps titleSize="h3">
+
+<Step title="Install Dependencies">
+<Tabs>
+<Tab title="Rust">
+
+Add LiteSVM to your dev dependencies:
+
+```bash
+cargo add --dev litesvm
+```
+
+Several Solana crates enhance the testing experience by providing essential
+types and utilities. The examples on this page use the `solana-sdk` convenience
+crate (pinned to the 4.x line that LiteSVM 0.18 uses) and the System Program
+interface crate:
+
+```bash
+cargo add --dev solana-sdk@4
+cargo add --dev solana-system-interface --features bincode
+```
+
+<Warning>
+  Use `solana-sdk@4`, not the latest major version. A newer `solana-sdk` pulls
+  in a second copy of the component crates (`solana-keypair`,
+  `solana-transaction`, and others), and the types no longer match the ones
+  LiteSVM expects. If you prefer, you can add the individual component crates
+  that LiteSVM re-exports instead of `solana-sdk`.
+</Warning>
+
+</Tab>
+<Tab title="TypeScript">
+
+<Tabs>
+<Tab title="pnpm">
+
+```bash
+pnpm add @solana/kit @solana/kit-plugin-litesvm @solana/kit-plugin-signer @solana-program/system
+```
+
+</Tab>
+<Tab title="npm">
+
+```bash
+npm install @solana/kit @solana/kit-plugin-litesvm @solana/kit-plugin-signer @solana-program/system
+```
+
+</Tab>
+<Tab title="yarn">
+
+```bash
+yarn add @solana/kit @solana/kit-plugin-litesvm @solana/kit-plugin-signer @solana-program/system
+```
+
+</Tab>
+<Tab title="bun">
+
+```bash
+bun add @solana/kit @solana/kit-plugin-litesvm @solana/kit-plugin-signer @solana-program/system
+```
+
+</Tab>
+</Tabs>
+
+</Tab>
+</Tabs>
+
+</Step>
+
+<Step title="Create Test File">
+<Tabs>
+<Tab title="Rust">
+
+Inside your workspace, create a folder for `tests`.
+
+```bash
+mkdir tests
+```
+
+</Tab>
+<Tab title="TypeScript">
+
+Create a new TypeScript file for your test.
+
+```bash
+touch basic-test.ts
+```
+
+</Tab>
+</Tabs>
+
+</Step>
+
+<Step title="Create and Fund an Account">
+<Tabs>
+<Tab title="Rust">
+
+Let's write your first LiteSVM test.
+
+Inside your `tests` folder, create a new file and copy this code:
+
+```rust tests/create_account.rs
+use litesvm::LiteSVM;
+use solana_sdk::signature::{Keypair, Signer};
+
+#[test]
+fn create_account() {
+    // Create the test environment
+    let mut svm = LiteSVM::new();
+
+    // Create a test account
+    let user = Keypair::new();
+
+    // Fund the account with SOL
+    svm.airdrop(&user.pubkey(), 1_000_000_000).unwrap();
+
+    // Check the balance
+    let balance = svm.get_balance(&user.pubkey()).unwrap();
+    assert_eq!(balance, 1_000_000_000);
+
+    println!("Account funded with {} SOL", balance as f64 / 1e9);
+}
+```
+
+</Tab>
+<Tab title="TypeScript">
+
+Copy this code into your test file:
+
+```typescript basic-test.ts
+import { createClient, generateKeyPairSigner, lamports } from "@solana/kit";
+import { litesvm } from "@solana/kit-plugin-litesvm";
+import { signer } from "@solana/kit-plugin-signer";
+
+// Payer first, then the LiteSVM transport.
+const mySigner = await generateKeyPairSigner();
+const client = createClient().use(signer(mySigner)).use(litesvm());
+
+// Fund the payer and check balance
+client.svm.airdrop(client.payer.address, lamports(5_000_000_000n));
+const balance = client.svm.getBalance(client.payer.address);
+console.log("Balance:", balance, "lamports");
+```
+
+</Tab>
+</Tabs>
+
+</Step>
+
+<Step title="Run Your Test">
+<Tabs>
+<Tab title="Rust">
+
+```bash
+cargo test create_account -- --show-output
+```
+
+You should see:
+
+```
+running 1 test
+test create_account ... ok
+
+successes:
+
+---- create_account stdout ----
+Account funded with 1 SOL
+
+
+successes:
+    create_account
+```
+
+</Tab>
+<Tab title="TypeScript">
+
+```bash
+npx tsx basic-test.ts
+```
+
+You should see:
+
+```
+Balance: 5000000000n lamports
+```
+
+</Tab>
+</Tabs>
+
+<Info>
+  **That's it!** You just made your first litesvm test, that covers creating an
+  account and funding it.
+</Info>
+
+</Step>
+
+<Step title="Execute a Transaction">
+Now let's create a transfer transaction.
+
+<Tabs>
+<Tab title="Rust">
+
+Create a new test file and copy this code:
+
+```rust tests/transfer_test.rs
+use litesvm::LiteSVM;
+use solana_sdk::{
+    signature::{Keypair, Signer},
+    transaction::Transaction,
+};
+use solana_system_interface::instruction as system_instruction;
+
+#[test]
+fn test_transfer() {
+    let mut svm = LiteSVM::new();
+
+    // Create two accounts
+    let alice = Keypair::new();
+    let bob = Keypair::new();
+
+    // Fund Alice
+    svm.airdrop(&alice.pubkey(), 2_000_000_000).unwrap();
+
+    // Create transfer instruction
+    let transfer = system_instruction::transfer(
+        &alice.pubkey(),
+        &bob.pubkey(),
+        1_000_000_000, // 1 SOL
+    );
+
+    // Build and sign transaction
+    let tx = Transaction::new_signed_with_payer(
+        &[transfer],
+        Some(&alice.pubkey()),
+        &[&alice],
+        svm.latest_blockhash(),
+    );
+
+    // Send it (execution happens immediately)
+    svm.send_transaction(tx).unwrap();
+
+    // Check new balances
+    assert_eq!(svm.get_balance(&bob.pubkey()).unwrap(), 1_000_000_000);
+    assert!(svm.get_balance(&alice.pubkey()).unwrap() < 1_000_000_000);
+
+    println!("Transfer successful!");
+}
+```
+
+</Tab>
+<Tab title="TypeScript">
+
+Create a new file and copy this code:
+
+```typescript transfer-test.ts
+import { createClient, generateKeyPairSigner, lamports } from "@solana/kit";
+import { litesvm } from "@solana/kit-plugin-litesvm";
+import { signer } from "@solana/kit-plugin-signer";
+import { systemProgram } from "@solana-program/system";
+
+// Payer first, then the LiteSVM transport, then program plugins.
+const mySigner = await generateKeyPairSigner();
+const client = createClient()
+  .use(signer(mySigner))
+  .use(litesvm())
+  .use(systemProgram());
+const recipient = await generateKeyPairSigner();
+
+// Airdrop SOL to the payer
+client.svm.airdrop(client.payer.address, lamports(2_000_000_000n));
+
+// Build and send the transfer
+await client.system.instructions
+  .transferSol({
+    source: client.payer,
+    destination: recipient.address,
+    amount: lamports(1_000_000_000n) // 1 SOL
+  })
+  .sendTransaction();
+
+// Check new balances
+const recipientBalance = client.svm.getBalance(recipient.address) ?? 0n;
+console.log("Recipient balance:", Number(recipientBalance) / 1e9, "SOL");
+console.log("Transfer successful!");
+```
+
+</Tab>
+</Tabs>
+
+<Info>
+  **Test complete!** This test covers executing the transfer instruction from
+  the system program.
+</Info>
+
+</Step>
+
+<Step title="Run All Tests">
+<Tabs>
+<Tab title="Rust">
+
+```bash
+cargo test -- --show-output
+```
+
+You should see:
+
+```
+running 1 test
+test create_account ... ok
+
+successes:
+
+---- create_account stdout ----
+Account funded with 1 SOL
+
+
+successes:
+    create_account
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/transfer_test.rs (target/debug/deps/transfer_test-f174954e7483f36b)
+
+running 1 test
+test test_transfer ... ok
+
+successes:
+
+---- test_transfer stdout ----
+Transfer successful!
+
+
+successes:
+    test_transfer
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+   Doc-tests litesvm_quickstart
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+```
+
+</Tab>
+<Tab title="TypeScript">
+
+```bash
+npx tsx basic-test.ts && npx tsx transfer-test.ts
+```
+
+You should see:
+
+```
+Balance: 5000000000n lamports
+Recipient balance: 1 SOL
+Transfer successful!
+```
+
+</Tab>
+</Tabs>
+
+<Info>
+  **That's it!** Now you've successfully made litesvm tests that create and fund accounts and execute transactions.
+</Info>
+</Step>
+
+</Steps>
+
+## Next Steps
+
+**[Why LiteSVM →](/developers/docs/tools/litesvm/core-concepts)** Learn why you would want
+to use LiteSVM for testing
+
+<Tabs>
+  <Tab title="Rust">
+    **[Testing Your Program →](/developers/docs/tools/litesvm/testing-your-program)** Learn
+    how to test your own Solana program <br /> **[Examples
+    →](/developers/docs/tools/litesvm/examples)** View copy-paste solutions for common
+    scenarios and full repository examples <br /> **[API Reference
+    →](/developers/docs/tools/litesvm/api-reference)** Learn advanced features and custom
+    configurations
+  </Tab>
+  <Tab title="TypeScript">
+    **[Testing Your Program →](/developers/docs/tools/litesvm/typescript/getting-started)**
+    Learn how to test your own Solana program using LiteSVM for TypeScript{" "}
+    <br /> **[Examples →](/developers/docs/tools/litesvm/typescript/examples)** View
+    copy-paste solutions for common scenarios <br /> **[API Reference
+    →](/developers/docs/tools/litesvm/typescript/api-reference)** Learn advanced features
+    and custom configurations
+  </Tab>
+</Tabs>

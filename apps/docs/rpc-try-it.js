@@ -15,8 +15,8 @@
  * the public RPC rate limits. Public Solana RPC endpoints allow CORS, so this
  * panel calls them straight from the reader's browser.
  *
- * Which pages: /docs/rpc/http/<method> and /docs/rpc/websocket/<method>Subscribe
- * (and their locale copies, /<locale>/docs/rpc/...). Same set as the old site:
+ * Which pages: /developers/docs/rpc/http/<method> and /developers/docs/rpc/websocket/<method>Subscribe
+ * (and their locale copies, /<locale>/developers/docs/rpc/...). Same set as the old site:
  * 53 HTTP methods and the 9 subscriptions (unsubscribe pages need a live
  * subscription id, as before). No marker is needed: the request is read from
  * the page's own <RequestExample>, which Mintlify renders server-side with
@@ -72,7 +72,7 @@
   var MAX_NOTIFICATIONS = 10;
   var MAX_SHOWN_CHARS = 400000;
   var PAGE_RE =
-    /^\/(?:[a-z]{2}(?:-[a-z]{2})?\/)?docs\/rpc\/(http|websocket)\/([a-z0-9]+)\/?$/i;
+    /^\/(?:[a-z]{2}(?:-[a-z]{2})?\/)?developers\/docs\/rpc\/(http|websocket)\/([a-z0-9]+)\/?$/i;
 
   var PLAY =
     '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false"><path d="M4.5 2.6v10.8a.6.6 0 0 0 .92.5l8.3-5.4a.6.6 0 0 0 0-1L5.42 2.1a.6.6 0 0 0-.92.5z"/></svg>';

@@ -38,6 +38,7 @@ export function shouldShowDocsSidebarToggle(
   pathname: string | null | undefined,
 ) {
   return (
+    matchesRouteSegment(pathname, "/developers/docs") ||
     matchesRouteSegment(pathname, "/docs") ||
     matchesRouteSegment(pathname, "/developers/cookbook")
   );
@@ -74,6 +75,7 @@ function matchesExactRoute(pathname: string | null | undefined) {
 export function isThemeRoute(pathname: string | null | undefined) {
   return (
     matchesExactRoute(pathname) ||
+    matchesRouteSegment(pathname, "/developers/docs") ||
     matchesRouteSegment(pathname, "/docs") ||
     matchesRouteSegment(pathname, "/developers/cookbook") ||
     matchesRouteSegment(pathname, "/developers/bootcamp")

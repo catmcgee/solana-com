@@ -29,8 +29,12 @@ export const MINTLIFY_LOCALE_PATTERN = MINTLIFY_LOCALES.join("|");
 /**
  * Path prefixes (without a locale) served by Mintlify. `/learn` itself is the
  * apps/web landing (WP10), so only articles below it are docs paths.
+ * `/docs` moved to `/developers/docs` (2026-10-16); the old prefix is only
+ * redirects now (next.config, before middleware), but stays listed so that a
+ * mixed-case `/Docs/x` still gets the lowercase 308 and then the redirect.
  */
 export const DOCS_COLLECTION_PREFIXES = [
+  "/developers/docs",
   "/docs",
   "/developers/cookbook",
   "/developers/bootcamp",
@@ -60,7 +64,7 @@ function matchesPrefix(pathname: string, prefix: string) {
 
 /**
  * True when `restLower` (lowercase, locale removed) is a path that Mintlify
- * serves: `/docs[...]`, `/developers/{cookbook,bootcamp}[...]`,
+ * serves: `/developers/{docs,cookbook,bootcamp}[...]` (and the old `/docs`),
  * `/learn/<article>`, plus their `.md` twins.
  */
 export function isMintlifyContentPath(restLower: string) {
@@ -91,7 +95,8 @@ export function getDocsPathInfo(pathname: string): DocsPathInfo | null {
  * old docs-app middleware did (spec §5.8), in one hop:
  * 1. lowercase the path;
  * 2. remove duplicate locale segments, keeping the first;
- * 3. drop a leading default-locale segment (`/en/docs/x` -> `/docs/x`).
+ * 3. drop a leading default-locale segment
+ *    (`/en/developers/docs/x` -> `/developers/docs/x`).
  * Returns null when the path is already canonical.
  */
 export function canonicalDocsPath(pathname: string): string | null {

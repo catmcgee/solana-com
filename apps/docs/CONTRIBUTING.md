@@ -81,7 +81,7 @@ All tooling (converters, generators, checks) lives in `packages/docs-tooling`;
 ### Hosting and the Mintlify plan
 
 The docs are hosted by Mintlify (Hobby plan) and served on solana.com by
-`apps/web`, which rewrites `/docs`, `/learn/*`, `/developers/cookbook` and
+`apps/web`, which rewrites `/developers/docs`, `/learn/*`, `/developers/cookbook` and
 `/developers/bootcamp` to the `*.mintlify.site` root
 (`apps/web/rewrites-redirects.ts`, MINTLIFY block).
 

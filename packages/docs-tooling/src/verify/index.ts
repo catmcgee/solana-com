@@ -130,7 +130,7 @@ function flatNav(x: unknown, out: string[] = []): string[] {
   return out;
 }
 
-/** `docs/<section>/index` pages preceded in nav order by one of their sub-pages. */
+/** `developers/docs/<section>/index` pages preceded in nav order by one of their sub-pages. */
 export function shadowedIndexPages(
   navFile = path.join(repoRoot, "apps/docs/navigation/en.json"),
 ) {
@@ -238,7 +238,7 @@ export async function runVerify(
   );
   const shadowed = shadowedIndexPages();
   const unhandled = shadowed.filter((p) => {
-    const m = /^docs\/([^/]+)\/index$/.exec(p);
+    const m = /^developers\/docs\/([^/]+)\/index$/.exec(p);
     return !m || !listed.has(m[1]!);
   });
   checks.push({

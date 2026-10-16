@@ -92,10 +92,10 @@ describe("cost calculator model", () => {
 describe("developers hub links", () => {
   it("points the four job cards at the job-path intros", () => {
     expect(JOB_PATHS.map((job) => job.href)).toEqual([
-      "/docs/payments/checkout",
-      "/docs/payments/paywall-api",
-      "/docs/assets/issue-asset",
-      "/docs/defi/settle-trade",
+      "/developers/docs/payments/checkout",
+      "/developers/docs/payments/paywall-api",
+      "/developers/docs/assets/issue-asset",
+      "/developers/docs/defi/settle-trade",
     ]);
     for (const job of JOB_PATHS) {
       expect(landing.picker.cards[job.id]).toMatchObject({
@@ -116,11 +116,11 @@ describe("developers hub links", () => {
   });
 
   it("prefixes docs-owned links with the locale, but not templates or anchors", () => {
-    expect(localizedHref("en", "/docs/payments/checkout")).toBe(
-      "/docs/payments/checkout",
+    expect(localizedHref("en", "/developers/docs/payments/checkout")).toBe(
+      "/developers/docs/payments/checkout",
     );
-    expect(localizedHref("ja", "/docs/payments/checkout")).toBe(
-      "/ja/docs/payments/checkout",
+    expect(localizedHref("ja", "/developers/docs/payments/checkout")).toBe(
+      "/ja/developers/docs/payments/checkout",
     );
     expect(localizedHref("ar", "/developers/bootcamp")).toBe(
       "/ar/developers/bootcamp",

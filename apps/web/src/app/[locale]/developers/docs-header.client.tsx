@@ -52,7 +52,7 @@ function currentTheme(): Theme {
  * One-click light/dark switch, like the docs (apps/docs/theme-toggle.js): the
  * icon is the mode a click switches to (moon in light mode, sun in dark), and
  * the choice is stored in localStorage "isDarkMode", which Mintlify reads on
- * /docs, so it carries over both ways. Until the first click the theme
+ * /developers/docs, so it carries over both ways. Until the first click the theme
  * follows the system. Hidden without JavaScript (developers.css).
  */
 export function ThemeToggle({
@@ -176,7 +176,7 @@ export function DocsSearchField({
   action,
   prompt,
 }: {
-  /** Localized docs root, e.g. "/docs" or "/ja/docs". */
+  /** Localized docs root, e.g. "/developers/docs" or "/ja/developers/docs". */
   action: string;
   prompt: string;
 }) {

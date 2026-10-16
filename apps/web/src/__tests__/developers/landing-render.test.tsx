@@ -168,7 +168,10 @@ describe("/developers landing", () => {
   it("prefixes docs links with the locale", async () => {
     renderWithIntl(await DevelopersHub({ locale: "ja", updates: [] }), "ja");
     const cards = within(screen.getByTestId("job-cards")).getAllByRole("link");
-    expect(cards[0]).toHaveAttribute("href", "/ja/docs/payments/checkout");
+    expect(cards[0]).toHaveAttribute(
+      "href",
+      "/ja/developers/docs/payments/checkout",
+    );
     expect(
       screen.getByRole("link", {
         name: "Templates Starter apps for Next.js, mobile and programs.",

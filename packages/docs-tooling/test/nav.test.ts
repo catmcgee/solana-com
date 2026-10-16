@@ -39,17 +39,20 @@ const meta = (rel: string, m: object) => put(rel, JSON.stringify(m));
 beforeAll(() => {
   root = mkdtempSync(path.join(os.tmpdir(), "nav-test-"));
   docs = path.join(root, "apps/docs");
-  put("docs/index.mdx");
-  put("docs/guide/index.mdx", "---\ntitle: Guide\nindex: true\n---\n");
-  put("docs/guide/a.mdx");
-  put("docs/guide/b.mdx");
-  put("docs/guide/orphan.mdx");
-  put("docs/guide/sub/index.mdx");
-  put("docs/guide/sub/c.mdx");
-  put("docs/guide/ts/d.mdx");
-  put("docs/other.mdx");
+  put("developers/docs/index.mdx");
+  put(
+    "developers/docs/guide/index.mdx",
+    "---\ntitle: Guide\nindex: true\n---\n",
+  );
+  put("developers/docs/guide/a.mdx");
+  put("developers/docs/guide/b.mdx");
+  put("developers/docs/guide/orphan.mdx");
+  put("developers/docs/guide/sub/index.mdx");
+  put("developers/docs/guide/sub/c.mdx");
+  put("developers/docs/guide/ts/d.mdx");
+  put("developers/docs/other.mdx");
   put("developers/cookbook/index.mdx");
-  meta("docs/guide/meta.json", {
+  meta("developers/docs/guide/meta.json", {
     title: "Guide",
     pages: [
       "a",
@@ -62,19 +65,19 @@ beforeAll(() => {
       "b",
     ],
   });
-  meta("docs/guide/sub/meta.json", {
+  meta("developers/docs/guide/sub/meta.json", {
     title: "Sub",
     pages: ["c"],
     defaultOpen: true,
   });
   // ja: translated folder titles, a partial page set, a stale extra page.
-  put("ja/docs/index.mdx");
-  put("ja/docs/guide/index.mdx");
-  put("ja/docs/guide/a.mdx");
-  put("ja/docs/guide/sub/c.mdx");
-  put("ja/docs/stale.mdx");
-  meta("ja/docs/guide/meta.json", { title: "ガイド", pages: [] });
-  meta("ja/docs/guide/sub/meta.json", { title: "サブ", pages: [] });
+  put("ja/developers/docs/index.mdx");
+  put("ja/developers/docs/guide/index.mdx");
+  put("ja/developers/docs/guide/a.mdx");
+  put("ja/developers/docs/guide/sub/c.mdx");
+  put("ja/developers/docs/stale.mdx");
+  meta("ja/developers/docs/guide/meta.json", { title: "ガイド", pages: [] });
+  meta("ja/developers/docs/guide/sub/meta.json", { title: "サブ", pages: [] });
   for (const [loc, v] of [
     ["en", "Cookbook"],
     ["ja", "クックブック"],
@@ -97,16 +100,23 @@ const TEMPLATE: TemplateTab[] = [
   {
     tab: "Start",
     groups: [
-      { group: "Start", pages: ["docs/index", "docs/other"] },
+      {
+        group: "Start",
+        pages: ["developers/docs/index", "developers/docs/other"],
+      },
       {
         group: "Guide",
-        root: "docs/guide/index",
-        pages: [{ expand: "docs/guide" }],
+        root: "developers/docs/guide/index",
+        pages: [{ expand: "developers/docs/guide" }],
       },
       { group: "Cookbook", pages: ["developers/cookbook/index"] },
     ],
   },
-  { tab: "Videos", href: "https://solana.com/docs/other", align: "end" },
+  {
+    tab: "Videos",
+    href: "https://solana.com/developers/docs/other",
+    align: "end",
+  },
 ];
 
 function compile() {
@@ -125,29 +135,31 @@ describe("compile-legacy-nav", () => {
     const guide = nav.tabs[0]!.groups![1]!;
     expect(guide).toEqual({
       group: "Guide",
-      root: "docs/guide/index",
+      root: "developers/docs/guide/index",
       directory: "card",
       pages: [
-        "docs/guide/a",
+        "developers/docs/guide/a",
         {
           group: "Section",
           pages: [
             {
               group: "Sub",
-              root: "docs/guide/sub/index",
+              root: "developers/docs/guide/sub/index",
               expanded: true,
-              pages: ["docs/guide/sub/c"],
+              pages: ["developers/docs/guide/sub/c"],
             },
-            "docs/guide/ts/d",
+            "developers/docs/guide/ts/d",
           ],
         },
-        "docs/guide/b",
-        "docs/guide/orphan",
+        "developers/docs/guide/b",
+        "developers/docs/guide/orphan",
       ],
     });
-    expect(report.orphans.map((o) => o.page)).toEqual(["docs/guide/orphan"]);
+    expect(report.orphans.map((o) => o.page)).toEqual([
+      "developers/docs/guide/orphan",
+    ]);
     expect(report.missing).toEqual([
-      { folder: "docs/guide", entry: "missing" },
+      { folder: "developers/docs/guide", entry: "missing" },
     ]);
     expect(report.droppedLinks).toHaveLength(1);
     expect(report.unplaced).toEqual([]);
@@ -159,7 +171,13 @@ describe("compile-legacy-nav", () => {
       {
         tab: "A",
         groups: [
-          { group: "A", pages: ["docs/guide/b", { expand: "docs/guide" }] },
+          {
+            group: "A",
+            pages: [
+              "developers/docs/guide/b",
+              { expand: "developers/docs/guide" },
+            ],
+          },
         ],
       },
     ];
@@ -171,9 +189,9 @@ describe("compile-legacy-nav", () => {
       newPages: new Set(),
     });
     const refs = navPageRefs(r.nav);
-    expect(refs.filter((p) => p === "docs/guide/b")).toHaveLength(1);
+    expect(refs.filter((p) => p === "developers/docs/guide/b")).toHaveLength(1);
     expect(r.report.placedElsewhere.map((p) => p.page)).toContain(
-      "docs/guide/b",
+      "developers/docs/guide/b",
     );
   });
 
@@ -213,26 +231,28 @@ describe("build-locale-nav", () => {
     const b = buildLocaleNav(nav, "ja", inv, seeds.get("ja")!);
     const refs = navPageRefs(b.nav);
     expect(refs).toHaveLength(navPageRefs(nav).length);
-    expect(refs).toContain("ja/docs/guide/a");
-    expect(refs).toContain("docs/guide/b");
-    expect(b.pages.find((p) => p.page === "docs/guide/b")?.reason).toBe(
-      "missing-translation",
-    );
+    expect(refs).toContain("ja/developers/docs/guide/a");
+    expect(refs).toContain("developers/docs/guide/b");
+    expect(
+      b.pages.find((p) => p.page === "developers/docs/guide/b")?.reason,
+    ).toBe("missing-translation");
     expect(
       b.pages.find((p) => p.page === "developers/cookbook/index")?.reason,
     ).toBe("english-only");
     expect(b.nav.tabs[0]!.groups![1]!.group).toBe("ガイド");
     expect(b.labels.map((l) => l.en)).toContain("Section");
     // External tab href stays English until the page is translated.
-    expect(b.nav.tabs[1]!.href).toBe("https://solana.com/docs/other");
+    expect(b.nav.tabs[1]!.href).toBe(
+      "https://solana.com/developers/docs/other",
+    );
   });
 
   it("maps internal hrefs and URLs", () => {
     expect(internalPath("https://solana.com/docs/x")).toBe("/docs/x");
-    expect(internalPath("/docs/x")).toBe("/docs/x");
+    expect(internalPath("/developers/docs/x")).toBe("/developers/docs/x");
     expect(internalPath("https://example.com/docs/x")).toBeUndefined();
-    expect(urlOf("docs/core/index")).toBe("/docs/core");
-    expect(urlOf("docs/index")).toBe("/docs");
+    expect(urlOf("developers/docs/core/index")).toBe("/developers/docs/core");
+    expect(urlOf("developers/docs/index")).toBe("/developers/docs");
   });
 });
 
@@ -245,7 +265,7 @@ describe("verify-nav, build and swap on a fixture project", () => {
       path.join(docs, "navigation/labels/ja.json"),
       JSON.stringify(seeds.get("ja")),
     );
-    rmSync(path.join(docs, "ja/docs/stale.mdx"));
+    rmSync(path.join(docs, "ja/developers/docs/stale.mdx"));
     runBuild({ docsRoot: docs, locales: ["ja"] });
     const docsJson = JSON.parse(
       readFileSync(path.join(docs, "docs.json"), "utf8"),
@@ -260,25 +280,33 @@ describe("verify-nav, build and swap on a fixture project", () => {
     expect(v.errors).toEqual([]);
 
     // A locale page that is in no nav entry fails.
-    put("ja/docs/stale.mdx");
+    put("ja/developers/docs/stale.mdx");
     v = verifyNav({ docsRoot: docs, locales: ["ja"], newPages: [] });
-    expect(v.errors).toContain('ja: page "ja/docs/stale" is in no nav entry');
-    rmSync(path.join(docs, "ja/docs/stale.mdx"));
+    expect(v.errors).toContain(
+      'ja: page "ja/developers/docs/stale" is in no nav entry',
+    );
+    rmSync(path.join(docs, "ja/developers/docs/stale.mdx"));
 
     // A new translation makes the generated nav stale until swapped.
-    put("ja/docs/guide/b.mdx");
+    put("ja/developers/docs/guide/b.mdx");
     v = verifyNav({ docsRoot: docs, locales: ["ja"], newPages: [] });
     expect(
-      v.errors.some((e) => e.includes('"docs/guide/b" points at English')),
+      v.errors.some((e) =>
+        e.includes('"developers/docs/guide/b" points at English'),
+      ),
     ).toBe(true);
     const s = runSwap({ docsRoot: docs, locales: ["ja"] });
     expect(s.swapped).toEqual([
-      { loc: "ja", page: "docs/guide/b", target: "ja/docs/guide/b" },
+      {
+        loc: "ja",
+        page: "developers/docs/guide/b",
+        target: "ja/developers/docs/guide/b",
+      },
     ]);
     const ja = JSON.parse(
       readFileSync(path.join(docs, "navigation/ja.json"), "utf8"),
     );
-    expect(navPageRefs(ja)).toContain("ja/docs/guide/b");
+    expect(navPageRefs(ja)).toContain("ja/developers/docs/guide/b");
   });
 
   it("flags duplicates and missing files in en.json", () => {
@@ -287,17 +315,28 @@ describe("verify-nav, build and swap on a fixture project", () => {
         {
           tab: "T",
           groups: [
-            { group: "G", pages: ["docs/index", "docs/index", "docs/nope"] },
+            {
+              group: "G",
+              pages: [
+                "developers/docs/index",
+                "developers/docs/index",
+                "developers/docs/nope",
+              ],
+            },
           ],
         },
       ],
     };
     writeFileSync(path.join(docs, "navigation/en.json"), JSON.stringify(nav));
     const v = verifyNav({ docsRoot: docs, locales: [], newPages: [] });
-    expect(v.errors).toContain('en: "docs/index" appears 2 times');
-    expect(v.errors).toContain('en: nav entry "docs/nope" has no file');
+    expect(v.errors).toContain('en: "developers/docs/index" appears 2 times');
+    expect(v.errors).toContain(
+      'en: nav entry "developers/docs/nope" has no file',
+    );
     expect(
-      v.errors.some((e) => e.includes('"docs/other" is in no nav entry')),
+      v.errors.some((e) =>
+        e.includes('"developers/docs/other" is in no nav entry'),
+      ),
     ).toBe(true);
   });
 });

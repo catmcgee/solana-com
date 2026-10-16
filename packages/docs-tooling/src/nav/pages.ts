@@ -11,7 +11,7 @@ import { docsRoot } from "../lib/paths.ts";
 import type { NavPage } from "./types.ts";
 
 /** Top-level folders of the English collections. */
-export const EN_COLLECTION_DIRS = ["docs", "developers", "learn"] as const;
+export const EN_COLLECTION_DIRS = ["developers", "learn"] as const;
 
 /** Folders under apps/docs that never hold pages. */
 const NON_PAGE_DIRS = new Set([
@@ -78,13 +78,16 @@ export function loadInventory(root: string = docsRoot): PageInventory {
   return { byLang, all };
 }
 
-/** Language of a page path ("ja/docs/x" -> "ja", "docs/x" -> "en"). */
+/**
+ * Language of a page path ("ja/developers/docs/x" -> "ja",
+ * "developers/docs/x" -> "en").
+ */
 export function langOf(page: NavPage): string {
   const first = page.split("/")[0]!;
   return TARGET_LOCALES.includes(first) ? first : DEFAULT_LOCALE;
 }
 
-/** Strip the locale prefix ("ja/docs/x" -> "docs/x"). */
+/** Strip the locale prefix ("ja/developers/docs/x" -> "developers/docs/x"). */
 export function stripLocale(page: NavPage): NavPage {
   const lang = langOf(page);
   return lang === DEFAULT_LOCALE ? page : page.slice(lang.length + 1);
@@ -99,7 +102,7 @@ export function localize(page: NavPage, loc: string): NavPage {
 export function collectionOf(
   page: NavPage,
 ): "docs" | "cookbook" | "bootcamp" | "learn" | "other" {
-  if (page.startsWith("docs/")) return "docs";
+  if (page.startsWith("developers/docs/")) return "docs";
   if (page.startsWith("developers/cookbook/") || page === "developers/cookbook")
     return "cookbook";
   if (page.startsWith("developers/bootcamp/")) return "bootcamp";
@@ -107,14 +110,17 @@ export function collectionOf(
   return "other";
 }
 
-/** Public URL path of a page ("docs/core/index" -> "/docs/core"). */
+/**
+ * Public URL path of a page ("developers/docs/core/index" ->
+ * "/developers/docs/core").
+ */
 export function urlOf(page: NavPage): string {
   return "/" + page.replace(/(^|\/)index$/, "").replace(/\/$/, "");
 }
 
 /**
- * Page that serves an internal URL ("/docs/video-guides" ->
- * "docs/video-guides/index"), or undefined.
+ * Page that serves an internal URL ("/developers/docs/video-guides" ->
+ * "developers/docs/video-guides/index"), or undefined.
  */
 export function pageForUrl(
   url: string,

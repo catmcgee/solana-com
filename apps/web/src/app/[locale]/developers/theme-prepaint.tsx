@@ -9,7 +9,7 @@
  *   globals.css falls back to prefers-color-scheme for them.
  * - `DocsThemePrepaint` (/developers): the docs theme. Reads the choice
  *   from localStorage "isDarkMode", where Mintlify (next-themes) keeps it on
- *   /docs, so one choice applies to both ("dark" | "light" | "system", or
+ *   /developers/docs, so one choice applies to both ("dark" | "light" | "system", or
  *   the legacy "true" | "false"); "system" or nothing follows
  *   prefers-color-scheme. Sets `dark tw-dark` or `light tw-light`,
  *   html[data-theme-preference] and color-scheme like Mintlify, and

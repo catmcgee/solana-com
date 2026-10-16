@@ -3,6 +3,13 @@ import { isDocsHref } from "../url-config";
 
 describe("isDocsHref", () => {
   it.each([
+    "/developers/docs",
+    "/developers/docs/payments/checkout",
+    "/ja/developers/docs/core/accounts",
+    "/pt/developers/docs/rpc#getbalance",
+    "/developers/docs?q=mint",
+    "https://solana.com/developers/docs/core",
+    // The old prefix still counts: apps/web redirects it.
     "/docs",
     "/docs/payments/checkout",
     "/ja/docs/core/accounts",
@@ -20,6 +27,7 @@ describe("isDocsHref", () => {
     "/developers",
     "/learn",
     "/developers/payments",
+    "/developers/docsearch",
     "/docsearch",
     "https://mcp.solana.com",
     "#picker",

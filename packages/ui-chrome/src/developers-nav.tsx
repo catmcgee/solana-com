@@ -52,14 +52,14 @@ type DocsTab = {
   external?: boolean;
 };
 
-/** docs/tools sections that the Mintlify nav files under a domain tab. */
+/** developers/docs/tools sections that the Mintlify nav files under a domain tab. */
 const PAYMENTS_TOOLS = [
-  "/docs/tools/commerce-kit",
-  "/docs/tools/kora",
-  "/docs/tools/solana-pay",
-  "/docs/tools/x402-facilitator",
+  "/developers/docs/tools/commerce-kit",
+  "/developers/docs/tools/kora",
+  "/developers/docs/tools/solana-pay",
+  "/developers/docs/tools/x402-facilitator",
 ];
-const ASSETS_TOOLS = ["/docs/tools/attestations"];
+const ASSETS_TOOLS = ["/developers/docs/tools/attestations"];
 
 /**
  * The docs tabs, in the order of the Mintlify tab bar (apps/docs
@@ -69,61 +69,78 @@ const ASSETS_TOOLS = ["/docs/tools/attestations"];
 export const DOCS_TABS: DocsTab[] = [
   {
     label: "quickstart",
-    to: "/docs",
+    to: "/developers/docs",
     Icon: StartIcon,
-    match: ["/docs/finance", "/docs/from-ethereum", "/docs/research"],
+    match: [
+      "/developers/docs/finance",
+      "/developers/docs/from-ethereum",
+      "/developers/docs/research",
+    ],
     ignore: [
-      "/docs/payments",
-      "/docs/assets",
-      "/docs/tokens",
-      "/docs/tokenization",
-      "/docs/defi",
-      "/docs/core",
-      "/docs/references",
-      "/docs/tools",
-      "/docs/intro",
-      "/docs/programs",
-      "/docs/frontend",
-      "/docs/rpc",
-      "/docs/clients",
-      "/docs/video-guides",
+      "/developers/docs/payments",
+      "/developers/docs/assets",
+      "/developers/docs/tokens",
+      "/developers/docs/tokenization",
+      "/developers/docs/defi",
+      "/developers/docs/core",
+      "/developers/docs/references",
+      "/developers/docs/tools",
+      "/developers/docs/intro",
+      "/developers/docs/programs",
+      "/developers/docs/frontend",
+      "/developers/docs/rpc",
+      "/developers/docs/clients",
+      "/developers/docs/video-guides",
     ],
   },
   {
     label: "payments",
-    to: "/docs/payments",
+    to: "/developers/docs/payments",
     Icon: PaymentsIcon,
     match: PAYMENTS_TOOLS,
   },
   {
     label: "assets",
-    to: "/docs/assets",
+    to: "/developers/docs/assets",
     Icon: AssetsIcon,
-    match: ["/docs/tokens", "/docs/tokenization", ...ASSETS_TOOLS],
+    match: [
+      "/developers/docs/tokens",
+      "/developers/docs/tokenization",
+      ...ASSETS_TOOLS,
+    ],
   },
   {
     label: "markets",
-    to: "/docs/defi",
+    to: "/developers/docs/defi",
     Icon: MarketsIcon,
     dividerAfter: true,
   },
   {
     label: "howSolanaWorks",
-    to: "/docs/core",
+    to: "/developers/docs/core",
     Icon: ConceptsIcon,
-    match: ["/docs/references"],
+    match: ["/developers/docs/references"],
   },
   {
     label: "resources",
-    to: "/docs/tools",
+    to: "/developers/docs/tools",
     Icon: ResourcesIcon,
-    match: ["/docs/intro", "/docs/programs", "/docs/frontend"],
+    match: [
+      "/developers/docs/intro",
+      "/developers/docs/programs",
+      "/developers/docs/frontend",
+    ],
     ignore: [...PAYMENTS_TOOLS, ...ASSETS_TOOLS],
   },
-  { label: "rpc", to: "/docs/rpc", Icon: ApiIcon, match: ["/docs/clients"] },
+  {
+    label: "rpc",
+    to: "/developers/docs/rpc",
+    Icon: ApiIcon,
+    match: ["/developers/docs/clients"],
+  },
   {
     label: "videoTutorials",
-    to: "/docs/video-guides",
+    to: "/developers/docs/video-guides",
     Icon: VideoIcon,
     external: true,
   },

@@ -48,9 +48,9 @@ describe("slugs", () => {
 describe("site-links helpers", () => {
   it("knows what Mintlify serves", () => {
     for (const p of [
-      "/docs",
-      "/docs/core#x",
-      "/fr/docs/a",
+      "/developers/docs",
+      "/developers/docs/core#x",
+      "/fr/developers/docs/a",
       "/learn/what-is-solana",
       "/developers/cookbook/x",
       "/zh/developers/bootcamp",
@@ -78,16 +78,18 @@ describe("site-links helpers", () => {
     expect(trimAutolink("https://en.wikipedia.org/wiki/A_(b)")).toBe(
       "https://en.wikipedia.org/wiki/A_(b)",
     );
-    expect(pageUrl("apps/docs/de/docs/tools/attestations/overview.mdx")).toBe(
-      "/de/docs/tools/attestations/overview",
+    expect(
+      pageUrl("apps/docs/de/developers/docs/tools/attestations/overview.mdx"),
+    ).toBe("/de/developers/docs/tools/attestations/overview");
+    expect(pageUrl("apps/docs/developers/docs/core/index.mdx")).toBe(
+      "/developers/docs/core",
     );
-    expect(pageUrl("apps/docs/docs/core/index.mdx")).toBe("/docs/core");
   });
 });
 
 describe("anchors on the real corpus", () => {
   it("maps an English fragment on a translated page by heading position", () => {
-    const rel = "apps/docs/ar/docs/clients/community/game-sdks.mdx";
+    const rel = "apps/docs/ar/developers/docs/clients/community/game-sdks.mdx";
     const src = readFileSync(path.join(repoRoot, rel), "utf8");
     const reg = new TransformRegistry().register(anchors);
     const out = convertSource(

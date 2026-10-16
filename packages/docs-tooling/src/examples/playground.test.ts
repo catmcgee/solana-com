@@ -126,8 +126,8 @@ describe("Open tutorial in Playground (gen:paths)", () => {
     job: "Job",
     name: "Name",
     time: "~1 min",
-    intro: `/docs/${tab}/${key}`,
-    steps: [{ href: `/docs/${tab}/${key}/a`, title: "A" }],
+    intro: `/developers/docs/${tab}/${key}`,
+    steps: [{ href: `/developers/docs/${tab}/${key}/a`, title: "A" }],
     demo: demo && {
       component: "asset",
       title: "T",

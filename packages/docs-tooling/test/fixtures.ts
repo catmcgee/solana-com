@@ -43,7 +43,8 @@ export function loadFixtureCases(
         input: readFileSync(path.join(c, "in.mdx"), "utf8"),
         expected: readFileSync(path.join(c, "out.mdx"), "utf8"),
         file: {
-          path: meta.path ?? `apps/docs/docs/__fixture__/${name}.mdx`,
+          path:
+            meta.path ?? `apps/docs/developers/docs/__fixture__/${name}.mdx`,
           locale: meta.locale ?? "en",
           collection: meta.collection ?? "docs",
         },

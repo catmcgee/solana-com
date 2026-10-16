@@ -49,14 +49,14 @@ describe("docs tabs on /developers", () => {
       visibleTabs.map((tab) => tab.tab),
     );
     expect(tabs.map((tab) => tab.href)).toEqual([
-      "/docs",
-      "/docs/payments",
-      "/docs/assets",
-      "/docs/defi",
-      "/docs/core",
-      "/docs/tools",
-      "/docs/rpc",
-      "/docs/video-guides",
+      "/developers/docs",
+      "/developers/docs/payments",
+      "/developers/docs/assets",
+      "/developers/docs/defi",
+      "/developers/docs/core",
+      "/developers/docs/tools",
+      "/developers/docs/rpc",
+      "/developers/docs/video-guides",
     ]);
     expect(tabs.filter((tab) => tab.alignEnd).map((tab) => tab.key)).toEqual([
       "video-tutorials",
@@ -70,17 +70,17 @@ describe("docs tabs on /developers", () => {
     expect(tabs[1]!.label).toBe(
       (jaLabels as Record<string, string>)[labelSlug("Payments")],
     );
-    expect(tabs[1]!.href).toBe("/ja/docs/payments");
+    expect(tabs[1]!.href).toBe("/ja/developers/docs/payments");
     // A locale without docs labels falls back to English.
     expect(getDocsTabs("el")[0]!.label).toBe("Start here");
   });
 
   it("builds the search hand-off URLs", () => {
-    expect(docsSearchHref("en")).toBe("/docs?search=1");
+    expect(docsSearchHref("en")).toBe("/developers/docs?search=1");
     expect(docsSearchHref("en", "  token extensions ")).toBe(
-      "/docs?q=token%20extensions",
+      "/developers/docs?q=token%20extensions",
     );
-    expect(docsSearchHref("ja", "mint")).toBe("/ja/docs?q=mint");
+    expect(docsSearchHref("ja", "mint")).toBe("/ja/developers/docs?q=mint");
     expect(DOCS_SEARCH_PROMPT).toBe(docsConfig.search.prompt);
   });
 
@@ -127,7 +127,7 @@ describe("DocsHeader", () => {
   it("has a search form to the docs, a theme switch and a language menu", async () => {
     const { container } = renderWithIntl(await DocsHeader({ locale: "ja" }));
     const form = container.querySelector('form[role="search"]')!;
-    expect(form).toHaveAttribute("action", "/ja/docs");
+    expect(form).toHaveAttribute("action", "/ja/developers/docs");
     expect(form).toHaveAttribute("method", "get");
     expect(form.querySelector('input[name="q"]')).toHaveAttribute(
       "placeholder",
@@ -135,7 +135,7 @@ describe("DocsHeader", () => {
     );
     expect(
       container.querySelector(".dh-search-icon")!.getAttribute("href"),
-    ).toBe("/ja/docs?search=1");
+    ).toBe("/ja/developers/docs?search=1");
 
     const toggles = container.querySelectorAll("button[data-theme-toggle]");
     expect(toggles.length).toBeGreaterThan(0);

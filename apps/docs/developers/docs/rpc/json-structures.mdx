@@ -1,0 +1,2239 @@
+---
+title: Solana RPC JSON Structures
+sidebarTitle: "JSON reference"
+---
+
+## Overview
+
+Various Solana RPC methods return structured JSON objects with well-defined
+fields and nested data.
+
+This page documents the shared JSON data structures reused across Solana RPC
+responses.
+
+Start with the top-level structure returned by the RPC method you are using,
+then follow the linked sections for any nested objects it contains.
+
+| Reference              | Details                                                                                                                                                                                                                                                                                                                                                      |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Type definitions       | [`transaction-status-client-types`](https://github.com/anza-xyz/agave/blob/v3.1.8/transaction-status-client-types/src/lib.rs); [`rpc-client-types`](https://github.com/anza-xyz/agave/blob/v3.1.8/rpc-client-types/src/response.rs); [`account-decoder-client-types`](https://github.com/anza-xyz/agave/blob/v3.1.8/account-decoder-client-types/src/lib.rs) |
+| Serialization behavior | [`transaction-status`](https://github.com/anza-xyz/agave/blob/v3.1.8/transaction-status/src/lib.rs); [`rpc`](https://github.com/anza-xyz/agave/blob/v3.1.8/rpc/src/rpc.rs)                                                                                                                                                                                   |
+
+The sections below are grouped into top-level response objects and shared
+structures. Each section begins with a reference table that links the structure
+to the RPC method or parent structure, response path, and type definition.
+
+## Top-Level Response Objects
+
+### Confirmed Blocks
+
+Block-oriented RPC methods such as `getBlock` return confirmed blocks in this
+structure:
+
+| Reference       | Details                                                                                                                          |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Returned by     | [`getBlock`](/developers/docs/rpc/http/getblock); the `block` field in [`blockSubscribe`](/developers/docs/rpc/websocket/blocksubscribe) notifications |
+| Response path   | `result` in `getBlock`; `params.result.value.block` in `blockSubscribe`                                                          |
+| Type Definition | [`UiConfirmedBlock`](https://github.com/anza-xyz/agave/blob/v3.1.8/transaction-status-client-types/src/lib.rs#L107-L123)         |
+
+```json
+{
+  "previousBlockhash": "9gAzd1Mv43CptYG8cjy5bE7uNq6P9SFNZFTKToHcQHGD",
+  "blockhash": "J8mfvgG5xJ1hfGVxcrJ9f3BwdYPuXNfY3cJzKMwHyFTe",
+  "parentSlot": 408671999,
+  "transactions": [
+    {
+      "transaction": {
+        "signatures": [
+          "2sZrnsqbiPqTznPsnU33CBb1LVeqaMCxE1vsn4YGVnvFzkS684YAMFYFVZAQuQqhiEQNoNSpdMe54v1ppsBG7HCj"
+        ],
+        "message": {
+          "accountKeys": [
+            "9GHvMeJ4ZWuAX6sDGscFL1TBMszx2EehnrcTVUy4MZJQ",
+            "GVYt3tbokX7mH4i86AA6Nh5hPiHEekercNZyNevviotL",
+            "Vote111111111111111111111111111111111111111"
+          ],
+          "header": {
+            "numReadonlySignedAccounts": 0,
+            "numReadonlyUnsignedAccounts": 1,
+            "numRequiredSignatures": 1
+          },
+          "instructions": [
+            {
+              "accounts": [1, 0],
+              "data": "67MGnCUMzh8M6jYY5veq8MTkdaEKoxtaNUYE5m2uWtdMh4r9TSV22JarEohoXJtLZUCLR2bsuWxZcPstBTaf5fc72ceL3RAhWXLmMJeGgqdkUosgbpKw6yRWipuMWmsW34dm8vm868Fz3R3LXnQVJoVkUGxjQ5JsFSyRQQsK2woykd5dHoeCd38cniefmTjWgbhgt88UBm",
+              "programIdIndex": 2,
+              "stackHeight": 1
+            }
+          ],
+          "recentBlockhash": "B7YsL7tnAhMLCZsThdgK2iVEH6gajo6fueSrwtGTGd9K"
+        }
+      },
+      "meta": {
+        "err": null,
+        "fee": 5000,
+        "innerInstructions": [],
+        "logMessages": [
+          "Program Vote111111111111111111111111111111111111111 invoke [1]",
+          "Program Vote111111111111111111111111111111111111111 success"
+        ],
+        "postBalances": [83925018422, 321677325, 1],
+        "postTokenBalances": [],
+        "preBalances": [83925023422, 321677325, 1],
+        "preTokenBalances": [],
+        "rewards": [],
+        "loadedAddresses": {
+          "readonly": [],
+          "writable": []
+        },
+        "computeUnitsConsumed": 2100,
+        "costUnits": 3428,
+        "status": {
+          "Ok": null
+        }
+      },
+      "version": "legacy"
+    }
+  ],
+  "rewards": [
+    {
+      "commission": 0,
+      "lamports": 0,
+      "postBalance": 637848765,
+      "pubkey": "7PmWxxiTneGteGxEYvzj5pGDVMQ4nuN9DfUypEXmaA8o",
+      "rewardType": "Voting"
+    }
+  ],
+  "numRewardPartitions": 312,
+  "blockTime": 1774404960,
+  "blockHeight": 386774297
+}
+```
+
+<ResponseField name="previousBlockhash" type="string">
+  The previous block's blockhash, as a base-58 encoded string.
+</ResponseField>
+
+<ResponseField name="blockhash" type="string">
+  This block's blockhash, as a base-58 encoded string.
+</ResponseField>
+
+<ResponseField name="parentSlot" type="u64">
+  Slot index of this block's parent.
+</ResponseField>
+
+<ResponseField name="transactions" type="array[object] | undefined">
+  Transactions included in the block. Each entry uses the structure documented in
+  [Encoded Transaction Responses](#encoded-transaction-responses). Present when
+  `transactionDetails` is `"full"` or `"accounts"`.
+
+  <Expandable title="properties" defaultOpen>
+    <ResponseField name="transaction" type="object | string | [string, &#x22;base58&#x22; | &#x22;base64&#x22;]">
+      Encoded transaction payload. Uses the structure documented in
+      [Encoded Transaction Responses](#encoded-transaction-responses).
+    </ResponseField>
+
+    <ResponseField name="meta" type="object | null">
+      Transaction metadata using the same structure documented in
+      [Transaction Status Metadata](#transaction-status-metadata), or `null` if
+      metadata is unavailable.
+    </ResponseField>
+
+    <ResponseField name="version" type="&#x22;legacy&#x22; | number | undefined">
+      Transaction version for this entry. Omitted when version information is not
+      available, including legacy transactions without
+      `maxSupportedTransactionVersion`.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="rewards" type="array[object] | undefined">
+  Rewards recorded for the block. Present when block rewards are requested;
+  omitted otherwise. Uses the structure documented in [Rewards](#rewards).
+</ResponseField>
+
+<ResponseField name="numRewardPartitions" type="u64 | undefined">
+  Number of reward partitions in the block, when available.
+</ResponseField>
+
+<ResponseField name="blockTime" type="i64 | null">
+  Estimated production time of the block as a Unix timestamp.
+</ResponseField>
+
+<ResponseField name="blockHeight" type="u64 | null">
+  Block height of this block, if available.
+</ResponseField>
+
+<ResponseField name="signatures" type="array[string] | undefined">
+  Transaction signatures only. Present when `transactionDetails` is
+  `"signatures"`.
+</ResponseField>
+
+### Confirmed Transaction Responses
+
+`getTransaction` returns a confirmed transaction in this structure:
+
+| Reference       | Details                                                                                                                                           |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Returned by     | [`getTransaction`](/developers/docs/rpc/http/gettransaction)                                                                                                 |
+| Response path   | `result`                                                                                                                                          |
+| Type Definition | [`EncodedConfirmedTransactionWithStatusMeta`](https://github.com/anza-xyz/agave/blob/v3.1.8/transaction-status-client-types/src/lib.rs#L709-L714) |
+
+```json
+{
+  "slot": 408830360,
+  "transaction": {
+    "signatures": [
+      "4fqGV381e6h87Hn5vGm7W5MGivHFtTisS9G2UpbsuritcTmXPsPtU32BWF2Bw4yMxH1NAFgGtpWbuVfXbZt8xTBw",
+      "3KYwzbzs2oupAv2A4qMCLpPQusXazJRSxzT99UE3rfoejStBbDnBFeZRUt8et3LTSVBXncCqTXzBVWqxNSrK4J41"
+    ],
+    "message": {
+      "accountKeys": [
+        "44ZsKstjBY52Zz1iB9Q9HqVPbpK4d6BqAJgqshz1bXPs",
+        "BhRYqZJfASkDVaKPtU8NLoPyXAbJFAWSsMujzRn1wFRV",
+        "D3XSB6m2ZjNjTspKVd8hXdmi19CbjmtKabBLLzgf9x6B",
+        "5eHy2DQ7cQjEw2PoEfxvUd5rttzr2NydmGhKpQHk2TdM",
+        "8YFbpsQqUkzmcLHrSDR44LN9DeGrV47rtwETN4sM6V4i",
+        "HTi6JahmSzq2s1B2zg7GG6Ev6cQEpoGRDRxKWATYpump",
+        "DocSpnPnyffShXENq9xKSuL68GeScV7HsQnZw5X65LSb",
+        "mKLWCKDeHeym4egVLMTLNV661E1FsHarXvYr6pwAFPz"
+      ],
+      "addressTableLookups": [
+        {
+          "accountKey": "buDnget76BvfyDQQgUKN6npRixeir9K59jBVP9QMqZq",
+          "readonlyIndexes": [140, 144, 141, 33, 26, 20, 3, 34, 143, 142],
+          "writableIndexes": [4]
+        }
+      ],
+      "header": {
+        "numReadonlySignedAccounts": 1,
+        "numReadonlyUnsignedAccounts": 5,
+        "numRequiredSignatures": 2
+      },
+      "instructions": [
+        {
+          "accounts": [2, 20, 1],
+          "data": "6vx8P",
+          "programIdIndex": 15,
+          "stackHeight": 1
+        },
+        {
+          "accounts": [21],
+          "data": "2fX7imjEaEwy",
+          "programIdIndex": 18,
+          "stackHeight": 1
+        },
+        {
+          "accounts": [],
+          "data": "3Sby4Ya7yebR",
+          "programIdIndex": 18,
+          "stackHeight": 1
+        }
+      ],
+      "recentBlockhash": "5D7W1x5zbqBn67kPDz62L5ZF1McxnhajiRGrhh3Y3wKb"
+    }
+  },
+  "meta": {
+    "err": null,
+    "fee": 2010000,
+    "innerInstructions": [
+      {
+        "index": 5,
+        "instructions": [
+          {
+            "accounts": [28, 16],
+            "data": "2BfZXS1GQrCLZ1vzWVcaYz6Kpzd9QSStQWUgg9fK2UEsEo",
+            "programIdIndex": 29,
+            "stackHeight": 2
+          }
+        ]
+      }
+    ],
+    "logMessages": [
+      "Program 11111111111111111111111111111111 invoke [1]",
+      "Program 11111111111111111111111111111111 success",
+      "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+      "Program ComputeBudget111111111111111111111111111111 success",
+      "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+      "Program ComputeBudget111111111111111111111111111111 success"
+    ],
+    "postBalances": [
+      232434298, 100440447, 1447680, 0, 2985840, 3821040, 2074080, 2074080
+    ],
+    "postTokenBalances": [
+      {
+        "accountIndex": 6,
+        "mint": "HTi6JahmSzq2s1B2zg7GG6Ev6cQEpoGRDRxKWATYpump",
+        "owner": "44ZsKstjBY52Zz1iB9Q9HqVPbpK4d6BqAJgqshz1bXPs",
+        "programId": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+        "uiTokenAmount": {
+          "amount": "0",
+          "decimals": 6,
+          "uiAmount": null,
+          "uiAmountString": "0"
+        }
+      },
+      {
+        "accountIndex": 7,
+        "mint": "HTi6JahmSzq2s1B2zg7GG6Ev6cQEpoGRDRxKWATYpump",
+        "owner": "8YFbpsQqUkzmcLHrSDR44LN9DeGrV47rtwETN4sM6V4i",
+        "programId": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+        "uiTokenAmount": {
+          "amount": "170620656370954",
+          "decimals": 6,
+          "uiAmount": 170620656.370954,
+          "uiAmountString": "170620656.370954"
+        }
+      }
+    ],
+    "preBalances": [
+      131202493, 100440447, 1447680, 0, 2985840, 3821040, 2074080, 2074080
+    ],
+    "preTokenBalances": [
+      {
+        "accountIndex": 6,
+        "mint": "HTi6JahmSzq2s1B2zg7GG6Ev6cQEpoGRDRxKWATYpump",
+        "owner": "44ZsKstjBY52Zz1iB9Q9HqVPbpK4d6BqAJgqshz1bXPs",
+        "programId": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+        "uiTokenAmount": {
+          "amount": "175173728464",
+          "decimals": 6,
+          "uiAmount": 175173.728464,
+          "uiAmountString": "175173.728464"
+        }
+      },
+      {
+        "accountIndex": 7,
+        "mint": "HTi6JahmSzq2s1B2zg7GG6Ev6cQEpoGRDRxKWATYpump",
+        "owner": "8YFbpsQqUkzmcLHrSDR44LN9DeGrV47rtwETN4sM6V4i",
+        "programId": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+        "uiTokenAmount": {
+          "amount": "170445482642490",
+          "decimals": 6,
+          "uiAmount": 170445482.64249,
+          "uiAmountString": "170445482.64249"
+        }
+      }
+    ],
+    "rewards": [],
+    "loadedAddresses": {
+      "readonly": [
+        "SysvarRecentB1ockHashes11111111111111111111",
+        "jitodontfront1111111111111111111111tradewiz",
+        "SysvarRent111111111111111111111111111111111",
+        "ADyA8hdefvWN2dbGGWFotbzWxrAvLW83WG6QCVXvJKqw"
+      ],
+      "writable": ["So11111111111111111111111111111111111111112"]
+    },
+    "returnData": null,
+    "computeUnitsConsumed": 98924,
+    "costUnits": 107709,
+    "status": {
+      "Ok": null
+    }
+  },
+  "version": 0,
+  "blockTime": 1774467439
+}
+```
+
+<ResponseField name="slot" type="u64">
+  Slot that contains this transaction.
+</ResponseField>
+
+<ResponseField name="transaction" type="object | string | [string, &#x22;base58&#x22; | &#x22;base64&#x22;]">
+  Encoded transaction payload. Uses the structure documented in
+  [Encoded Transaction Responses](#encoded-transaction-responses).
+</ResponseField>
+
+<ResponseField name="meta" type="object | null">
+  Transaction metadata, or `null` if metadata is unavailable. Uses the structure
+  documented in [Transaction Status Metadata](#transaction-status-metadata).
+</ResponseField>
+
+<ResponseField name="version" type="&#x22;legacy&#x22; | number | undefined">
+  Transaction version. Omitted when version information is not available,
+  including legacy transactions when `maxSupportedTransactionVersion` is not set.
+  Versioned transactions serialize as a numeric version.
+</ResponseField>
+
+<ResponseField name="blockTime" type="i64 | null">
+  Estimated production time of the block that contains this transaction, as a Unix
+  timestamp.
+</ResponseField>
+
+### Simulation Results
+
+`simulateTransaction` returns this object inside `result.value`.
+`sendTransaction` preflight failures use the same structure inside `error.data`.
+Preflight failures return a sparser subset of fields, with several fields set to
+`null`:
+
+| Reference        | Details                                                                                                                                                                                                                                                                                                                                              |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Returned by      | [`simulateTransaction`](/developers/docs/rpc/http/simulatetransaction); `sendTransaction` preflight failures in `error.data`                                                                                                                                                                                                                                    |
+| Response path    | `result.value` in `simulateTransaction`; `error.data` in `sendTransaction` preflight failures                                                                                                                                                                                                                                                        |
+| Type Definitions | [`RpcSimulateTransactionResult`](https://github.com/anza-xyz/agave/blob/v3.1.8/rpc-client-types/src/response.rs#L433-L448), [`RpcBlockhash`](https://github.com/anza-xyz/agave/blob/v3.1.8/rpc-client-types/src/response.rs#L145-L148), [`UiAccount`](https://github.com/anza-xyz/agave/blob/v3.1.8/account-decoder-client-types/src/lib.rs#L24-L34) |
+
+```json
+{
+  "accounts": null,
+  "err": null,
+  "innerInstructions": null,
+  "loadedAccountsDataSize": 711749,
+  "logs": [
+    "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb invoke [1]",
+    "Program log: Instruction: Transfer",
+    "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 1824 of 200000 compute units",
+    "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb success"
+  ],
+  "replacementBlockhash": {
+    "blockhash": "CDK7TP7iVFdqwMhdrG3kZUhLcNUS9KQ3d7MsGQyUyfKx",
+    "lastValidBlockHeight": 438875965
+  },
+  "returnData": null,
+  "unitsConsumed": 1824,
+  "fee": 5000,
+  "preBalances": [994375240, 2074080, 2074080, 1159846],
+  "postBalances": [994370240, 2074080, 2074080, 1159846],
+  "postTokenBalances": [
+    {
+      "accountIndex": 1,
+      "mint": "72p1XsRo7KRptf8ZhPoHvVFneLPpUT4rpTYRu5EnKB8A",
+      "owner": "GzKdGsAgBBz7ekBnVmiaoq1QV43J9fu6tTexJMmygQUS",
+      "programId": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "uiTokenAmount": {
+        "amount": "200",
+        "decimals": 2,
+        "uiAmount": 2.0,
+        "uiAmountString": "2"
+      }
+    },
+    {
+      "accountIndex": 2,
+      "mint": "72p1XsRo7KRptf8ZhPoHvVFneLPpUT4rpTYRu5EnKB8A",
+      "owner": "AUpUPTU4dUGJmGSk6TbWDua2EzLr4oV8VtQ9vd6t6mqc",
+      "programId": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "uiTokenAmount": {
+        "amount": "999999999999800",
+        "decimals": 2,
+        "uiAmount": 9999999999998.0,
+        "uiAmountString": "9999999999998"
+      }
+    }
+  ],
+  "preTokenBalances": [
+    {
+      "accountIndex": 1,
+      "mint": "72p1XsRo7KRptf8ZhPoHvVFneLPpUT4rpTYRu5EnKB8A",
+      "owner": "GzKdGsAgBBz7ekBnVmiaoq1QV43J9fu6tTexJMmygQUS",
+      "programId": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "uiTokenAmount": {
+        "amount": "100",
+        "decimals": 2,
+        "uiAmount": 1.0,
+        "uiAmountString": "1"
+      }
+    },
+    {
+      "accountIndex": 2,
+      "mint": "72p1XsRo7KRptf8ZhPoHvVFneLPpUT4rpTYRu5EnKB8A",
+      "owner": "AUpUPTU4dUGJmGSk6TbWDua2EzLr4oV8VtQ9vd6t6mqc",
+      "programId": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "uiTokenAmount": {
+        "amount": "999999999999900",
+        "decimals": 2,
+        "uiAmount": 9999999999999.0,
+        "uiAmountString": "9999999999999"
+      }
+    }
+  ],
+  "loadedAddresses": {
+    "readonly": [],
+    "writable": []
+  }
+}
+```
+
+<ResponseField name="accounts" type="array[object | null] | null">
+  Post-simulation snapshots for the addresses requested in
+  `simulateTransaction.accounts.addresses`. Each element corresponds to the same
+  index in the request and is either `null` or an account object using the same
+  schema documented in [Account Data](#account-data). The `data` field depends on
+  the requested account encoding.
+</ResponseField>
+
+<ResponseField name="err" type="string | object | null">
+  Simulation error. Uses the structure documented in
+  [Transaction Errors](#transaction-errors). `null` indicates success.
+</ResponseField>
+
+<ResponseField name="innerInstructions" type="array[object] | null">
+  Inner instructions captured during simulation. `null` unless CPI recording was
+  requested. Uses the structure documented in
+  [Inner Instructions](#inner-instructions), always in the JSON Parsed form: each
+  instruction is either fully parsed or partially decoded, never a compiled
+  instruction with account indexes.
+</ResponseField>
+
+<ResponseField name="loadedAccountsDataSize" type="u32">
+  Total number of account-data bytes loaded while simulating the transaction.
+</ResponseField>
+
+<ResponseField name="logs" type="array[string] | null">
+  Program log output captured during simulation. This field is `null` if the
+  simulation failed before execution began; otherwise, it is an array that may be
+  empty.
+</ResponseField>
+
+<ResponseField name="replacementBlockhash" type="object | null">
+  Replacement blockhash the RPC node used when `replaceRecentBlockhash` was
+  enabled.
+
+  <Expandable title="properties" defaultOpen>
+    <ResponseField name="blockhash" type="string">
+      Replacement recent blockhash, as a base-58 encoded string.
+    </ResponseField>
+
+    <ResponseField name="lastValidBlockHeight" type="u64">
+      Last block height at which the replacement blockhash remains valid.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="returnData" type="object | null">
+  Most recent instruction return data captured during simulation. Uses the
+  structure documented in [Return Data](#return-data).
+</ResponseField>
+
+<ResponseField name="unitsConsumed" type="u64">
+  Compute units consumed during simulation.
+</ResponseField>
+
+<ResponseField name="fee" type="u64 | null">
+  Fee charged for the simulated transaction. `null` if simulation failed before
+  fee calculation completed.
+</ResponseField>
+
+<ResponseField name="preBalances" type="array[u64] | null">
+  Lamport balances before simulation, indexed to the transaction account list.
+</ResponseField>
+
+<ResponseField name="postBalances" type="array[u64] | null">
+  Lamport balances after simulation, indexed to the transaction account list.
+</ResponseField>
+
+<ResponseField name="postTokenBalances" type="array[object] | null">
+  Token balances after simulation. Uses the structure documented in
+  [Token Balances](#token-balances).
+</ResponseField>
+
+<ResponseField name="preTokenBalances" type="array[object] | null">
+  Token balances before simulation. Uses the structure documented in
+  [Token Balances](#token-balances).
+</ResponseField>
+
+<ResponseField name="loadedAddresses" type="object | null">
+  Loaded account addresses resolved from lookup tables. `simulateTransaction`
+  currently serializes this field as an object, using empty arrays when no
+  addresses were loaded. `sendTransaction` preflight failures may return `null`
+  for this field in `error.data`. Uses the structure documented in
+  [Loaded Addresses](#loaded-addresses).
+</ResponseField>
+
+## Shared Structures
+
+### Encoded Transaction Responses
+
+Transaction-oriented RPC methods embed transactions in an encoded wrapper using
+this structure:
+
+| Reference       | Details                                                                                                                                                                                  |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Included in     | `transactions[]` in [Confirmed Blocks](#confirmed-blocks); the shared `transaction`, `meta`, and `version` fields in [Confirmed Transaction Responses](#confirmed-transaction-responses) |
+| Response path   | `transactions[]` in confirmed blocks; `result.transaction`, `result.meta`, and `result.version` in confirmed transaction responses                                                       |
+| Type Definition | [`EncodedTransactionWithStatusMeta`](https://github.com/anza-xyz/agave/blob/v3.1.8/transaction-status-client-types/src/lib.rs#L199-L205)                                                 |
+
+```json
+{
+  "transaction": {
+    "signatures": [
+      "4fqGV381e6h87Hn5vGm7W5MGivHFtTisS9G2UpbsuritcTmXPsPtU32BWF2Bw4yMxH1NAFgGtpWbuVfXbZt8xTBw",
+      "3KYwzbzs2oupAv2A4qMCLpPQusXazJRSxzT99UE3rfoejStBbDnBFeZRUt8et3LTSVBXncCqTXzBVWqxNSrK4J41"
+    ],
+    "message": {
+      "accountKeys": [
+        "44ZsKstjBY52Zz1iB9Q9HqVPbpK4d6BqAJgqshz1bXPs",
+        "BhRYqZJfASkDVaKPtU8NLoPyXAbJFAWSsMujzRn1wFRV",
+        "D3XSB6m2ZjNjTspKVd8hXdmi19CbjmtKabBLLzgf9x6B",
+        "5eHy2DQ7cQjEw2PoEfxvUd5rttzr2NydmGhKpQHk2TdM",
+        "8YFbpsQqUkzmcLHrSDR44LN9DeGrV47rtwETN4sM6V4i",
+        "HTi6JahmSzq2s1B2zg7GG6Ev6cQEpoGRDRxKWATYpump",
+        "DocSpnPnyffShXENq9xKSuL68GeScV7HsQnZw5X65LSb",
+        "mKLWCKDeHeym4egVLMTLNV661E1FsHarXvYr6pwAFPz"
+      ],
+      "addressTableLookups": [
+        {
+          "accountKey": "buDnget76BvfyDQQgUKN6npRixeir9K59jBVP9QMqZq",
+          "readonlyIndexes": [140, 144, 141, 33, 26, 20, 3, 34, 143, 142],
+          "writableIndexes": [4]
+        }
+      ],
+      "header": {
+        "numReadonlySignedAccounts": 1,
+        "numReadonlyUnsignedAccounts": 5,
+        "numRequiredSignatures": 2
+      },
+      "instructions": [
+        {
+          "accounts": [2, 20, 1],
+          "data": "6vx8P",
+          "programIdIndex": 15,
+          "stackHeight": 1
+        },
+        {
+          "accounts": [21],
+          "data": "2fX7imjEaEwy",
+          "programIdIndex": 18,
+          "stackHeight": 1
+        },
+        {
+          "accounts": [],
+          "data": "3Sby4Ya7yebR",
+          "programIdIndex": 18,
+          "stackHeight": 1
+        }
+      ],
+      "recentBlockhash": "5D7W1x5zbqBn67kPDz62L5ZF1McxnhajiRGrhh3Y3wKb"
+    }
+  },
+  "meta": {
+    "err": null,
+    "fee": 2010000,
+    "innerInstructions": [
+      {
+        "index": 5,
+        "instructions": [
+          {
+            "accounts": [28, 16],
+            "data": "2BfZXS1GQrCLZ1vzWVcaYz6Kpzd9QSStQWUgg9fK2UEsEo",
+            "programIdIndex": 29,
+            "stackHeight": 2
+          }
+        ]
+      }
+    ],
+    "logMessages": [
+      "Program 11111111111111111111111111111111 invoke [1]",
+      "Program 11111111111111111111111111111111 success",
+      "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+      "Program ComputeBudget111111111111111111111111111111 success",
+      "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+      "Program ComputeBudget111111111111111111111111111111 success"
+    ],
+    "postBalances": [
+      232434298, 100440447, 1447680, 0, 2985840, 3821040, 2074080, 2074080
+    ],
+    "postTokenBalances": [
+      {
+        "accountIndex": 6,
+        "mint": "HTi6JahmSzq2s1B2zg7GG6Ev6cQEpoGRDRxKWATYpump",
+        "owner": "44ZsKstjBY52Zz1iB9Q9HqVPbpK4d6BqAJgqshz1bXPs",
+        "programId": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+        "uiTokenAmount": {
+          "amount": "0",
+          "decimals": 6,
+          "uiAmount": null,
+          "uiAmountString": "0"
+        }
+      },
+      {
+        "accountIndex": 7,
+        "mint": "HTi6JahmSzq2s1B2zg7GG6Ev6cQEpoGRDRxKWATYpump",
+        "owner": "8YFbpsQqUkzmcLHrSDR44LN9DeGrV47rtwETN4sM6V4i",
+        "programId": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+        "uiTokenAmount": {
+          "amount": "170620656370954",
+          "decimals": 6,
+          "uiAmount": 170620656.370954,
+          "uiAmountString": "170620656.370954"
+        }
+      }
+    ],
+    "preBalances": [
+      131202493, 100440447, 1447680, 0, 2985840, 3821040, 2074080, 2074080
+    ],
+    "preTokenBalances": [
+      {
+        "accountIndex": 6,
+        "mint": "HTi6JahmSzq2s1B2zg7GG6Ev6cQEpoGRDRxKWATYpump",
+        "owner": "44ZsKstjBY52Zz1iB9Q9HqVPbpK4d6BqAJgqshz1bXPs",
+        "programId": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+        "uiTokenAmount": {
+          "amount": "175173728464",
+          "decimals": 6,
+          "uiAmount": 175173.728464,
+          "uiAmountString": "175173.728464"
+        }
+      },
+      {
+        "accountIndex": 7,
+        "mint": "HTi6JahmSzq2s1B2zg7GG6Ev6cQEpoGRDRxKWATYpump",
+        "owner": "8YFbpsQqUkzmcLHrSDR44LN9DeGrV47rtwETN4sM6V4i",
+        "programId": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+        "uiTokenAmount": {
+          "amount": "170445482642490",
+          "decimals": 6,
+          "uiAmount": 170445482.64249,
+          "uiAmountString": "170445482.64249"
+        }
+      }
+    ],
+    "rewards": [],
+    "loadedAddresses": {
+      "readonly": [
+        "SysvarRecentB1ockHashes11111111111111111111",
+        "jitodontfront1111111111111111111111tradewiz",
+        "SysvarRent111111111111111111111111111111111",
+        "ADyA8hdefvWN2dbGGWFotbzWxrAvLW83WG6QCVXvJKqw"
+      ],
+      "writable": ["So11111111111111111111111111111111111111112"]
+    },
+    "returnData": null,
+    "computeUnitsConsumed": 98924,
+    "costUnits": 107709,
+    "status": {
+      "Ok": null
+    }
+  },
+  "version": 0
+}
+```
+
+<ResponseField name="transaction" type="object | string | [string, &#x22;base58&#x22; | &#x22;base64&#x22;]">
+  Encoded transaction payload. For JSON encodings, this uses the structures
+  documented in [Transactions](#transactions) or
+  [Accounts Only Transaction Responses](#accounts-only-transaction-responses). For
+  binary encodings, this is a base-58/base-64 string or a `[string, encoding]`
+  tuple.
+</ResponseField>
+
+<ResponseField name="meta" type="object | null">
+  Transaction metadata, or `null` if metadata is unavailable. Uses the structure
+  documented in [Transaction Status Metadata](#transaction-status-metadata). In
+  `accounts` mode block responses, some metadata fields are intentionally omitted,
+  including `innerInstructions`, `logMessages`, `loadedAddresses`, `returnData`,
+  `computeUnitsConsumed`, and `costUnits`.
+</ResponseField>
+
+<ResponseField name="version" type="&#x22;legacy&#x22; | number | undefined">
+  Transaction version. Omitted when version information is not available,
+  including legacy transactions when `maxSupportedTransactionVersion` is not set.
+  Versioned transactions serialize as a numeric version.
+</ResponseField>
+
+### Transactions
+
+Transactions are quite different from those on other blockchains. Be sure to
+review [Anatomy of a Transaction](/developers/docs/core/transactions) to learn about
+transactions on Solana.
+
+| Reference        | Details                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Included in      | [Encoded Transaction Responses](#encoded-transaction-responses); the `transaction` field in [Confirmed Transaction Responses](#confirmed-transaction-responses)                                                                                                                                                                                                                                                                                                                         |
+| Response path    | `transaction`                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| Type Definitions | [`UiTransaction`](https://github.com/anza-xyz/agave/blob/v3.1.8/transaction-status-client-types/src/lib.rs#L128-L131), [`UiMessage`](https://github.com/anza-xyz/agave/blob/v3.1.8/transaction-status-client-types/src/lib.rs#L160-L165), [`UiRawMessage`](https://github.com/anza-xyz/agave/blob/v3.1.8/transaction-status-client-types/src/lib.rs#L531-L540), [`UiParsedMessage`](https://github.com/anza-xyz/agave/blob/v3.1.8/transaction-status-client-types/src/lib.rs#L136-L142) |
+
+| Encoding     | Message shape     | Instruction shape                        | Notes                                                                                                                                                                  |
+| ------------ | ----------------- | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `json`       | `UiRawMessage`    | Compiled instructions                    | `accountKeys` are base-58 strings. Versioned messages describe lookup tables in `addressTableLookups`, with resolved loaded addresses reported separately in metadata. |
+| `jsonParsed` | `UiParsedMessage` | Parsed or partially decoded instructions | `accountKeys` are objects, and parsed versioned responses include lookup-table accounts.                                                                               |
+
+In the
+[v1 transaction format](/developers/docs/core/transactions/versioned-transactions#v1-format),
+v1 messages additionally carry a `transactionConfig` object holding the
+transaction's resource limits (requests must set
+`maxSupportedTransactionVersion: 1` to receive v1 transactions):
+
+```jsonc
+"message": {
+  // ... standard message fields ...
+  "transactionConfig": {
+    "computeUnitLimit": 30000,
+    "heapSize": null,
+    "loadedAccountsDataSizeLimit": 200000,
+    "priorityFee": null
+  }
+}
+```
+
+- `transactionConfig` is present only for v1 messages — it is absent entirely
+  (never `null`) for legacy and v0.
+- Unset inner fields are explicit `null`, not omitted.
+- `priorityFee` is a total in lamports, not micro-lamports per compute unit.
+- `addressTableLookups` is omitted for v1 messages, which do not support address
+  lookup tables.
+
+#### JSON
+
+The JSON structure of a transaction is defined as follows:
+
+```json
+{
+  "message": {
+    "accountKeys": [
+      "44ZsKstjBY52Zz1iB9Q9HqVPbpK4d6BqAJgqshz1bXPs",
+      "BhRYqZJfASkDVaKPtU8NLoPyXAbJFAWSsMujzRn1wFRV",
+      "D3XSB6m2ZjNjTspKVd8hXdmi19CbjmtKabBLLzgf9x6B",
+      "5eHy2DQ7cQjEw2PoEfxvUd5rttzr2NydmGhKpQHk2TdM",
+      "8YFbpsQqUkzmcLHrSDR44LN9DeGrV47rtwETN4sM6V4i",
+      "HTi6JahmSzq2s1B2zg7GG6Ev6cQEpoGRDRxKWATYpump",
+      "DocSpnPnyffShXENq9xKSuL68GeScV7HsQnZw5X65LSb",
+      "mKLWCKDeHeym4egVLMTLNV661E1FsHarXvYr6pwAFPz"
+    ],
+    "addressTableLookups": [
+      {
+        "accountKey": "buDnget76BvfyDQQgUKN6npRixeir9K59jBVP9QMqZq",
+        "readonlyIndexes": [140, 144, 141, 33, 26, 20, 3, 34, 143, 142],
+        "writableIndexes": [4]
+      }
+    ],
+    "header": {
+      "numReadonlySignedAccounts": 1,
+      "numReadonlyUnsignedAccounts": 5,
+      "numRequiredSignatures": 2
+    },
+    "instructions": [
+      {
+        "accounts": [2, 20, 1],
+        "data": "6vx8P",
+        "programIdIndex": 15,
+        "stackHeight": 1
+      },
+      {
+        "accounts": [21],
+        "data": "2fX7imjEaEwy",
+        "programIdIndex": 18,
+        "stackHeight": 1
+      },
+      {
+        "accounts": [],
+        "data": "3Sby4Ya7yebR",
+        "programIdIndex": 18,
+        "stackHeight": 1
+      }
+    ],
+    "recentBlockhash": "5D7W1x5zbqBn67kPDz62L5ZF1McxnhajiRGrhh3Y3wKb"
+  },
+  "signatures": [
+    "4fqGV381e6h87Hn5vGm7W5MGivHFtTisS9G2UpbsuritcTmXPsPtU32BWF2Bw4yMxH1NAFgGtpWbuVfXbZt8xTBw",
+    "3KYwzbzs2oupAv2A4qMCLpPQusXazJRSxzT99UE3rfoejStBbDnBFeZRUt8et3LTSVBXncCqTXzBVWqxNSrK4J41"
+  ]
+}
+```
+
+<ResponseField name="message" type="object">
+  Defines the content of the transaction.
+
+  <Expandable title="properties" defaultOpen>
+    <ResponseField name="accountKeys" type="array[string]">
+      List of base-58 encoded static account keys stored in the message. For legacy
+      transactions this is the full account list. For versioned transactions,
+      additional loaded addresses are described separately via
+      `message.addressTableLookups` and metadata `loadedAddresses`. The first
+      `message.header.numRequiredSignatures` public keys must sign the transaction.
+    </ResponseField>
+
+    <ResponseField name="addressTableLookups" type="array[object] | undefined">
+      Address lookup table references for versioned transactions. Present when the
+      transaction is versioned and `maxSupportedTransactionVersion` is set. This field
+      is currently emitted for v0 messages even when the array is empty, and is
+      omitted for v1 messages, which do not support address lookup tables. Uses the
+      structure documented in [Address Table Lookups](#address-table-lookups).
+    </ResponseField>
+
+    <ResponseField name="header" type="object">
+      Details the account types and signatures required by the transaction.
+
+      <Expandable title="properties">
+        <ResponseField name="numReadonlySignedAccounts" type="u8">
+          The last `numReadonlySignedAccounts` of the signed keys are read-only accounts.
+          Programs may process multiple transactions that load read-only accounts within a
+          single PoH entry, but are not permitted to credit or debit lamports or modify
+          account data. Transactions targeting the same read-write account are evaluated
+          sequentially.
+        </ResponseField>
+
+        <ResponseField name="numReadonlyUnsignedAccounts" type="u8">
+          The last `numReadonlyUnsignedAccounts` of the unsigned keys are read-only
+          accounts.
+        </ResponseField>
+
+        <ResponseField name="numRequiredSignatures" type="u8">
+          The total number of signatures required to make the transaction valid. The
+          signatures must match the first `numRequiredSignatures` of
+          `message.accountKeys`.
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+
+    <ResponseField name="instructions" type="array[object]">
+      List of program instructions that will be executed in sequence and committed in
+      one atomic transaction if all succeed.
+
+      <Expandable title="properties">
+        <ResponseField name="accounts" type="array[u8]">
+          List of ordered indices into the transaction's account key space indicating
+          which accounts to pass to the program. For versioned messages, lookup-loaded
+          addresses are appended after the static `message.accountKeys`.
+        </ResponseField>
+
+        <ResponseField name="data" type="string">
+          The program input data encoded in a base-58 string.
+        </ResponseField>
+
+        <ResponseField name="programIdIndex" type="u8">
+          Index into the transaction's account key space indicating the program account
+          that executes this instruction. For legacy messages this indexes directly into
+          `message.accountKeys`; for versioned messages, lookup-loaded addresses are
+          appended after the static keys.
+        </ResponseField>
+
+        <ResponseField name="stackHeight" type="u32">
+          Transaction-level instruction stack height. This is currently `1` for top-level
+          instructions.
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+
+    <ResponseField name="recentBlockhash" type="string">
+      A base-58 encoded hash of a recent block in the ledger used to prevent
+      transaction duplication and to give transactions lifetimes.
+    </ResponseField>
+
+    <ResponseField name="transactionConfig" type="object | undefined">
+      The compute budget a v1 message declares inline, in place of the ComputeBudget
+      program instructions used by legacy and v0 messages. Present only for v1
+      messages, and absent entirely — never `null` — for legacy and v0. Each inner
+      field is an explicit `null` when the transaction did not request that limit.
+
+      <Expandable title="properties">
+        <ResponseField name="computeUnitLimit" type="u32 | null">
+          The maximum number of compute units the transaction may consume. A v1
+          transaction that requests no limit is budgeted zero compute units and fails at
+          execution.
+        </ResponseField>
+
+        <ResponseField name="heapSize" type="u32 | null">
+          The heap frame size in bytes requested for execution. When `null`, the runtime
+          allocated the default 32,768 bytes.
+        </ResponseField>
+
+        <ResponseField name="loadedAccountsDataSizeLimit" type="u32 | null">
+          The maximum size in bytes of account data the transaction may load. When `null`,
+          the transaction was budgeted zero bytes.
+        </ResponseField>
+
+        <ResponseField name="priorityFee" type="u64 | null">
+          The total priority fee in lamports paid for prioritization, for the whole
+          transaction rather than a price per compute unit.
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="signatures" type="array[string]">
+  A list of base-58 encoded signatures applied to the transaction. The list is
+  always of length `message.header.numRequiredSignatures` and not empty. The
+  signature at index `i` corresponds to the public key at index `i` in
+  `message.accountKeys`. The first one is used as the
+  [transaction id](/developers/docs/references/terminology#transaction-id).
+</ResponseField>
+
+#### JSON Parsed
+
+The JSON parsed structure of a transaction follows a similar structure to the
+regular JSON format, with additional parsing of account and instruction
+information:
+
+```json
+{
+  "message": {
+    "accountKeys": [
+      {
+        "pubkey": "44ZsKstjBY52Zz1iB9Q9HqVPbpK4d6BqAJgqshz1bXPs",
+        "signer": true,
+        "source": "transaction",
+        "writable": true
+      },
+      {
+        "pubkey": "BhRYqZJfASkDVaKPtU8NLoPyXAbJFAWSsMujzRn1wFRV",
+        "signer": true,
+        "source": "transaction",
+        "writable": false
+      },
+      {
+        "pubkey": "D3XSB6m2ZjNjTspKVd8hXdmi19CbjmtKabBLLzgf9x6B",
+        "signer": false,
+        "source": "transaction",
+        "writable": true
+      },
+      {
+        "pubkey": "5eHy2DQ7cQjEw2PoEfxvUd5rttzr2NydmGhKpQHk2TdM",
+        "signer": false,
+        "source": "transaction",
+        "writable": true
+      },
+      {
+        "pubkey": "8sjV1AqBFvFuADBCQHhotaRq5DFFYSjjg1jMyVWMqXvZ",
+        "signer": false,
+        "source": "lookupTable",
+        "writable": true
+      }
+    ],
+    "addressTableLookups": [
+      {
+        "accountKey": "buDnget76BvfyDQQgUKN6npRixeir9K59jBVP9QMqZq",
+        "readonlyIndexes": [140, 144, 141, 33, 26, 20, 3, 34, 143, 142],
+        "writableIndexes": [4]
+      }
+    ],
+    "instructions": [
+      {
+        "parsed": {
+          "info": {
+            "nonceAccount": "D3XSB6m2ZjNjTspKVd8hXdmi19CbjmtKabBLLzgf9x6B",
+            "nonceAuthority": "BhRYqZJfASkDVaKPtU8NLoPyXAbJFAWSsMujzRn1wFRV",
+            "recentBlockhashesSysvar": "SysvarRecentB1ockHashes11111111111111111111"
+          },
+          "type": "advanceNonce"
+        },
+        "program": "system",
+        "programId": "11111111111111111111111111111111",
+        "stackHeight": 1
+      },
+      {
+        "accounts": ["jitodontfront1111111111111111111111tradewiz"],
+        "data": "2fX7imjEaEwy",
+        "programId": "ComputeBudget111111111111111111111111111111",
+        "stackHeight": 1
+      },
+      {
+        "accounts": [],
+        "data": "3Sby4Ya7yebR",
+        "programId": "ComputeBudget111111111111111111111111111111",
+        "stackHeight": 1
+      }
+    ],
+    "recentBlockhash": "5D7W1x5zbqBn67kPDz62L5ZF1McxnhajiRGrhh3Y3wKb"
+  },
+  "signatures": [
+    "4fqGV381e6h87Hn5vGm7W5MGivHFtTisS9G2UpbsuritcTmXPsPtU32BWF2Bw4yMxH1NAFgGtpWbuVfXbZt8xTBw",
+    "3KYwzbzs2oupAv2A4qMCLpPQusXazJRSxzT99UE3rfoejStBbDnBFeZRUt8et3LTSVBXncCqTXzBVWqxNSrK4J41"
+  ]
+}
+```
+
+<ResponseField name="message" type="object">
+  Defines the content of the transaction.
+
+  <Expandable title="properties" defaultOpen>
+    <ResponseField name="accountKeys" type="array[object]">
+      List of account information used by the transaction. Uses the shared
+      [Parsed Accounts](#parsed-accounts) structure. In current full `jsonParsed`
+      versioned transaction responses, this includes loaded lookup-table accounts.
+
+      <Expandable title="properties">
+        <ResponseField name="pubkey" type="string">
+          The base-58 encoded public key of the account.
+        </ResponseField>
+
+        <ResponseField name="signer" type="boolean">
+          Indicates if the account is a required transaction signer.
+        </ResponseField>
+
+        <ResponseField name="source" type="&#x22;transaction&#x22; | &#x22;lookupTable&#x22;">
+          Source of the account metadata. This field is `transaction` for static message
+          accounts and `lookupTable` for loaded lookup-table accounts in
+          transaction/accounts responses.
+        </ResponseField>
+
+        <ResponseField name="writable" type="boolean">
+          Indicates if the account is writable.
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+
+    <ResponseField name="addressTableLookups" type="array[object] | undefined">
+      Address lookup table references for versioned transactions. Present when the
+      transaction is versioned and `maxSupportedTransactionVersion` is set. This field
+      is currently emitted for v0 messages even when the array is empty, and is
+      omitted for v1 messages, which do not support address lookup tables. Uses the
+      structure documented in [Address Table Lookups](#address-table-lookups).
+    </ResponseField>
+
+    <ResponseField name="instructions" type="array[object]">
+      List of parsed or partially decoded program instructions.
+
+      <Expandable title="properties">
+        <ResponseField name="parsed" type="object | undefined">
+          Program-specific parsed data. Present when the instruction was fully parsed.
+
+          <Expandable title="properties">
+            <ResponseField name="info" type="object">
+              Parsed instruction information specific to the program and instruction type.
+            </ResponseField>
+
+            <ResponseField name="type" type="string">
+              The type of instruction (e.g., "transfer").
+            </ResponseField>
+          </Expandable>
+        </ResponseField>
+
+        <ResponseField name="program" type="string | undefined">
+          The name of the program being called. Present when the instruction was fully
+          parsed.
+        </ResponseField>
+
+        <ResponseField name="programId" type="string">
+          The base-58 encoded public key of the program.
+        </ResponseField>
+
+        <ResponseField name="stackHeight" type="u32">
+          Transaction-level instruction stack height. This is currently `1` for top-level
+          instructions.
+        </ResponseField>
+
+        <ResponseField name="accounts" type="array[string] | undefined">
+          Account addresses referenced by the instruction, in order. Present when the
+          instruction was partially decoded because the RPC node did not have a parser for
+          the program.
+        </ResponseField>
+
+        <ResponseField name="data" type="string | undefined">
+          Instruction data, base-58 encoded. Present when the instruction was partially
+          decoded because the RPC node did not have a parser for the program.
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+
+    <ResponseField name="recentBlockhash" type="string">
+      A base-58 encoded hash of a recent block in the ledger used to prevent
+      transaction duplication and to give transactions lifetimes.
+    </ResponseField>
+
+    <ResponseField name="transactionConfig" type="object | undefined">
+      The compute budget a v1 message declares inline, in place of the ComputeBudget
+      program instructions used by legacy and v0 messages. Present only for v1
+      messages, and absent entirely — never `null` — for legacy and v0. Each inner
+      field is an explicit `null` when the transaction did not request that limit.
+
+      <Expandable title="properties">
+        <ResponseField name="computeUnitLimit" type="u32 | null">
+          The maximum number of compute units the transaction may consume. A v1
+          transaction that requests no limit is budgeted zero compute units and fails at
+          execution.
+        </ResponseField>
+
+        <ResponseField name="heapSize" type="u32 | null">
+          The heap frame size in bytes requested for execution. When `null`, the runtime
+          allocated the default 32,768 bytes.
+        </ResponseField>
+
+        <ResponseField name="loadedAccountsDataSizeLimit" type="u32 | null">
+          The maximum size in bytes of account data the transaction may load. When `null`,
+          the transaction was budgeted zero bytes.
+        </ResponseField>
+
+        <ResponseField name="priorityFee" type="u64 | null">
+          The total priority fee in lamports paid for prioritization, for the whole
+          transaction rather than a price per compute unit.
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="signatures" type="array[string]">
+  A list of base-58 encoded signatures applied to the transaction.
+</ResponseField>
+
+### Accounts Only Transaction Responses
+
+When a block is requested with `transactionDetails: "accounts"`, the response
+returns transaction account metadata in this structure:
+
+| Reference       | Details                                                                                                                |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Included in     | [Encoded Transaction Responses](#encoded-transaction-responses) when `transactionDetails: "accounts"`                  |
+| Response path   | `transaction`                                                                                                          |
+| Type Definition | [`UiAccountsList`](https://github.com/anza-xyz/agave/blob/v3.1.8/transaction-status-client-types/src/lib.rs#L523-L528) |
+
+```json
+{
+  "signatures": [
+    "bciv6kPHkXFqBWGnWoHvQ4Tcv6gFZXajipE8x7Aty5VSCz4U7F3jK2yaFZvFUDDRWxf2i38r2WRoM8oGHqwUJaK"
+  ],
+  "accountKeys": [
+    {
+      "pubkey": "a1Xnxu7n1Rmeph9KP4Q1Cx7o8EPUN16fwPZHQ8ncVLa",
+      "signer": true,
+      "source": "transaction",
+      "writable": true
+    },
+    {
+      "pubkey": "AT9SNJB3RmrJ5MERohWQHc6HGbtCJHWkFCUVb1rUUyb6",
+      "signer": false,
+      "source": "transaction",
+      "writable": true
+    },
+    {
+      "pubkey": "BFAXnehgs9BPSH8GVAzUvjXLCqUrxm3RqK6YBzTdoxuX",
+      "signer": false,
+      "source": "transaction",
+      "writable": true
+    },
+    {
+      "pubkey": "Cw8CFyM9FkoMi7K7Crf6HNQqf4uEMzpKw6QNghXLvLkY",
+      "signer": false,
+      "source": "transaction",
+      "writable": true
+    },
+    {
+      "pubkey": "11111111111111111111111111111111",
+      "signer": false,
+      "source": "transaction",
+      "writable": false
+    },
+    {
+      "pubkey": "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+      "signer": false,
+      "source": "transaction",
+      "writable": false
+    },
+    {
+      "pubkey": "8sjV1AqBFvFuADBCQHhotaRq5DFFYSjjg1jMyVWMqXvZ",
+      "signer": false,
+      "source": "lookupTable",
+      "writable": true
+    },
+    {
+      "pubkey": "MNFSTqtC93rEfYHB6hF82sKdZpUDFWkViLByLd1k1Ms",
+      "signer": false,
+      "source": "lookupTable",
+      "writable": false
+    }
+  ]
+}
+```
+
+<ResponseField name="signatures" type="array[string]">
+  Transaction signatures in wire order.
+</ResponseField>
+
+<ResponseField name="accountKeys" type="array[object]">
+  Parsed account metadata for each transaction account. Uses the structure
+  documented in [Parsed Accounts](#parsed-accounts).
+</ResponseField>
+
+### Account Data
+
+RPC methods and subscriptions that return account data use this structure:
+
+| Reference        | Details                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Returned by      | [`getAccountInfo`](/developers/docs/rpc/http/getaccountinfo); [`getMultipleAccounts`](/developers/docs/rpc/http/getmultipleaccounts); the `value` field in [`accountSubscribe`](/developers/docs/rpc/websocket/accountsubscribe) notifications                                                                                                                                                                                                                                                           |
+| Response path    | `result.value`; `result.value[]`; `params.result.value`                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| Type Definitions | [`UiAccount`](https://github.com/anza-xyz/agave/blob/v3.1.8/account-decoder-client-types/src/lib.rs#L24-L34), [`UiAccountData`](https://github.com/anza-xyz/agave/blob/v3.1.8/account-decoder-client-types/src/lib.rs#L36-L42), [`UiAccountEncoding`](https://github.com/anza-xyz/agave/blob/v3.1.8/account-decoder-client-types/src/lib.rs#L71-L80), [`ParsedAccount`](https://github.com/anza-xyz/agave/blob/v3.1.8/account-decoder-client-types/src/lib.rs#L95-L101) |
+
+Account data also appears in these nested response objects:
+
+| Reference     | Details                                                                                                                                                                                                                                                                                                                                                                  |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Included in   | [Simulation Results](#simulation-results); the `account` field in response objects returned by [`getProgramAccounts`](/developers/docs/rpc/http/getprogramaccounts), [`getTokenAccountsByOwner`](/developers/docs/rpc/http/gettokenaccountsbyowner), [`getTokenAccountsByDelegate`](/developers/docs/rpc/http/gettokenaccountsbydelegate), and [`programSubscribe`](/developers/docs/rpc/websocket/programsubscribe) |
+| Response path | `result.value.accounts[]`; `result[].account`; `result.value[].account`; `params.result.value.account`                                                                                                                                                                                                                                                                   |
+
+#### JSON
+
+```json
+{
+  "data": ["", "base64"],
+  "executable": false,
+  "lamports": 88867121550052,
+  "owner": "11111111111111111111111111111111",
+  "rentEpoch": 18446744073709551615,
+  "space": 0
+}
+```
+
+<ResponseField name="data" type="string | [string, &#x22;base58&#x22; | &#x22;base64&#x22; | &#x22;base64+zstd&#x22;]">
+  Account data. If the requested encoding is `binary`, this is a plain base-58
+  string. If the encoding is `base58`, `base64`, or `base64+zstd`, this is
+  `[data, encoding]`.
+</ResponseField>
+
+<ResponseField name="executable" type="boolean">
+  Whether the account contains a program and is therefore read-only.
+</ResponseField>
+
+<ResponseField name="lamports" type="u64">
+  Lamports assigned to this account.
+</ResponseField>
+
+<ResponseField name="owner" type="string">
+  Program owner pubkey, as a base-58 encoded string.
+</ResponseField>
+
+<ResponseField name="rentEpoch" type="u64">
+  Epoch at which this account next owes rent.
+</ResponseField>
+
+<ResponseField name="space" type="u64 | null">
+  Account data size in bytes. Current Solana RPC responses populate this field for
+  encoded account responses.
+</ResponseField>
+
+#### JSON Parsed
+
+When `jsonParsed` encoding is requested, the `data` field uses this parsed
+wrapper when a parser is available:
+
+```json
+{
+  "data": {
+    "parsed": {
+      "info": {
+        "isNative": false,
+        "mint": "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+        "owner": "DBD8hAwLDRQkTsu6EqviaYNGKPnsAMmQonxf7AH8ZcFY",
+        "state": "initialized",
+        "tokenAmount": {
+          "amount": "3482803892164901945",
+          "decimals": 6,
+          "uiAmount": 3482803892164.902,
+          "uiAmountString": "3482803892164.901945"
+        }
+      },
+      "type": "account"
+    },
+    "program": "spl-token",
+    "space": 165
+  },
+  "executable": false,
+  "lamports": 2039280,
+  "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+  "rentEpoch": 18446744073709551615,
+  "space": 165
+}
+```
+
+<ResponseField name="data" type="object | [string, &#x22;base64&#x22;]">
+  Parsed account data wrapper. When a parser is available, this is
+  `{program, parsed, space}`. If `jsonParsed` is requested but no parser is
+  available, the RPC node falls back to `[data, "base64"]`.
+
+  <Expandable title="properties" defaultOpen>
+    <ResponseField name="parsed" type="object">
+      Parser-specific JSON payload. Its structure depends on the owning program and
+      account type.
+    </ResponseField>
+
+    <ResponseField name="program" type="string">
+      Name of the parser that produced the decoded account data.
+    </ResponseField>
+
+    <ResponseField name="space" type="u64">
+      Account data size in bytes inside the parsed `data` object.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="executable" type="boolean">
+  Whether the account contains a program and is therefore read-only.
+</ResponseField>
+
+<ResponseField name="lamports" type="u64">
+  Lamports assigned to this account.
+</ResponseField>
+
+<ResponseField name="owner" type="string">
+  Program owner pubkey, as a base-58 encoded string.
+</ResponseField>
+
+<ResponseField name="rentEpoch" type="u64">
+  Epoch at which this account next owes rent.
+</ResponseField>
+
+<ResponseField name="space" type="u64 | null">
+  Account data size in bytes. Current Solana RPC responses populate this field for
+  encoded account responses.
+</ResponseField>
+
+### Parsed Accounts
+
+Parsed transaction and accounts only responses represent account keys in this
+structure:
+
+| Reference        | Details                                                                                                                                                                                                                                            |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Included in      | [Transactions](#transactions); [Accounts Only Transaction Responses](#accounts-only-transaction-responses)                                                                                                                                         |
+| Response path    | `message.accountKeys[]` in parsed transactions; `accountKeys[]` in accounts only responses                                                                                                                                                         |
+| Type Definitions | [`ParsedAccount`](https://github.com/anza-xyz/agave/blob/v3.1.8/transaction-status-client-types/src/lib.rs#L144-L151), [`ParsedAccountSource`](https://github.com/anza-xyz/agave/blob/v3.1.8/transaction-status-client-types/src/lib.rs#L153-L158) |
+
+```json
+{
+  "pubkey": "8sjV1AqBFvFuADBCQHhotaRq5DFFYSjjg1jMyVWMqXvZ",
+  "signer": false,
+  "source": "lookupTable",
+  "writable": true
+}
+```
+
+<ResponseField name="pubkey" type="string">
+  Account address, as a base-58 encoded string.
+</ResponseField>
+
+<ResponseField name="signer" type="boolean">
+  Whether this account signed the transaction.
+</ResponseField>
+
+<ResponseField name="source" type="&#x22;transaction&#x22; | &#x22;lookupTable&#x22;">
+  Source of the account metadata. This field is `transaction` for static message
+  accounts and `lookupTable` for loaded lookup-table accounts in
+  transaction/accounts responses.
+</ResponseField>
+
+<ResponseField name="writable" type="boolean">
+  Whether the transaction marks this account writable.
+</ResponseField>
+
+### Address Table Lookups
+
+Versioned transaction messages may include address table lookups:
+
+| Reference       | Details                                                                                                                      |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Included in     | [Transactions](#transactions)                                                                                                |
+| Response path   | `message.addressTableLookups[]`                                                                                              |
+| Type Definition | [`UiAddressTableLookup`](https://github.com/anza-xyz/agave/blob/v3.1.8/transaction-status-client-types/src/lib.rs#L220-L237) |
+
+```jsonc
+"addressTableLookups": [
+  {
+    "accountKey": "4m25Bu6JhCFLzbPKJm8usuxr1yjJBnWNEe4u8PUgcpaU",
+    "writableIndexes": [143, 141, 134, 139, 137],
+    "readonlyIndexes": [57, 13, 60, 31]
+  }
+]
+```
+
+<ResponseField name="addressTableLookups" type="array[object]">
+  List of address table lookups used by a versioned transaction to dynamically
+  load account addresses.
+
+  <Expandable title="properties" defaultOpen>
+    <ResponseField name="accountKey" type="string">
+      Address lookup table account pubkey, as a base-58 encoded string.
+    </ResponseField>
+
+    <ResponseField name="writableIndexes" type="array[u8]">
+      Lookup-table indexes loaded as writable accounts.
+    </ResponseField>
+
+    <ResponseField name="readonlyIndexes" type="array[u8]">
+      Lookup-table indexes loaded as readonly accounts.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+### Transaction Status Metadata
+
+Transaction execution metadata is returned in this structure:
+
+| Reference       | Details                                                                                                                              |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Included in     | [Encoded Transaction Responses](#encoded-transaction-responses); [Confirmed Transaction Responses](#confirmed-transaction-responses) |
+| Response path   | `meta`                                                                                                                               |
+| Type Definition | [`UiTransactionStatusMeta`](https://github.com/anza-xyz/agave/blob/v3.1.8/transaction-status-client-types/src/lib.rs#L332-L415)      |
+
+The table below highlights fields whose presence changes across transaction
+response modes. Fields not listed here serialize the same way whenever metadata
+is available.
+
+`json / full` covers full metadata responses in raw JSON form, including
+`getTransaction` responses with `encoding: "json"` and block responses with
+`transactionDetails: "full"`. `jsonParsed` covers parsed transaction responses,
+and `accounts` covers block responses with `transactionDetails: "accounts"`.
+
+| Field                  | `json / full`         | `jsonParsed`          | `accounts`                 |
+| ---------------------- | --------------------- | --------------------- | -------------------------- |
+| `innerInstructions`    | `array \| null`       | `array \| null`       | omitted                    |
+| `logMessages`          | `array \| null`       | `array \| null`       | omitted                    |
+| `loadedAddresses`      | `object`              | omitted               | omitted                    |
+| `returnData`           | `object \| undefined` | `object \| undefined` | omitted                    |
+| `computeUnitsConsumed` | `u64 \| undefined`    | `u64 \| undefined`    | omitted                    |
+| `costUnits`            | `u64 \| undefined`    | `u64 \| undefined`    | omitted                    |
+| `rewards`              | `array \| null`       | `array \| null`       | `array \| null \| omitted` |
+
+In `accounts` responses, `rewards` is omitted when `showRewards` is `false`.
+Otherwise it serializes as an array or `null`.
+
+```json
+{
+  "meta": {
+    "err": null,
+    "fee": 8772,
+    "innerInstructions": [
+      {
+        "index": 2,
+        "instructions": [
+          {
+            "accounts": [0, 0, 10, 4, 2, 1, 12, 13, 16, 18, 16, 17, 14, 11],
+            "data": "3UnF8KPv9rbpD1e4dSEq3QqVZa",
+            "programIdIndex": 15,
+            "stackHeight": 2
+          }
+        ]
+      }
+    ],
+    "logMessages": [
+      "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+      "Program ComputeBudget111111111111111111111111111111 success",
+      "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+      "Program ComputeBudget111111111111111111111111111111 success",
+      "Program JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4 invoke [1]",
+      "Program log: Instruction: Route"
+    ],
+    "postBalances": [435302465, 2039280, 2039280, 946560, 1, 1, 6184956904, 0],
+    "postTokenBalances": [
+      {
+        "accountIndex": 1,
+        "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "owner": "a1Xnxu7n1Rmeph9KP4Q1Cx7o8EPUN16fwPZHQ8ncVLa",
+        "programId": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        "uiTokenAmount": {
+          "amount": "0",
+          "decimals": 6,
+          "uiAmount": null,
+          "uiAmountString": "0"
+        }
+      },
+      {
+        "accountIndex": 2,
+        "mint": "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+        "owner": "a1Xnxu7n1Rmeph9KP4Q1Cx7o8EPUN16fwPZHQ8ncVLa",
+        "programId": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        "uiTokenAmount": {
+          "amount": "466231747",
+          "decimals": 6,
+          "uiAmount": 466.231747,
+          "uiAmountString": "466.231747"
+        }
+      }
+    ],
+    "preBalances": [435311237, 2039280, 2039280, 946560, 1, 1, 6184956904, 0],
+    "preTokenBalances": [
+      {
+        "accountIndex": 1,
+        "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "owner": "a1Xnxu7n1Rmeph9KP4Q1Cx7o8EPUN16fwPZHQ8ncVLa",
+        "programId": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        "uiTokenAmount": {
+          "amount": "466190218",
+          "decimals": 6,
+          "uiAmount": 466.190218,
+          "uiAmountString": "466.190218"
+        }
+      },
+      {
+        "accountIndex": 2,
+        "mint": "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+        "owner": "a1Xnxu7n1Rmeph9KP4Q1Cx7o8EPUN16fwPZHQ8ncVLa",
+        "programId": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        "uiTokenAmount": {
+          "amount": "0",
+          "decimals": 6,
+          "uiAmount": null,
+          "uiAmountString": "0"
+        }
+      }
+    ],
+    "rewards": null,
+    "loadedAddresses": {
+      "readonly": [
+        "MNFSTqtC93rEfYHB6hF82sKdZpUDFWkViLByLd1k1Ms",
+        "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"
+      ],
+      "writable": [
+        "8sjV1AqBFvFuADBCQHhotaRq5DFFYSjjg1jMyVWMqXvZ",
+        "9x85APtURYxxxosTmJhvZWBmPSoTMqhYHz4tBnJ7N4T8",
+        "CNRQ2Q5YURFcQrATzYeKUWgKUoBDfqzkDrRWf21UXCVo"
+      ]
+    },
+    "returnData": {
+      "programId": "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+      "data": ["wyHKGwAAAAA=", "base64"]
+    },
+    "computeUnitsConsumed": 35804,
+    "costUnits": 40132,
+    "status": {
+      "Ok": null
+    }
+  }
+}
+```
+
+<ResponseField name="meta" type="object">
+  <Expandable title="properties" defaultOpen>
+    <ResponseField name="err" type="string | object | null">
+      Transaction error. `null` means the transaction succeeded. Simple error variants
+      serialize as strings, while variants with extra data serialize as objects keyed
+      by the variant name. For example, `InstructionError` serializes as
+      `{"InstructionError": [instructionIndex, instructionError]}`. Uses the structure
+      documented in [Transaction Errors](#transaction-errors).
+    </ResponseField>
+
+    <ResponseField name="fee" type="u64">
+      Fee charged for the transaction, in lamports.
+    </ResponseField>
+
+    <ResponseField name="innerInstructions" type="array[object] | null | undefined">
+      List of [inner instructions](/developers/docs/rpc/json-structures#inner-instructions).
+      Present in full and `jsonParsed` transaction metadata responses. `null` if inner
+      instruction recording was not enabled during this transaction. Omitted in
+      `accounts` mode responses.
+    </ResponseField>
+
+    <ResponseField name="logMessages" type="array[string] | null | undefined">
+      Program log output captured during execution. Present in full and `jsonParsed`
+      transaction metadata responses. `null` if log recording was not enabled during
+      this transaction. Omitted in `accounts` mode responses.
+    </ResponseField>
+
+    <ResponseField name="postBalances" type="array[u64]">
+      Lamport balances from after the transaction was processed, indexed to the
+      transaction's full account key list. For versioned transactions, this includes
+      lookup-loaded addresses in addition to the static message keys.
+    </ResponseField>
+
+    <ResponseField name="postTokenBalances" type="array[object] | null">
+      List of [token balances](/developers/docs/rpc/json-structures#token-balances) from after
+      the transaction was processed. `null` if token balance recording was not
+      available during this transaction.
+    </ResponseField>
+
+    <ResponseField name="preBalances" type="array[u64]">
+      Lamport balances from before the transaction was processed, indexed to the
+      transaction's full account key list. For versioned transactions, this includes
+      lookup-loaded addresses in addition to the static message keys.
+    </ResponseField>
+
+    <ResponseField name="preTokenBalances" type="array[object] | null">
+      List of [token balances](/developers/docs/rpc/json-structures#token-balances) from before
+      the transaction was processed. `null` if token balance recording was not
+      available during this transaction.
+    </ResponseField>
+
+    <ResponseField name="rewards" type="array[object] | null | undefined">
+      Rewards applied while processing the transaction. `null` if rewards were not
+      recorded or were disabled in full/`jsonParsed` transaction responses. Omitted in
+      `accounts` mode when rewards are disabled. Uses the structure documented in
+      [Rewards](#rewards).
+    </ResponseField>
+
+    <ResponseField name="loadedAddresses" type="object">
+      Loaded account addresses resolved from lookup tables. Present in full
+      non-`jsonParsed` transaction metadata responses. This field is always serialized
+      as an object, using empty arrays when no addresses were loaded. Omitted for
+      `jsonParsed` and `accounts` responses. Uses the structure documented in
+      [Loaded Addresses](#loaded-addresses).
+    </ResponseField>
+
+    <ResponseField name="returnData" type="object | undefined">
+      Most recent return data generated by an instruction in the transaction. Present
+      in full and `jsonParsed` transaction metadata responses when available. Omitted
+      if no instruction generated return data, and omitted in `accounts` mode. Uses
+      the structure documented in [Return Data](#return-data).
+    </ResponseField>
+
+    <ResponseField name="computeUnitsConsumed" type="u64 | undefined">
+      Number of [compute units](/developers/docs/core/fees/compute-budget) consumed by the
+      transaction. Present when available in full and `jsonParsed` transaction
+      responses; omitted otherwise and in `accounts` mode.
+    </ResponseField>
+
+    <ResponseField name="costUnits" type="u64 | undefined">
+      Total cost-model units charged by the transaction. Present when available in
+      full and `jsonParsed` transaction responses; omitted otherwise and in `accounts`
+      mode.
+    </ResponseField>
+
+    <ResponseField name="status" type="object">
+      DEPRECATED: Transaction status that mirrors `err`.
+
+      <Expandable title="properties">
+        <ResponseField name="Ok" type="null">
+          Deprecated success marker.
+        </ResponseField>
+
+        <ResponseField name="Err" type="string | object">
+          Deprecated failure payload. Uses the same structure documented in
+          [Transaction Errors](#transaction-errors).
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+### Transaction Errors
+
+Transaction errors serialize as a string or a variant-tagged object:
+
+| Reference       | Details                                                                                                                    |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Included in     | [Transaction Status Metadata](#transaction-status-metadata); [Simulation Results](#simulation-results)                     |
+| Response path   | `err`                                                                                                                      |
+| Type Definition | [`UiTransactionError`](https://github.com/anza-xyz/agave/blob/v3.1.8/transaction-status-client-types/src/lib.rs#L239-L327) |
+
+Simple variants appear as a string:
+
+```json
+"BlockhashNotFound"
+```
+
+<ResponseField name="transactionError" type="string | object">
+  Serialized transaction error value.
+
+  <Expandable title="properties" defaultOpen>
+    <ResponseField name="string" type="string">
+      Simple error variant encoded as a string, such as `"BlockhashNotFound"`.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+Variants with additional data appear as an object, for example:
+
+```json
+{
+  "InstructionError": [
+    0,
+    {
+      "Custom": 1
+    }
+  ]
+}
+```
+
+<ResponseField name="transactionError" type="string | object">
+  Serialized transaction error value.
+
+  <Expandable title="properties" defaultOpen>
+    <ResponseField name="object" type="object">
+      Tuple and struct variants serialize as an object keyed by the variant name.
+
+      <Expandable title="properties">
+        <ResponseField name="InstructionError" type="[u8, string | object]">
+          Instruction error tuple containing:
+
+          <Expandable title="properties">
+            <ResponseField name="instructionIndex" type="u8">
+              Zero-based index of the outer instruction in `transaction.message.instructions`.
+            </ResponseField>
+
+            <ResponseField name="instructionError" type="string | object">
+              Serialized instruction error value. This may be a string such as
+              `"InvalidArgument"` or an object such as `{"Custom": 1}`.
+            </ResponseField>
+          </Expandable>
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+### Inner Instructions
+
+When an instruction in a transaction makes a
+[cross-program invocation](/developers/docs/core/cpi) (CPI), the invoked instructions are
+detailed under `innerInstructions`.
+
+| Reference        | Details                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Included in      | [Transaction Status Metadata](#transaction-status-metadata); [Simulation Results](#simulation-results)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| Response path    | `innerInstructions`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| Type Definitions | [`UiCompiledInstruction`](https://github.com/anza-xyz/agave/blob/v3.1.8/transaction-status-client-types/src/lib.rs#L542-L550), [`UiInstruction`](https://github.com/anza-xyz/agave/blob/v3.1.8/transaction-status-client-types/src/lib.rs#L563-L569), [`UiParsedInstruction`](https://github.com/anza-xyz/agave/blob/v3.1.8/transaction-status-client-types/src/lib.rs#L571-L576), [`UiPartiallyDecodedInstruction`](https://github.com/anza-xyz/agave/blob/v3.1.8/transaction-status-client-types/src/lib.rs#L578-L586), [`UiInnerInstructions`](https://github.com/anza-xyz/agave/blob/v3.1.8/transaction-status-client-types/src/lib.rs#L597-L604) |
+
+- `index: u8` – Index of the instruction at
+  `transaction.message.instructions[index]` that made the CPI.
+- `instructions: array[object]` – List of CPI instructions invoked by the
+  instruction at `index`, encoded as Json or JsonParsed objects.
+
+Transaction responses use the form matching the requested transaction encoding:
+`json` returns compiled instructions with account indexes, while `jsonParsed`
+returns parsed or partially decoded instructions with base-58 encoded addresses.
+[Simulation Results](#simulation-results) always use the JSON Parsed form.
+
+#### JSON Parsed
+
+```jsonc
+"innerInstructions": [
+  {
+    "index": 5,
+    "instructions": [
+      {
+        "accounts": [
+          "5PHirr8joyTMp9JMm6nW7hNDVyEYdkzDqazxPD7RaTjx",
+          "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA"
+        ],
+        "data": "2BfZXS1GQrCLZ1vzWVcaYz6Kpzd9QSStQWUgg9fK2UEsEo",
+        "programId": "pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ",
+        "stackHeight": 2
+      },
+      {
+        "parsed": {
+          "info": {
+            "authority": "44ZsKstjBY52Zz1iB9Q9HqVPbpK4d6BqAJgqshz1bXPs",
+            "destination": "mKLWCKDeHeym4egVLMTLNV661E1FsHarXvYr6pwAFPz",
+            "mint": "HTi6JahmSzq2s1B2zg7GG6Ev6cQEpoGRDRxKWATYpump",
+            "source": "DocSpnPnyffShXENq9xKSuL68GeScV7HsQnZw5X65LSb",
+            "tokenAmount": {
+              "amount": "175173728464",
+              "decimals": 6,
+              "uiAmount": 175173.728464,
+              "uiAmountString": "175173.728464"
+            }
+          },
+          "type": "transferChecked"
+        },
+        "program": "spl-token",
+        "programId": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+        "stackHeight": 2
+      },
+      {
+        "parsed": {
+          "info": {
+            "authority": "8YFbpsQqUkzmcLHrSDR44LN9DeGrV47rtwETN4sM6V4i",
+            "destination": "5eHy2DQ7cQjEw2PoEfxvUd5rttzr2NydmGhKpQHk2TdM",
+            "mint": "So11111111111111111111111111111111111111112",
+            "source": "2vu4YeTiCp5qfqDLAfAS5fPUGp7o24borXCGctbzR5Uc",
+            "tokenAmount": {
+              "amount": "106318851",
+              "decimals": 9,
+              "uiAmount": 0.106318851,
+              "uiAmountString": "0.106318851"
+            }
+          },
+          "type": "transferChecked"
+        },
+        "program": "spl-token",
+        "programId": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        "stackHeight": 2
+      }
+    ]
+  }
+]
+```
+
+<ResponseField name="innerInstructions" type="array[object]">
+  <Expandable title="properties" defaultOpen>
+    <ResponseField name="index" type="u8">
+      Index of the instruction at `transaction.message.instructions[index]` that made
+      the CPI.
+    </ResponseField>
+
+    <ResponseField name="instructions" type="array[object]">
+      List of CPI instructions invoked by the instruction at `index`. Each instruction
+      is either fully parsed or partially decoded.
+
+      <Expandable title="properties">
+        <ResponseField name="parsed" type="object | undefined">
+          Parser output when the program is recognized. Present when the instruction was
+          fully parsed:
+
+          <Expandable title="properties">
+            <ResponseField name="info" type="object">
+              Program specific data returned by the parser.
+            </ResponseField>
+
+            <ResponseField name="type" type="string">
+              Instruction name identified by the parser.
+            </ResponseField>
+          </Expandable>
+        </ResponseField>
+
+        <ResponseField name="program" type="string | undefined">
+          Name of the program the CPI is being made to. Present when the instruction was
+          fully parsed.
+        </ResponseField>
+
+        <ResponseField name="programId" type="string">
+          Program ID of the program the CPI is being made to.
+        </ResponseField>
+
+        <ResponseField name="stackHeight" type="u32 | null">
+          CPI depth. Inner instructions start at `2` and can reach `5`, or `9` once
+          [SIMD-0268](https://solana.com/upgrades/cpi-nesting-depth) activates.
+        </ResponseField>
+
+        <ResponseField name="accounts" type="array[string] | undefined">
+          Account addresses referenced by the instruction, in order. Present when the
+          instruction was partially decoded because the RPC node did not have a parser for
+          the program.
+        </ResponseField>
+
+        <ResponseField name="data" type="string | undefined">
+          Instruction data, base-58 encoded. Present when the instruction was partially
+          decoded because the RPC node did not have a parser for the program.
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+#### JSON
+
+```jsonc
+"innerInstructions": [
+  {
+    "index": 5,
+    "instructions": [
+      {
+        "accounts": [28, 16],
+        "data": "2BfZXS1GQrCLZ1vzWVcaYz6Kpzd9QSStQWUgg9fK2UEsEo",
+        "programIdIndex": 29,
+        "stackHeight": 2
+      },
+      {
+        "accounts": [6, 5, 7, 0],
+        "data": "imDtMm9P2f2U5",
+        "programIdIndex": 25,
+        "stackHeight": 2
+      },
+      {
+        "accounts": [8, 19, 3, 4],
+        "data": "g9PBeEKHUSc7i",
+        "programIdIndex": 14,
+        "stackHeight": 2
+      },
+      {
+        "accounts": [8, 19, 9, 4],
+        "data": "ghWmjs5Cndrfz",
+        "programIdIndex": 14,
+        "stackHeight": 2
+      }
+    ]
+  }
+]
+```
+
+<ResponseField name="innerInstructions" type="array[object]">
+  <Expandable title="properties" defaultOpen>
+    <ResponseField name="index" type="u8">
+      Index of the instruction at `transaction.message.instructions[index]` that made
+      the CPI.
+    </ResponseField>
+
+    <ResponseField name="instructions" type="array[object]">
+      List of CPI instructions invoked by the instruction at `index`, encoded as Json
+      or JsonParsed objects.
+
+      <Expandable title="properties">
+        <ResponseField name="accounts" type="array[u8]">
+          Indexes into the transaction's account key space for the accounts passed to the
+          program the CPI is being made to. For versioned transactions, lookup-loaded
+          addresses are appended after the static message keys.
+        </ResponseField>
+
+        <ResponseField name="data" type="string">
+          Base58 encoded instruction data passed to the program the CPI is being made to.
+        </ResponseField>
+
+        <ResponseField name="programIdIndex" type="u8">
+          Index into the transaction's account key space of the Program ID for the program
+          the CPI is being made to. For versioned transactions, lookup-loaded addresses
+          are appended after the static message keys.
+        </ResponseField>
+
+        <ResponseField name="stackHeight" type="u32 | null">
+          Depth of the CPI call. Inner instructions start at `2` and can reach `5`, or `9`
+          once [SIMD-0268](https://solana.com/upgrades/cpi-nesting-depth) activates.
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+### Token Balances
+
+The JSON structure of token balances is defined as a list of objects in the
+following structure:
+
+| Reference        | Details                                                                                                                                                                                                                                              |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Included in      | [Transaction Status Metadata](#transaction-status-metadata); [Simulation Results](#simulation-results)                                                                                                                                               |
+| Response path    | `preTokenBalances[]`, `postTokenBalances[]`                                                                                                                                                                                                          |
+| Type Definitions | [`UiTransactionTokenBalance`](https://github.com/anza-xyz/agave/blob/v3.1.8/transaction-status-client-types/src/lib.rs#L485-L501), [`UiTokenAmount`](https://github.com/anza-xyz/agave/blob/v3.1.8/account-decoder-client-types/src/token.rs#L6-L13) |
+
+```jsonc
+"postTokenBalances": [
+  {
+    "accountIndex": 1,
+    "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+    "owner": "a1Xnxu7n1Rmeph9KP4Q1Cx7o8EPUN16fwPZHQ8ncVLa",
+    "programId": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "uiTokenAmount": {
+      "amount": "0",
+      "decimals": 6,
+      "uiAmount": null,
+      "uiAmountString": "0"
+    }
+  },
+  {
+    "accountIndex": 2,
+    "mint": "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+    "owner": "a1Xnxu7n1Rmeph9KP4Q1Cx7o8EPUN16fwPZHQ8ncVLa",
+    "programId": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "uiTokenAmount": {
+      "amount": "466231747",
+      "decimals": 6,
+      "uiAmount": 466.231747,
+      "uiAmountString": "466.231747"
+    }
+  }
+],
+
+"preTokenBalances": [
+  {
+    "accountIndex": 1,
+    "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+    "owner": "a1Xnxu7n1Rmeph9KP4Q1Cx7o8EPUN16fwPZHQ8ncVLa",
+    "programId": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "uiTokenAmount": {
+      "amount": "466190218",
+      "decimals": 6,
+      "uiAmount": 466.190218,
+      "uiAmountString": "466.190218"
+    }
+  },
+  {
+    "accountIndex": 2,
+    "mint": "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+    "owner": "a1Xnxu7n1Rmeph9KP4Q1Cx7o8EPUN16fwPZHQ8ncVLa",
+    "programId": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "uiTokenAmount": {
+      "amount": "0",
+      "decimals": 6,
+      "uiAmount": null,
+      "uiAmountString": "0"
+    }
+  }
+]
+```
+
+<ResponseField name="postTokenBalances" type="array[object]">
+  <Expandable title="properties" defaultOpen>
+    <ResponseField name="accountIndex" type="u8">
+      Index of the account in which the token balance is provided for.
+    </ResponseField>
+
+    <ResponseField name="mint" type="string">
+      Pubkey of the token's mint.
+    </ResponseField>
+
+    <ResponseField name="owner" type="string | undefined">
+      Pubkey of token balance's owner. Omitted if the validator did not record it.
+    </ResponseField>
+
+    <ResponseField name="programId" type="string | undefined">
+      Pubkey of the Token program that owns the account. Omitted if the validator did
+      not record it.
+    </ResponseField>
+
+    <ResponseField name="uiTokenAmount" type="object">
+      <Expandable title="properties">
+        <ResponseField name="amount" type="string">
+          Raw amount of tokens as a string, ignoring decimals.
+        </ResponseField>
+
+        <ResponseField name="decimals" type="u8">
+          Number of decimals configured for token's mint.
+        </ResponseField>
+
+        <ResponseField name="uiAmount" type="number | null">
+          Token amount as a float, accounting for decimals. **DEPRECATED**
+        </ResponseField>
+
+        <ResponseField name="uiAmountString" type="string">
+          Token amount as a string, accounting for decimals.
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="preTokenBalances" type="array[object]">
+  <Expandable title="properties" defaultOpen>
+    <ResponseField name="accountIndex" type="u8">
+      Index of the account in which the token balance is provided for.
+    </ResponseField>
+
+    <ResponseField name="mint" type="string">
+      Pubkey of the token's mint.
+    </ResponseField>
+
+    <ResponseField name="owner" type="string | undefined">
+      Pubkey of token balance's owner. Omitted if the validator did not record it.
+    </ResponseField>
+
+    <ResponseField name="programId" type="string | undefined">
+      Pubkey of the Token program that owns the account. Omitted if the validator did
+      not record it.
+    </ResponseField>
+
+    <ResponseField name="uiTokenAmount" type="object">
+      <Expandable title="properties">
+        <ResponseField name="amount" type="string">
+          Raw amount of tokens as a string, ignoring decimals.
+        </ResponseField>
+
+        <ResponseField name="decimals" type="u8">
+          Number of decimals configured for token's mint.
+        </ResponseField>
+
+        <ResponseField name="uiAmount" type="number | null">
+          Token amount as a float, accounting for decimals. **DEPRECATED**
+        </ResponseField>
+
+        <ResponseField name="uiAmountString" type="string">
+          Token amount as a string, accounting for decimals.
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+### Rewards
+
+Transaction and block metadata may include rewards:
+
+| Reference       | Details                                                                                                        |
+| --------------- | -------------------------------------------------------------------------------------------------------------- |
+| Included in     | [Confirmed Blocks](#confirmed-blocks); [Transaction Status Metadata](#transaction-status-metadata)             |
+| Response path   | `rewards[]`                                                                                                    |
+| Type Definition | [`Reward`](https://github.com/anza-xyz/agave/blob/v3.1.8/transaction-status-client-types/src/lib.rs#L208-L218) |
+
+```jsonc
+"rewards": [
+  {
+    "pubkey": "7PmWxxiTneGteGxEYvzj5pGDVMQ4nuN9DfUypEXmaA8o",
+    "lamports": 0,
+    "postBalance": 637848765,
+    "rewardType": "Voting",
+    "commission": 0
+  }
+]
+```
+
+<ResponseField name="rewards" type="array[object]">
+  Rewards applied while processing a transaction or block.
+
+  <Expandable title="properties" defaultOpen>
+    <ResponseField name="pubkey" type="string">
+      Rewarded account pubkey, as a base-58 encoded string.
+    </ResponseField>
+
+    <ResponseField name="lamports" type="i64">
+      Lamports credited or debited by this reward entry.
+    </ResponseField>
+
+    <ResponseField name="postBalance" type="u64">
+      Account balance after the reward was applied.
+    </ResponseField>
+
+    <ResponseField name="rewardType" type="string | null">
+      Reward category. When present, the value is `Fee`, `Rent`, `Voting`, or
+      `Staking`.
+    </ResponseField>
+
+    <ResponseField name="commission" type="u8 | null">
+      Vote-account commission at the time of the reward. Present only for voting and
+      staking rewards; otherwise `null`.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+### Loaded Addresses
+
+Transaction metadata may include loaded addresses resolved from lookup tables:
+
+| Reference       | Details                                                                                                                   |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Included in     | [Transaction Status Metadata](#transaction-status-metadata); [Simulation Results](#simulation-results)                    |
+| Response path   | `loadedAddresses`                                                                                                         |
+| Type Definition | [`UiLoadedAddresses`](https://github.com/anza-xyz/agave/blob/v3.1.8/transaction-status-client-types/src/lib.rs#L451-L474) |
+
+```jsonc
+"loadedAddresses": {
+  "writable": [
+    "8sjV1AqBFvFuADBCQHhotaRq5DFFYSjjg1jMyVWMqXvZ",
+    "9x85APtURYxxxosTmJhvZWBmPSoTMqhYHz4tBnJ7N4T8",
+    "CNRQ2Q5YURFcQrATzYeKUWgKUoBDfqzkDrRWf21UXCVo"
+  ],
+  "readonly": [
+    "MNFSTqtC93rEfYHB6hF82sKdZpUDFWkViLByLd1k1Ms",
+    "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+    "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"
+  ]
+}
+```
+
+<ResponseField name="loadedAddresses" type="object">
+  Loaded account addresses resolved from lookup tables.
+
+  <Expandable title="properties" defaultOpen>
+    <ResponseField name="writable" type="array[string]">
+      Ordered list of writable loaded-account addresses, as base-58 encoded strings.
+    </ResponseField>
+
+    <ResponseField name="readonly" type="array[string]">
+      Ordered list of readonly loaded-account addresses, as base-58 encoded strings.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+### Return Data
+
+Transaction metadata may include return data from the most recent instruction
+that generated it:
+
+| Reference        | Details                                                                                                                                                                                                                                                       |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Included in      | [Transaction Status Metadata](#transaction-status-metadata); [Simulation Results](#simulation-results)                                                                                                                                                        |
+| Response path    | `returnData`                                                                                                                                                                                                                                                  |
+| Type Definitions | [`UiTransactionReturnData`](https://github.com/anza-xyz/agave/blob/v3.1.8/transaction-status-client-types/src/lib.rs#L417-L443), [`UiReturnDataEncoding`](https://github.com/anza-xyz/agave/blob/v3.1.8/transaction-status-client-types/src/lib.rs#L445-L449) |
+
+```jsonc
+"returnData": {
+  "programId": "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+  "data": ["wyHKGwAAAAA=", "base64"]
+}
+```
+
+<ResponseField name="returnData" type="object">
+  Most recent return data generated by an instruction in the transaction.
+
+  <Expandable title="properties" defaultOpen>
+    <ResponseField name="programId" type="string">
+      Program that generated the return data, as a base-58 encoded pubkey.
+    </ResponseField>
+
+    <ResponseField name="data" type="[string, &#x22;base64&#x22;]">
+      Return data payload and encoding. This field uses base-64 data with `"base64"`
+      encoding.
+    </ResponseField>
+  </Expandable>
+</ResponseField>

@@ -30,12 +30,12 @@ import { layoutKey, listLayoutPages } from "../src/verify/verify-urls.ts";
 
 const SAMPLE_SIZE = 30;
 const ANCHORS = [
-  "apps/docs/docs/rpc/http/getbalance.mdx",
-  "apps/docs/docs/intro/quick-start/build-first-program.mdx",
-  "apps/docs/docs/core/accounts/account-structure.mdx",
-  "apps/docs/docs/payments/advanced-payments/deferred-execution.mdx",
-  "apps/docs/ru/docs/core/accounts/account-structure.mdx",
-  "apps/docs/fr/docs/intro/quick-start/build-first-program.mdx",
+  "apps/docs/developers/docs/rpc/http/getbalance.mdx",
+  "apps/docs/developers/docs/intro/quick-start/build-first-program.mdx",
+  "apps/docs/developers/docs/core/accounts/account-structure.mdx",
+  "apps/docs/developers/docs/payments/advanced-payments/deferred-execution.mdx",
+  "apps/docs/ru/developers/docs/core/accounts/account-structure.mdx",
+  "apps/docs/fr/developers/docs/intro/quick-start/build-first-program.mdx",
 ];
 
 const hash = (s: string) => createHash("sha1").update(s).digest("hex");

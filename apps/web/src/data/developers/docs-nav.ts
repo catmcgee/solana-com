@@ -100,7 +100,10 @@ export function labelSlug(s: string): string {
   );
 }
 
-/** First page of a tab, as Mintlify links it ("docs/payments/index" -> "/docs/payments"). */
+/**
+ * First page of a tab, as Mintlify links it
+ * ("developers/docs/payments/index" -> "/developers/docs/payments").
+ */
 function firstPage(node: unknown): string | null {
   if (typeof node === "string") return node;
   if (!node || typeof node !== "object") return null;
@@ -158,7 +161,7 @@ export const DOCS_SEARCH_PROMPT: string = docsConfig.search.prompt;
  * search-handoff.js opens the docs search on arrival and types `query`.
  */
 export function docsSearchHref(locale: string, query = ""): string {
-  const docs = localizedHref(locale, "/docs");
+  const docs = localizedHref(locale, "/developers/docs");
   const q = query.trim();
   return q ? `${docs}?q=${encodeURIComponent(q)}` : `${docs}?search=1`;
 }

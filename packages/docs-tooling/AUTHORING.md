@@ -13,21 +13,21 @@ deployed `*.mintlify.site` is listed under "Release gates" below.
 
 ## Where things live
 
-| Path                                                  | What                                                                                                                                                                                                                  |
-| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/docs/`                                          | Mintlify project root (dashboard: "docs.json is in a subdirectory" = `/apps/docs`). No `package.json`.                                                                                                                |
-| `apps/docs/docs.json`                                 | Mintlify config (WP11 keys; `navigation` = `$ref` to `navigation/<lang>.json`, `redirects` = `$ref` to `redirects.json`).                                                                                             |
-| `apps/docs/docs/**`                                   | English docs, served at `/docs/**` (`index.mdx` = folder URL).                                                                                                                                                        |
-| `apps/docs/developers/cookbook/**`                    | Cookbook (English only), `/developers/cookbook/**`.                                                                                                                                                                   |
-| `apps/docs/developers/bootcamp/**`                    | English bootcamp, `/developers/bootcamp/**`.                                                                                                                                                                          |
-| `apps/docs/learn/*.mdx`                               | English learn articles, `/learn/<slug>`. The `/learn` landing is a React page moving to apps/web (WP10).                                                                                                              |
-| `apps/docs/<loc>/{docs,developers/bootcamp,learn}/**` | Translations for ar de es fi fr id it ja ko nl pl pt ru tr uk vi zh. Greek (`el`) was removed.                                                                                                                        |
-| `apps/docs/docs-assets/**`                            | Images/video served at `/docs-assets/<original public path>`.                                                                                                                                                         |
-| `apps/docs/**/meta.json`                              | Removed at integration (WP12): the legacy Fumadocs nav is compiled into `navigation/en.json`; `nav compile-legacy` reads the originals from git (`LEGACY_REF`).                                                       |
-| `packages/docs-tooling/`                              | All build/migration tooling (this package).                                                                                                                                                                           |
-| `packages/docs-tooling/data/`                         | Data moved out of the Next app: Surfpool JSON schemas, bootcamp curriculum, learn order, legacy `resources.json`.                                                                                                     |
-| `packages/docs-tooling/legacy/`                       | Legacy TypeScript kept for reference by later work packages (not compiled).                                                                                                                                           |
-| `migration/` (repo root)                              | Review artifacts: `legacy-urls.{txt,tsv}`, `move-map.csv`, `assets-diff.txt`, `asset-refs.csv`, `docs-app-redirects.json`, `pending-web-work.json` (WP9/WP10 handoff), `verify-urls.tsv`, `missing-translations.txt`. |
+| Path                                                             | What                                                                                                                                                                                                                  |
+| ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/docs/`                                                     | Mintlify project root (dashboard: "docs.json is in a subdirectory" = `/apps/docs`). No `package.json`.                                                                                                                |
+| `apps/docs/docs.json`                                            | Mintlify config (WP11 keys; `navigation` = `$ref` to `navigation/<lang>.json`, `redirects` = `$ref` to `redirects.json`).                                                                                             |
+| `apps/docs/developers/docs/**`                                   | English docs, served at `/developers/docs/**` (`index.mdx` = folder URL). Moved from `apps/docs/docs/**` (`/docs/**`) on 2026-10-16; see "The /developers/docs move".                                                 |
+| `apps/docs/developers/cookbook/**`                               | Cookbook (English only), `/developers/cookbook/**`.                                                                                                                                                                   |
+| `apps/docs/developers/bootcamp/**`                               | English bootcamp, `/developers/bootcamp/**`.                                                                                                                                                                          |
+| `apps/docs/learn/*.mdx`                                          | English learn articles, `/learn/<slug>`. The `/learn` landing is a React page moving to apps/web (WP10).                                                                                                              |
+| `apps/docs/<loc>/{developers/docs,developers/bootcamp,learn}/**` | Translations for ar de es fi fr id it ja ko nl pl pt ru tr uk vi zh. Greek (`el`) was removed.                                                                                                                        |
+| `apps/docs/docs-assets/**`                                       | Images/video served at `/docs-assets/<original public path>`.                                                                                                                                                         |
+| `apps/docs/**/meta.json`                                         | Removed at integration (WP12): the legacy Fumadocs nav is compiled into `navigation/en.json`; `nav compile-legacy` reads the originals from git (`LEGACY_REF`).                                                       |
+| `packages/docs-tooling/`                                         | All build/migration tooling (this package).                                                                                                                                                                           |
+| `packages/docs-tooling/data/`                                    | Data moved out of the Next app: Surfpool JSON schemas, bootcamp curriculum, learn order, legacy `resources.json`.                                                                                                     |
+| `packages/docs-tooling/legacy/`                                  | Legacy TypeScript kept for reference by later work packages (not compiled).                                                                                                                                           |
+| `migration/` (repo root)                                         | Review artifacts: `legacy-urls.{txt,tsv}`, `move-map.csv`, `assets-diff.txt`, `asset-refs.csv`, `docs-app-redirects.json`, `pending-web-work.json` (WP9/WP10 handoff), `verify-urls.tsv`, `missing-translations.txt`. |
 
 Rules for `apps/docs`:
 
@@ -48,6 +48,30 @@ Rules for `apps/docs`:
   update `navigation/en.json` and inbound links, then run `generate` and
   `verify` (`gen:redirects` mirrors the result into `apps/docs/redirects.json`).
   The 2026-10-15 merges are listed in the comment above those redirects.
+  Redirect sources keep the URL readers had (`/docs/...` for pages that moved
+  before 2026-10-16); destinations are always the final `/developers/docs/...`
+  page.
+
+### The /developers/docs move (2026-10-16)
+
+The docs moved from `/docs` to `/developers/docs` (files from `apps/docs/docs`
+and `apps/docs/<loc>/docs` to `apps/docs/developers/docs` and
+`apps/docs/<loc>/developers/docs`, with `git mv`). What keeps old links working:
+
+- apps/web `docsPrefixMoveRedirects` (last in the redirect list): `/docs`,
+  `/docs.md`, `/docs/*`, `/en/docs/*` and `/<loc>/docs/*` answer one 308 to the
+  same path under `/developers/docs` (query strings kept, so `/docs?q=` still
+  opens the search). Page-level redirects run first and point straight at the
+  final page, so a page that moved is still one hop. Greek goes
+  `/el/docs/x -> /docs/x -> /developers/docs/x` (two hops).
+- `apps/docs/redirects.json` (gen:redirects) mirrors the same rules for direct
+  `*.mintlify.site` traffic.
+- `verify-urls` follows every legacy URL through the apps/web redirects and
+  fails a chain longer than two hops (`redirect-chain`) or one that ends on
+  nothing (`redirect-dead`). `migration/move-map.csv` points at the new files
+  and URLs; `migration/legacy-urls.*` keep the legacy URLs.
+- Internal links in content, snippets, generator sources, apps/web, ui-chrome
+  and the i18n messages use `/developers/docs/...` directly.
 - Locale folders keep our codes (`ja`, `zh`, `pt`); Mintlify's
   `navigation.languages` uses `jp`, `cn`, `pt-BR` (see `src/lib/locales.ts`).
 - Translations come from Lingo, never from agents.
@@ -364,11 +388,11 @@ Locale copies of these hubs keep the old structure until the next Lingo run.
 
 - `site-links` (650): root-relative links to pages apps/web serves (`/skills`,
   `/discord`, `/developers/templates`, …) become `https://solana.com/…`;
-  Mintlify serves only `/docs/**`, `/learn/<article>`,
+  Mintlify serves only `/developers/docs/**`, `/learn/<article>`,
   `/developers/cookbook/**`, `/developers/bootcamp/**`, `/docs-assets/**`
-  (optionally locale-prefixed). Bare relative links are resolved the way the
-  legacy browser did. GFM autolinks that swallowed CJK/Arabic punctuation are
-  cut.
+  (optionally locale-prefixed; old `/docs/**` links are left alone because they
+  redirect). Bare relative links are resolved the way the legacy browser did.
+  GFM autolinks that swallowed CJK/Arabic punctuation are cut.
 - `anchors` (920): Mintlify heading ids come from @sindresorhus/slugify
   (`actions.json` -> `#actions-json`), not github-slugger (`#actionsjson`).
   Fragments that pointed at a legacy id are rewritten to the Mintlify id of the
@@ -438,15 +462,16 @@ solana.com) before cutover. `mint dev` cannot answer them:
    404 on Mintlify itself and are served the English page (with the English
    canonical) by the apps/web fallback rewrite. If production also shows a wrong
    path, stamp `canonical` frontmatter on every page with a transform.
-2. **`/docs/tools`.** On `mint dev` it 307s to its first sub-page. Mintlify's
-   dev page lookup only tries `src/_props/<slug>.mdx`, never `<slug>/index.mdx`,
-   and falls back to the first nav page under the prefix. For `/docs/tools` that
-   page (commerce-kit, in Payments) comes before the index in nav order, so dev
-   redirects. Production resolves pages differently. The apps/web
-   `MINTLIFY_INDEX_SHADOWED` rewrite to `/<section>/index` keeps solana.com
-   correct either way; remove it only if the deployed site answers 200.
-   (`/docs/tokenization` was the second case until its index was merged into
-   `/docs/assets#tokenization`; it is now a redirect.)
+2. **`/developers/docs/tools`.** On `mint dev` it 307s to its first sub-page.
+   Mintlify's dev page lookup only tries `src/_props/<slug>.mdx`, never
+   `<slug>/index.mdx`, and falls back to the first nav page under the prefix.
+   For `/developers/docs/tools` that page (commerce-kit, in Payments) comes
+   before the index in nav order, so dev redirects. Production resolves pages
+   differently. The apps/web `MINTLIFY_INDEX_SHADOWED` rewrite to
+   `/<section>/index` keeps solana.com correct either way; remove it only if the
+   deployed site answers 200. (`/docs/tokenization` was the second case until
+   its index was merged into `/developers/docs/assets#tokenization`; it is now a
+   redirect.)
 3. **`.md` twins and `Accept: text/markdown`** are served by Mintlify (all 404
    on `mint dev`).
 4. **Proxy headers.** Mintlify accepts the proxied Host/Origin, including the
@@ -460,12 +485,12 @@ solana.com) before cutover. `mint dev` cannot answer them:
    (`app.mintlify.com/api/end-user-auth/deployment?next=solana.mintlify.io`), so
    the deployment was either auth-protected or not this project. Confirm the
    subdomain is ours and public, then
-   `curl -sI "$MINTLIFY_ORIGIN/docs/core/accounts"` returns 200.
+   `curl -sI "$MINTLIFY_ORIGIN/developers/docs/core/accounts"` returns 200.
 7. **Repository links.** Path pages tell readers to clone `catmcgee/solana-com`
    on `mintlify-migration` (checkout and paywall `Run it on your machine`,
    issue-asset `demo.ts`), because the examples exist only there. After the
    merge into `solana-foundation/solana-com`, switch them back:
-   `grep -rn "catmcgee/solana-com" apps/docs/docs`.
+   `grep -rn "catmcgee/solana-com" apps/docs/developers/docs`.
 
 ## Component and content notes from the work packages
 

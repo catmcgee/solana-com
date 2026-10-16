@@ -1,0 +1,131 @@
+---
+title: signatureSubscribe RPC Metodu
+sidebarTitle: signatureSubscribe
+---
+
+Verilen imzaya sahip işlemin belirtilen taahhüt seviyesine ulaştığında bildirim
+almak için abone olun.
+
+<Warning>
+  Bu, tek bir bildirime aboneliktir. RPC tarafından `signatureNotification`
+  bildirimi gönderildikten sonra sunucu tarafından otomatik olarak iptal edilir.
+</Warning>
+
+<RequestExample>
+  ```json WebSocket
+  {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "signatureSubscribe",
+    "params": [
+      "2EBVM6cB8vAAD93Ktr6Vd8p67XPbQzCJX47MpReuiCXJAtcjaxpvWpcg9Ege1Nr5Tk3a2GFrByT7WPBjdsTycY9b",
+      {
+        "commitment": "finalized",
+        "enableReceivedNotification": false
+      }
+    ]
+  }
+  ```
+</RequestExample>
+
+<ResponseExample>
+  ```json Response
+  {
+    "jsonrpc": "2.0",
+    "result": 0,
+    "id": 1
+  }
+  ```
+</ResponseExample>
+
+### Parameters
+
+<ParamField body="0" type="string" required>
+  base-58 kodlu dize olarak işlem imzası
+
+  <Info>
+    İşlem imzası, işlemdeki ilk imza olmalıdır (daha fazla ayrıntı için [işlem
+    kimliği](/developers/docs/references/terminology#transaction-id) bölümüne bakın).
+  </Info>
+</ParamField>
+
+<ParamField body="1" type="object">
+  Aşağıdaki alanları içeren yapılandırma nesnesi:
+
+  <Expandable title="properties" defaultOpen>
+    <ParamField body="commitment" type="string">
+      Taahhüt, bir bloğun o zaman noktasında ne kadar sonlandırıldığını açıklar. Bkz.
+      [Durum Taahhüdünü Yapılandırma](/developers/docs/rpc#configuring-state-commitment).
+    </ParamField>
+
+    <ParamField body="enableReceivedNotification" type="boolean">
+      İmzaların işlenmesinin yanı sıra RPC tarafından alındığında bildirim almak için
+      abone olup olmamak.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+### Result
+
+<ResponseField name="result" type="integer">
+  abonelik kimliği (abonelikten çıkmak için gereklidir)
+</ResponseField>
+
+#### Bildirim Formatı:
+
+Bildirim, değer içeren bir RpcResponse JSON nesnesi olacaktır ve bu değer
+şunları içeren bir nesne olacaktır:
+
+- `slot: <u64>` - İlgili slot.
+- `value: <object|string>` -
+  [`RpcSignatureResult`](https://github.com/solana-labs/solana/blob/6d28fd455b07e3557fc6c0c3ddf3ba03e3fe8482/rpc-client-api/src/response.rs#L265-L268)
+  bildirim değeri, şu sonuçlardan birine yol açar:
+  - `enableReceivedNotification` değeri `true` olduğunda ve imza alındığında:
+    [`"receivedSignature"`](https://github.com/solana-labs/solana/blob/6d28fd455b07e3557fc6c0c3ddf3ba03e3fe8482/rpc-client-api/src/response.rs#L286-L288)
+    şeklinde bir metin dizisi, veya
+  - imza işlendiğinde: `err: <object|null>`:
+    - İşlem belirtilen taahhüt seviyesinde başarıyla işlendiyse `null`, veya
+    - İşlem başarısız olduysa bir
+      [`TransactionError`](https://github.com/solana-labs/solana/blob/6d28fd455b07e3557fc6c0c3ddf3ba03e3fe8482/sdk/src/transaction/error.rs#L15-L164)
+
+#### Örnek yanıtlar:
+
+Aşağıda, başarıyla **işlenmiş** bir işlemden gelen bir bildirim yanıtı örneği
+verilmiştir:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "signatureNotification",
+  "params": {
+    "result": {
+      "context": {
+        "slot": 5207624
+      },
+      "value": {
+        "err": null
+      }
+    },
+    "subscription": 24006
+  }
+}
+```
+
+Aşağıda, başarıyla **alınmış** bir işlem imzasından gelen bir bildirim yanıtı
+örneği verilmiştir:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "signatureNotification",
+  "params": {
+    "result": {
+      "context": {
+        "slot": 5207624
+      },
+      "value": "receivedSignature"
+    },
+    "subscription": 24006
+  }
+}
+```

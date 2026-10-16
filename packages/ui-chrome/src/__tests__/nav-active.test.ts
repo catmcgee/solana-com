@@ -107,13 +107,13 @@ describe("shared header route matching", () => {
     expect(productsSection).toBeDefined();
 
     const productToolRoutes = [
-      "/docs/tools",
-      "/docs/tools/commerce-kit",
-      "/docs/tools/kora",
-      "/docs/tools/solana-pay",
-      "/docs/payments/developer-tools",
-      "/fr/docs/payments/developer-tools",
-      "/fr/docs/tools/kora",
+      "/developers/docs/tools",
+      "/developers/docs/tools/commerce-kit",
+      "/developers/docs/tools/kora",
+      "/developers/docs/tools/solana-pay",
+      "/developers/docs/payments/developer-tools",
+      "/fr/developers/docs/payments/developer-tools",
+      "/fr/developers/docs/tools/kora",
       "/rpc",
       "/solutions/payments-tooling",
       "/solutions/token-extensions",

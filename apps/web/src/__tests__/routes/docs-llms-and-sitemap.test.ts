@@ -6,7 +6,7 @@ import {
   dynamic,
   dynamicParams,
   generateStaticParams,
-} from "@/app/docs/[section]/llms.txt/route";
+} from "@/app/developers/docs/[section]/llms.txt/route";
 import { listLlmsSections } from "@/lib/docs-edge/llms-sections";
 import { findRepoRoot } from "@/lib/docs-edge/repo-root";
 import {
@@ -20,12 +20,15 @@ const repoRoot = findRepoRoot()!;
 const sections = listLlmsSections();
 
 function call(section: string) {
-  return GET(new Request(`https://solana.com/docs/${section}/llms.txt`), {
-    params: Promise.resolve({ section }),
-  });
+  return GET(
+    new Request(`https://solana.com/developers/docs/${section}/llms.txt`),
+    {
+      params: Promise.resolve({ section }),
+    },
+  );
 }
 
-describe("/docs/[section]/llms.txt", () => {
+describe("/developers/docs/[section]/llms.txt", () => {
   it("is fully static", () => {
     expect(dynamic).toBe("force-static");
     expect(dynamicParams).toBe(false);
@@ -52,8 +55,12 @@ describe("/docs/[section]/llms.txt", () => {
       const body = await res.text();
       expect(body).toMatch(/^# Solana Documentation: /);
       expect(body).toContain("> Sending, accepting, and processing payments");
-      expect(body).toContain("(https://solana.com/docs/payments.md)");
-      expect(body).not.toMatch(/\]\(https:\/\/solana\.com\/(?!docs\/payments)/);
+      expect(body).toContain(
+        "(https://solana.com/developers/docs/payments.md)",
+      );
+      expect(body).not.toMatch(
+        /\]\(https:\/\/solana\.com\/(?!developers\/docs\/payments)/,
+      );
     },
   );
 
@@ -66,24 +73,28 @@ describe("/docs/[section]/llms.txt", () => {
 describe("docs sitemap", () => {
   it("adds hreflang alternates and skips Greek and noindex pages", () => {
     const entries = docsEntriesFromManifest([
-      { url: "/docs/core", lang: "en", lastmod: "2026-01-01T00:00:00Z" },
-      { url: "/fr/docs/core", lang: "fr" },
-      { url: "/el/docs/core", lang: "el" },
-      { url: "/docs/secret", lang: "en", noindex: true },
-      { url: "/docs/solo", lang: "en" },
+      {
+        url: "/developers/docs/core",
+        lang: "en",
+        lastmod: "2026-01-01T00:00:00Z",
+      },
+      { url: "/fr/developers/docs/core", lang: "fr" },
+      { url: "/el/developers/docs/core", lang: "el" },
+      { url: "/developers/docs/secret", lang: "en", noindex: true },
+      { url: "/developers/docs/solo", lang: "en" },
     ]);
     expect(entries.map((e) => e.url)).toEqual([
-      "https://solana.com/docs/core",
-      "https://solana.com/fr/docs/core",
-      "https://solana.com/docs/solo",
+      "https://solana.com/developers/docs/core",
+      "https://solana.com/fr/developers/docs/core",
+      "https://solana.com/developers/docs/solo",
     ]);
     expect(entries[0]).toMatchObject({
       lastModified: "2026-01-01T00:00:00Z",
       alternates: {
         languages: {
-          en: "https://solana.com/docs/core",
-          fr: "https://solana.com/fr/docs/core",
-          "x-default": "https://solana.com/docs/core",
+          en: "https://solana.com/developers/docs/core",
+          fr: "https://solana.com/fr/developers/docs/core",
+          "x-default": "https://solana.com/developers/docs/core",
         },
       },
     });
@@ -92,9 +103,11 @@ describe("docs sitemap", () => {
 
   it("lists the Mintlify docs from the manifest, without Greek", async () => {
     const urls = (await docsRoutes()).map((entry) => entry.url);
-    expect(urls).toContain("https://solana.com/docs");
-    expect(urls).toContain("https://solana.com/docs/core/accounts");
-    expect(urls).toContain("https://solana.com/fr/docs/core/accounts");
+    expect(urls).toContain("https://solana.com/developers/docs");
+    expect(urls).toContain("https://solana.com/developers/docs/core/accounts");
+    expect(urls).toContain(
+      "https://solana.com/fr/developers/docs/core/accounts",
+    );
     expect(urls).toContain("https://solana.com/developers/cookbook");
     expect(urls).toContain("https://solana.com/ja/developers/bootcamp");
     // /el/data is an apps/web page; only Greek docs URLs are gone.
@@ -135,8 +148,19 @@ describe("docs sitemap", () => {
       .filter((row) => row[col("collection")] !== "developers")
       // Pages merged into another page since (migration/dup-audit.md) are
       // redirects now, so they no longer serve their own page.
-      .filter((row) => resolveRedirect(row[col("url")]!).kind !== "redirect")
-      .map((row) => `https://solana.com${row[col("url")]}`)
+      .map((row) => row[col("url")]!)
+      // The docs moved to /developers/docs (2026-10-16): a legacy URL whose
+      // only redirect is that move is listed at its new URL.
+      .map((url) => {
+        const moved = url.replace(
+          /^((?:\/[a-z]{2})?)\/docs(?=\/|$)/,
+          "$1/developers/docs",
+        );
+        const r = resolveRedirect(url);
+        return r.kind === "redirect" && r.destination === moved ? moved : url;
+      })
+      .filter((url) => resolveRedirect(url).kind !== "redirect")
+      .map((url) => `https://solana.com${url}`)
       .filter((url) => !urls.has(url));
     // Every non-Greek legacy page URL that is not redirected is still listed.
     expect(missing).toEqual([]);

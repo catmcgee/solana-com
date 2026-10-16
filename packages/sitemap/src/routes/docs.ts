@@ -36,7 +36,7 @@ const docsRoot = path.join(repoRoot, "apps", "docs");
 export const DOCS_LOCALES = locales.filter((locale) => locale !== "el");
 
 const COLLECTION_ROOTS = new Set([
-  "/docs",
+  "/developers/docs",
   "/developers/cookbook",
   "/developers/bootcamp",
 ]);
@@ -119,7 +119,7 @@ export function readDocsManifest(
 function walkDocsTree(): DocsManifestPage[] {
   const pages: DocsManifestPage[] = [];
   const collections = [
-    "docs",
+    "developers/docs",
     "learn",
     "developers/cookbook",
     "developers/bootcamp",

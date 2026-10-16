@@ -1,7 +1,8 @@
 /**
  * English fallbacks for untranslated locale docs pages (spec §5.10).
  *
- * Fumadocs served the English page at `/<loc>/docs/<path>` when a translation
+ * Fumadocs served the English page at `/<loc>/docs/<path>` (now
+ * `/<loc>/developers/docs/<path>`) when a translation
  * was missing. Mintlify only serves files that exist, so apps/web rewrites
  * those URLs to the English Mintlify page (the public URL is unchanged).
  *
@@ -34,7 +35,7 @@ export const FALLBACK_COLLECTIONS: Record<
   FallbackCollection,
   { urlPrefix: string; dir: string }
 > = {
-  docs: { urlPrefix: "/docs", dir: "docs" },
+  docs: { urlPrefix: "/developers/docs", dir: "developers/docs" },
   bootcamp: { urlPrefix: "/developers/bootcamp", dir: "developers/bootcamp" },
   learn: { urlPrefix: "/learn", dir: "learn" },
 };

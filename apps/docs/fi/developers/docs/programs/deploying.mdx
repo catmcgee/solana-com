@@ -1,0 +1,471 @@
+---
+title: Ohjelmien käyttöönotto
+description:
+  Complete guide to building, deploying, and managing Solana programs using the
+  Solana CLI.
+---
+
+Tämä osio käy läpi perusvaiheiden prosessin Solana-ohjelman käyttöönotosta
+Solana CLI:n avulla.
+
+## CLI-komentojen viiteluettelo
+
+| Tehtävä                               | Komento                                                                                       |
+| ---------------------------------- | --------------------------------------------------------------------------------------------- |
+| Rakenna ohjelma                      | `cargo build-sbf`                                                                             |
+| Julkaise uusi ohjelma                 | `solana program deploy <path_to_program.so>`                                                  |
+| Päivitä olemassa oleva ohjelma            | `solana program deploy <path_to_program.so>` (sama kuin julkaisu)                                 |
+| Näytä ohjelman tiedot                  | `solana program show <program-id>`                                                            |
+| Siirrä ohjelman valtuutus         | `solana program set-upgrade-authority <program-id> --new-upgrade-authority <path_to_keypair>` |
+| Tee ohjelmasta muuttumaton             | `solana program set-upgrade-authority <program-id> --final`                                   |
+| Sulje ohjelma                      | `solana program close <program-id> --bypass-warning`                                          |
+| Tarkista lompakon saldo               | `solana balance`                                                                              |
+| Pyydä airdrop (devnet/localhost) | `solana airdrop 2`                                                                            |
+
+## Keskeiset käsitteet
+
+Ennen kuin syvennymme aiheeseen, selvennetään joitakin termejä:
+
+- **Ohjelmatunnus (Program ID)**: Ohjelmasi ketjussa oleva osoite. Käyttäjät
+  ovat vuorovaikutuksessa ohjelmasi kanssa viittaamalla ohjelmatunnukseen.
+- **program account**: Ketjussa oleva tili, joka tallentaa ohjelmasi metatiedot.
+  program accountin osoite on ohjelmatunnus. program account tallentaa myös
+  programdata accountin osoitteen.
+- **programdata account**: Ketjussa oleva tili, joka tallentaa ohjelmasi
+  käyttöönotetun suoritettavan koodin.
+- **Ohjelman valtuutus (Program Authority)**: Tili, jolla on oikeus päivittää
+  tai sulkea ohjelma. Oletusarvoisesti tämä on CLI-lompakkosi.
+
+## Edellytykset
+
+<Steps titleSize="h3">
+
+<Step title="Asenna Solana CLI">
+
+Ensin [asenna Solana CLI](/developers/docs/intro/installation).
+
+</Step>
+
+<Step title="Lompakon määrittäminen">
+
+Asennuksen jälkeen luo paikallinen keypair-lompakko. Tämän lompakon osoite
+asetetaan oletusarvoiseksi program authorityksi ohjelmia käyttöönotettaessa:
+
+```bash Terminal
+solana-keygen new
+```
+
+Tämä luo keypair-avaimen oletuksena sijaintiin `~/.config/solana/id.json`.
+
+</Step>
+
+<Step title="Klusterin määrittäminen">
+
+Valitse, mille Solana-klusterille haluat julkaista. Käytä `solana config get`
+-komentoa tarkistaaksesi nykyisen konfiguraatiosi:
+
+```bash Terminal
+solana config get
+```
+
+```text Output
+Config File: ~/.config/solana/cli/config.yml
+RPC URL: http://localhost:8899
+WebSocket URL: ws://localhost:8900/ (computed)
+Keypair Path: ~/.config/solana/id.json
+Commitment: confirmed
+```
+
+Vaihda klusterien välillä tarpeen mukaan:
+
+```bash Terminal
+solana config set --url mainnet-beta
+solana config set --url devnet
+solana config set --url localhost
+solana config set --url testnet
+solana config set --url "https://your-rpc-url.com"
+```
+
+</Step>
+
+<Step title="Lompakon rahoittaminen">
+
+Tarvitset SOL-tokeneita ohjelmien käyttöönottoa varten. Tarvittava määrä riippuu
+ohjelmasi koosta.
+
+Devnetissä tai localhostissa rahoita lompakkosi käyttämällä `solana airdrop`
+-komentoa:
+
+```bash Terminal
+solana airdrop 2
+```
+
+```text Output
+Requesting airdrop of 2 SOL
+Signature: 5zQKxvRdgJDA8fRGPdKfGxRLnLpwmNnMXGYxfBqFSUPqc5BTmFPrTG8vnC4HvKDVY8zQ8aQxZxcEE7WFpGhZGVAA
+2 SOL
+```
+
+Tarkista lompakkosi saldo:
+
+```bash Terminal
+solana balance
+```
+
+```text Output
+2 SOL
+```
+
+</Step>
+
+</Steps>
+
+## Perustoiminnot
+
+### Ohjelman rakentaminen
+
+Rakentaaksesi ohjelman käytä `cargo build-sbf` -komentoa:
+
+```bash Terminal
+cargo build-sbf
+```
+
+<Steps>
+  <Step title="Esimerkkiohjelma">
+    Tässä on minimaalinen Solana-ohjelma, joka tulostaa "Hello, Solana!" ohjelman
+    lokeihin.
+
+    ```rs src/lib.rs
+    use solana_program::{
+        account_info::AccountInfo, entrypoint, entrypoint::ProgramResult, msg, pubkey::Pubkey,
+    };
+
+    entrypoint!(process_instruction);
+
+    pub fn process_instruction(
+        _program_id: &Pubkey,
+        _accounts: &[AccountInfo],
+        _instruction_data: &[u8],
+    ) -> ProgramResult {
+        msg!("Hello, Solana!");
+        Ok(())
+    }
+    ```
+
+    ```toml Cargo.toml
+    [package]
+    name = "hello_world"
+    version = "0.1.0"
+    edition = "2021"
+
+    [lib]
+    crate-type = ["cdylib", "lib"]
+
+    [dependencies]
+    solana-program = "2.2.0"
+    ```
+  </Step>
+
+  <Step title="Käännöksen tulos">
+    Rakenna ohjelmasi käyttämällä `cargo build-sbf` -komentoa:
+
+    ```bash Terminal
+    cargo build-sbf
+    ```
+
+    Tämä luo kaksi tärkeää tiedostoa hakemistoon `target/deploy/`:
+
+    1. `hello_world-keypair.json`: Keypair-tiedosto, jonka julkista avainta
+       käytetään ohjelman tunnuksena (Program ID)
+    2. `hello_world.so`: Käännetty ohjelman suoritettava tiedosto
+
+    ```json target/deploy/hello_world-keypair.json
+    [
+      203, 253, 43, 62, 165, 111, 94, 222, 105, 225, 218, 85, 143, 9, 114, 96, 243,
+      181, 114, 89, 72, 230, 124, 85, 59, 165, 198, 23, 240, 212, 23, 154, 229, 241,
+      153, 61, 153, 105, 79, 204, 193, 163, 33, 65, 82, 183, 49, 240, 224, 137, 248,
+      24, 128, 25, 192, 197, 118, 235, 239, 67, 85, 156, 219, 231
+    ]
+    ```
+
+    ```txt target/deploy/hello_world.so
+    [binary executable file]
+    ```
+  </Step>
+</Steps>
+
+### Tarkista ohjelman koko ja kustannukset
+
+Ohjelman käyttöönotto vaatii SOL-tokeneita, jotka allokoidaan ohjelmatilille
+ohjelman koon perusteella. Suuremmat ohjelmat maksavat enemmän SOL-tokeneita
+käyttöönotossa.
+
+Tarkista ohjelmasi koko:
+
+```bash Terminal
+wc -c < ./target/deploy/hello_world.so
+```
+
+```text Output
+18504
+```
+
+Laske tarvittava SOL-määrä tälle koolle (tavuina):
+
+```bash Terminal
+solana rent 18504
+```
+
+```text Output
+Rent-exempt minimum: 0.12967872 SOL
+```
+
+<Info>
+  Tarvitset hieman enemmän SOL-tokeneita kuin näytetty kattaaksesi käyttöönoton
+  transaktiomaksut.
+</Info>
+
+### Ota ohjelma käyttöön
+
+Käytä `solana program deploy` -komentoa julkaistaksesi ohjelmasi:
+
+```bash Terminal
+solana program deploy ./target/deploy/hello_world.so
+```
+
+```text Output
+Program Id: 7NxQjW8H8hVcqBKgXbVDWqGQCovHbqDW9p1SJJwUyTpE
+Signature: 2BYwsqRP7ZwBNQvJp3S8bphTJ4zKW5JBPVMqCTE5KyLkP8xHzAyUEeC4LdTgjJdGBKHWNCkRF8Mf1T1WkLFyEu8W
+```
+
+Näytetty **Program Id** on ohjelmasi pysyvä osoite verkossa.
+
+<Note>
+
+Jos haluat ottaa ohjelman käyttöön tietyllä Program ID:llä (automaattisesti
+luodun sijaan), käytä:
+
+```bash Terminal
+solana program deploy ./target/deploy/hello_world.so --program-id ./custom-keypair.json
+```
+
+Voit luoda uusia keypair-avaimia käyttämällä `solana-keygen` -komentoa:
+
+```bash Terminal
+solana-keygen new -o ./custom-keypair.json
+```
+
+</Note>
+
+### Päivitä ohjelma
+
+Päivitä ohjelmasi käyttämällä samaa `solana program deploy` -komentoa:
+
+1. Tee muutoksia ohjelmakoodiisi
+2. Käännä ohjelmasi uudelleen: `cargo build-sbf`
+3. Ota päivitys käyttöön:
+
+```bash Terminal
+solana program deploy ./target/deploy/hello_world.so
+```
+
+```text Output
+Program Id: 7NxQjW8H8hVcqBKgXbVDWqGQCovHbqDW9p1SJJwUyTpE
+Signature: 3zKnXDfEm1R8hVcEmTnNFYUaFjVVbLJrKdFj5hBMXoBRfz8xGyDhCYgKr9YY5KxKYPEUQQVfwEPNz9hQGvYhLNBJ
+```
+
+<Info>
+
+Jos päivitetty ohjelmasi vaatii enemmän tilaa (tavuja) kuin on tällä hetkellä
+varattu, käyttöönotto laajentaa automaattisesti program account -tiliä. Näin
+tapahtuu, kun uusi ohjelmasi on suurempi kuin edellinen versio. Program account
+tarvitsee lisää tavuja uuden ohjelman tallentamiseen. CLI laskee tarvittavan
+SOL-määrän ja vähentää sen automaattisesti lompakostasi.
+
+Voit myös manuaalisesti laajentaa ohjelmaa varataksesi lisää tavuja:
+
+```bash Terminal
+solana program extend 7NxQjW8H8hVcqBKgXbVDWqGQCovHbqDW9p1SJJwUyTpE 1000
+```
+
+```text Output
+Extended Program Id 7NxQjW8H8hVcqBKgXbVDWqGQCovHbqDW9p1SJJwUyTpE by 1000 bytes
+```
+
+</Info>
+
+## Ohjelman hallinta
+
+Kun ohjelmasi on otettu käyttöön, on olemassa useita yleisiä komentoja program
+account -tilin hallintaan.
+
+### Tarkastele ohjelman metatietoja
+
+Tarkistaaksesi ohjelmasi metatiedot, käytä `solana program show` -komentoa:
+
+```bash Terminal
+solana program show 7NxQjW8H8hVcqBKgXbVDWqGQCovHbqDW9p1SJJwUyTpE
+```
+
+Esimerkki tulostuksesta:
+
+```txt
+$ solana program show 7283x8k8fyBcfaFLyPsxbd2VV1AMmZFP7FNoyTXVKJw7
+Program Id: 7283x8k8fyBcfaFLyPsxbd2VV1AMmZFP7FNoyTXVKJw7
+Owner: BPFLoaderUpgradeab1e11111111111111111111111
+ProgramData Address: Gqn7YQVCP8NtYV1qkEqR4Udhj8EJ3fkikvS7HskCNQ7c
+Authority: 5kh6HxYZiAebF8HWLsUWod2EaQQ6iWHpHYCz8UcmFbM1
+Last Deployed In Slot: 6573
+Data Length: 18504 (0x4848) bytes
+Balance: 0.12999192 SOL
+```
+
+<Note>
+  **`Program Id`**
+
+  Ohjelmatunnus on ohjelmatilin ketjussa oleva osoite. Käyttäjät ja muut ohjelmat
+  kutsuvat ohjelmaasi viittaamalla tähän tunnukseen transaktioissaan.
+
+  **`Owner`**
+
+  Owner määrittää, mitä latausohjelmaa käytettiin tämän ohjelman käyttöönottoon.
+  Useimpien ohjelmien kohdalla tämä on BPF Upgradeable Loader.
+
+  **`ProgramData Address`**
+
+  ProgramData Address osoittaa erilliseen tiliin, joka tallentaa ohjelmasi
+  suoritettavan koodin.
+
+  **`Authority`**
+
+  Authority on tili, jolla on oikeus päivittää tai sulkea tämä ohjelma. Vain
+  authority voi ottaa käyttöön päivityksiä tai sulkea ohjelman saadakseen takaisin
+  ohjelmalle allokoidun SOLin.
+
+  **`Last Deployed In Slot`**
+
+  Last Deployed In Slot osoittaa, milloin tätä ohjelmaa viimeksi päivitettiin.
+
+  **`Data Length`**
+
+  Data Length näyttää tälle ohjelmalle varattujen tavujen kokonaismäärän. Tämä
+  tila voi mahdollistaa tulevat päivitykset, jotka saattavat olla suurempia kuin
+  nykyisen ohjelman koko.
+
+  **`Balance`**
+
+  Balance näyttää ohjelmatilille allokoidun SOLin määrän sen tietojen
+  tallentamiseen.
+</Note>
+
+### Ohjelman authorityn siirtäminen
+
+Siirtääksesi ohjelman valtuutuksen toiselle tilille, käytä
+`solana program set-upgrade-authority` -komentoa:
+
+```bash Terminal
+solana program set-upgrade-authority 7NxQjW8H8hVcqBKgXbVDWqGQCovHbqDW9p1SJJwUyTpE --new-upgrade-authority ./new-authority-keypair.json
+```
+
+<Warning>
+  Kun olet siirtänyt ohjelman authorityn, et voi enää päivittää ohjelmaa, ellei
+  sinulla ole pääsyä uuteen authority-keypairiin.
+</Warning>
+
+### Ohjelman tekeminen muuttumattomaksi
+
+Tehdäksesi ohjelmastasi muuttumattoman, käytä
+`solana program set-upgrade-authority` -komentoa `--final` -lipun kanssa
+poistaaksesi ohjelman valtuutuksen:
+
+```bash Terminal
+solana program set-upgrade-authority 7NxQjW8H8hVcqBKgXbVDWqGQCovHbqDW9p1SJJwUyTpE --final
+```
+
+```text Output
+Account Type: Program
+Authority: none
+```
+
+<Warning>
+  Kun ohjelma on tehty muuttumattomaksi, sitä ei voi koskaan päivittää tai
+  sulkea.
+</Warning>
+
+### Ohjelman sulkeminen
+
+Sulkeaksesi ohjelmasi ja saadaksesi takaisin ohjelman tilille varatun SOL:n,
+käytä `solana program close` -komentoa:
+
+```bash Terminal
+solana program close 7NxQjW8H8hVcqBKgXbVDWqGQCovHbqDW9p1SJJwUyTpE --bypass-warning
+```
+
+```text Output
+Closed Program Id 7NxQjW8H8hVcqBKgXbVDWqGQCovHbqDW9p1SJJwUyTpE, 0.12999192 SOL reclaimed
+```
+
+<Warning>
+  Kun ohjelma on suljettu, Program ID:tä ei voi käyttää uudelleen. Et voi ottaa
+  käyttöön uutta ohjelmaa samaan osoitteeseen.
+</Warning>
+
+## Apukomennot
+
+### Kaikkien ohjelmien listaaminen
+
+Näytä kaikki ohjelmat, joissa nykyinen lompakkosi on authority:
+
+```bash Terminal
+solana program show --programs
+```
+
+Esimerkki tulostuksesta:
+
+```txt
+Program Id                                       | Slot       | Authority                                      | Balance
+-------------------------------------------------|------------|------------------------------------------------|-------------
+7NxQjW8H8hVcqBKgXbVDWqGQCovHbqDW9p1SJJwUyTpE     | 249885434  | 5kh6HxYZiAebF8HWLsUWod2EaQQ6iWHpHYCz8UcmFbM1   | 0.12999192
+3KSGCk4m5hqJkTjPHBXUCPcqMwJnK3VmkqEsFUKKGJPK     | 249883212  | 5kh6HxYZiAebF8HWLsUWod2EaQQ6iWHpHYCz8UcmFbM1   | 0.28654328
+```
+
+### Käyttöönotetun ohjelman lataaminen
+
+Ladataksesi käyttöönotetun ohjelman, käytä `solana program dump` -komentoa:
+
+```bash Terminal
+solana program dump 7NxQjW8H8hVcqBKgXbVDWqGQCovHbqDW9p1SJJwUyTpE ./downloaded_program.so
+```
+
+```text Output
+Wrote program to ./downloaded_program.so
+```
+
+## Edistyneet vaihtoehdot
+
+### Käyttöönottolippuja
+
+Kun Solana-verkko on ruuhkainen, käytä näitä lippuja auttamaan ohjelman
+käyttöönotossa.
+
+Esimerkki käytöstä:
+
+```bash Terminal
+solana program deploy ./target/deploy/hello_world.so \
+    --with-compute-unit-price 10000 \
+    --max-sign-attempts 10 \
+    --use-rpc
+```
+
+Vaihtoehtojen selitykset:
+
+- **`--with-compute-unit-price`**: Aseta prioriteettimaksu mikrolamporteissa
+  (0,000001 SOL) laskentayksikköä kohden. Tarkista
+  [Helius Priority Fee API](https://docs.helius.dev/guides/priority-fee-api)
+  nykyisten hintojen osalta. Prioriteettimaksu on lisämaksu, joka maksetaan
+  nykyiselle johtajalle tapahtumasi priorisoimiseksi.
+- **`--max-sign-attempts`**: Uudelleenyritysten määrä uudella
+  lohkohajautusarvolla, jos tapahtumat vanhenevat. (Oletus: 5)
+- **`--use-rpc`**: Lähettää transaktiot määritettyyn RPC:hen. Tämä lippu vaatii
+  [stake-weighted](/developers/docs/defi/stake-weighted-qos) RPC-yhteyden palveluntarjoajilta,
+  kuten [Triton](https://triton.one/) tai [Helius](https://www.helius.dev/).

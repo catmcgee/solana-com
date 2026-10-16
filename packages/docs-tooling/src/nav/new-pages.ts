@@ -45,7 +45,7 @@ const path1 = (base: string, steps: [string, string, string][]): NewPage[] =>
 export const NEW_PAGES: readonly NewPage[] = [
   // Start here
   {
-    page: "docs/from-ethereum",
+    page: "developers/docs/from-ethereum",
     title: "Coming from Ethereum",
     description:
       "How EVM concepts map onto Solana: accounts vs contract storage, programs vs contracts, fees and finality.",
@@ -53,32 +53,32 @@ export const NEW_PAGES: readonly NewPage[] = [
     brief:
       "Coming from Ethereum; link to /developers/migrate-to-solana/ethereum.",
   },
-  // Payments. The pay-per-call hub (docs/payments/pay-per-call) was merged
-  // into docs/payments/agentic-payments/index, an existing page
+  // Payments. The pay-per-call hub (developers/docs/payments/pay-per-call) was merged
+  // into developers/docs/payments/agentic-payments/index, an existing page
   // (migration/dup-audit.md #4).
   {
-    page: "docs/payments/checkout",
+    page: "developers/docs/payments/checkout",
     title: "Accept dollar payments that settle in seconds",
     sidebarTitle: "Build a checkout",
     description: "TODO(WP8a)",
     kind: "path-intro",
     brief: "Path 1 intro: fit check, time (~30 min), stepper-0.",
   },
-  ...path1("docs/payments/checkout", [
+  ...path1("developers/docs/payments/checkout", [
     ["try-it", "Pay as a customer", "Step 1 (stepper-1)."],
     ["browser", "Build the checkout in your browser", "Step 2."],
     ["backend", "Confirm payments from your backend", "Step 3."],
     ["go-live", "Go live", "Step 4."],
   ]),
   {
-    page: "docs/payments/paywall-api",
+    page: "developers/docs/payments/paywall-api",
     title: "Charge a few cents per API call",
     sidebarTitle: "Paywall an endpoint",
     description: "TODO(WP8a)",
     kind: "path-intro",
     brief: "Path 2 intro: fit check, time (~30 min), stepper-0.",
   },
-  ...path1("docs/payments/paywall-api", [
+  ...path1("developers/docs/payments/paywall-api", [
     ["try-it", "Call a paid API", "Step 1."],
     ["browser", "Paywall an endpoint in your browser", "Step 2."],
     ["server", "Add it to your server", "Step 3."],
@@ -86,7 +86,7 @@ export const NEW_PAGES: readonly NewPage[] = [
   ]),
   // Assets
   {
-    page: "docs/assets/index",
+    page: "developers/docs/assets/index",
     title: "Assets",
     description:
       "Create and manage tokens: tokenized funds and securities, stablecoins, points, NFTs and game items.",
@@ -94,21 +94,21 @@ export const NEW_PAGES: readonly NewPage[] = [
     brief: "Assets hub.",
   },
   {
-    page: "docs/assets/issue-asset",
+    page: "developers/docs/assets/issue-asset",
     title: "Issue a tokenized asset with compliance controls",
     sidebarTitle: "Issue an asset",
     description: "TODO(WP8a)",
     kind: "path-intro",
     brief: "Path 3 intro: fit check, time (~45 min), stepper-0.",
   },
-  ...path1("docs/assets/issue-asset", [
+  ...path1("developers/docs/assets/issue-asset", [
     ["try-it", "Hold a restricted asset", "Step 1."],
     ["browser", "Create the asset in your browser", "Step 2."],
     ["local", "Run it from your machine", "Step 3."],
     ["go-live", "Go live", "Step 4."],
   ]),
   {
-    page: "docs/assets/games",
+    page: "developers/docs/assets/games",
     title: "Let players own items across games",
     sidebarTitle: "Let players own items",
     description: "Mint an item to a player and read it from a second app.",
@@ -117,14 +117,14 @@ export const NEW_PAGES: readonly NewPage[] = [
   },
   // How Solana works (new concept pages)
   {
-    page: "docs/core/wallets",
+    page: "developers/docs/core/wallets",
     title: "Wallets & signatures",
     description: "TODO(WP8a)",
     kind: "concept",
     brief: "Concept page `wallet`; In short from concepts.en.json.",
   },
   {
-    page: "docs/core/rent",
+    page: "developers/docs/core/rent",
     title: "Rent (storage deposit)",
     sidebarTitle: "Rent",
     description: "TODO(WP8a)",
@@ -132,14 +132,14 @@ export const NEW_PAGES: readonly NewPage[] = [
     brief: "Concept page `rent` (today core/accounts#rent).",
   },
   {
-    page: "docs/core/transactions/confirmation",
+    page: "developers/docs/core/transactions/confirmation",
     title: "Confirmation & finality",
     description: "TODO(WP8a)",
     kind: "concept",
     brief: "Concept page `commitment`.",
   },
   {
-    page: "docs/core/fees/fee-sponsorship",
+    page: "developers/docs/core/fees/fee-sponsorship",
     title: "Fee sponsorship",
     description: "TODO(WP8a)",
     kind: "concept",
@@ -147,7 +147,7 @@ export const NEW_PAGES: readonly NewPage[] = [
   },
   // Resources
   {
-    page: "docs/programs/index",
+    page: "developers/docs/programs/index",
     title: "Write onchain programs",
     sidebarTitle: "Overview",
     description:
@@ -156,14 +156,14 @@ export const NEW_PAGES: readonly NewPage[] = [
     brief: "Programs hub (the folder had no index). Linked from Start here.",
   },
   {
-    page: "docs/programs/anchor",
+    page: "developers/docs/programs/anchor",
     title: "Anchor framework",
     description: "TODO(WP8a)",
     kind: "hub",
     brief: "Short overview; link anchor-lang.com and programs/anchor-events.",
   },
   {
-    page: "docs/tools/microscope",
+    page: "developers/docs/tools/microscope",
     title: "Microscope",
     description: "Inspect accounts and transactions with Microscope.",
     kind: "nav-stub",

@@ -106,14 +106,23 @@ export function scanRpcTryIt(
   for (const locale of locales) {
     const prefix = locale === DEFAULT_LOCALE ? "" : `${locale}/`;
     for (const folder of ["http", "websocket"]) {
-      const dir = path.join(docsRoot, prefix, "docs", "rpc", folder);
+      const dir = path.join(
+        docsRoot,
+        prefix,
+        "developers",
+        "docs",
+        "rpc",
+        folder,
+      );
       if (!existsSync(dir)) continue;
       for (const name of readdirSync(dir).sort()) {
         if (!name.endsWith(".mdx") || name === "index.mdx") continue;
         const slug = name.replace(/\.mdx$/, "");
         const file = path.join(dir, name);
         const rel = toPosix(path.relative(repoRoot, file));
-        const info = api.pageInfo(`/${prefix}docs/rpc/${folder}/${slug}`);
+        const info = api.pageInfo(
+          `/${prefix}developers/docs/rpc/${folder}/${slug}`,
+        );
         if (!info) continue; // unsubscribe pages: no panel by design
         const fence = firstRequestFence(readFileSync(file, "utf8"));
         const req = fence && api.requestFromText(info.kind, info.slug, fence);

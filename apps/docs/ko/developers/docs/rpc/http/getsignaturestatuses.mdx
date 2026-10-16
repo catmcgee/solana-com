@@ -1,0 +1,184 @@
+---
+title: getSignatureStatuses RPC 메소드
+sidebarTitle: getSignatureStatuses
+---
+
+서명 목록의 상태를 반환합니다. 각 서명은 반드시
+[txid](/developers/docs/references/terminology#transaction-id), 즉 트랜잭션의 첫 번째
+서명이어야 합니다.
+
+<Info>
+  `searchTransactionHistory` 구성 매개변수가 포함되지 않는 한, 이 메소드는 최근
+  서명 상태 캐시만 검색하며, 이 캐시는 모든 활성 slot과 `MAX_RECENT_BLOCKHASHES`
+  루팅된 slot의 상태를 유지합니다.
+</Info>
+
+<RequestExample>
+  ```bash cURL
+  curl https://api.devnet.solana.com -s -X POST \
+    -H "Content-Type: application/json" \
+    -d '
+    {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "getSignatureStatuses",
+      "params": [
+        [
+          "4cdd1oX7cfVALfr26tP52BZ6cSzrgnNGtYD7BFhm6FFeZV5sPTnRvg6NRn8yC6DbEikXcrNChBM5vVJnTgKhGhVu"
+        ],
+        {
+          "searchTransactionHistory": true
+        }
+      ]
+    }
+  '
+  ```
+
+  ```ts Kit
+  import { createSolanaRpc, type Signature } from "@solana/kit";
+
+  const rpc_url = "https://api.devnet.solana.com";
+  const rpc = createSolanaRpc(rpc_url);
+
+  let signatures = [
+    "4cdd1oX7cfVALfr26tP52BZ6cSzrgnNGtYD7BFhm6FFeZV5sPTnRvg6NRn8yC6DbEikXcrNChBM5vVJnTgKhGhVu" as unknown as Signature
+  ];
+
+  let config = {
+    searchTransactionHistory: true
+  };
+
+  let signatureStatus = await rpc.getSignatureStatuses(signatures, config).send();
+
+  console.log(signatureStatus);
+  ```
+
+  ```ts web3.js
+  import {
+    Connection,
+    clusterApiUrl,
+    type SignatureStatusConfig
+  } from "@solana/web3.js";
+
+  const connection = new Connection(clusterApiUrl("devnet"), "confirmed");
+
+  let signatures = [
+    "4cdd1oX7cfVALfr26tP52BZ6cSzrgnNGtYD7BFhm6FFeZV5sPTnRvg6NRn8yC6DbEikXcrNChBM5vVJnTgKhGhVu"
+  ];
+
+  let config: SignatureStatusConfig = {
+    searchTransactionHistory: true
+  };
+
+  let signatureStatus = await connection.getSignatureStatuses(signatures, config);
+  console.log(signatureStatus);
+  ```
+
+  ```rs Rust
+  use anyhow::Result;
+  use solana_client::nonblocking::rpc_client::RpcClient;
+  use solana_sdk::{commitment_config::CommitmentConfig, signature::Signature};
+  use std::str::FromStr;
+
+  #[tokio::main]
+  async fn main() -> Result<()> {
+      let client = RpcClient::new_with_commitment(
+          String::from("https://api.devnet.solana.com"),
+          CommitmentConfig::confirmed(),
+      );
+
+      let signatures_str = [
+          "4cdd1oX7cfVALfr26tP52BZ6cSzrgnNGtYD7BFhm6FFeZV5sPTnRvg6NRn8yC6DbEikXcrNChBM5vVJnTgKhGhVu",
+      ];
+      let signatures = signatures_str.map(|sig| Signature::from_str(sig).unwrap());
+
+      let signature_status = client
+          .get_signature_statuses_with_history(&signatures)
+          .await?;
+
+      println!("{:#?}", signature_status);
+
+      Ok(())
+  }
+  ```
+</RequestExample>
+
+<ResponseExample>
+  ```json Response
+  {
+    "jsonrpc": "2.0",
+    "result": {
+      "context": {
+        "slot": 82
+      },
+      "value": [
+        {
+          "slot": 48,
+          "confirmations": null,
+          "err": null,
+          "status": {
+            "Ok": null
+          },
+          "confirmationStatus": "finalized"
+        },
+        null
+      ]
+    },
+    "id": 1
+  }
+  ```
+</ResponseExample>
+
+## Parameters
+
+<ParamField body="0" type="array" required>
+  확인할 트랜잭션 서명 배열로, base-58로 인코딩된 문자열입니다(최대 256개까지)
+</ParamField>
+
+<ParamField body="1" type="object">
+  다음 필드를 포함하는 구성 객체:
+
+  <Expandable title="properties" defaultOpen>
+    <ParamField body="searchTransactionHistory" type="bool">
+      `true`인 경우 - Solana 노드는 최근 상태 캐시에서 찾을 수 없는 서명에 대해 원장
+      캐시를 검색합니다
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Result
+
+<ResponseField name="result" type="array">
+  `RpcResponse<object>` 배열로, `null` 또는 다음 필드를 포함하는 객체로
+  구성됩니다:
+
+  <Expandable title="properties" defaultOpen>
+    <ResponseField name="slot" type="u64">
+      트랜잭션이 처리된 slot
+    </ResponseField>
+
+    <ResponseField name="confirmations" type="usize | null">
+      서명 확인 이후의 블록 수, 루팅된 경우 `null`, 그리고 클러스터의 대다수에 의해
+      확정된 경우
+    </ResponseField>
+
+    <ResponseField name="err" type="object | null">
+      트랜잭션이 실패한 경우 오류, 트랜잭션이 성공한 경우 `null`.
+      [TransactionError 정의](https://github.com/anza-xyz/solana-sdk/blob/50dfbd088c51b7229c67d432d8c8801dafaa7904/transaction-error/src/lib.rs#L15)
+      참조
+    </ResponseField>
+
+    <ResponseField name="status" type="object">
+      **더 이상 사용되지 않음** 트랜잭션 상태
+
+      - `"Ok": <null>` - 트랜잭션 성공
+      - `"Err": <ERR>` - TransactionError로 트랜잭션 실패
+    </ResponseField>
+
+    <ResponseField name="confirmationStatus" type="string | null">
+      트랜잭션의 클러스터 확인 상태; `processed`, `confirmed`, 또는 `finalized` 중
+      하나. 낙관적 확인에 대한 자세한 내용은
+      [Commitment](/developers/docs/rpc/#configuring-state-commitment)를 참조하세요.
+    </ResponseField>
+  </Expandable>
+</ResponseField>

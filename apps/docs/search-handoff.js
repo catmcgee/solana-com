@@ -2,7 +2,7 @@
  * Search hand-off from solana.com/developers (2026-10-16). The search field
  * in the /developers header (apps/web, developers/docs-header.tsx) cannot
  * search the docs itself, so it navigates here with
- *   /docs?q=<typed text>   or   /docs?search=1   (nothing typed yet)
+ *   /developers/docs?q=<typed text>   or   /developers/docs?search=1   (nothing typed yet)
  * and this script opens Mintlify's search, types the query into it, and
  * removes the parameters from the URL (history.replaceState), so a reload or
  * a shared link does not reopen the search.

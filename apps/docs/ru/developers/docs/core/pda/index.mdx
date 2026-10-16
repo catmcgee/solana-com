@@ -1,0 +1,78 @@
+---
+title: Program Derived Addresses (PDA)
+description:
+  Program Derived Addresses (PDA) в Solana — это детерминированные адреса вне
+  кривой, получаемые из seed и идентификатора программы. Приватного ключа не
+  существует — только программа, выполняющая вычисление, может подписывать через
+  invoke_signed.
+type: conceptual
+prerequisites:
+  - /developers/docs/core/accounts
+  - /developers/docs/core/programs
+related:
+  - /developers/docs/core/pda/pda-derivation
+  - /developers/docs/core/pda/pda-accounts
+  - /developers/docs/core/cpi
+---
+
+Program Derived Addresses (PDA) — это 32-байтные адреса аккаунтов, которые
+детерминированно вычисляются из идентификатора программы и набора seed.
+Гарантируется, что такие адреса не лежат на кривой Ed25519, то есть для них не
+существует приватного ключа. Только программа, чей идентификатор использовался
+при вычислении, может "подписывать" для PDA, делая это через
+[`invoke_signed`](/developers/docs/core/cpi) во время межпрограммных вызовов (CPI).
+
+<Frame caption="Program Derived Address">
+  <img className="block dark:hidden" src="/docs-assets/assets/docs/core/pda/pda-light.svg" alt="Program Derived Address" />
+
+  <img className="hidden dark:block" src="/docs-assets/assets/docs/core/pda/pda.svg" alt="Program Derived Address" />
+
+  <img className="block dark:hidden" src="/docs-assets/assets/docs/core/pda/pda-sm-light.svg" alt="Program Derived Address" />
+
+  <img className="hidden dark:block" src="/docs-assets/assets/docs/core/pda/pda-sm.svg" alt="Program Derived Address" />
+</Frame>
+
+<Columns cols={2}>
+  <Card title="Вычисление PDA" href="/developers/docs/core/pda/pda-derivation">
+    Алгоритм вычисления, канонический bump, примеры findProgramAddress с разными
+    типами seed.
+  </Card>
+  <Card title="PDA-аккаунты" href="/developers/docs/core/pda/pda-accounts">
+    Создание аккаунтов по адресам PDA, подпись через invoke_signed, паттерны
+    Anchor.
+  </Card>
+</Columns>
+
+## Основные факты
+
+- **Детерминированность**: Одни и те же seed и идентификатор программы всегда
+  дают один и тот же адрес.
+- **Вне кривой**: Полученный адрес гарантированно не является допустимым
+  публичным ключом Ed25519. Если хэш попадает на кривую, вычисление не удаётся,
+  и пробуется другой bump seed.
+- **Нет приватного ключа**: Так как адрес вне кривой, никто не может создать
+  криптографическую подпись для него. Программа "подписывает" через механизм
+  `invoke_signed` рантайма.
+
+## Когда использовать PDA
+
+- **Детерминированные адреса**: Каждый раз получать один и тот же аккаунт из
+  одних и тех же seed.
+- **Подпись программой**: Только владеющая программа может подписывать через
+  `invoke_signed`, что позволяет программам выступать автономными
+  авторитетами.
+- **Пользовательское состояние**: Получать аккаунты для каждого пользователя из
+  его pubkey как seed (например, `["user", user_pubkey]`).
+- **Без управления keypair**: Нет приватного ключа, который нужно хранить или
+  можно потерять. Адрес вычисляется только из seed.
+
+## Ограничения
+
+| Ограничение                          | Значение                           | Источник                                                                                                                     |
+| ------------------------------------ | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Максимум seed                        | 16                                 | [`MAX_SEEDS`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/pubkey/src/lib.rs#L47)                              |
+| Максимальная длина seed              | максимум 32 байта на seed          | [`MAX_SEED_LEN`](https://github.com/anza-xyz/solana-sdk/blob/clock%40v2.2.3/pubkey/src/lib.rs#L45)                           |
+| Диапазон bump                        | 0–255 (1 байт)                     | Добавляется как последний элемент seed                                                                                       |
+| Стоимость `create_program_address`   | 1 500 CU                           | [`create_program_address_units`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/execution_budget.rs#L200) |
+| Худший случай `find_program_address` | 1 500 при входе + 1 500 × итераций | 1 500 при входе + 1 500 за каждый неудачный bump                                                                             |
+| Максимум PDA-сигнаторов на CPI       | 16                                 | [`MAX_SIGNERS`](https://github.com/anza-xyz/agave/blob/v3.1.8/program-runtime/src/cpi.rs#L62)                                |

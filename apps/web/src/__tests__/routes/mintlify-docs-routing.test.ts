@@ -86,46 +86,110 @@ describe("Mintlify rewrites", () => {
   });
 
   it("proxies English docs pages and their markdown twins", () => {
-    expectRewrite("/docs", `${M}/docs`);
-    expectRewrite("/docs.md", `${M}/docs.md`);
-    expectRewrite("/docs/core/accounts", `${M}/docs/core/accounts`);
-    expectRewrite("/docs/core/accounts.md", `${M}/docs/core/accounts.md`);
+    expectRewrite("/developers/docs", `${M}/developers/docs`);
+    expectRewrite("/developers/docs.md", `${M}/developers/docs.md`);
     expectRewrite(
-      "/docs/intro/quick-start/build-first-program",
-      `${M}/docs/intro/quick-start/build-first-program`,
+      "/developers/docs/core/accounts",
+      `${M}/developers/docs/core/accounts`,
+    );
+    expectRewrite(
+      "/developers/docs/core/accounts.md",
+      `${M}/developers/docs/core/accounts.md`,
+    );
+    expectRewrite(
+      "/developers/docs/intro/quick-start/build-first-program",
+      `${M}/developers/docs/intro/quick-start/build-first-program`,
     );
   });
 
+  it("redirects every old /docs URL to /developers/docs in one hop", () => {
+    expectRedirect("/docs", "/developers/docs");
+    expectRedirect("/docs.md", "/developers/docs.md");
+    expectRedirect("/docs/core/accounts", "/developers/docs/core/accounts");
+    expectRedirect(
+      "/docs/core/accounts.md",
+      "/developers/docs/core/accounts.md",
+    );
+    expectRedirect("/docs/a/b/c", "/developers/docs/a/b/c");
+    // The default locale goes straight to the unprefixed URL.
+    expectRedirect("/en/docs", "/developers/docs");
+    expectRedirect("/en/docs/core/pda", "/developers/docs/core/pda");
+    for (const locale of MINTLIFY_LOCALES) {
+      expectRedirect(`/${locale}/docs`, `/${locale}/developers/docs`);
+      expectRedirect(`/${locale}/docs.md`, `/${locale}/developers/docs.md`);
+      expectRedirect(
+        `/${locale}/docs/core/accounts`,
+        `/${locale}/developers/docs/core/accounts`,
+      );
+    }
+    // The new URLs are not redirected again.
+    for (const url of [
+      "/developers/docs",
+      "/developers/docs/core/accounts",
+      "/ja/developers/docs/core/accounts.md",
+    ]) {
+      expect(resolveRedirect(url)).toEqual({ kind: "none" });
+    }
+  });
+
+  it("keeps the /docs?q= search hand-off query on the redirect", () => {
+    const docsMove = rewritesAndRedirects.redirects.find(
+      (r) => r.source === "/docs",
+    );
+    expect(docsMove).toMatchObject({
+      destination: "/developers/docs",
+      permanent: true,
+    });
+    // Next.js keeps the query string on redirects that do not set one.
+    expect(docsMove?.destination).not.toContain("?");
+  });
+
   it("serves index pages Mintlify would 307 away via their /index path", () => {
-    expectRewrite("/docs/tools", `${M}/docs/tools/index`);
-    expectRewrite("/fr/docs/tools", `${M}/fr/docs/tools/index`);
-    expectRewrite("/docs/tools/kora", `${M}/docs/tools/kora`);
-    expectRewrite("/docs/tools.md", `${M}/docs/tools.md`);
+    expectRewrite("/developers/docs/tools", `${M}/developers/docs/tools/index`);
+    expectRewrite(
+      "/fr/developers/docs/tools",
+      `${M}/fr/developers/docs/tools/index`,
+    );
+    expectRewrite(
+      "/developers/docs/tools/kora",
+      `${M}/developers/docs/tools/kora`,
+    );
+    expectRewrite("/developers/docs/tools.md", `${M}/developers/docs/tools.md`);
   });
 
   it("redirects the tokenization hub, merged into the assets hub", () => {
-    expectRedirect("/docs/tokenization", "/docs/assets#tokenization");
-    expectRedirect("/fr/docs/tokenization", "/fr/docs/assets#tokenization");
-    expectRedirect("/docs/tokenization.md", "/docs/assets.md");
-    // Exact path only: the tokenization guides keep their URLs.
-    expectRewrite(
+    expectRedirect(
+      "/docs/tokenization",
+      "/developers/docs/assets#tokenization",
+    );
+    expectRedirect(
+      "/fr/docs/tokenization",
+      "/fr/developers/docs/assets#tokenization",
+    );
+    expectRedirect("/docs/tokenization.md", "/developers/docs/assets.md");
+    // Exact path only: the tokenization guides keep their (moved) URLs.
+    expectRedirect(
       "/docs/tokenization/token-acl",
-      `${M}/docs/tokenization/token-acl`,
+      "/developers/docs/tokenization/token-acl",
+    );
+    expectRewrite(
+      "/developers/docs/tokenization/token-acl",
+      `${M}/developers/docs/tokenization/token-acl`,
     );
   });
 
   it("sends merged duplicate pages straight to their final page", () => {
     expectRedirect(
       "/docs/payments/agentic-payments/x402-quickstart",
-      "/docs/payments/pay-sh#let-an-agent-pay-x402",
+      "/developers/docs/payments/pay-sh#let-an-agent-pay-x402",
     );
     expectRedirect(
       "/docs/payments/agentic-payments/x402/making-a-payment.md",
-      "/docs/payments/pay-sh.md",
+      "/developers/docs/payments/pay-sh.md",
     );
     expectRedirect(
       "/ja/docs/payments/quickstart",
-      "/ja/docs/payments/checkout/browser",
+      "/ja/developers/docs/payments/checkout/browser",
     );
     expectRedirect(
       "/docs/tokenization/quickstart.md",
@@ -134,12 +198,17 @@ describe("Mintlify rewrites", () => {
   });
 
   it("serves per-section llms.txt from apps/web, not Mintlify", () => {
-    expectAppWebRoute("/docs/payments/llms.txt");
-    expectAppWebRoute("/docs/finance/llms.txt");
+    expectAppWebRoute("/developers/docs/payments/llms.txt");
+    expectAppWebRoute("/developers/docs/finance/llms.txt");
+    // The old URL redirects to the new one.
+    expectRedirect(
+      "/docs/payments/llms.txt",
+      "/developers/docs/payments/llms.txt",
+    );
     // Deeper paths are not apps/web routes and stay with Mintlify.
     expectRewrite(
-      "/docs/core/accounts/llms.txt",
-      `${M}/docs/core/accounts/llms.txt`,
+      "/developers/docs/core/accounts/llms.txt",
+      `${M}/developers/docs/core/accounts/llms.txt`,
     );
   });
 
@@ -148,18 +217,25 @@ describe("Mintlify rewrites", () => {
     expect(MINTLIFY_LOCALES).not.toContain("el");
     expect(MINTLIFY_LOCALES).not.toContain("en");
     for (const locale of MINTLIFY_LOCALES) {
-      expectRewrite(`/${locale}/docs`, `${M}/${locale}/docs`);
       expectRewrite(
-        `/${locale}/docs/core/accounts`,
-        `${M}/${locale}/docs/core/accounts`,
+        `/${locale}/developers/docs`,
+        `${M}/${locale}/developers/docs`,
+      );
+      expectRewrite(
+        `/${locale}/developers/docs/core/accounts`,
+        `${M}/${locale}/developers/docs/core/accounts`,
       );
     }
-    expectRewrite("/ja/docs.md", `${M}/ja/docs.md`);
-    expectRewrite("/zh/docs/core/pda.md", `${M}/zh/docs/core/pda.md`);
+    expectRewrite("/ja/developers/docs.md", `${M}/ja/developers/docs.md`);
+    expectRewrite(
+      "/zh/developers/docs/core/pda.md",
+      `${M}/zh/developers/docs/core/pda.md`,
+    );
   });
 
   it("does not proxy unknown first segments as locales", () => {
     expectAppWebRoute("/xx/docs/core/accounts");
+    expectAppWebRoute("/xx/developers/docs/core/accounts");
   });
 
   it("proxies learn articles but leaves the /learn landing to apps/web", () => {
@@ -174,6 +250,9 @@ describe("Mintlify rewrites", () => {
     expectAppWebRoute("/developers");
     expectAppWebRoute("/fr/developers");
     expectAppWebRoute("/developers.md");
+    // Only /developers/docs is proxied, not its look-alikes.
+    expectAppWebRoute("/developers/docsy");
+    expectAppWebRoute("/developers/payments");
   });
 
   it("keeps /developers/templates on the templates app", () => {
@@ -235,7 +314,7 @@ describe("English fallbacks for untranslated locale pages", () => {
     for (const fallback of fallbacks) {
       const prefix =
         fallback.collection === "docs"
-          ? "/docs"
+          ? "/developers/docs"
           : fallback.collection === "bootcamp"
             ? "/developers/bootcamp"
             : "/learn";
@@ -266,23 +345,23 @@ describe("English fallbacks for untranslated locale pages", () => {
     ];
     expect(buildFallbackRewrites(sample, "https://m")).toEqual([
       {
-        source: "/:locale(de|fr)/docs/:path(video-guides)",
-        destination: "https://m/docs/:path",
+        source: "/:locale(de|fr)/developers/docs/:path(video-guides)",
+        destination: "https://m/developers/docs/:path",
         locale: false,
       },
       {
-        source: "/:locale(de|fr)/docs/:path(video-guides).md",
-        destination: "https://m/docs/:path.md",
+        source: "/:locale(de|fr)/developers/docs/:path(video-guides).md",
+        destination: "https://m/developers/docs/:path.md",
         locale: false,
       },
       {
-        source: "/:locale(fr)/docs/:path(research)",
-        destination: "https://m/docs/:path",
+        source: "/:locale(fr)/developers/docs/:path(research)",
+        destination: "https://m/developers/docs/:path",
         locale: false,
       },
       {
-        source: "/:locale(fr)/docs/:path(research).md",
-        destination: "https://m/docs/:path.md",
+        source: "/:locale(fr)/developers/docs/:path(research).md",
+        destination: "https://m/developers/docs/:path.md",
         locale: false,
       },
       {
@@ -300,7 +379,10 @@ describe("English fallbacks for untranslated locale pages", () => {
 
   it("does not shadow translated pages", () => {
     // A translated page keeps its own locale URL.
-    expectRewrite("/fr/docs/core/accounts", `${M}/fr/docs/core/accounts`);
+    expectRewrite(
+      "/fr/developers/docs/core/accounts",
+      `${M}/fr/developers/docs/core/accounts`,
+    );
   });
 });
 
@@ -313,9 +395,13 @@ describe("Docs redirects", () => {
       ),
     ) as { redirects: { source: string; destination: string }[] };
     expect(ported.redirects).toHaveLength(16);
+    // The file keeps the pre-move destinations; the live rules point
+    // straight at the same page under /developers/docs.
+    const moved = (p: string) =>
+      p.replace(/^(\/fr)?\/docs(?=\/|$|#)/, "$1/developers/docs");
     for (const { source, destination } of ported.redirects) {
       const concrete = (p: string) => p.replace(":locale", "fr");
-      expectRedirect(concrete(source), concrete(destination));
+      expectRedirect(concrete(source), moved(concrete(destination)));
     }
   });
 
@@ -337,21 +423,27 @@ describe("Docs redirects", () => {
   });
 
   it("sends tag pages to the tags index temporarily", () => {
-    expectRedirect("/docs/tags/payments", "/docs/tags", false);
-    expectRedirect("/docs/tags/a/b", "/docs/tags", false);
-    expectRewrite("/docs/tags", `${M}/docs/tags`);
+    expectRedirect("/docs/tags/payments", "/developers/docs/tags", false);
+    expectRedirect("/docs/tags/a/b", "/developers/docs/tags", false);
+    expectRedirect(
+      "/developers/docs/tags/payments",
+      "/developers/docs/tags",
+      false,
+    );
+    expectRedirect("/docs/tags", "/developers/docs/tags");
+    expectRewrite("/developers/docs/tags", `${M}/developers/docs/tags`);
   });
 
   it("sends old advanced/transaction URLs straight to existing pages", () => {
     for (const [from, to] of [
-      ["/docs/advanced", "/docs/core/transactions/confirmation"],
+      ["/docs/advanced", "/developers/docs/core/transactions/confirmation"],
       [
         "/docs/core/transactions/retry",
         "/developers/cookbook/transactions/retry",
       ],
       [
         "/docs/core/transactions/versions",
-        "/docs/core/transactions/versioned-transactions",
+        "/developers/docs/core/transactions/versioned-transactions",
       ],
     ]) {
       expectRedirect(from, to);
@@ -365,6 +457,15 @@ describe("Docs redirects", () => {
     expectRedirect("/el/docs.md", "/docs.md");
     expectRedirect("/el/docs/core/accounts", "/docs/core/accounts");
     expectRedirect("/el/docs/core/accounts.md", "/docs/core/accounts.md");
+    expectRedirect("/el/developers/docs", "/developers/docs");
+    expectRedirect(
+      "/el/developers/docs/core/accounts",
+      "/developers/docs/core/accounts",
+    );
+    expectRedirect(
+      "/el/developers/docs/core/accounts.md",
+      "/developers/docs/core/accounts.md",
+    );
     expectRedirect("/el/learn", "/learn");
     expectRedirect("/el/learn/what-is-solana", "/learn/what-is-solana");
     expectRedirect("/el/developers", "/developers");
@@ -383,7 +484,10 @@ describe("Docs redirects", () => {
   it("sends Greek URLs of moved pages to English first, then on", () => {
     // One Greek rule runs first; the English redirect then takes over.
     expectRedirect("/el/docs/clients/go", "/docs/clients/go");
-    expectRedirect("/docs/clients/go", "/docs/clients/community/go");
+    expectRedirect("/docs/clients/go", "/developers/docs/clients/community/go");
+    // Greek URLs of pages that only moved prefix: /el/docs/x -> /docs/x ->
+    // /developers/docs/x (two hops).
+    expectRedirect("/docs/core/accounts", "/developers/docs/core/accounts");
     expectRedirect("/el/docs/clients/go.md", "/docs/clients/go.md");
     expectRedirect(
       "/el/docs/payments/accept-payments/payment-button",

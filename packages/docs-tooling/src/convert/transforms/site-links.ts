@@ -7,7 +7,7 @@
  * 1. Root-relative links to pages apps/web serves (`/skills`, `/discord`,
  *    `/solutions/…`, `/developers/templates`, `/data`, `/rpc`, …) become
  *    absolute `https://solana.com/…` links. Mintlify serves only the docs
- *    collections: `/docs/**`, `/learn/<article>`, `/developers/cookbook/**`,
+ *    collections: `/developers/docs/**`, `/learn/<article>`, `/developers/cookbook/**`,
  *    `/developers/bootcamp/**` and `/docs-assets/**` (each optionally
  *    locale-prefixed); the exact `/learn` and `/developers` landings belong
  *    to apps/web (spec §7.6). On solana.com the absolute link is same-origin.
@@ -39,13 +39,17 @@ export const SITE_ORIGIN = "https://solana.com";
 export function mintlifyServes(p: string): boolean {
   const bare = p.split(/[?#]/)[0]!.replace(LOCALE_RE, "") || "/";
   return (
-    /^\/(?:docs|docs-assets|developers\/cookbook|developers\/bootcamp)(?:\/|$)/.test(
+    /^\/(?:docs|docs-assets|developers\/docs|developers\/cookbook|developers\/bootcamp)(?:\/|$)/.test(
       bare,
     ) || /^\/learn\/.+/.test(bare)
   );
 }
 
-/** Legacy public URL of a page file (apps/docs/<loc>/docs/a/index.mdx -> /<loc>/docs/a). */
+/**
+ * Public URL of a page file (apps/docs/<loc>/developers/docs/a/index.mdx ->
+ * /<loc>/developers/docs/a). `/docs/**` still counts as served: apps/web and
+ * redirects.json redirect it to `/developers/docs/**`.
+ */
 export function pageUrl(file: string): string {
   const rel = file.replace(/^apps\/docs\//, "").replace(/\.mdx?$/, "");
   const url = `/${rel}`.replace(/\/index$/, "");

@@ -67,7 +67,11 @@ describe("TransformRegistry", () => {
     const src = "---\ntitle: x\n---\n\n<CodeTabs>\n</CodeTabs>\n";
     const out = convertSource(
       src,
-      { path: "apps/docs/docs/x.mdx", locale: "en", collection: "docs" },
+      {
+        path: "apps/docs/developers/docs/x.mdx",
+        locale: "en",
+        collection: "docs",
+      },
       new TransformRegistry(),
     );
     expect(out.output).toBe(src);

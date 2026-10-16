@@ -1,0 +1,1215 @@
+---
+title: Membaca dari jaringan
+description:
+  Learn how to read data from the Solana blockchain network. This guide covers
+  fetching wallet accounts, program accounts, and token mint accounts with
+  JavaScript/TypeScript examples using Solana Kit.
+---
+
+Baca data dari jaringan Solana dengan mengambil berbagai akun. Panduan ini
+menjelaskan struktur [akun](/developers/docs/core/accounts) Solana. Setiap akun Solana
+memiliki
+[alamat](/developers/docs/core/accounts/account-structure#account-address) unik yang digunakan untuk
+menemukan data onchain akun tersebut. Akun Solana berisi
+[data status atau program yang dapat dieksekusi](/developers/docs/core/accounts/account-types).
+
+## Mengambil akun wallet
+
+Akun dompet adalah akun yang dimiliki oleh
+[System Program](/developers/docs/core/programs/builtin-programs#the-system-program). Akun
+dompet terutama digunakan untuk menyimpan SOL dan menandatangani transaksi.
+Ketika SOL dikirim ke alamat baru untuk pertama kalinya, akun sistem akan dibuat
+secara otomatis.
+
+Contoh di bawah ini membuat klien Kit, menghasilkan
+penanda tangan baru, meminta SOL untuk
+mendanai alamat baru, dan mengambil data akun dari API RPC
+klien.
+
+```ts title="Fetch account"
+import { createClient, generateKeyPairSigner, lamports } from "@solana/kit";
+import { solanaRpc, rpcAirdrop } from "@solana/kit-plugin-rpc";
+import { generatedPayer } from "@solana/kit-plugin-signer";
+
+const client = await createClient()
+  .use(generatedPayer())
+  .use(
+    solanaRpc({
+      rpcUrl: "http://localhost:8899",
+      rpcSubscriptionsUrl: "ws://localhost:8900"
+    })
+  )
+  .use(rpcAirdrop());
+
+const signer = await generateKeyPairSigner();
+console.log(`Address: ${signer.address}`);
+
+// Funding an address with SOL automatically creates an account
+await client.airdrop(signer.address, lamports(1_000_000_000n));
+
+const accountInfo = await client.rpc.getAccountInfo(signer.address).send();
+
+console.log(accountInfo);
+```
+
+<Steps>
+  <Step>
+    Saat Anda mengambil akun dompet dengan `getAccountInfo()`, Kit mengembalikan
+    respons RPC seperti yang ditampilkan pada contoh output di sebelah kanan.
+
+    Respons memiliki dua field tingkat atas: `context` mendeskripsikan kapan
+    pembacaan terjadi, dan `value` berisi field akun yang dikembalikan oleh metode
+    RPC.
+
+    ```ts title="Contoh output"
+    {
+      context: {
+        slot: 420602714n,
+        apiVersion: "3.1.6"
+      },
+      value: {
+        lamports: 1000000000n,
+        data: ["", "base64"],
+        owner: "11111111111111111111111111111111",
+        executable: false,
+        rentEpoch: 0n,
+        space: 0n
+      }
+    }
+    ```
+  </Step>
+
+  <Step>
+    Field `context` menampilkan slot yang digunakan untuk membaca akun dan versi API
+    RPC yang melayani respons tersebut. Pembacaan berikutnya dapat mengembalikan
+    slot atau versi API yang berbeda.
+
+    ```ts title="Contoh output" focus={2-5}
+    {
+      context: {
+        slot: 420602714n,
+        apiVersion: "3.1.6"
+      },
+      value: {
+        lamports: 1000000000n,
+        data: ["", "base64"],
+        owner: "11111111111111111111111111111111",
+        executable: false,
+        rentEpoch: 0n,
+        space: 0n
+      }
+    }
+    ```
+  </Step>
+
+  <Step>
+    Field `value` berisi status akun yang dikembalikan oleh metode RPC.
+    Langkah-langkah berikut memandu Anda melalui field di dalam `value` sesuai
+    urutan field tersebut muncul.
+
+    ```ts title="Example output" focus={6-13}
+    {
+      context: {
+        slot: 420602714n,
+        apiVersion: "3.1.6"
+      },
+      value: {
+        lamports: 1000000000n,
+        data: ["", "base64"],
+        owner: "11111111111111111111111111111111",
+        executable: false,
+        rentEpoch: 0n,
+        space: 0n
+      }
+    }
+    ```
+  </Step>
+
+  <Step>
+    Kolom `lamports` berisi saldo SOL akun, diukur dalam
+    [lamport](/developers/docs/references/terminology#lamport), satuan terkecil dari SOL.
+
+    ```ts title="Example output" focus={7}
+    {
+      context: {
+        slot: 420602714n,
+        apiVersion: "3.1.6"
+      },
+      value: {
+        lamports: 1000000000n,
+        data: ["", "base64"],
+        owner: "11111111111111111111111111111111",
+        executable: false,
+        rentEpoch: 0n,
+        space: 0n
+      }
+    }
+    ```
+  </Step>
+
+  <Step>
+    Kolom `data` berisi data akun yang disimpan dalam bentuk byte. RPC mengembalikan
+    data akun sebagai tuple: string data yang telah dienkode, diikuti dengan
+    encoding-nya. Untuk akun dompet, string data yang dienkode kosong karena akun
+    menyimpan 0 byte data.
+
+    ```ts title="Example output" focus={8}
+    {
+      context: {
+        slot: 420602714n,
+        apiVersion: "3.1.6"
+      },
+      value: {
+        lamports: 1000000000n,
+        data: ["", "base64"],
+        owner: "11111111111111111111111111111111",
+        executable: false,
+        rentEpoch: 0n,
+        space: 0n
+      }
+    }
+    ```
+  </Step>
+
+  <Step>
+    Kolom `owner` menampilkan program yang memiliki akun tersebut. Untuk dompet,
+    pemiliknya selalu System Program, dengan alamat
+    `11111111111111111111111111111111`.
+
+    ```ts title="Example output" focus={9}
+    {
+      context: {
+        slot: 420602714n,
+        apiVersion: "3.1.6"
+      },
+      value: {
+        lamports: 1000000000n,
+        data: ["", "base64"],
+        owner: "11111111111111111111111111111111",
+        executable: false,
+        rentEpoch: 0n,
+        space: 0n
+      }
+    }
+    ```
+  </Step>
+
+  <Step>
+    Kolom `executable` memberi tahu apakah alamat akun dapat dipanggil. `true`
+    berarti alamat tersebut merepresentasikan program yang dapat memproses
+    instruksi. `false` berarti akun menyimpan state, seperti saldo dompet atau data
+    akun, dan tidak dipanggil sebagai program. Akun dompet menggunakan `false`.
+
+    ```ts title="Contoh output" focus={10}
+    {
+      context: {
+        slot: 420602714n,
+        apiVersion: "3.1.6"
+      },
+      value: {
+        lamports: 1000000000n,
+        data: ["", "base64"],
+        owner: "11111111111111111111111111111111",
+        executable: false,
+        rentEpoch: 0n,
+        space: 0n
+      }
+    }
+    ```
+  </Step>
+
+  <Step>
+    Kolom `rentEpoch` adalah kolom lama dari mekanisme rent yang sudah tidak
+    digunakan. Kolom ini masih dikembalikan untuk kompatibilitas mundur.
+
+    ```ts title="Example output" focus={11}
+    {
+      context: {
+        slot: 420602714n,
+        apiVersion: "3.1.6"
+      },
+      value: {
+        lamports: 1000000000n,
+        data: ["", "base64"],
+        owner: "11111111111111111111111111111111",
+        executable: false,
+        rentEpoch: 0n,
+        space: 0n
+      }
+    }
+    ```
+  </Step>
+
+  <Step>
+    Kolom `space` menampilkan jumlah byte yang terdapat dalam kolom `data`. Kolom
+    `space` dikembalikan bersama respons pengambilan akun, tetapi bukan merupakan
+    bagian dari tipe data akun.
+
+    Untuk contoh akun dompet, kolom `space` bernilai 0 karena kolom `data` berisi 0
+    byte data.
+
+    ```ts title="Example output" focus={12}
+    {
+      context: {
+        slot: 420602714n,
+        apiVersion: "3.1.6"
+      },
+      value: {
+        lamports: 1000000000n,
+        data: ["", "base64"],
+        owner: "11111111111111111111111111111111",
+        executable: false,
+        rentEpoch: 0n,
+        space: 0n
+      }
+    }
+    ```
+  </Step>
+</Steps>
+
+## Ambil Token Program
+
+Contoh di bawah ini mengambil Token Program untuk menunjukkan perbedaan antara
+akun dompet dan akun program. Token Program mendefinisikan instruksi untuk
+bekerja dengan token, seperti membuat dan mentransfer token. Program dipanggil
+untuk memproses instruksi. Status program, seperti data token dan saldo,
+disimpan dalam akun terpisah yang dimiliki oleh program.
+
+Alamat Token Program adalah program account onchain. Untuk kemudahan, Anda dapat
+menganggap alamat program sebagai program itu sendiri, karena itulah alamat yang
+digunakan untuk memanggilnya. Untuk program yang dapat diperbarui, program
+account menyimpan metadata dan menunjuk ke ProgramData account terpisah yang
+menyimpan kode eksekusi yang telah di-deploy. Anda dapat melihat
+[kode sumber](https://github.com/solana-program/token/tree/main/program) Token
+Program dan program account di
+[Solana Explorer](https://explorer.solana.com/address/TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA).
+
+```ts title="Fetch program account" highlight={13-15,17-21,25-28}
+import { address, createClient, fetchJsonParsedAccount } from "@solana/kit";
+import { solanaRpc } from "@solana/kit-plugin-rpc";
+import { generatedPayer } from "@solana/kit-plugin-signer";
+
+const client = await createClient()
+  .use(generatedPayer())
+  .use(
+    solanaRpc({
+      rpcUrl: "https://api.mainnet.solana.com"
+    })
+  );
+
+const tokenProgramAddress = address(
+  "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+);
+
+const accountInfo = await client.rpc
+  .getAccountInfo(tokenProgramAddress, {
+    encoding: "base64"
+  })
+  .send();
+
+console.log(accountInfo);
+
+const parsedAccount = await fetchJsonParsedAccount(
+  client.rpc,
+  tokenProgramAddress
+);
+
+console.log(parsedAccount);
+```
+
+<Steps>
+  <Step>
+    Token Program adalah program account yang dapat dieksekusi. Program memiliki
+    field dasar yang sama seperti semua
+    [akun](/developers/docs/core/accounts/account-structure), tetapi dengan perbedaan utama.
+
+    Contoh Token Program menggunakan encoding `base64` untuk mengembalikan data
+    mentah program account.
+
+    Langkah-langkah berikut membahas field di dalam `value` sesuai urutan field
+    tersebut muncul.
+
+    ```ts title="Akun Token program"
+    {
+      context: {
+        apiVersion: "3.1.14",
+        slot: 420601581n
+      },
+      value: {
+        data: ["AgAAACfxkLHTr5i4znFMROjK3/n4/EXLjl+sQgLv+BENl903", "base64"],
+        executable: true,
+        lamports: 2191440n,
+        owner: "BPFLoaderUpgradeab1e11111111111111111111111",
+        rentEpoch: 18446744073709551615n,
+        space: 36n
+      }
+    }
+    ```
+  </Step>
+
+  <Step>
+    Field `data` menyimpan status program account BPF Upgradeable Loader. Item tuple
+    pertama berisi data akun lengkap yang dikodekan sebagai base64. Item tuple kedua
+    mengidentifikasi encoding. Di sini, 36 byte mencakup metadata dan alamat
+    programdata account.
+
+    Untuk program yang dapat diperbarui, status program account menunjuk ke
+    programdata account terpisah yang menyimpan kode eksekusi program.
+
+    ```ts title="Token program account" focus={7}
+    {
+      context: {
+        apiVersion: "3.1.14",
+        slot: 420601581n
+      },
+      value: {
+        data: ["AgAAACfxkLHTr5i4znFMROjK3/n4/EXLjl+sQgLv+BENl903", "base64"],
+        executable: true,
+        lamports: 2191440n,
+        owner: "BPFLoaderUpgradeab1e11111111111111111111111",
+        rentEpoch: 18446744073709551615n,
+        space: 36n
+      }
+    }
+    ```
+  </Step>
+
+  <Step>
+    Bidang `executable` diatur ke `true`, yang menunjukkan bahwa alamat akun dapat
+    dipanggil sebagai program.
+
+    ```ts title="Token program account" focus={8}
+    {
+      context: {
+        apiVersion: "3.1.14",
+        slot: 420601581n
+      },
+      value: {
+        data: ["AgAAACfxkLHTr5i4znFMROjK3/n4/EXLjl+sQgLv+BENl903", "base64"],
+        executable: true,
+        lamports: 2191440n,
+        owner: "BPFLoaderUpgradeab1e11111111111111111111111",
+        rentEpoch: 18446744073709551615n,
+        space: 36n
+      }
+    }
+    ```
+  </Step>
+
+  <Step>
+    Bidang `lamports` berisi saldo SOL yang dimiliki oleh program account. program
+    account memerlukan lamport yang cukup agar tetap bebas dari rent.
+
+    ```ts title="Token program account" focus={9}
+    {
+      context: {
+        apiVersion: "3.1.14",
+        slot: 420601581n
+      },
+      value: {
+        data: ["AgAAACfxkLHTr5i4znFMROjK3/n4/EXLjl+sQgLv+BENl903", "base64"],
+        executable: true,
+        lamports: 2191440n,
+        owner: "BPFLoaderUpgradeab1e11111111111111111111111",
+        rentEpoch: 18446744073709551615n,
+        space: 36n
+      }
+    }
+    ```
+  </Step>
+
+  <Step>
+    Setiap program account dimiliki oleh
+    [loader program](/developers/docs/core/programs/program-deployment#loader-programs). Untuk
+    Token Program account, `owner` adalah BPF Upgradeable Loader.
+
+    ```ts title="Token program account" focus={10}
+    {
+      context: {
+        apiVersion: "3.1.14",
+        slot: 420601581n
+      },
+      value: {
+        data: ["AgAAACfxkLHTr5i4znFMROjK3/n4/EXLjl+sQgLv+BENl903", "base64"],
+        executable: true,
+        lamports: 2191440n,
+        owner: "BPFLoaderUpgradeab1e11111111111111111111111",
+        rentEpoch: 18446744073709551615n,
+        space: 36n
+      }
+    }
+    ```
+  </Step>
+
+  <Step>
+    Bidang `rentEpoch` adalah bidang lama dari mekanisme rent yang sudah tidak
+    digunakan. Bidang ini masih dikembalikan untuk kompatibilitas mundur.
+
+    ```ts title="Token program account" focus={11}
+    {
+      context: {
+        apiVersion: "3.1.14",
+        slot: 420601581n
+      },
+      value: {
+        data: ["AgAAACfxkLHTr5i4znFMROjK3/n4/EXLjl+sQgLv+BENl903", "base64"],
+        executable: true,
+        lamports: 2191440n,
+        owner: "BPFLoaderUpgradeab1e11111111111111111111111",
+        rentEpoch: 18446744073709551615n,
+        space: 36n
+      }
+    }
+    ```
+  </Step>
+
+  <Step>
+    Bidang `space` menunjukkan ukuran penuh data program account dalam byte. Nilai
+    `space` hanya `36` byte karena program account menyimpan metadata loader dan
+    alamat ProgramData account, bukan program yang telah dikompilasi secara penuh.
+
+    ```ts title="Token program account" focus={12}
+    {
+      context: {
+        apiVersion: "3.1.14",
+        slot: 420601581n
+      },
+      value: {
+        data: ["AgAAACfxkLHTr5i4znFMROjK3/n4/EXLjl+sQgLv+BENl903", "base64"],
+        executable: true,
+        lamports: 2191440n,
+        owner: "BPFLoaderUpgradeab1e11111111111111111111111",
+        rentEpoch: 18446744073709551615n,
+        space: 36n
+      }
+    }
+    ```
+  </Step>
+
+  <Step>
+    Respons sebelumnya mengembalikan bidang `data` dari program account sebagai
+    tuple base64. Respons yang telah diurai mendeserialisasi byte tersebut ke dalam
+    bidang bernama pada objek `data`. Bidang `programData` berisi alamat ProgramData
+    account yang menyimpan kode program yang dapat dieksekusi.
+
+    ```ts title="Parsed Token program account" focus={7-10}
+    {
+      executable: true,
+      lamports: 43712780n,
+      programAddress: "BPFLoaderUpgradeab1e11111111111111111111111",
+      space: 36n,
+      address: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      data: {
+        programData: "3gvYRKWyXRR9xKWe1ZjPhLY5ZJRN7KDB4rFZFGoJfFk2",
+        parsedAccountMeta: { program: "bpf-upgradeable-loader", type: "program" }
+      },
+      exists: true
+    }
+    ```
+  </Step>
+</Steps>
+
+## Mengambil mint account
+
+[mint account](/developers/docs/tokens/basics/create-mint) adalah akun yang dimiliki oleh
+Token Program yang menyimpan metadata global untuk token tertentu. mint account
+menyimpan total pasokan token, jumlah desimal, otoritas mint, dan otoritas
+pembekuan. Alamat mint account secara unik mengidentifikasi sebuah token di
+jaringan Solana.
+
+Contoh di bawah ini mengambil mint account USD Coin untuk mendemonstrasikan
+bagaimana status program disimpan dalam akun terpisah. Saldo dan nilai pasokan
+yang tepat dapat berbeda tergantung pada slot yang dibaca oleh node RPC Anda.
+
+```ts title="Fetch mint account" highlight={13,15-19}
+import { address, createClient } from "@solana/kit";
+import { solanaRpc } from "@solana/kit-plugin-rpc";
+import { generatedPayer } from "@solana/kit-plugin-signer";
+
+const client = await createClient()
+  .use(generatedPayer())
+  .use(
+    solanaRpc({
+      rpcUrl: "https://api.mainnet.solana.com"
+    })
+  );
+
+const mintAddress = address("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
+
+const accountInfo = await client.rpc
+  .getAccountInfo(mintAddress, {
+    encoding: "base64"
+  })
+  .send();
+
+console.log(accountInfo);
+```
+
+<Steps>
+  <Step>
+    mint account menyimpan status, bukan kode yang dapat dieksekusi. mint account
+    dimiliki oleh Token Program, yang mencakup instruksi yang mendefinisikan cara
+    membuat dan memperbarui mint account.
+
+    Langkah-langkah berikut memandu melalui field di dalam `value` sesuai urutan
+    field tersebut muncul.
+
+    ```ts title="Mint account"
+    {
+      context: {
+        slot: 325000000n,
+        apiVersion: "3.1.14"
+      },
+      value: {
+        data: [
+          "AQAAAJj+huiNm+Lqi8HMpIeLKYjCQPUrhCS/tA7Rot3LXhmbbq9O2SvsHwAGAQEAAABicKqKWcWUBbRShshncubNEm6bil06OFNtN/e0FOi2Zw==",
+          "base64"
+        ],
+        executable: false,
+        lamports: 407438077149n,
+        owner: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        rentEpoch: 18446744073709551615n,
+        space: 82n
+      }
+    }
+    ```
+  </Step>
+
+  <Step>
+    Field `data` berisi status akun `Mint` yang telah diserialisasi. Item tuple
+    pertama berisi data akun lengkap 82 byte yang dikodekan sebagai base64. Item
+    tuple kedua mengidentifikasi pengkodean.
+
+    Untuk membaca dari mint account, Anda harus mendeserialisasi field `data` ke
+    dalam tipe data `Mint`, seperti yang ditunjukkan pada
+    [contoh berikutnya](#deserialisasi-mint-account).
+
+    ```ts title="Mint account" focus={7-10}
+    {
+      context: {
+        slot: 325000000n,
+        apiVersion: "3.1.14"
+      },
+      value: {
+        data: [
+          "AQAAAJj+huiNm+Lqi8HMpIeLKYjCQPUrhCS/tA7Rot3LXhmbbq9O2SvsHwAGAQEAAABicKqKWcWUBbRShshncubNEm6bil06OFNtN/e0FOi2Zw==",
+          "base64"
+        ],
+        executable: false,
+        lamports: 407438077149n,
+        owner: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        rentEpoch: 18446744073709551615n,
+        space: 82n
+      }
+    }
+    ```
+  </Step>
+
+  <Step>
+    Field `executable` menunjukkan apakah akun dapat dipanggil sebagai program. mint
+    account menyimpan status, sehingga field `executable` bernilai `false`.
+
+    ```ts title="Mint account" focus={11}
+    {
+      context: {
+        slot: 325000000n,
+        apiVersion: "3.1.14"
+      },
+      value: {
+        data: [
+          "AQAAAJj+huiNm+Lqi8HMpIeLKYjCQPUrhCS/tA7Rot3LXhmbbq9O2SvsHwAGAQEAAABicKqKWcWUBbRShshncubNEm6bil06OFNtN/e0FOi2Zw==",
+          "base64"
+        ],
+        executable: false,
+        lamports: 407438077149n,
+        owner: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        rentEpoch: 18446744073709551615n,
+        space: 82n
+      }
+    }
+    ```
+  </Step>
+
+  <Step>
+    Field `lamports` berisi saldo SOL yang dimiliki oleh mint account. Nilai lamport
+    adalah saldo bebas sewa mint account, bukan pasokan token.
+
+    ```ts title="Mint account" focus={12}
+    {
+      context: {
+        slot: 325000000n,
+        apiVersion: "3.1.14"
+      },
+      value: {
+        data: [
+          "AQAAAJj+huiNm+Lqi8HMpIeLKYjCQPUrhCS/tA7Rot3LXhmbbq9O2SvsHwAGAQEAAABicKqKWcWUBbRShshncubNEm6bil06OFNtN/e0FOi2Zw==",
+          "base64"
+        ],
+        executable: false,
+        lamports: 407438077149n,
+        owner: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        rentEpoch: 18446744073709551615n,
+        space: 82n
+      }
+    }
+    ```
+  </Step>
+
+  <Step>
+    mint account dimiliki oleh
+    [Token Program](/developers/docs/references/terminology#token-program). Kolom `data` pada
+    mint account hanya dapat dimodifikasi oleh instruksi Token Program.
+
+    ```ts title="Mint account" focus={13}
+    {
+      context: {
+        slot: 325000000n,
+        apiVersion: "3.1.14"
+      },
+      value: {
+        data: [
+          "AQAAAJj+huiNm+Lqi8HMpIeLKYjCQPUrhCS/tA7Rot3LXhmbbq9O2SvsHwAGAQEAAABicKqKWcWUBbRShshncubNEm6bil06OFNtN/e0FOi2Zw==",
+          "base64"
+        ],
+        executable: false,
+        lamports: 407438077149n,
+        owner: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        rentEpoch: 18446744073709551615n,
+        space: 82n
+      }
+    }
+    ```
+  </Step>
+
+  <Step>
+    Kolom `rentEpoch` adalah kolom lama dari mekanisme rent yang sudah tidak
+    digunakan lagi. Kolom ini tetap dikembalikan demi kompatibilitas mundur.
+
+    ```ts title="Mint account" focus={14}
+    {
+      context: {
+        slot: 325000000n,
+        apiVersion: "3.1.14"
+      },
+      value: {
+        data: [
+          "AQAAAJj+huiNm+Lqi8HMpIeLKYjCQPUrhCS/tA7Rot3LXhmbbq9O2SvsHwAGAQEAAABicKqKWcWUBbRShshncubNEm6bil06OFNtN/e0FOi2Zw==",
+          "base64"
+        ],
+        executable: false,
+        lamports: 407438077149n,
+        owner: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        rentEpoch: 18446744073709551615n,
+        space: 82n
+      }
+    }
+    ```
+  </Step>
+
+  <Step>
+    Kolom `space` menunjukkan bahwa mint account memuat 82 byte data.
+
+    ```ts title="Mint account" focus={15}
+    {
+      context: {
+        slot: 325000000n,
+        apiVersion: "3.1.14"
+      },
+      value: {
+        data: [
+          "AQAAAJj+huiNm+Lqi8HMpIeLKYjCQPUrhCS/tA7Rot3LXhmbbq9O2SvsHwAGAQEAAABicKqKWcWUBbRShshncubNEm6bil06OFNtN/e0FOi2Zw==",
+          "base64"
+        ],
+        executable: false,
+        lamports: 407438077149n,
+        owner: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        rentEpoch: 18446744073709551615n,
+        space: 82n
+      }
+    }
+    ```
+  </Step>
+</Steps>
+
+## Deserialisasi mint account
+
+Data akun disimpan dalam kolom `data` dalam format serial. Untuk membaca data
+tersebut sebagai kolom seperti `supply` atau `decimals`, deserialisasi kolom
+`data` ke dalam tipe akun yang didefinisikan oleh program pemilik. Sebagian
+besar program Solana menyediakan library klien dengan fungsi pembantu untuk
+langkah ini. Fungsi pembantu ini mengembalikan data akun terstruktur, sehingga
+hasilnya lebih mudah digunakan.
+
+Misalnya, library `@solana-program/token` menyertakan fungsi
+`fetchMint()` untuk mengambil mint account dan
+mendeserialisasi kolom `data` pada mint account ke dalam tipe data
+[Mint](https://github.com/solana-program/token/blob/program%40v8.0.0/program/src/state.rs#L16-L30)
+yang didefinisikan oleh Token Program.
+
+```ts title="Deserialize mint account data"
+import { address, createClient } from "@solana/kit";
+import { solanaRpc } from "@solana/kit-plugin-rpc";
+import { generatedPayer } from "@solana/kit-plugin-signer";
+import { fetchMint } from "@solana-program/token";
+
+const client = await createClient()
+  .use(generatedPayer())
+  .use(
+    solanaRpc({
+      rpcUrl: "https://api.mainnet.solana.com"
+    })
+  );
+
+const mintAddress = address("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
+const mint = await fetchMint(client.rpc, mintAddress);
+
+console.log(mint);
+```
+
+```rs title="Mint account type"
+pub struct Mint {
+    /// Optional authority used to mint new tokens. The mint authority may only
+    /// be provided during mint creation. If no mint authority is present
+    /// then the mint has a fixed supply and no further tokens may be
+    /// minted.
+    pub mint_authority: COption<Pubkey>,
+    /// Total supply of tokens.
+    pub supply: u64,
+    /// Number of base 10 digits to the right of the decimal place.
+    pub decimals: u8,
+    /// Is `true` if this structure has been initialized
+    pub is_initialized: bool,
+    /// Optional authority to freeze token accounts.
+    pub freeze_authority: COption<Pubkey>,
+}
+```
+
+<Steps>
+  <Step>
+    Fungsi `fetchMint()` mengambil mint account dan mendeserialisasi kolom
+    `data` pada mint account ke dalam tipe akun Mint.
+
+    ```ts title="Mint account" focus={7-10}
+    {
+      context: {
+        slot: 325000000n,
+        apiVersion: "3.1.14"
+      },
+      value: {
+        data: [
+          "AQAAAJj+huiNm+Lqi8HMpIeLKYjCQPUrhCS/tA7Rot3LXhmbbq9O2SvsHwAGAQEAAABicKqKWcWUBbRShshncubNEm6bil06OFNtN/e0FOi2Zw==",
+          "base64"
+        ],
+        executable: false,
+        lamports: 407438077149n,
+        owner: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        rentEpoch: 18446744073709551615n,
+        space: 82n
+      }
+    }
+    ```
+
+    Anda dapat melihat data
+    [mint account](https://explorer.solana.com/address/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v?cluster=mainnet-beta)
+    yang telah sepenuhnya dideserialisasi di Solana Explorer.
+
+    ```ts title="Decoded mint account"
+    {
+      address: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      data: {
+        mintAuthority: {
+          __option: "Some",
+          value: "BJE5MMbqXjVwjAF7oxwPYXnTXDyspzZyt4vwenNw5ruG"
+        },
+        supply: 8985397351591790n,
+        decimals: 6,
+        isInitialized: true,
+        freezeAuthority: {
+          __option: "Some",
+          value: "7dGbd2QZcCKcTndnHcTL8q7SMVXAkp688NTQYwrRCrar"
+        }
+      },
+      executable: false,
+      lamports: 407438077149n,
+      programAddress: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      space: 82n
+    }
+    ```
+  </Step>
+
+  <Step>
+    Kolom `address` berisi alamat mint account.
+
+    ```ts title="Decoded mint account" focus={2}
+    {
+      address: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      data: {
+        mintAuthority: {
+          __option: "Some",
+          value: "BJE5MMbqXjVwjAF7oxwPYXnTXDyspzZyt4vwenNw5ruG"
+        },
+        supply: 8985397351591790n,
+        decimals: 6,
+        isInitialized: true,
+        freezeAuthority: {
+          __option: "Some",
+          value: "7dGbd2QZcCKcTndnHcTL8q7SMVXAkp688NTQYwrRCrar"
+        }
+      },
+      executable: false,
+      lamports: 407438077149n,
+      programAddress: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      space: 82n
+    }
+    ```
+  </Step>
+
+  <Step>
+    Kolom `data` berisi status akun `Mint` yang telah dideserialisasi. Kolom-kolom
+    bersarang di dalam `data` berasal dari tipe akun `Mint` milik Token Program.
+
+    ```ts title="Decoded mint account" focus={3-15}
+    {
+      address: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      data: {
+        mintAuthority: {
+          __option: "Some",
+          value: "BJE5MMbqXjVwjAF7oxwPYXnTXDyspzZyt4vwenNw5ruG"
+        },
+        supply: 8985397351591790n,
+        decimals: 6,
+        isInitialized: true,
+        freezeAuthority: {
+          __option: "Some",
+          value: "7dGbd2QZcCKcTndnHcTL8q7SMVXAkp688NTQYwrRCrar"
+        }
+      },
+      executable: false,
+      lamports: 407438077149n,
+      programAddress: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      space: 82n
+    }
+    ```
+  </Step>
+
+  <Step>
+    Kolom `data.mintAuthority` menunjukkan satu-satunya akun yang dapat membuat unit
+    baru dari token tersebut.
+
+    ```ts title="Decoded mint account" focus={4-7}
+    {
+      address: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      data: {
+        mintAuthority: {
+          __option: "Some",
+          value: "BJE5MMbqXjVwjAF7oxwPYXnTXDyspzZyt4vwenNw5ruG"
+        },
+        supply: 8985397351591790n,
+        decimals: 6,
+        isInitialized: true,
+        freezeAuthority: {
+          __option: "Some",
+          value: "7dGbd2QZcCKcTndnHcTL8q7SMVXAkp688NTQYwrRCrar"
+        }
+      },
+      executable: false,
+      lamports: 407438077149n,
+      programAddress: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      space: 82n
+    }
+    ```
+  </Step>
+
+  <Step>
+    Kolom `supply` menunjukkan jumlah total token yang telah dicetak. Nilai suplai
+    diukur dalam unit terkecil token. Untuk mendapatkan total suplai dalam unit
+    standar, sesuaikan nilai kolom `supply` dengan `decimals`.
+
+    ```ts title="Decoded mint account" focus={8}
+    {
+      address: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      data: {
+        mintAuthority: {
+          __option: "Some",
+          value: "BJE5MMbqXjVwjAF7oxwPYXnTXDyspzZyt4vwenNw5ruG"
+        },
+        supply: 8985397351591790n,
+        decimals: 6,
+        isInitialized: true,
+        freezeAuthority: {
+          __option: "Some",
+          value: "7dGbd2QZcCKcTndnHcTL8q7SMVXAkp688NTQYwrRCrar"
+        }
+      },
+      executable: false,
+      lamports: 407438077149n,
+      programAddress: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      space: 82n
+    }
+    ```
+  </Step>
+
+  <Step>
+    Kolom `decimals` menunjukkan jumlah angka desimal untuk token tersebut.
+
+    ```ts title="Decoded mint account" focus={9}
+    {
+      address: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      data: {
+        mintAuthority: {
+          __option: "Some",
+          value: "BJE5MMbqXjVwjAF7oxwPYXnTXDyspzZyt4vwenNw5ruG"
+        },
+        supply: 8985397351591790n,
+        decimals: 6,
+        isInitialized: true,
+        freezeAuthority: {
+          __option: "Some",
+          value: "7dGbd2QZcCKcTndnHcTL8q7SMVXAkp688NTQYwrRCrar"
+        }
+      },
+      executable: false,
+      lamports: 407438077149n,
+      programAddress: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      space: 82n
+    }
+    ```
+  </Step>
+
+  <Step>
+    Kolom `isInitialized` menunjukkan apakah mint account telah diinisialisasi.
+    Kolom `isInitialized` merupakan pemeriksaan keamanan yang digunakan dalam Token
+    Program.
+
+    ```ts title="Decoded mint account" focus={10}
+    {
+      address: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      data: {
+        mintAuthority: {
+          __option: "Some",
+          value: "BJE5MMbqXjVwjAF7oxwPYXnTXDyspzZyt4vwenNw5ruG"
+        },
+        supply: 8985397351591790n,
+        decimals: 6,
+        isInitialized: true,
+        freezeAuthority: {
+          __option: "Some",
+          value: "7dGbd2QZcCKcTndnHcTL8q7SMVXAkp688NTQYwrRCrar"
+        }
+      },
+      executable: false,
+      lamports: 407438077149n,
+      programAddress: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      space: 82n
+    }
+    ```
+  </Step>
+
+  <Step>
+    Kolom `data.freezeAuthority` menampilkan akun yang memiliki wewenang untuk
+    membekukan token account. Sebuah
+    [token account](/developers/docs/tokens/basics/create-token-account) adalah akun terpisah
+    yang menyimpan unit token milik pemiliknya. Saat dibekukan, sebuah token account
+    tidak dapat mentransfer atau membakar saldo tokennya.
+
+    ```ts title="Decoded mint account" focus={11-14}
+    {
+      address: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      data: {
+        mintAuthority: {
+          __option: "Some",
+          value: "BJE5MMbqXjVwjAF7oxwPYXnTXDyspzZyt4vwenNw5ruG"
+        },
+        supply: 8985397351591790n,
+        decimals: 6,
+        isInitialized: true,
+        freezeAuthority: {
+          __option: "Some",
+          value: "7dGbd2QZcCKcTndnHcTL8q7SMVXAkp688NTQYwrRCrar"
+        }
+      },
+      executable: false,
+      lamports: 407438077149n,
+      programAddress: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      space: 82n
+    }
+    ```
+  </Step>
+
+  <Step>
+    Kolom `executable` bernilai false. mint account USDC menyimpan state token,
+    sehingga mint account USDC tidak dapat dipanggil sebagai program.
+
+    ```ts title="Decoded mint account" focus={16}
+    {
+      address: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      data: {
+        mintAuthority: {
+          __option: "Some",
+          value: "BJE5MMbqXjVwjAF7oxwPYXnTXDyspzZyt4vwenNw5ruG"
+        },
+        supply: 8985397351591790n,
+        decimals: 6,
+        isInitialized: true,
+        freezeAuthority: {
+          __option: "Some",
+          value: "7dGbd2QZcCKcTndnHcTL8q7SMVXAkp688NTQYwrRCrar"
+        }
+      },
+      executable: false,
+      lamports: 407438077149n,
+      programAddress: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      space: 82n
+    }
+    ```
+  </Step>
+
+  <Step>
+    Kolom `lamports` berisi saldo SOL yang dimiliki oleh mint account. Nilai lamport
+    adalah saldo bebas-sewa (rent-exempt) dari mint account, bukan pasokan token.
+
+    ```ts title="Decoded mint account" focus={17}
+    {
+      address: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      data: {
+        mintAuthority: {
+          __option: "Some",
+          value: "BJE5MMbqXjVwjAF7oxwPYXnTXDyspzZyt4vwenNw5ruG"
+        },
+        supply: 8985397351591790n,
+        decimals: 6,
+        isInitialized: true,
+        freezeAuthority: {
+          __option: "Some",
+          value: "7dGbd2QZcCKcTndnHcTL8q7SMVXAkp688NTQYwrRCrar"
+        }
+      },
+      executable: false,
+      lamports: 407438077149n,
+      programAddress: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      space: 82n
+    }
+    ```
+  </Step>
+
+  <Step>
+    Kolom `programAddress` menampilkan program yang memiliki mint account. Untuk
+    USDC, program pemiliknya adalah Token Program. Hanya program yang memiliki suatu
+    akun yang dapat mengubah kolom `data` melalui instruksi yang telah di-deploy
+    oleh program tersebut.
+
+    ```ts title="Decoded mint account" focus={18}
+    {
+      address: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      data: {
+        mintAuthority: {
+          __option: "Some",
+          value: "BJE5MMbqXjVwjAF7oxwPYXnTXDyspzZyt4vwenNw5ruG"
+        },
+        supply: 8985397351591790n,
+        decimals: 6,
+        isInitialized: true,
+        freezeAuthority: {
+          __option: "Some",
+          value: "7dGbd2QZcCKcTndnHcTL8q7SMVXAkp688NTQYwrRCrar"
+        }
+      },
+      executable: false,
+      lamports: 407438077149n,
+      programAddress: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      space: 82n
+    }
+    ```
+  </Step>
+
+  <Step>
+    Kolom `space` menampilkan ukuran data mint account asli dalam byte. Akun `Mint`
+    dasar dari Token Program berukuran 82 byte.
+
+    ```ts title="Decoded mint account" focus={19}
+    {
+      address: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      data: {
+        mintAuthority: {
+          __option: "Some",
+          value: "BJE5MMbqXjVwjAF7oxwPYXnTXDyspzZyt4vwenNw5ruG"
+        },
+        supply: 8985397351591790n,
+        decimals: 6,
+        isInitialized: true,
+        freezeAuthority: {
+          __option: "Some",
+          value: "7dGbd2QZcCKcTndnHcTL8q7SMVXAkp688NTQYwrRCrar"
+        }
+      },
+      executable: false,
+      lamports: 407438077149n,
+      programAddress: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      space: 82n
+    }
+    ```
+  </Step>
+</Steps>
+
+### Output terserialisasi vs terdeserialisasi
+
+Kedua contoh membaca mint account USDC yang sama. Respons pertama membiarkan
+kolom `data` dalam bentuk terserialisasi. Untuk membaca isi mint account, dekode
+data tersebut sesuai tipe akun yang didefinisikan oleh program pemiliknya. Untuk
+mint account, Token Program mendefinisikan tipe `Mint` seperti yang ditampilkan
+di sebelah kanan.
+
+<Columns cols={2}>
+  <div>
+    Sebelum didekode, bidang `data` berisi data akun yang
+    telah diserialisasi.
+
+    ```ts title="Serialized mint account" highlight={7-10} wrap
+    {
+      context: {
+        slot: 325000000n,
+        apiVersion: "3.1.14"
+      },
+      value: {
+        data: [
+          "AQAAAJj+huiNm+Lqi8HMpIeLKYjCQPUrhCS/tA7Rot3LXhmbbq9O2SvsHwAGAQEAAABicKqKWcWUBbRShshncubNEm6bil06OFNtN/e0FOi2Zw==",
+          "base64"
+        ],
+        executable: false,
+        lamports: 407438077149n,
+        owner: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        rentEpoch: 18446744073709551615n,
+        space: 82n
+      }
+    }
+    ```
+  </div>
+
+  <div>
+    Setelah mendekode data sebagai `Mint`, bidang `data`
+    berisi kolom akun yang telah diberi nama.
+
+    ```ts title="Deserialized mint account" highlight={3-15} wrap
+    {
+      address: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      data: {
+        mintAuthority: {
+          __option: "Some",
+          value: "BJE5MMbqXjVwjAF7oxwPYXnTXDyspzZyt4vwenNw5ruG"
+        },
+        supply: 8985397351591790n,
+        decimals: 6,
+        isInitialized: true,
+        freezeAuthority: {
+          __option: "Some",
+          value: "7dGbd2QZcCKcTndnHcTL8q7SMVXAkp688NTQYwrRCrar"
+        }
+      },
+      executable: false,
+      lamports: 407438077149n,
+      programAddress: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      space: 82n
+    }
+    ```
+  </div>
+</Columns>

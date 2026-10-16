@@ -1,0 +1,300 @@
+---
+title: signatureSubscribe
+description: Subscribe to status notifications for a transaction signature.
+type: reference
+---
+
+Subscribe to receive status notifications for the transaction with the given
+signature.
+
+<Info>
+  **Source**
+
+  [`signature_subscribe`](https://github.com/anza-xyz/agave/blob/v3.1.8/rpc/src/rpc_pubsub.rs#L511)
+</Info>
+
+<Warning>
+  This subscription ends after the terminal confirmation notification. If
+  `enableReceivedNotification` is `true`, the RPC node may send an earlier
+  `receivedSignature` notification first and keep the subscription active until
+  the signature reaches the requested commitment.
+</Warning>
+
+<RequestExample>
+  ```json WebSocket
+  {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "signatureSubscribe",
+    "params": [
+      "2EBVM6cB8vAAD93Ktr6Vd8p67XPbQzCJX47MpReuiCXJAtcjaxpvWpcg9Ege1Nr5Tk3a2GFrByT7WPBjdsTycY9b",
+      {
+        "commitment": "finalized",
+        "enableReceivedNotification": false
+      }
+    ]
+  }
+  ```
+
+  ```ts Kit
+  import { createSolanaRpcSubscriptions, signature } from "@solana/kit";
+
+  const rpc = createSolanaRpcSubscriptions("wss://api.devnet.solana.com");
+
+  const sig = signature(
+    "2EBVM6cB8vAAD93Ktr6Vd8p67XPbQzCJX47MpReuiCXJAtcjaxpvWpcg9Ege1Nr5Tk3a2GFrByT7WPBjdsTycY9b"
+  );
+
+  const subscription = await rpc
+    .signatureNotifications(sig, {
+      commitment: "finalized",
+      enableReceivedNotification: false
+    })
+    .subscribe({ abortSignal: AbortSignal.timeout(5_000) });
+
+  for await (const notification of subscription) {
+    console.log(notification);
+  }
+  ```
+
+  ```ts web3.js
+  import { Connection, clusterApiUrl } from "@solana/web3.js";
+
+  const connection = new Connection(clusterApiUrl("devnet"), "confirmed");
+
+  const signature =
+    "2EBVM6cB8vAAD93Ktr6Vd8p67XPbQzCJX47MpReuiCXJAtcjaxpvWpcg9Ege1Nr5Tk3a2GFrByT7WPBjdsTycY9b";
+
+  const subscriptionId = connection.onSignature(
+    signature,
+    (signatureResult, context) => {
+      console.log("Signature result:", signatureResult);
+      console.log("Context:", context);
+    },
+    "finalized"
+  );
+  ```
+
+  ```rs Rust
+  use anyhow::Result;
+  use futures::StreamExt;
+  use solana_client::{
+      nonblocking::pubsub_client::PubsubClient,
+      rpc_config::RpcSignatureSubscribeConfig,
+  };
+  use solana_commitment_config::CommitmentConfig;
+  use solana_sdk::signature::Signature;
+  use std::str::FromStr;
+
+  #[tokio::main]
+  async fn main() -> Result<()> {
+      let pubsub_client = PubsubClient::new("wss://api.devnet.solana.com/").await?;
+
+      let signature = Signature::from_str(
+          "2EBVM6cB8vAAD93Ktr6Vd8p67XPbQzCJX47MpReuiCXJAtcjaxpvWpcg9Ege1Nr5Tk3a2GFrByT7WPBjdsTycY9b",
+      )?;
+
+      let config = RpcSignatureSubscribeConfig {
+          commitment: Some(CommitmentConfig::finalized()),
+          enable_received_notification: Some(false),
+      };
+
+      let (mut notifications, unsubscribe) = pubsub_client
+          .signature_subscribe(&signature, Some(config))
+          .await?;
+
+      while let Some(notification) = notifications.next().await {
+          println!("{:?}", notification);
+      }
+
+      unsubscribe().await;
+
+      Ok(())
+  }
+  ```
+</RequestExample>
+
+<ResponseExample>
+  ```json Response
+  {
+    "jsonrpc": "2.0",
+    "result": 0,
+    "id": 1
+  }
+  ```
+</ResponseExample>
+
+### Parameters
+
+<ParamField body="signature" type="string" required>
+  Transaction signature, as a base-58 encoded string.
+
+  <Info>
+    The signature must be the first signature from the transaction.
+  </Info>
+</ParamField>
+
+<ParamField body="config" type="object">
+  Optional configuration object.
+
+  <Expandable title="properties" defaultOpen>
+    <ParamField body="commitment" type="string" default="finalized">
+      Values: `processed`, `confirmed`, `finalized`
+
+      The commitment describes how finalized a block is at that point in time. See
+      [Configuring State Commitment](/developers/docs/rpc#configuring-state-commitment).
+    </ParamField>
+
+    <ParamField body="enableReceivedNotification" type="boolean" default="false">
+      Values: `true`, `false`
+
+      Whether to also notify when the RPC first receives the signature, before it
+      reaches the requested commitment.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+### Result
+
+<ResponseField name="result" type="integer">
+  Subscription id. Pass this to
+  [signatureUnsubscribe](/developers/docs/rpc/websocket/signatureunsubscribe) if you cancel
+  the subscription before it fires.
+</ResponseField>
+
+### Notification format
+
+Notifications are delivered as `signatureNotification`. The payload includes
+`params.result.context` and `params.result.value`, where `value` is either:
+
+- `{ "err": null | <transaction error> }` when the signature reaches the
+  requested commitment
+- `"receivedSignature"` when `enableReceivedNotification` is `true` and the RPC
+  first receives the signature
+
+Terminal confirmation notification:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "signatureNotification",
+  "params": {
+    "result": {
+      "context": {
+        "slot": 306
+      },
+      "value": {
+        "err": null
+      }
+    },
+    "subscription": 0
+  }
+}
+```
+
+<ResponseField name="jsonrpc" type="string">
+  Always `"2.0"`.
+</ResponseField>
+
+<ResponseField name="method" type="string">
+  Always `"signatureNotification"`.
+</ResponseField>
+
+<ResponseField name="params" type="object">
+  Notification wrapper with the signature status payload and the subscription id.
+
+  <Expandable title="properties" defaultOpen>
+    <ResponseField name="result" type="object">
+      Notification result object with `context` and `value`. For PubSub notifications,
+      `context` includes `slot` and omits `apiVersion`.
+
+      <Expandable title="properties">
+        <ResponseField name="context" type="object">
+          Context for the slot that satisfied the subscription.
+
+          <Expandable title="properties">
+            <ResponseField name="slot" type="u64">
+              Slot associated with the notification.
+            </ResponseField>
+          </Expandable>
+        </ResponseField>
+
+        <ResponseField name="value" type="object">
+          Terminal status payload emitted when the signature reaches the requested
+          commitment.
+
+          <Expandable title="properties">
+            <ResponseField name="err" type="object | null">
+              Transaction error for the observed signature, or `null` on success. Uses the
+              same structure documented in
+              [Transaction Errors](/developers/docs/rpc/json-structures#transaction-errors).
+            </ResponseField>
+          </Expandable>
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+
+    <ResponseField name="subscription" type="integer">
+      Subscription id that produced this notification.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+This early notification is only emitted when `enableReceivedNotification: true`.
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "signatureNotification",
+  "params": {
+    "result": {
+      "context": {
+        "slot": 1
+      },
+      "value": "receivedSignature"
+    },
+    "subscription": 0
+  }
+}
+```
+
+<ResponseField name="jsonrpc" type="string">
+  Always `"2.0"`.
+</ResponseField>
+
+<ResponseField name="method" type="string">
+  Always `"signatureNotification"`.
+</ResponseField>
+
+<ResponseField name="params" type="object">
+  Notification wrapper with the early received-signature payload and the
+  subscription id.
+
+  <Expandable title="properties" defaultOpen>
+    <ResponseField name="result" type="object">
+      Notification result object with `context` and `value`. For PubSub notifications,
+      `context` includes `slot` and omits `apiVersion`.
+
+      <Expandable title="properties">
+        <ResponseField name="context" type="object">
+          Context for the slot that observed the signature.
+
+          <Expandable title="properties">
+            <ResponseField name="slot" type="u64">
+              Slot associated with the notification.
+            </ResponseField>
+          </Expandable>
+        </ResponseField>
+
+        <ResponseField name="value" type="&#x22;receivedSignature&#x22;">
+          Plain JSON string emitted when `enableReceivedNotification` is `true` and the
+          RPC node first receives the signature.
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+
+    <ResponseField name="subscription" type="integer">
+      Subscription id that produced this notification.
+    </ResponseField>
+  </Expandable>
+</ResponseField>

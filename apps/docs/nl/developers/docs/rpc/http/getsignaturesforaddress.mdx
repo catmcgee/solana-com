@@ -1,0 +1,200 @@
+---
+title: getSignaturesForAddress RPC-methode
+sidebarTitle: getSignaturesForAddress
+---
+
+Retourneert handtekeningen voor bevestigde transacties die het opgegeven adres
+bevatten in hun `accountKeys` lijst. Retourneert handtekeningen terug in de tijd
+vanaf de opgegeven handtekening of het meest recente bevestigde blok
+
+<RequestExample>
+  ```bash cURL
+  curl https://api.devnet.solana.com -s -X POST \
+    -H "Content-Type: application/json" \
+    -d '
+    {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "getSignaturesForAddress",
+      "params": [
+        "Vote111111111111111111111111111111111111111",
+        {
+          "commitment": "finalized",
+          "limit": 1
+        }
+      ]
+    }
+  '
+  ```
+
+  ```ts Kit
+  import { address, createSolanaRpc } from "@solana/kit";
+
+  const rpc_url = "https://api.devnet.solana.com";
+  const rpc = createSolanaRpc(rpc_url);
+
+  let addr = address("Vote111111111111111111111111111111111111111");
+
+  let signaturesForConfig = {
+    limit: 1
+  };
+
+  let signatures = await rpc
+    .getSignaturesForAddress(addr, signaturesForConfig)
+    .send();
+
+  console.log(signatures);
+  ```
+
+  ```ts web3.js
+  import {
+    Connection,
+    PublicKey,
+    clusterApiUrl,
+    type SignaturesForAddressOptions
+  } from "@solana/web3.js";
+
+  const connection = new Connection(clusterApiUrl("devnet"), "confirmed");
+
+  let signaturesOptions: SignaturesForAddressOptions = {
+    limit: 1
+  };
+
+  let address = new PublicKey("Vote111111111111111111111111111111111111111");
+  let signatures = await connection.getSignaturesForAddress(
+    address,
+    signaturesOptions
+  );
+
+  console.log(signatures);
+  ```
+
+  ```rs Rust
+  use anyhow::Result;
+  use solana_client::{
+      nonblocking::rpc_client::RpcClient, rpc_client::GetConfirmedSignaturesForAddress2Config,
+  };
+  use solana_sdk::{commitment_config::CommitmentConfig, pubkey};
+
+  #[tokio::main]
+  async fn main() -> Result<()> {
+      let client = RpcClient::new_with_commitment(
+          String::from("https://api.devnet.solana.com"),
+          CommitmentConfig::confirmed(),
+      );
+
+      let address = pubkey!("Vote111111111111111111111111111111111111111");
+
+      let signatures_for_config = GetConfirmedSignaturesForAddress2Config {
+          before: None,
+          until: None,
+          limit: Some(1),
+          commitment: CommitmentConfig::finalized().into(),
+      };
+
+      let signatures = client
+          .get_signatures_for_address_with_config(&address, signatures_for_config)
+          .await?;
+
+      println!("{:#?}", signatures);
+
+      Ok(())
+  }
+  ```
+</RequestExample>
+
+<ResponseExample>
+  ```json Response
+  {
+    "jsonrpc": "2.0",
+    "result": [
+      {
+        "signature": "5h6xBEauJ3PK6SWCZ1PGjBvj8vDdWG3KpwATGy1ARAXFSDwt8GFXM7W5Ncn16wmqokgpiKRLuS83KUxyZyv2sUYv",
+        "slot": 114,
+        "err": null,
+        "memo": null,
+        "blockTime": null,
+        "confirmationStatus": "finalized"
+      }
+    ],
+    "id": 1
+  }
+  ```
+</ResponseExample>
+
+## Parameters
+
+<ParamField body="address" type="string" required>
+  Accountadres als base-58 gecodeerde string
+</ParamField>
+
+<ParamField body="1" type="object">
+  Configuratieobject met de volgende velden:
+
+  <Expandable title="properties" defaultOpen>
+    <ParamField body="commitment" type="string">
+      De commitment beschrijft hoe definitief een blok is op dat moment. Zie
+      [Configureren van state commitment](/developers/docs/rpc#configuring-state-commitment).
+    </ParamField>
+
+    <ParamField body="minContextSlot" type="number">
+      De minimale slot waarop het verzoek kan worden geëvalueerd
+    </ParamField>
+
+    <ParamField body="limit" type="number">
+      Maximaal aantal transactiehandtekeningen om terug te geven (tussen 1 en 1.000).
+
+      Standaard: `1000`
+    </ParamField>
+
+    <ParamField body="before" type="string">
+      Begin met achterwaarts zoeken vanaf deze transactiehandtekening. Als deze niet
+      is opgegeven, begint het zoeken vanaf de top van het hoogste max bevestigde
+      blok.
+    </ParamField>
+
+    <ParamField body="until" type="string">
+      Zoek tot aan deze transactiehandtekening, indien gevonden voordat de limiet is
+      bereikt
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Result
+
+<ResponseField name="result" type="array">
+  Een array van transactiehandtekening-informatieobjecten, geordend van
+  **nieuwste** naar **oudste** transactie, die het volgende bevat:
+
+  <Expandable title="properties" defaultOpen>
+    <ResponseField name="signature" type="string">
+      Transactiehandtekening als base-58 gecodeerde string
+    </ResponseField>
+
+    <ResponseField name="slot" type="u64">
+      De slot die het blok met de transactie bevat
+    </ResponseField>
+
+    <ResponseField name="err" type="object | null">
+      Fout als de transactie is mislukt, null als de transactie is geslaagd. Zie
+      [TransactionError definities](https://github.com/solana-labs/solana/blob/c0c60386544ec9a9ec7119229f37386d9f070523/sdk/src/transaction/error.rs#L13)
+      voor meer informatie.
+    </ResponseField>
+
+    <ResponseField name="memo" type="string | null">
+      Memo gekoppeld aan de transactie, null als er geen memo aanwezig is
+    </ResponseField>
+
+    <ResponseField name="blockTime" type="i64 | null">
+      Geschatte productietijd, als Unix-tijdstempel (seconden sinds het Unix-tijdperk)
+      waarop de transactie is verwerkt. null indien niet beschikbaar.
+    </ResponseField>
+
+    <ResponseField name="confirmationStatus" type="string | null">
+      De bevestigingsstatus van de transactie op de cluster; ofwel `processed`,
+      `confirmed`, of `finalized`. Zie
+      [Commitment](/developers/docs/rpc/#configuring-state-commitment) voor meer informatie over
+      optimistische bevestiging.
+    </ResponseField>
+  </Expandable>
+</ResponseField>

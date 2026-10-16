@@ -12,25 +12,25 @@
 export const JOB_PATHS = [
   {
     id: "payments",
-    href: "/docs/payments/checkout",
+    href: "/developers/docs/payments/checkout",
     firstResult: "5 min",
     total: "30 min",
   },
   {
     id: "payPerCall",
-    href: "/docs/payments/paywall-api",
+    href: "/developers/docs/payments/paywall-api",
     firstResult: "5 min",
     total: "30 min",
   },
   {
     id: "asset",
-    href: "/docs/assets/issue-asset",
+    href: "/developers/docs/assets/issue-asset",
     firstResult: "10 min",
     total: "45 min",
   },
   {
     id: "trade",
-    href: "/docs/defi/settle-trade",
+    href: "/developers/docs/defi/settle-trade",
     firstResult: "10 min",
     total: "40 min",
   },
@@ -40,15 +40,15 @@ export type JobPathId = (typeof JOB_PATHS)[number]["id"];
 
 /** Secondary use-case links under the job picker. */
 export const MORE_USE_CASES = [
-  { id: "markets", href: "/docs/defi" },
-  { id: "games", href: "/docs/assets/games" },
-  { id: "agents", href: "/docs/payments/agentic-payments" },
-  { id: "programs", href: "/docs/programs" },
-  { id: "all", href: "/docs/finance" },
+  { id: "markets", href: "/developers/docs/defi" },
+  { id: "games", href: "/developers/docs/assets/games" },
+  { id: "agents", href: "/developers/docs/payments/agentic-payments" },
+  { id: "programs", href: "/developers/docs/programs" },
+  { id: "all", href: "/developers/docs/finance" },
 ] as const;
 
 /**
- * Prefix docs-owned paths with the locale. Mintlify serves /<loc>/docs/* and
+ * Prefix docs-owned paths with the locale. Mintlify serves /<loc>/developers/docs/* and
  * /<loc>/developers/{bootcamp,cookbook}/*; templates and hash links stay
  * unprefixed.
  */
@@ -60,7 +60,7 @@ export function localizedHref(locale: string, href: string): string {
 
 export const HERO_LINKS = {
   picker: "#picker",
-  docs: "/docs",
+  docs: "/developers/docs",
 } as const;
 
 /**
@@ -90,7 +90,7 @@ export const AGENT_SETUP = {
 
 /** "Other ways to learn" cards. */
 export const LEARN_ROUTES = [
-  { id: "docs", href: "/docs" },
+  { id: "docs", href: "/developers/docs" },
   { id: "bootcamp", href: "/developers/bootcamp" },
   { id: "templates", href: "/developers/templates" },
   { id: "cookbook", href: "/developers/cookbook" },
@@ -214,7 +214,7 @@ export const COST_MODEL = {
     feeUsd: 0.001,
     source: {
       name: "Solana docs: fees",
-      url: "/docs/core/fees",
+      url: "/developers/docs/core/fees",
     },
   },
   retrievedAt: "2026-10-13",

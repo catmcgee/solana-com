@@ -1,0 +1,1738 @@
+---
+title: Créez votre premier programme Solana
+description:
+  Créez un programme Anchor local, compilez-le et testez-le, et parcourez chaque
+  fichier du programme compteur par défaut.
+sidebarTitle: Créez votre premier programme
+---
+
+Ce démarrage rapide utilise le projet de démarrage du
+[framework Anchor](https://www.anchor-lang.com/docs) généré par `anchor init`.
+Vous allez créer le projet localement, exécuter ses tests, compiler le programme
+et parcourir le code du programme qu'Anchor génère.
+
+## Prérequis
+
+Avant de commencer,
+[installez les outils de développement Solana](/developers/docs/intro/installation).
+L'installation inclut Rust, la CLI Solana et la CLI Anchor.
+
+Utilisez la version 1.1.2 ou supérieure de la CLI Anchor pour ce modèle.
+Vérifiez votre version installée :
+
+```bash Terminal
+anchor --version
+```
+
+<Steps titleSize="h3">
+
+<Step title="Créer le projet">
+
+Exécutez les commandes suivantes dans votre terminal :
+
+```bash Terminal
+anchor init my-program
+cd my-program
+```
+
+Le projet de démarrage comprend un programme Solana sous `programs/my-program`.
+Le programme comprend deux instructions : une pour initialiser un compte
+compteur et une pour incrémenter le compteur.
+
+Certaines parties du modèle illustrent des patterns courants des programmes
+Solana : la dérivation d'adresses de compte [PDA](/developers/docs/core/pda), l'exécution
+d'un Cross Program Invocation ([CPI](/developers/docs/core/cpi)) pour transférer des SOL,
+et l'utilisation de vérifications d'erreurs personnalisées pour arrêter une
+instruction lorsqu'une condition échoue.
+
+<Tree>
+  <Tree.Folder name="my-program" defaultOpen>
+    <Tree.File name="Anchor.toml" />
+    <Tree.File name="Cargo.toml" />
+    <Tree.Folder name="programs" defaultOpen>
+      <Tree.Folder name="my-program" defaultOpen>
+        <Tree.File name="Cargo.toml" />
+        <Tree.Folder name="src" defaultOpen>
+          <Tree.File name="lib.rs" />
+          <Tree.File name="constants.rs" />
+          <Tree.File name="error.rs" />
+          <Tree.File name="instructions.rs" />
+          <Tree.Folder name="instructions" defaultOpen>
+            <Tree.File name="initialize.rs" />
+            <Tree.File name="increment.rs" />
+          </Tree.Folder>
+          <Tree.File name="state.rs" />
+        </Tree.Folder>
+        <Tree.Folder name="tests" defaultOpen>
+          <Tree.File name="test_initialize.rs" />
+        </Tree.Folder>
+      </Tree.Folder>
+    </Tree.Folder>
+  </Tree.Folder>
+</Tree>
+
+</Step>
+
+<Step title="Compiler le programme">
+
+Exécutez `anchor build` pour compiler le programme de démarrage :
+
+```bash Terminal
+anchor build
+```
+
+Le programme compilé est écrit dans `target/deploy/my_program.so`. Lorsque le
+programme est déployé, le contenu de ce fichier `.so` est stocké dans un compte
+on-chain.
+
+</Step>
+
+<Step title="Exécuter le test">
+
+Exécutez le test par défaut :
+
+```bash Terminal
+anchor test
+```
+
+Le `Anchor.toml` de ce modèle utilise la commande de test Rust :
+
+```toml Anchor.toml
+skip_local_validator = true
+
+[scripts]
+test = "cargo test"
+```
+
+Le test charge le programme compilé dans [LiteSVM](https://www.litesvm.com/),
+créé un payeur, envoie les instructions `initialize` et `increment`,
+puis vérifie l'état du compte compteur.
+
+L'exécution de `anchor test` compile également le programme, vous n'avez donc
+pas besoin d'exécuter `anchor build` en premier lors des tests en local.
+
+</Step>
+
+<Step title="Déployer le programme">
+
+Les tests locaux offrent la boucle de rétroaction la plus rapide. Lorsque vous
+êtes prêt à déployer sur un réseau, par exemple devnet, compilez d'abord, puis
+déployez sur un cluster.
+
+Le déploiement d'un programme Solana nécessite des SOL car le programme est
+stocké dans un program account, et celui-ci doit payer pour l'espace qu'il
+utilise. Sur devnet, demandez des SOL devnet gratuits depuis le
+[Solana Faucet](https://faucet.solana.com/) ou via le Solana CLI :
+
+```bash Terminal
+solana airdrop 2 --url devnet
+```
+
+```bash Terminal
+anchor build
+anchor deploy --provider.cluster devnet
+```
+
+</Step>
+
+</Steps>
+
+## Fichiers sources
+
+Le répertoire `src` contient le programme Solana. La documentation d'Anchor sur
+la
+[Structure du programme](https://www.anchor-lang.com/docs/basics/program-structure)
+explique les macros principales utilisées ici, notamment `declare_id!`,
+`#[program]`, `#[derive(Accounts)]` et `#[account]`. Cette section
+parcourt les fichiers du modèle.
+
+### lib.rs
+
+`lib.rs` est le point d'entrée du programme. Il relie les fichiers sources,
+définit l'adresse du programme et définit les instructions du programme que les
+utilisateurs peuvent appeler.
+
+```rust programs/my-program/src/lib.rs wrap
+pub mod constants;
+pub mod error;
+pub mod instructions;
+pub mod state;
+
+use anchor_lang::prelude::*;
+
+pub use constants::*;
+pub use instructions::*;
+pub use state::*;
+
+declare_id!("82sFkffP9wxwpyfZyeaKHH2chQoJPUGsJZSPi9mrUuXd");
+
+#[program]
+pub mod my_program {
+    use super::*;
+
+    pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
+        crate::instructions::initialize::handle_initialize(ctx)
+    }
+
+    pub fn increment(ctx: Context<Increment>) -> Result<()> {
+        crate::instructions::increment::handle_increment(ctx)
+    }
+}
+```
+
+<Note>
+  **`pub mod constants`**
+
+  `pub mod constants` intègre `constants.rs` dans la crate du programme. C'est
+  ici que le modèle conserve les valeurs partagées du programme, telles que le
+  seed PDA, le montant du transfert et la valeur maximale du compteur.
+
+  **`pub mod error`**
+
+  `pub mod error` intègre `error.rs` dans la crate du programme. Ce fichier
+  définit les erreurs personnalisées que le programme peut retourner lorsqu'une
+  instruction est invalide.
+
+  **`pub mod instructions`**
+
+  `pub mod instructions` intègre `instructions.rs` dans la crate du programme.
+  Ce fichier fonctionne comme un index pour les fichiers spécifiques aux
+  instructions dans `src/instructions/`.
+
+  **`pub mod state`**
+
+  `pub mod state` intègre `state.rs` dans la crate du programme. Ce fichier
+  définit la structure des données pour les comptes appartenant à ce programme, y
+  compris le compte `Counter`.
+
+  **`anchor_lang::prelude`**
+
+  `anchor_lang::prelude::*` importe les types et macros Anchor utilisés pour
+  définir un programme Solana, notamment `Context`, `Result`,
+  `Pubkey`, `Account`, `Signer`, et les attributs de compte Anchor.
+
+  Les lignes `pub use` rendent publics les éléments des modules enfants depuis
+  la racine de la crate. Cela permet de raccourcir les points d'entrée des
+  instructions, par exemple `Context<Initialize>` au lieu d'un chemin de
+  module plus long.
+
+  **`declare_id!`**
+
+  `declare_id!` définit l'adresse du programme. Elle doit correspondre à
+  l'adresse dans `Anchor.toml`, le program account déployé, et tout utilisateur ou
+  test qui appelle le programme.
+
+  **`#[program]`**
+
+  `#[program]` indique à Anchor de générer le point d'entrée du programme
+  Solana et le code de dispatch des instructions. Les fonctions publiques de ce
+  module deviennent les instructions que les utilisateurs peuvent appeler.
+
+  **`pub fn initialize`, `pub fn increment`**
+
+  `initialize` et `increment` sont les deux noms d'instructions que les
+  utilisateurs peuvent appeler. Chacune reçoit un `Context<T>`. Le type à
+  l'intérieur de `Context` définit les comptes requis par cette instruction,
+  et Anchor valide ces comptes avant l'exécution de l'instruction.
+
+  **`handle_initialize`, `handle_increment`**
+
+  La fonction de traitement contient la logique de l'instruction.
+</Note>
+
+<Columns cols={2}>
+  <div>
+    ```toml Anchor.toml highlight={2} wrap
+    [programs.localnet]
+    my_program = "82sFkffP9wxwpyfZyeaKHH2chQoJPUGsJZSPi9mrUuXd"
+    ```
+  </div>
+
+  <div>
+    ```rust lib.rs highlight={1} wrap
+    declare_id!("82sFkffP9wxwpyfZyeaKHH2chQoJPUGsJZSPi9mrUuXd");
+    ```
+  </div>
+</Columns>
+
+La même adresse de programme apparaît dans la configuration et dans le code.
+`Anchor.toml` indique à Anchor l'adresse à déployer ou à appeler pour un
+cluster. `declare_id!` définit l'adresse du programme dans le programme pour
+les vérifications de sécurité.
+
+### constants.rs
+
+`constants.rs` regroupe les valeurs partagées en un seul endroit. Dans ce
+modèle, `COUNTER_SEED` dérive le PDA du compteur, `HELLO_WORLD_LAMPORTS`
+est transféré lors de l'initialisation, et `MAX_COUNT` est vérifié avant
+l'incrémentation.
+
+```rust programs/my-program/src/constants.rs wrap
+use anchor_lang::prelude::*;
+
+#[constant]
+pub const COUNTER_SEED: &[u8] = b"counter";
+
+#[constant]
+pub const HELLO_WORLD_LAMPORTS: u64 = 1;
+
+#[constant]
+pub const MAX_COUNT: u64 = 10;
+```
+
+<Note>
+  **`#[constant]`**
+
+  `#[constant]` indique à Anchor d'inclure la valeur dans l'IDL du programme.
+  Cela rend les constantes importantes du programme visibles pour les clients
+  générés et les outils.
+
+  **`COUNTER_SEED`**
+
+  `COUNTER_SEED` est la chaîne d'octets utilisée pour dériver le PDA du
+  compteur. Le programme et les tests utilisent tous les deux ce seed afin de
+  s'accorder sur l'adresse du compte sans stocker un keypair séparé. Ce modèle
+  utilise un seed fixe unique, de sorte que le programme ne possède qu'une seule
+  adresse de compteur. Les programmes réels incluent souvent l'adresse d'un
+  utilisateur ou un autre identifiant dans les seeds pour créer de nombreux
+  comptes associés.
+
+  **`HELLO_WORLD_LAMPORTS`**
+
+  `HELLO_WORLD_LAMPORTS` est le montant de lamports transféré du payeur vers
+  le program account dans `initialize`. Il est volontairement infime car le
+  modèle illustre un CPI vers le System Program.
+
+  **`MAX_COUNT`**
+
+  `MAX_COUNT` est la limite supérieure vérifiée par `increment`. La
+  conserver ici permet au programme, aux tests et à l'IDL généré de partager un
+  nom unique pour cette règle.
+</Note>
+
+<Columns cols={2}>
+  <div>
+    ```rust initialize.rs highlight={8,18} wrap
+    #[derive(Accounts)]
+    pub struct Initialize<'info> {
+        // ...
+        #[account(
+            init,
+            payer = payer,
+            space = 8 + Counter::INIT_SPACE,
+            seeds = [COUNTER_SEED],
+            bump
+        )]
+        pub counter: Account<'info, Counter>,
+        // ...
+    }
+
+    pub fn handle_initialize(ctx: Context<Initialize>) -> Result<()> {
+        // ...
+
+        anchor_lang::system_program::transfer(cpi_ctx, HELLO_WORLD_LAMPORTS)?;
+
+        Ok(())
+    }
+    ```
+  </div>
+
+  <div>
+    `initialize.rs` utilise deux constantes :
+
+    - `COUNTER_SEED` dérive l'adresse PDA du compteur.
+    - `HELLO_WORLD_LAMPORTS` définit le montant
+      transféré du payeur vers le compte compteur.
+  </div>
+</Columns>
+
+<Columns cols={2}>
+  <div>
+    ```rust increment.rs highlight={5} wrap
+    pub fn handle_increment(ctx: Context<Increment>) -> Result<()> {
+        // ...
+
+        require!(
+            ctx.accounts.counter.count < MAX_COUNT,
+            ErrorCode::CounterOverflow,
+        );
+
+        ctx.accounts.counter.count += 1;
+        Ok(())
+    }
+    ```
+  </div>
+
+  <div>
+    `increment.rs` utilise `MAX_COUNT` comme limite
+    supérieure du compteur. Si le compteur actuel a déjà atteint la valeur maximale,
+    `require!` retourne `CounterOverflow` et les données du compte ne sont
+    pas modifiées.
+  </div>
+</Columns>
+
+### state.rs
+
+`state.rs` définit des types de données personnalisés pour les comptes que le
+programme crée et possède. Le programme définit des instructions pour créer,
+initialiser et mettre à jour ces données, mais les données du compteur ne sont
+pas stockées dans le programme lui-même. Elles sont stockées dans un compte
+séparé possédant sa propre adresse.
+
+```rust programs/my-program/src/state.rs wrap
+use anchor_lang::prelude::*;
+
+#[account]
+#[derive(InitSpace)]
+pub struct Counter {
+    pub count: u64,
+    pub authority: Pubkey,
+}
+```
+
+<Note>
+  **`#[account]`**
+
+  `#[account]` indique à Anchor que cette structure est une donnée pouvant
+  être stockée dans un compte onchain appartenant à ce programme. Anchor l'utilise
+  pour sérialiser, désérialiser et valider les comptes `Counter`.
+
+  **`InitSpace`**
+
+  `InitSpace` permet à Anchor de calculer `Counter::INIT_SPACE`, le nombre
+  d'octets nécessaires pour les champs de cette structure. Le discriminateur de
+  compte Anchor de 8 octets est ajouté séparément lors de la création du compte.
+
+  **`count`**
+
+  `count` est la valeur du compteur stockée dans les données du compte.
+
+  **`authority`**
+
+  `authority` stocke l'adresse autorisée à incrémenter le compteur.
+  `initialize` écrit cette adresse, et `increment` exige que cette même
+  adresse signe.
+</Note>
+
+<Columns cols={2}>
+  <div>
+    ```rust initialize.rs highlight={4,12-13} wrap
+    #[account(
+        init,
+        payer = payer,
+        space = 8 + Counter::INIT_SPACE,
+        seeds = [COUNTER_SEED],
+        bump
+    )]
+    pub counter: Account<'info, Counter>,
+    // ...
+
+    pub fn handle_initialize(ctx: Context<Initialize>) -> Result<()> {
+        ctx.accounts.counter.count = 0;
+        ctx.accounts.counter.authority = ctx.accounts.payer.key();
+
+        Ok(())
+    }
+    ```
+
+    ```rust increment.rs highlight={4} wrap
+    pub fn handle_increment(ctx: Context<Increment>) -> Result<()> {
+        // ...
+
+        ctx.accounts.counter.count += 1;
+        Ok(())
+    }
+    ```
+  </div>
+
+  <div>
+    `state.rs` définit les données du compte `Counter`. Les fichiers
+    d'instruction utilisent ce type lors de la création et de la mise à jour du
+    compte :
+
+    - `Counter::INIT_SPACE` dimensionne le compte pour
+      les champs définis dans `state.rs`.
+    - `count` et `authority` sont les valeurs
+      de champs écrites lors de l'initialisation du compte.
+    - `count += 1` met à jour la valeur du compteur
+      stockée une fois la validation réussie.
+  </div>
+</Columns>
+
+### error.rs
+
+`error.rs` définit les erreurs personnalisées du programme. Dans ce modèle, les
+erreurs montrent comment les gestionnaires d'instructions s'arrêtent lorsqu'un
+appelant n'est pas autorisé à mettre à jour le compteur ou que celui-ci a déjà
+atteint `MAX_COUNT`.
+
+```rust programs/my-program/src/error.rs wrap
+use anchor_lang::prelude::*;
+
+#[error_code]
+pub enum ErrorCode {
+    #[msg("Only the counter authority can update this counter")]
+    Unauthorized,
+    #[msg("Counter has reached the maximum value")]
+    CounterOverflow,
+}
+```
+
+<Note>
+  **`#[error_code]`**
+
+  `#[error_code]` indique à Anchor de transformer ces variantes en erreurs de
+  programme personnalisées. Les clients et les tests peuvent utiliser ces erreurs
+  plutôt que de deviner à partir de codes d'erreur bruts.
+
+  **`Unauthorized`**
+
+  `Unauthorized` est retourné lorsque le signataire de la transaction n'est
+  pas l'autorité stockée dans le compte du compteur.
+
+  **`CounterOverflow`**
+
+  `CounterOverflow` est retourné lorsqu'un incrément enfreindrait la règle
+  `MAX_COUNT` du programme.
+</Note>
+
+<Columns cols={2}>
+  <div>
+    ```rust increment.rs highlight={5,9} wrap
+    pub fn handle_increment(ctx: Context<Increment>) -> Result<()> {
+        require_keys_eq!(
+            ctx.accounts.counter.authority,
+            ctx.accounts.authority.key(),
+            ErrorCode::Unauthorized,
+        );
+        require!(
+            ctx.accounts.counter.count < MAX_COUNT,
+            ErrorCode::CounterOverflow,
+        );
+
+        ctx.accounts.counter.count += 1;
+        msg!("Hello, world! Counter is now {}", ctx.accounts.counter.count);
+        Ok(())
+    }
+    ```
+  </div>
+
+  <div>
+    `error.rs` nomme les erreurs que l'instruction peut retourner :
+
+    - `ErrorCode::Unauthorized` est retourné
+      lorsque le signataire n'est pas l'autorité stockée dans le compte du compteur.
+    - `ErrorCode::CounterOverflow` est retourné
+      lorsque le compteur a déjà atteint `MAX_COUNT`.
+  </div>
+</Columns>
+
+### instructions.rs
+
+`instructions.rs` connecte les fichiers d'instructions au crate du programme
+afin que `lib.rs` puisse accéder au code des instructions `initialize` et
+`increment`. Chaque fichier d'instructions définit les comptes requis par
+cette instruction ainsi que la logique du gestionnaire qui s'exécute après
+qu'Anchor a validé ces comptes.
+
+```rust programs/my-program/src/instructions.rs wrap
+pub mod initialize;
+pub mod increment;
+
+pub use initialize::*;
+pub use increment::*;
+```
+
+<Note>
+  **`pub mod initialize`**
+
+  Les lignes `pub mod` intègrent `src/instructions/initialize.rs` et
+  `src/instructions/increment.rs` au crate du programme.
+
+  **`pub use initialize`**
+
+  Les lignes `pub use` réexportent les éléments publics de ces fichiers. Cela
+  rend les structs de comptes d'instructions et les fonctions de gestionnaire
+  disponibles via le module `instructions`.
+</Note>
+
+### initialize.rs
+
+`initialize.rs` définit les comptes nécessaires à la création du compte
+compteur, puis écrit les premières valeurs du compte. La struct
+`#[derive(Accounts)]` utilise les
+[contraintes de compte](https://www.anchor-lang.com/docs/references/account-constraints)
+Anchor pour spécifier quels comptes sont requis et comment le nouveau compte
+compteur est créé.
+
+```rust programs/my-program/src/instructions/initialize.rs wrap
+use anchor_lang::prelude::*;
+
+use crate::{constants::*, state::Counter};
+
+#[derive(Accounts)]
+pub struct Initialize<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    #[account(
+        init,
+        payer = payer,
+        space = 8 + Counter::INIT_SPACE,
+        seeds = [COUNTER_SEED],
+        bump
+    )]
+    pub counter: Account<'info, Counter>,
+    pub system_program: Program<'info, System>,
+}
+
+pub fn handle_initialize(ctx: Context<Initialize>) -> Result<()> {
+    ctx.accounts.counter.count = 0;
+    ctx.accounts.counter.authority = ctx.accounts.payer.key();
+
+    let cpi_accounts = anchor_lang::system_program::Transfer {
+        from: ctx.accounts.payer.to_account_info(),
+        to: ctx.accounts.counter.to_account_info(),
+    };
+    let cpi_ctx = CpiContext::new(anchor_lang::system_program::ID, cpi_accounts);
+    anchor_lang::system_program::transfer(cpi_ctx, HELLO_WORLD_LAMPORTS)?;
+
+    msg!("Hello, world! Counter initialized");
+    Ok(())
+}
+```
+
+<Note>
+  Ce fichier importe les constantes partagées et le type de compte `Counter`.
+  L'instruction utilise ces définitions pour dériver le PDA, choisir le montant du
+  transfert et allouer le compte avec la taille de données appropriée.
+
+  **`derive(Accounts)`**
+
+  `Initialize` est le contexte de compte pour l'instruction `initialize`.
+  Chaque champ dans la struct représente un compte distinct qui doit être inclus
+  lorsque l'instruction est appelée. Anchor utilise la struct pour valider ces
+  comptes entrants avant l'exécution du handler.
+
+  **`#[account(mut)]`**
+
+  `#[account(mut)]` indique à Anchor que le compte payeur doit être accessible
+  en écriture. Cela est obligatoire car la création de compte et le CPI de
+  transfert déduisent tous deux des lamports du payeur.
+
+  **`Signer<'info>`**
+
+  `Signer<'info>` indique à Anchor que le payeur doit signer la transaction.
+
+  **`#[account(`**
+
+  Le bloc `#[account(...)]` indique à Anchor comment créer et valider le
+  compte compteur avant l'exécution du handler.
+
+  **`init`**
+
+  `init` indique à Anchor de créer le compte `counter` avant l'exécution
+  du handler. Le nouveau compte appartient à ce programme, qui peut donc y stocker
+  des données de type `Counter`.
+
+  **`payer = payer`**
+
+  `payer = payer` désigne le compte `payer` comme payeur pour la création
+  du nouveau compte compteur.
+
+  **`space = 8 + Counter::INIT_SPACE`**
+
+  `space = 8 + Counter::INIT_SPACE` alloue les octets nécessaires pour le
+  discriminateur de compte d'Anchor ainsi que pour les champs `Counter` issus
+  de `state.rs`. Le discriminateur permet à Anchor de confirmer que le compte
+  contient le type attendu avant de le lire.
+
+  **`seeds = [COUNTER_SEED]`**
+
+  `seeds = [COUNTER_SEED]` indique que l'adresse du compte compteur doit être
+  le PDA dérivé de ce seed et de l'ID du programme. Avec un seul seed fixe, il
+  n'existe qu'un seul PDA compteur pour ce programme. Pour créer des compteurs
+  distincts dans un programme réel, vous ajouteriez généralement un autre seed,
+  tel que l'adresse d'un utilisateur.
+
+  **`bump`**
+
+  `bump` demande à Anchor de trouver et valider le bump du PDA, c'est-à-dire
+  l'octet supplémentaire qui rend l'adresse dérivée valide en tant que PDA.
+
+  **`Account<'info, Counter>`**
+
+  `Account<'info, Counter>` demande à Anchor de traiter les données du compte
+  comme étant de type `Counter` issu de `state.rs`. Anchor vérifie également
+  que le compte appartient à ce programme.
+
+  **`Program<'info, System>`**
+
+  `Program<'info, System>` exige que l'appelant fournisse le System Program.
+  Anchor l'utilise pour la contrainte de création de compte `init`. Le CPI de
+  transfert du handler invoque également le System Program.
+
+  **`handle_initialize`**
+
+  Le handler s'exécute après qu'Anchor a validé les comptes et créé le compte
+  compteur, ce qui lui permet d'écrire les données initiales du compte en toute
+  sécurité.
+
+  **`counter.count = 0`**
+
+  Définit le champ `count` du compte compteur à `0`.
+
+  **`counter.authority = ctx.accounts.payer.key()`**
+
+  Définit le champ `authority` du compte compteur à l'adresse du payeur.
+
+  **`system_program::Transfer`**
+
+  Ce sont les comptes transmis à l'instruction de transfert du System Program. Ce
+  CPI de transfert est inclus uniquement pour illustrer comment un CPI transmet
+  des comptes à un autre programme.
+
+  **`CpiContext::new`**
+
+  `CpiContext` regroupe le programme cible et les comptes requis pour une
+  Cross Program Invocation. La création du contexte prépare le CPI en associant le
+  programme que vous souhaitez appeler avec les comptes attendus par ce programme.
+
+  **`system_program::transfer`**
+
+  Ce CPI invoque l'instruction de transfert du System Program et déplace
+  `HELLO_WORLD_LAMPORTS` du payeur vers le compte compteur.
+
+  **`msg!`**
+
+  `msg!` écrit un message dans les journaux du programme lorsque celui-ci est
+  invoqué.
+</Note>
+
+<Steps>
+  <Step title="Account Context">
+    La struct `Initialize` définit les comptes qui doivent être inclus lorsqu'un
+    utilisateur appelle l'instruction `initialize`. Anchor vérifie ces comptes
+    avant l'exécution du gestionnaire.
+
+    ```rust initialize.rs focus={1-2}
+    #[derive(Accounts)]
+    pub struct Initialize<'info> {
+        #[account(mut)]
+        pub payer: Signer<'info>,
+        #[account(
+            init,
+            payer = payer,
+            space = 8 + Counter::INIT_SPACE,
+            seeds = [COUNTER_SEED],
+            bump
+        )]
+        pub counter: Account<'info, Counter>,
+        pub system_program: Program<'info, System>,
+    }
+    ```
+  </Step>
+
+  <Step title="Payer Account">
+    Le compte `payer` paie la création du compte compteur. Le type
+    `Signer<'info>` signifie que le payeur doit signer la transaction, et
+    `#[account(mut)]` indique que le compte payeur peut être modifié car des
+    lamports seront déduits.
+
+    ```rust initialize.rs focus={3-4}
+    #[derive(Accounts)]
+    pub struct Initialize<'info> {
+        #[account(mut)]
+        pub payer: Signer<'info>,
+        #[account(
+            init,
+            payer = payer,
+            space = 8 + Counter::INIT_SPACE,
+            seeds = [COUNTER_SEED],
+            bump
+        )]
+        pub counter: Account<'info, Counter>,
+        pub system_program: Program<'info, System>,
+    }
+    ```
+  </Step>
+
+  <Step title="Counter Account">
+    Le compte `counter` stocke les données `Counter` provenant de
+    `state.rs`. `init` indique à Anchor de créer ce compte avant l'exécution du
+    gestionnaire, et `payer = payer` indique à Anchor quel compte prend en
+    charge les frais de création.
+
+    ```rust initialize.rs focus={5-12}
+    #[derive(Accounts)]
+    pub struct Initialize<'info> {
+        #[account(mut)]
+        pub payer: Signer<'info>,
+        #[account(
+            init,
+            payer = payer,
+            space = 8 + Counter::INIT_SPACE,
+            seeds = [COUNTER_SEED],
+            bump
+        )]
+        pub counter: Account<'info, Counter>,
+        pub system_program: Program<'info, System>,
+    }
+    ```
+  </Step>
+
+  <Step title="Taille du compte">
+    La contrainte `space` indique à Anchor la quantité de données à allouer pour
+    le compte. Anchor stocke d'abord un discriminant de 8 octets, puis les octets
+    nécessaires pour les champs `Counter`. Le discriminant permet à Anchor de
+    reconnaître ce compte comme un compte `Counter` avant de désérialiser les
+    données du compte.
+
+    ```rust initialize.rs focus={8}
+    #[derive(Accounts)]
+    pub struct Initialize<'info> {
+        #[account(mut)]
+        pub payer: Signer<'info>,
+        #[account(
+            init,
+            payer = payer,
+            space = 8 + Counter::INIT_SPACE,
+            seeds = [COUNTER_SEED],
+            bump
+        )]
+        pub counter: Account<'info, Counter>,
+        pub system_program: Program<'info, System>,
+    }
+    ```
+  </Step>
+
+  <Step title="Adresse du compteur">
+    Les contraintes `seeds` et `bump` définissent l'adresse PDA attendue
+    pour le compte compteur. Anchor vérifie que le compte `counter` fourni
+    correspond à cette adresse. Le modèle utilise un PDA afin que les utilisateurs
+    puissent dériver l'adresse du compteur à partir de l'ID du programme et du seed,
+    rendant ainsi l'adresse du compteur déterministe.
+
+    ```rust initialize.rs focus={9-10}
+    #[derive(Accounts)]
+    pub struct Initialize<'info> {
+        #[account(mut)]
+        pub payer: Signer<'info>,
+        #[account(
+            init,
+            payer = payer,
+            space = 8 + Counter::INIT_SPACE,
+            seeds = [COUNTER_SEED],
+            bump
+        )]
+        pub counter: Account<'info, Counter>,
+        pub system_program: Program<'info, System>,
+    }
+    ```
+  </Step>
+
+  <Step title="System Program">
+    Le compte `system_program` est requis car la création d'un nouveau compte
+    utilise le System Program.
+
+    ```rust initialize.rs focus={13}
+    #[derive(Accounts)]
+    pub struct Initialize<'info> {
+        #[account(mut)]
+        pub payer: Signer<'info>,
+        #[account(
+            init,
+            payer = payer,
+            space = 8 + Counter::INIT_SPACE,
+            seeds = [COUNTER_SEED],
+            bump
+        )]
+        pub counter: Account<'info, Counter>,
+        pub system_program: Program<'info, System>,
+    }
+    ```
+  </Step>
+
+  <Step title="Fonction de gestionnaire">
+    La fonction `handle_initialize` s'exécute après qu'Anchor a validé les
+    comptes dans `Initialize`. La valeur `ctx` donne au gestionnaire accès à
+    ces comptes vérifiés.
+
+    ```rust initialize.rs focus={16}
+    #[derive(Accounts)]
+    pub struct Initialize<'info> {
+        #[account(mut)]
+        pub payer: Signer<'info>,
+        #[account(
+            init,
+            payer = payer,
+            space = 8 + Counter::INIT_SPACE,
+            seeds = [COUNTER_SEED],
+            bump
+        )]
+        pub counter: Account<'info, Counter>,
+        pub system_program: Program<'info, System>,
+    }
+
+    pub fn handle_initialize(ctx: Context<Initialize>) -> Result<()> {
+        ctx.accounts.counter.count = 0;
+        ctx.accounts.counter.authority = ctx.accounts.payer.key();
+
+        let cpi_accounts = anchor_lang::system_program::Transfer {
+            from: ctx.accounts.payer.to_account_info(),
+            to: ctx.accounts.counter.to_account_info(),
+        };
+        let cpi_ctx = CpiContext::new(anchor_lang::system_program::ID, cpi_accounts);
+        anchor_lang::system_program::transfer(cpi_ctx, HELLO_WORLD_LAMPORTS)?;
+
+        msg!("Hello, world! Counter initialized");
+        Ok(())
+    }
+    ```
+  </Step>
+
+  <Step title="Données initiales">
+    Le gestionnaire écrit les premières valeurs dans le nouveau compte compteur. Le
+    comptage commence à `0`, et le payeur devient l'autorité autorisée à
+    incrémenter le compteur ultérieurement.
+
+    ```rust initialize.rs focus={17-18}
+    #[derive(Accounts)]
+    pub struct Initialize<'info> {
+        #[account(mut)]
+        pub payer: Signer<'info>,
+        #[account(
+            init,
+            payer = payer,
+            space = 8 + Counter::INIT_SPACE,
+            seeds = [COUNTER_SEED],
+            bump
+        )]
+        pub counter: Account<'info, Counter>,
+        pub system_program: Program<'info, System>,
+    }
+
+    pub fn handle_initialize(ctx: Context<Initialize>) -> Result<()> {
+        ctx.accounts.counter.count = 0;
+        ctx.accounts.counter.authority = ctx.accounts.payer.key();
+
+        let cpi_accounts = anchor_lang::system_program::Transfer {
+            from: ctx.accounts.payer.to_account_info(),
+            to: ctx.accounts.counter.to_account_info(),
+        };
+        let cpi_ctx = CpiContext::new(anchor_lang::system_program::ID, cpi_accounts);
+        anchor_lang::system_program::transfer(cpi_ctx, HELLO_WORLD_LAMPORTS)?;
+
+        msg!("Hello, world! Counter initialized");
+        Ok(())
+    }
+    ```
+  </Step>
+
+  <Step title="Comptes de transfert">
+    Ce CPI de transfert est inclus uniquement pour illustrer comment un CPI transmet
+    des comptes à un autre programme. La structure `Transfer` liste les comptes
+    utilisés par le transfert du System Program.
+
+    ```rust initialize.rs focus={20-23}
+    #[derive(Accounts)]
+    pub struct Initialize<'info> {
+        #[account(mut)]
+        pub payer: Signer<'info>,
+        #[account(
+            init,
+            payer = payer,
+            space = 8 + Counter::INIT_SPACE,
+            seeds = [COUNTER_SEED],
+            bump
+        )]
+        pub counter: Account<'info, Counter>,
+        pub system_program: Program<'info, System>,
+    }
+
+    pub fn handle_initialize(ctx: Context<Initialize>) -> Result<()> {
+        ctx.accounts.counter.count = 0;
+        ctx.accounts.counter.authority = ctx.accounts.payer.key();
+
+        let cpi_accounts = anchor_lang::system_program::Transfer {
+            from: ctx.accounts.payer.to_account_info(),
+            to: ctx.accounts.counter.to_account_info(),
+        };
+        let cpi_ctx = CpiContext::new(anchor_lang::system_program::ID, cpi_accounts);
+        anchor_lang::system_program::transfer(cpi_ctx, HELLO_WORLD_LAMPORTS)?;
+
+        msg!("Hello, world! Counter initialized");
+        Ok(())
+    }
+    ```
+  </Step>
+
+  <Step title="Contexte CPI">
+    `CpiContext::new` combine le programme appelé avec les comptes transmis à ce
+    programme. C'est la structure de base d'un CPI : choisir le programme à
+    invoquer, collectionner les comptes attendus par ce programme, puis passer les
+    deux dans l'invocation. Ici, le programme appelé est le System Program.
+
+    ```rust initialize.rs focus={24}
+    #[derive(Accounts)]
+    pub struct Initialize<'info> {
+        #[account(mut)]
+        pub payer: Signer<'info>,
+        #[account(
+            init,
+            payer = payer,
+            space = 8 + Counter::INIT_SPACE,
+            seeds = [COUNTER_SEED],
+            bump
+        )]
+        pub counter: Account<'info, Counter>,
+        pub system_program: Program<'info, System>,
+    }
+
+    pub fn handle_initialize(ctx: Context<Initialize>) -> Result<()> {
+        ctx.accounts.counter.count = 0;
+        ctx.accounts.counter.authority = ctx.accounts.payer.key();
+
+        let cpi_accounts = anchor_lang::system_program::Transfer {
+            from: ctx.accounts.payer.to_account_info(),
+            to: ctx.accounts.counter.to_account_info(),
+        };
+        let cpi_ctx = CpiContext::new(anchor_lang::system_program::ID, cpi_accounts);
+        anchor_lang::system_program::transfer(cpi_ctx, HELLO_WORLD_LAMPORTS)?;
+
+        msg!("Hello, world! Counter initialized");
+        Ok(())
+    }
+    ```
+  </Step>
+
+  <Step title="Invoke Transfer">
+    `anchor_lang::system_program::transfer` invoque l'instruction de transfert
+    du System Program. Dans ce modèle, le transfert est un exemple simple d'appel
+    d'un autre programme depuis votre programme. Si le CPI de transfert échoue,
+    l'instruction `initialize` échoue également.
+
+    ```rust initialize.rs focus={25}
+    #[derive(Accounts)]
+    pub struct Initialize<'info> {
+        #[account(mut)]
+        pub payer: Signer<'info>,
+        #[account(
+            init,
+            payer = payer,
+            space = 8 + Counter::INIT_SPACE,
+            seeds = [COUNTER_SEED],
+            bump
+        )]
+        pub counter: Account<'info, Counter>,
+        pub system_program: Program<'info, System>,
+    }
+
+    pub fn handle_initialize(ctx: Context<Initialize>) -> Result<()> {
+        ctx.accounts.counter.count = 0;
+        ctx.accounts.counter.authority = ctx.accounts.payer.key();
+
+        let cpi_accounts = anchor_lang::system_program::Transfer {
+            from: ctx.accounts.payer.to_account_info(),
+            to: ctx.accounts.counter.to_account_info(),
+        };
+        let cpi_ctx = CpiContext::new(anchor_lang::system_program::ID, cpi_accounts);
+        anchor_lang::system_program::transfer(cpi_ctx, HELLO_WORLD_LAMPORTS)?;
+
+        msg!("Hello, world! Counter initialized");
+        Ok(())
+    }
+    ```
+  </Step>
+
+  <Step title="Log Message">
+    `msg!` écrit un message dans les journaux du programme. `Ok(())` indique
+    que l'instruction s'est terminée avec succès.
+
+    ```rust initialize.rs focus={27-28}
+    #[derive(Accounts)]
+    pub struct Initialize<'info> {
+        #[account(mut)]
+        pub payer: Signer<'info>,
+        #[account(
+            init,
+            payer = payer,
+            space = 8 + Counter::INIT_SPACE,
+            seeds = [COUNTER_SEED],
+            bump
+        )]
+        pub counter: Account<'info, Counter>,
+        pub system_program: Program<'info, System>,
+    }
+
+    pub fn handle_initialize(ctx: Context<Initialize>) -> Result<()> {
+        ctx.accounts.counter.count = 0;
+        ctx.accounts.counter.authority = ctx.accounts.payer.key();
+
+        let cpi_accounts = anchor_lang::system_program::Transfer {
+            from: ctx.accounts.payer.to_account_info(),
+            to: ctx.accounts.counter.to_account_info(),
+        };
+        let cpi_ctx = CpiContext::new(anchor_lang::system_program::ID, cpi_accounts);
+        anchor_lang::system_program::transfer(cpi_ctx, HELLO_WORLD_LAMPORTS)?;
+
+        msg!("Hello, world! Counter initialized");
+        Ok(())
+    }
+    ```
+  </Step>
+</Steps>
+
+### increment.rs
+
+`increment.rs` définit les comptes requis pour mettre à jour un compte compteur
+existant. Le handler vérifie que le signataire est l'autorité enregistrée,
+vérifie que le compteur n'a pas atteint la valeur `MAX_COUNT` spécifiée,
+puis incrémente le compteur.
+
+```rust programs/my-program/src/instructions/increment.rs wrap
+use anchor_lang::prelude::*;
+
+use crate::{constants::*, error::ErrorCode, state::Counter};
+
+#[derive(Accounts)]
+pub struct Increment<'info> {
+    #[account(
+        mut,
+        seeds = [COUNTER_SEED],
+        bump
+    )]
+    pub counter: Account<'info, Counter>,
+    pub authority: Signer<'info>,
+}
+
+pub fn handle_increment(ctx: Context<Increment>) -> Result<()> {
+    require_keys_eq!(
+        ctx.accounts.counter.authority,
+        ctx.accounts.authority.key(),
+        ErrorCode::Unauthorized,
+    );
+    require!(
+        ctx.accounts.counter.count < MAX_COUNT,
+        ErrorCode::CounterOverflow,
+    );
+
+    ctx.accounts.counter.count += 1;
+    msg!("Hello, world! Counter is now {}", ctx.accounts.counter.count);
+    Ok(())
+}
+```
+
+<Note>
+  **`derive(Accounts)`**
+
+  `Increment` est le contexte de compte pour l'instruction `increment`.
+  Anchor l'utilise pour valider le compte compteur mutable et le signataire
+  requis.
+
+  **`mut`**
+
+  `mut` indique à Anchor que le compte compteur doit être accessible en
+  écriture, car le handler met à jour la valeur `count` stockée.
+
+  **`seeds = [COUNTER_SEED]`**
+
+  `seeds = [COUNTER_SEED]` vérifie que le compte compteur fourni est bien le
+  PDA dérivé de ce seed et de l'ID du programme.
+
+  **`bump`**
+
+  `bump` indique à Anchor de trouver et de valider le bump PDA pour le compte
+  compteur.
+
+  **`Account<'info, Counter>`**
+
+  `Account<'info, Counter>` indique à Anchor de désérialiser les données du
+  compte en tant que type `Counter` depuis `state.rs`. Anchor vérifie
+  également que le compte appartient à ce programme.
+
+  **`Signer`**
+
+  `Signer` exige la signature de l'autorité. Le handler compare ensuite
+  l'adresse de ce signataire à l'autorité stockée dans le compte compteur.
+
+  **`handle_increment`**
+
+  Le handler s'exécute après qu'Anchor a validé la liste des comptes, vérifié la
+  propriété et désérialisé le compte compteur.
+
+  **`require_keys_eq!`**
+
+  `require_keys_eq!` compare deux clés publiques et interrompt l'instruction
+  si l'adresse du signataire ne correspond pas à l'autorité stockée dans le compte
+  compteur. Il s'agit de la règle d'autorisation au niveau applicatif de ce
+  modèle.
+
+  **`require!`**
+
+  `require!` vérifie une règle booléenne et interrompt l'instruction avec
+  `CounterOverflow` si le compteur a déjà atteint `MAX_COUNT`. Cette règle
+  de modèle illustre les erreurs personnalisées et l'échec avant mutation.
+
+  **`count += 1`**
+
+  Ce n'est qu'après la réussite des deux vérifications que le handler met à jour
+  les données du compte compteur. Si l'une ou l'autre échoue, la transaction
+  échoue et le compte n'est pas modifié.
+
+  **`msg!`**
+
+  `msg!` écrit un message dans les journaux du programme lorsque celui-ci est
+  invoqué.
+</Note>
+
+<Steps>
+  <Step title="Account Context">
+    La structure `Increment` définit les comptes qui doivent être inclus
+    lorsqu'un utilisateur appelle l'instruction `increment`. Anchor vérifie ces
+    comptes avant l'exécution du handler.
+
+    ```rust increment.rs focus={1-2}
+    #[derive(Accounts)]
+    pub struct Increment<'info> {
+        #[account(
+            mut,
+            seeds = [COUNTER_SEED],
+            bump
+        )]
+        pub counter: Account<'info, Counter>,
+        pub authority: Signer<'info>,
+    }
+    ```
+  </Step>
+
+  <Step title="Counter Account">
+    Le compte `counter` stocke les données `Counter`. La contrainte
+    `mut` permet au handler de mettre à jour le compteur enregistré, et les
+    contraintes `seeds` et `bump` vérifient l'adresse PDA du compteur.
+
+    ```rust increment.rs focus={3-8}
+    #[derive(Accounts)]
+    pub struct Increment<'info> {
+        #[account(
+            mut,
+            seeds = [COUNTER_SEED],
+            bump
+        )]
+        pub counter: Account<'info, Counter>,
+        pub authority: Signer<'info>,
+    }
+    ```
+  </Step>
+
+  <Step title="Authority Signer">
+    Le compte `authority` doit signer la transaction. Le handler vérifie ensuite
+    que ce signataire correspond à l'autorité enregistrée dans le compte compteur.
+
+    ```rust increment.rs focus={9}
+    #[derive(Accounts)]
+    pub struct Increment<'info> {
+        #[account(
+            mut,
+            seeds = [COUNTER_SEED],
+            bump
+        )]
+        pub counter: Account<'info, Counter>,
+        pub authority: Signer<'info>,
+    }
+    ```
+  </Step>
+
+  <Step title="Fonction du gestionnaire">
+    La fonction `handle_increment` s'exécute après qu'Anchor valide les comptes
+    dans `Increment`. La valeur `ctx` donne au gestionnaire accès à ces
+    comptes vérifiés.
+
+    ```rust increment.rs focus={12}
+    #[derive(Accounts)]
+    pub struct Increment<'info> {
+        #[account(
+            mut,
+            seeds = [COUNTER_SEED],
+            bump
+        )]
+        pub counter: Account<'info, Counter>,
+        pub authority: Signer<'info>,
+    }
+
+    pub fn handle_increment(ctx: Context<Increment>) -> Result<()> {
+        require_keys_eq!(
+            ctx.accounts.counter.authority,
+            ctx.accounts.authority.key(),
+            ErrorCode::Unauthorized,
+        );
+        require!(
+            ctx.accounts.counter.count < MAX_COUNT,
+            ErrorCode::CounterOverflow,
+        );
+
+        ctx.accounts.counter.count += 1;
+        msg!("Hello, world! Counter is now {}", ctx.accounts.counter.count);
+        Ok(())
+    }
+    ```
+  </Step>
+
+  <Step title="Vérification de l'autorité">
+    La première vérification s'assure que le signataire est autorisé à mettre à jour
+    ce compteur. Si l'adresse du signataire ne correspond pas à
+    `counter.authority`, l'instruction s'arrête avec
+    `ErrorCode::Unauthorized`. Cela illustre une autorisation au niveau de
+    l'application : le programme détient les données du compteur, mais il implémente
+    une règle définissant quel signataire peut modifier ces données.
+
+    ```rust increment.rs focus={13-17}
+    #[derive(Accounts)]
+    pub struct Increment<'info> {
+        #[account(
+            mut,
+            seeds = [COUNTER_SEED],
+            bump
+        )]
+        pub counter: Account<'info, Counter>,
+        pub authority: Signer<'info>,
+    }
+
+    pub fn handle_increment(ctx: Context<Increment>) -> Result<()> {
+        require_keys_eq!(
+            ctx.accounts.counter.authority,
+            ctx.accounts.authority.key(),
+            ErrorCode::Unauthorized,
+        );
+        require!(
+            ctx.accounts.counter.count < MAX_COUNT,
+            ErrorCode::CounterOverflow,
+        );
+
+        ctx.accounts.counter.count += 1;
+        msg!("Hello, world! Counter is now {}", ctx.accounts.counter.count);
+        Ok(())
+    }
+    ```
+  </Step>
+
+  <Step title="Vérification du compteur maximum">
+    La deuxième vérification empêche le compteur de dépasser `MAX_COUNT`. Si le
+    compteur a déjà atteint la limite, l'instruction s'arrête avec
+    `ErrorCode::CounterOverflow`. Cette limite est une règle artificielle dans
+    le modèle afin que vous puissiez voir comment les erreurs personnalisées
+    arrêtent une instruction avant que les données du compte ne soient modifiées.
+
+    ```rust increment.rs focus={18-21}
+    #[derive(Accounts)]
+    pub struct Increment<'info> {
+        #[account(
+            mut,
+            seeds = [COUNTER_SEED],
+            bump
+        )]
+        pub counter: Account<'info, Counter>,
+        pub authority: Signer<'info>,
+    }
+
+    pub fn handle_increment(ctx: Context<Increment>) -> Result<()> {
+        require_keys_eq!(
+            ctx.accounts.counter.authority,
+            ctx.accounts.authority.key(),
+            ErrorCode::Unauthorized,
+        );
+        require!(
+            ctx.accounts.counter.count < MAX_COUNT,
+            ErrorCode::CounterOverflow,
+        );
+
+        ctx.accounts.counter.count += 1;
+        msg!("Hello, world! Counter is now {}", ctx.accounts.counter.count);
+        Ok(())
+    }
+    ```
+  </Step>
+
+  <Step title="Mise à jour du compteur">
+    Ce n'est qu'une fois les deux vérifications passées que le gestionnaire met à
+    jour les données du compte. Cette ligne ajoute un à la valeur du compteur
+    stockée.
+
+    ```rust increment.rs focus={23}
+    #[derive(Accounts)]
+    pub struct Increment<'info> {
+        #[account(
+            mut,
+            seeds = [COUNTER_SEED],
+            bump
+        )]
+        pub counter: Account<'info, Counter>,
+        pub authority: Signer<'info>,
+    }
+
+    pub fn handle_increment(ctx: Context<Increment>) -> Result<()> {
+        require_keys_eq!(
+            ctx.accounts.counter.authority,
+            ctx.accounts.authority.key(),
+            ErrorCode::Unauthorized,
+        );
+        require!(
+            ctx.accounts.counter.count < MAX_COUNT,
+            ErrorCode::CounterOverflow,
+        );
+
+        ctx.accounts.counter.count += 1;
+        msg!("Hello, world! Counter is now {}", ctx.accounts.counter.count);
+        Ok(())
+    }
+    ```
+  </Step>
+
+  <Step title="Message de journal">
+    `msg!` écrit le compteur mis à jour dans les journaux du programme.
+    `Ok(())` indique que l'instruction s'est terminée avec succès.
+
+    ```rust increment.rs focus={24-25}
+    #[derive(Accounts)]
+    pub struct Increment<'info> {
+        #[account(
+            mut,
+            seeds = [COUNTER_SEED],
+            bump
+        )]
+        pub counter: Account<'info, Counter>,
+        pub authority: Signer<'info>,
+    }
+
+    pub fn handle_increment(ctx: Context<Increment>) -> Result<()> {
+        require_keys_eq!(
+            ctx.accounts.counter.authority,
+            ctx.accounts.authority.key(),
+            ErrorCode::Unauthorized,
+        );
+        require!(
+            ctx.accounts.counter.count < MAX_COUNT,
+            ErrorCode::CounterOverflow,
+        );
+
+        ctx.accounts.counter.count += 1;
+        msg!("Hello, world! Counter is now {}", ctx.accounts.counter.count);
+        Ok(())
+    }
+    ```
+  </Step>
+</Steps>
+
+## Fichier de test
+
+`programs/my-program/tests/test_initialize.rs` est un test d'intégration Rust.
+Il ne démarre pas de validator local. À la place, il charge le fichier `.so`
+compilé dans LiteSVM, construit des transactions qui appellent le programme et
+lit le compte compteur après chaque transaction. Le test construit des
+instructions pour une transaction Solana en spécifiant l'ID du programme à
+invoquer, en fournissant des instruction data et en passant les comptes requis.
+
+<Columns cols={2}>
+  <div>
+    ```rust initialize.rs highlight={4,12-13} wrap
+    #[derive(Accounts)]
+    pub struct Initialize<'info> {
+        #[account(mut)]
+        pub payer: Signer<'info>,
+        #[account(
+            init,
+            payer = payer,
+            space = 8 + Counter::INIT_SPACE,
+            seeds = [COUNTER_SEED],
+            bump
+        )]
+        pub counter: Account<'info, Counter>,
+        pub system_program: Program<'info, System>,
+    }
+    ```
+
+    ```rust test_initialize.rs highlight={5-7} wrap
+    let instruction = Instruction::new_with_bytes(
+        program_id,
+        &my_program::instruction::Initialize {}.data(),
+        my_program::accounts::Initialize {
+            payer: payer.pubkey(),
+            counter,
+            system_program: system_program::ID,
+        }
+        .to_account_metas(None),
+    );
+    ```
+  </div>
+
+  <div>
+    Le contexte de compte `Initialize` définit les comptes requis par
+    l'instruction `initialize`. Le test passe ces mêmes comptes au helper
+    `my_program::accounts::Initialize` généré :
+
+    - `payer` est passé en tant que
+      `payer: payer.pubkey()`.
+    - `counter` est passé en tant que
+      `counter`.
+    - `system_program` est passé en tant
+      que `system_program::ID`.
+
+    `my_program::instruction::Initialize {}.data()`
+    crée l'instruction data. C'est ici que les arguments d'instruction seraient
+    encodés, mais cette instruction `initialize` ne nécessite aucun argument.
+  </div>
+</Columns>
+
+<Columns cols={2}>
+  <div>
+    ```rust increment.rs highlight={8-9} wrap
+    #[derive(Accounts)]
+    pub struct Increment<'info> {
+        #[account(
+            mut,
+            seeds = [COUNTER_SEED],
+            bump
+        )]
+        pub counter: Account<'info, Counter>,
+        pub authority: Signer<'info>,
+    }
+    ```
+
+    ```rust test_initialize.rs highlight={5-6} wrap
+    let instruction = Instruction::new_with_bytes(
+        program_id,
+        &my_program::instruction::Increment {}.data(),
+        my_program::accounts::Increment {
+            counter,
+            authority: payer.pubkey(),
+        }
+        .to_account_metas(None),
+    );
+    ```
+  </div>
+
+  <div>
+    Le contexte de compte `Increment` définit les comptes requis par
+    l'instruction `increment`. Le test passe ces mêmes comptes au helper
+    `my_program::accounts::Increment` généré :
+
+    - `counter` est passé en tant que
+      `counter`.
+    - `authority` est passé en tant que
+      `authority: payer.pubkey()`.
+
+    `my_program::instruction::Increment {}.data()`
+    crée l'instruction data. C'est ici que les arguments d'instruction seraient
+    encodés, mais cette instruction `increment` ne nécessite aucun argument.
+  </div>
+</Columns>
+
+```rust programs/my-program/tests/test_initialize.rs wrap
+use {
+    anchor_lang::{
+        prelude::Pubkey,
+        solana_program::{instruction::Instruction, system_program},
+        AccountDeserialize, InstructionData, ToAccountMetas,
+    },
+    litesvm::LiteSVM,
+    solana_keypair::Keypair,
+    solana_message::{Message, VersionedMessage},
+    solana_signer::Signer,
+    solana_transaction::versioned::VersionedTransaction,
+};
+
+#[test]
+fn test_initialize() {
+    let program_id = my_program::id();
+    let payer = Keypair::new();
+    let counter = Pubkey::find_program_address(
+        &[my_program::constants::COUNTER_SEED],
+        &program_id,
+    )
+    .0;
+    let mut svm = LiteSVM::new();
+    let bytes = include_bytes!(concat!(
+        env!("CARGO_TARGET_TMPDIR"),
+        "/../deploy/my_program.so"
+    ));
+    svm.add_program(program_id, bytes).unwrap();
+    svm.airdrop(&payer.pubkey(), 1_000_000_000).unwrap();
+
+    let instruction = Instruction::new_with_bytes(
+        program_id,
+        &my_program::instruction::Initialize {}.data(),
+        my_program::accounts::Initialize {
+            payer: payer.pubkey(),
+            counter,
+            system_program: system_program::ID,
+        }
+        .to_account_metas(None),
+    );
+
+    let blockhash = svm.latest_blockhash();
+    let msg = Message::new_with_blockhash(&[instruction], Some(&payer.pubkey()), &blockhash);
+    let tx = VersionedTransaction::try_new(VersionedMessage::Legacy(msg), &[&payer]).unwrap();
+
+    let res = svm.send_transaction(tx);
+    assert!(res.is_ok());
+
+    let counter_account = svm.get_account(&counter).unwrap();
+    let mut data: &[u8] = &counter_account.data;
+    let counter_state = my_program::state::Counter::try_deserialize(&mut data).unwrap();
+    assert_eq!(counter_state.count, 0);
+    assert_eq!(counter_state.authority, payer.pubkey());
+
+    let instruction = Instruction::new_with_bytes(
+        program_id,
+        &my_program::instruction::Increment {}.data(),
+        my_program::accounts::Increment {
+            counter,
+            authority: payer.pubkey(),
+        }
+        .to_account_metas(None),
+    );
+
+    let blockhash = svm.latest_blockhash();
+    let msg = Message::new_with_blockhash(&[instruction], Some(&payer.pubkey()), &blockhash);
+    let tx = VersionedTransaction::try_new(VersionedMessage::Legacy(msg), &[&payer]).unwrap();
+
+    let res = svm.send_transaction(tx);
+    assert!(res.is_ok());
+
+    let counter_account = svm.get_account(&counter).unwrap();
+    let mut data: &[u8] = &counter_account.data;
+    let counter_state = my_program::state::Counter::try_deserialize(&mut data).unwrap();
+    assert_eq!(counter_state.count, 1);
+    assert_eq!(counter_state.authority, payer.pubkey());
+}
+```
+
+<Note>
+  **`litesvm::LiteSVM`**
+
+  `LiteSVM` est une VM Solana en cours de processus destinée aux tests. Elle
+  permet au test d'enregistrer le programme compilé, de créer des comptes,
+  d'envoyer des transactions et d'inspecter l'état des comptes sans démarrer un
+  processus validator.
+
+  **`let program_id`**
+
+  Le test récupère l'adresse du program account à partir de la valeur
+  `declare_id!` via `my_program::id()` et crée un nouveau keypair payeur
+  pour la transaction de test.
+
+  **`Pubkey::find_program_address`**
+
+  L'adresse du compteur est dérivée du même `COUNTER_SEED` utilisé par le
+  programme. Cela permet au test de cibler le PDA qu'`initialize.rs` attend.
+
+  **`include_bytes!`**
+
+  `include_bytes!` lit le fichier `my_program.so` compilé produit par la
+  compilation. Ces octets constituent le code exécutable du programme que LiteSVM
+  exécutera lors du test.
+
+  **`svm.add_program`**
+
+  `svm.add_program` enregistre les octets du programme compilé à l'adresse du
+  programme dans LiteSVM. Le parachutage donne au payeur suffisamment de SOL local
+  pour payer la transaction et la création du compte.
+
+  **`let instruction`**
+
+  `Instruction::new_with_bytes` crée une instruction pour invoquer le
+  programme. Elle inclut l'ID du programme, les instruction data et les comptes
+  d'instruction.
+
+  **`svm.latest_blockhash`**
+
+  Chaque transaction Solana nécessite un blockhash récent. Dans ce test, LiteSVM
+  fournit un blockhash à utiliser pour la transaction.
+
+  **`Message::new_with_blockhash`**
+
+  Le message contient l'instruction, le payeur des frais et le blockhash. Ce sont
+  les données de transaction qui seront signées.
+
+  **`VersionedTransaction::try_new`**
+
+  `VersionedTransaction::try_new` signe le message avec le keypair du payeur.
+  Le payeur signe car il règle les frais de transaction et finance le nouveau
+  compte compteur.
+
+  **`svm.send_transaction`**
+
+  `svm.send_transaction` exécute la transaction dans LiteSVM.
+
+  **`svm.get_account`**
+
+  Une fois la transaction exécutée, le test lit le compte compteur directement
+  depuis LiteSVM afin d'inspecter les données du compte.
+
+  **`Counter::try_deserialize`**
+
+  Le compte compteur stocke des données sérialisées.
+  `Counter::try_deserialize` vérifie le discriminateur de compte d'Anchor et
+  reconvertit les données du compte en type `Counter` depuis `state.rs`.
+
+  **`assert_eq!(counter_state.count, 0)`**
+
+  Une fois `initialize` réussi, le test désérialise le compte compteur et
+  vérifie que l'état initial correspond à ce que `handle_initialize` a écrit.
+
+  **`assert_eq!(counter_state.count, 1)`**
+
+  Une fois `increment` réussi, le même compte compteur devrait avoir
+  `count` défini à `1` tout en conservant la même autorité.
+</Note>
+
+## Configuration du projet
+
+Les fichiers racine du projet indiquent à Anchor et à Cargo comment compiler,
+tester et déployer le programme. Pour une référence complète, consultez la
+documentation Anchor pour la
+[configuration Anchor.toml](https://www.anchor-lang.com/docs/references/anchor-toml)
+et l'[Anchor CLI](https://www.anchor-lang.com/docs/references/cli).
+
+```toml Anchor.toml
+skip_local_validator = true
+
+[toolchain]
+
+[features]
+resolution = true
+skip-lint = false
+
+[programs.localnet]
+my_program = "82sFkffP9wxwpyfZyeaKHH2chQoJPUGsJZSPi9mrUuXd"
+
+[provider]
+cluster = "localnet"
+wallet = "~/.config/solana/id.json"
+
+[scripts]
+test = "cargo test"
+
+[hooks]
+```
+
+<Note>
+  **`skip_local_validator`**
+
+  `skip_local_validator = true` indique à Anchor de ne pas démarrer un validator
+  pour `anchor test`. Le test Rust utilise LiteSVM à la place.
+
+  **`programs.localnet`**
+
+  `[programs.localnet]` associe le nom de la crate Rust à l'adresse du programme
+  utilisée pour les builds et les tests locaux.
+
+  **`provider`**
+
+  `[provider]` définit le cluster et le portefeuille par défaut pour les commandes
+  telles que `anchor deploy`.
+
+  **`scripts`**
+
+  `[scripts]` modifie ce que `anchor test` exécute. Dans ce modèle, `anchor test`
+  exécute `cargo test`.
+</Note>

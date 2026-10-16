@@ -108,7 +108,7 @@ describe("bootcamp curriculum coverage", () => {
 
 describe("video-guides", () => {
   it("leaves no legacy component in any English video guide", () => {
-    const dir = path.join(docsRoot, "docs/video-guides");
+    const dir = path.join(docsRoot, "developers/docs/video-guides");
     for (const name of [
       "index",
       "2026-developer-bootcamp",
@@ -118,7 +118,7 @@ describe("video-guides", () => {
       "pay-sh-video-tutorials",
       "solana-crash-course",
     ]) {
-      const rel = `docs/video-guides/${name}.mdx`;
+      const rel = `developers/docs/video-guides/${name}.mdx`;
       const src = readFileSync(path.join(dir, `${name}.mdx`), "utf8");
       const r = run(videoGuides, src, {
         path: `apps/docs/${rel}`,
@@ -136,7 +136,7 @@ describe("video-guides", () => {
 
   it("rejects playlist-driven lists (would need a network fetch)", () => {
     const r = run(videoGuides, '<VideoChapterList playlistId="PL123" />\n', {
-      path: "apps/docs/docs/video-guides/x.mdx",
+      path: "apps/docs/developers/docs/video-guides/x.mdx",
       locale: "en",
       collection: "docs",
     });
@@ -175,22 +175,25 @@ describe("gen:tags", () => {
     writeFileSync(path.join(root, rel), text);
   };
   write(
-    "docs/tags/index.mdx",
+    "developers/docs/tags/index.mdx",
     "---\ntitle: Documentation tags\n# keep me\n---\n\nold body\n",
   );
-  write("fr/docs/tags/index.mdx", "---\ntitle: Tags\n---\n");
+  write("fr/developers/docs/tags/index.mdx", "---\ntitle: Tags\n---\n");
   write(
-    "docs/index.mdx",
+    "developers/docs/index.mdx",
     "---\ntitle: Start\ndescription: Begin {here}.\n---\n",
   );
-  write("fr/docs/index.mdx", "---\ntitle: Commencer\ndescription: Ici.\n---\n");
-  write("docs/payments/index.mdx", "---\ntitle: Payments\n---\n");
   write(
-    "docs/a.mdx",
+    "fr/developers/docs/index.mdx",
+    "---\ntitle: Commencer\ndescription: Ici.\n---\n",
+  );
+  write("developers/docs/payments/index.mdx", "---\ntitle: Payments\n---\n");
+  write(
+    "developers/docs/a.mdx",
     "---\ntitle: Page A\ndescription: About A.\ndocumentationTags: [Stablecoins, ' stablecoins ']\n---\n",
   );
   write(
-    "docs/b.mdx",
+    "developers/docs/b.mdx",
     "---\ntitle: Page B\ndocumentationTags:\n  - Agents\n  - Stablecoins\n---\n",
   );
 
@@ -198,10 +201,13 @@ describe("gen:tags", () => {
     const r = generateTags({ docsRoot: root });
     expect(r.ok).toBe(true);
     expect(r.written).toEqual([
-      "docs/tags/index.mdx",
-      "fr/docs/tags/index.mdx",
+      "developers/docs/tags/index.mdx",
+      "fr/developers/docs/tags/index.mdx",
     ]);
-    const en = readFileSync(path.join(root, "docs/tags/index.mdx"), "utf8");
+    const en = readFileSync(
+      path.join(root, "developers/docs/tags/index.mdx"),
+      "utf8",
+    );
     expect(
       en.startsWith(
         "---\ntitle: Documentation tags\n# keep me\n---\n\n{/* GENERATED",
@@ -210,30 +216,36 @@ describe("gen:tags", () => {
     expect(en).not.toContain("old body");
     expect(en.indexOf("## Agents")).toBeLessThan(en.indexOf("## Stablecoins"));
     expect(en).toContain(
-      '<Card title="Page A" href="/docs/a">\n    About A.\n  </Card>',
+      '<Card title="Page A" href="/developers/docs/a">\n    About A.\n  </Card>',
     );
     expect(en.match(/Page A/g)?.length).toBe(1); // duplicate tag folded
     expect(en).toContain("## Browse by section");
     expect(en).toContain(
-      '<Card title="Start here" href="/docs" icon="house">\n    Begin \\{here\\}.',
+      '<Card title="Start here" href="/developers/docs" icon="house">\n    Begin \\{here\\}.',
     );
     // Missing tab roots (e.g. not-yet-written hubs) are skipped.
-    expect(en).not.toContain("/docs/assets");
-    const fr = readFileSync(path.join(root, "fr/docs/tags/index.mdx"), "utf8");
+    expect(en).not.toContain("/developers/docs/assets");
+    const fr = readFileSync(
+      path.join(root, "fr/developers/docs/tags/index.mdx"),
+      "utf8",
+    );
     expect(fr).toContain(
-      '<Card title="Commencer" href="/fr/docs" icon="house">',
+      '<Card title="Commencer" href="/fr/developers/docs" icon="house">',
     );
     // Untranslated page -> English fallback.
-    expect(fr).toContain('href="/docs/payments"');
+    expect(fr).toContain('href="/developers/docs/payments"');
     expect(fr).not.toContain("## Browse by section");
   });
 
   it("is idempotent and --check reports drift", () => {
     expect(generateTags({ docsRoot: root, check: true }).ok).toBe(true);
-    write("docs/c.mdx", "---\ntitle: C\ndocumentationTags: [New]\n---\n");
+    write(
+      "developers/docs/c.mdx",
+      "---\ntitle: C\ndocumentationTags: [New]\n---\n",
+    );
     const r = generateTags({ docsRoot: root, check: true });
     expect(r.ok).toBe(false);
-    expect(r.written).toEqual(["docs/tags/index.mdx"]);
+    expect(r.written).toEqual(["developers/docs/tags/index.mdx"]);
   });
 
   it("reads tabs from navigation/<lang>.json when present", () => {
@@ -247,14 +259,16 @@ describe("gen:tags", () => {
             groups: [
               {
                 group: "x",
-                pages: [{ group: "g", root: "docs/index", pages: [] }],
+                pages: [
+                  { group: "g", root: "developers/docs/index", pages: [] },
+                ],
               },
             ],
           },
           {
             tab: "Hidden",
             hidden: true,
-            groups: [{ group: "h", pages: ["docs/a"] }],
+            groups: [{ group: "h", pages: ["developers/docs/a"] }],
           },
           { tab: "Video", href: "https://example.com" },
         ],
@@ -265,8 +279,13 @@ describe("gen:tags", () => {
       JSON.stringify({ tabs: { start: "Begin here" } }),
     );
     generateTags({ docsRoot: root, lang: "en" });
-    const en = readFileSync(path.join(root, "docs/tags/index.mdx"), "utf8");
-    expect(en).toContain('<Card title="Begin here" href="/docs" icon="house">');
+    const en = readFileSync(
+      path.join(root, "developers/docs/tags/index.mdx"),
+      "utf8",
+    );
+    expect(en).toContain(
+      '<Card title="Begin here" href="/developers/docs" icon="house">',
+    );
     expect(en).not.toContain('title="Payments"');
   });
 
@@ -285,15 +304,18 @@ describe("gen:tags", () => {
         path.join(dir, ".oxfmtrc.json"),
       );
       write(
-        "docs/long.mdx",
+        "developers/docs/long.mdx",
         "---\ntitle: A very long page title that pushes the opening Card tag past eighty columns\ndescription: Words words words words words words words words words words words words words words words.\ndocumentationTags: [Long]\n---\n",
       );
       write(
-        "docs/quoted.mdx",
+        "developers/docs/quoted.mdx",
         "---\ntitle: 'The \"quoted\" title of a long page that needs an expression attribute'\ndocumentationTags: [Long]\n---\n",
       );
       generateTags({ docsRoot: root, lang: "en" });
-      const want = readFileSync(path.join(root, "docs/tags/index.mdx"), "utf8");
+      const want = readFileSync(
+        path.join(root, "developers/docs/tags/index.mdx"),
+        "utf8",
+      );
       const file = path.join(dir, "page.mdx");
       writeFileSync(file, want);
       execFileSync(bin, [file], { cwd: dir, stdio: "ignore" });
@@ -305,7 +327,7 @@ describe("gen:tags", () => {
 
   it("defaults to the spec §2.2 tab roots", () => {
     expect(DEFAULT_TABS.map((t) => t.page)).toContain(
-      "docs/video-guides/index",
+      "developers/docs/video-guides/index",
     );
     expect(DEFAULT_TABS.length).toBe(8);
   });

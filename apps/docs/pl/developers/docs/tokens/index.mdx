@@ -1,0 +1,243 @@
+---
+title: Zasoby na Solanie
+description:
+  Learn how digital assets are represented on Solana using Token Programs, mint accounts, token accounts, and Token-2022 extensions.
+"og:title": Tokeny Solana, token account i Token Extensions
+"twitter:title": Tokeny Solana, token account i Token Extensions
+---
+
+Tokeny to cyfrowe aktywa reprezentujące własność różnych kategorii dóbr.
+Tokenizacja umożliwia cyfryzację praw własności. Tokeny na Solanie nazywane są
+tokenami SPL ([Solana Program Library](https://github.com/solana-program)).
+
+<Frame>
+  <img className="block dark:hidden" src="/docs-assets/assets/docs/diagrams/assets-overview-light.svg" alt="The Token Program updates a mint and its token accounts while owners authorize balance changes" />
+
+  <img className="hidden dark:block" src="/docs-assets/assets/docs/diagrams/assets-overview.svg" alt="The Token Program updates a mint and its token accounts while owners authorize balance changes" />
+
+  <img className="block dark:hidden" src="/docs-assets/assets/docs/diagrams/assets-overview-sm-light.svg" alt="The Token Program updates a mint and its token accounts while owners authorize balance changes" />
+
+  <img className="hidden dark:block" src="/docs-assets/assets/docs/diagrams/assets-overview-sm.svg" alt="The Token Program updates a mint and its token accounts while owners authorize balance changes" />
+</Frame>
+
+<Columns cols={2}>
+  <Card title="Utwórz token za pomocą CLI" href="/developers/docs/tokens/quickstart">
+    Utwórz mint, wyemituj podaż i transferuj tokeny w sieci devnet bezpośrednio z przeglądarki.
+  </Card>
+</Columns>
+
+Ta sekcja omawia podstawowe pojęcia dotyczące reprezentacji tokenów na Solanie.
+Zobacz sekcję [Podstawy tokenów SPL](/developers/docs/tokens/basics) po przykłady kodu.
+
+## Kluczowe informacje
+
+- [Token Programs](#token-programy) zawierają całą logikę instrukcji do
+  interakcji z tokenami w sieci (zarówno zamiennymi, jak i niezamiennymi).
+
+- [Mint Account](#mint-account) reprezentuje konkretny token i przechowuje
+  globalne metadane o tokenie, takie jak całkowita podaż i autorytet mint (adres
+  uprawniony do tworzenia nowych jednostek tokena).
+
+- [Token Account](#konto-tokena) śledzi indywidualną własność tokenów dla
+  konkretnego mint account i właściciela.
+
+- [Associated Token Account](#powiązane-konto-tokena) to Token Account
+  utworzony z adresem pochodzącym od adresów właściciela i mint account.
+
+## Token Programy
+
+Ekosystem Solany posiada dwa główne Token Programy. Poniżej znajduje się kod
+źródłowy obu programów.
+
+<Columns cols={2}>
+  <Card title="Token Program (Oryginalny)" href="https://github.com/solana-program/token">
+   - Podstawowe możliwości tokenów (mint, transfer itd.)
+   - Niezmienny i szeroko używany
+  </Card>
+
+  <Card title="Token Extension Program (Token 2022)" href="https://github.com/solana-program/token-2022">
+   - Zawiera wszystkie funkcje oryginalnego Token Programu
+   - Dodaje funkcje poprzez "rozszerzenia"
+  </Card>
+</Columns>
+
+Token Programs zawiera całą logikę instrukcji służącą do interakcji z tokenami w
+sieci (zarówno zamiennymi, jak i niezamiennymi). Wszystkie tokeny na Solanie są
+w istocie [kontami danych](/developers/docs/core/accounts/account-types#data-accounts) będącymi własnością
+Token Program.
+
+<Frame caption="Token Program">
+  <img className="block dark:hidden" src="/docs-assets/assets/docs/core/tokens/token-program-light.svg" alt="Token Program" />
+
+  <img className="hidden dark:block" src="/docs-assets/assets/docs/core/tokens/token-program.svg" alt="Token Program" />
+
+  <img className="block dark:hidden" src="/docs-assets/assets/docs/core/tokens/token-program-sm-light.svg" alt="Token Program" />
+
+  <img className="hidden dark:block" src="/docs-assets/assets/docs/core/tokens/token-program-sm.svg" alt="Token Program" />
+</Frame>
+
+### Mint Account
+
+Tokeny na Solanie są jednoznacznie identyfikowane przez adres
+[Mint Account](https://github.com/solana-program/token/blob/6d18ff73b1dd30703a30b1ca941cb0f1d18c2b2a/program/src/state.rs#L16-L30)
+należący do Token Programu. To konto działa jako globalny licznik dla danego
+tokena i przechowuje takie dane jak:
+
+- **Supply**: Całkowita podaż tokena
+- **Decimals**: Precyzja dziesiętna tokena
+- **Mint authority**: Konto uprawnione do tworzenia nowych jednostek tokena,
+  zwiększając podaż
+- **Freeze authority**: Konto uprawnione do zamrażania tokenów na Token Account,
+  uniemożliwiając ich transfer lub spalanie
+
+Uprawnienie do mintowania (mint authority) jest konfigurowane podczas inicjalizacji minta. Autoryzuje ono przyszłe mintowanie, jednak konto posiadające to uprawnienie nie musi być tym samym kontem, które utworzyło mint account lub pokryło koszty jego utworzenia.
+
+<Frame caption="Konto mint">
+  <img className="block dark:hidden" src="/docs-assets/assets/docs/core/tokens/mint-account-light.svg" alt="Konto mint" />
+
+  <img className="hidden dark:block" src="/docs-assets/assets/docs/core/tokens/mint-account.svg" alt="Konto mint" />
+
+  <img className="block dark:hidden" src="/docs-assets/assets/docs/core/tokens/mint-account-sm-light.svg" alt="Konto mint" />
+
+  <img className="hidden dark:block" src="/docs-assets/assets/docs/core/tokens/mint-account-sm.svg" alt="Konto mint" />
+</Frame>
+
+Pełne dane przechowywane na każdym koncie mint obejmują następujące informacje:
+
+```rust title="Mint Account State"
+pub struct Mint {
+    /// Optional authority used to mint new tokens. The mint authority may only
+    /// be provided during mint creation. If no mint authority is present
+    /// then the mint has a fixed supply and no further tokens may be
+    /// minted.
+    pub mint_authority: COption<Pubkey>,
+    /// Total supply of tokens.
+    pub supply: u64,
+    /// Number of base 10 digits to the right of the decimal place.
+    pub decimals: u8,
+    /// Is `true` if this structure has been initialized
+    pub is_initialized: bool,
+    /// Optional authority to freeze token accounts.
+    pub freeze_authority: COption<Pubkey>,
+}
+```
+
+Dla odniesienia, oto link do Solana Explorer z
+[USDC Mint Account](https://explorer.solana.com/address/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v).
+
+### Konto tokena
+
+Token Program tworzy
+[Token Accounts](https://github.com/solana-program/token/blob/6d18ff73b1dd30703a30b1ca941cb0f1d18c2b2a/program/src/state.rs#L87-L108),
+aby śledzić indywidualną własność każdej jednostki tokena. Token Account
+przechowuje dane takie jak:
+
+- **Mint**: Token, którego jednostki przechowuje Token Account
+- **Owner**: Konto uprawnione do transferu tokenów z Token Account
+- **Amount**: Liczba tokenów aktualnie przechowywanych na Token Account
+
+<Frame caption="Konto tokena">
+  <img className="block dark:hidden" src="/docs-assets/assets/docs/core/tokens/token-account-light.svg" alt="Konto tokena" />
+
+  <img className="hidden dark:block" src="/docs-assets/assets/docs/core/tokens/token-account.svg" alt="Konto tokena" />
+
+  <img className="block dark:hidden" src="/docs-assets/assets/docs/core/tokens/token-account-sm-light.svg" alt="Konto tokena" />
+
+  <img className="hidden dark:block" src="/docs-assets/assets/docs/core/tokens/token-account-sm.svg" alt="Konto tokena" />
+</Frame>
+
+Pełne dane przechowywane na każdym koncie tokena obejmują następujące
+informacje:
+
+```rust title="Token Account State"
+pub struct Account {
+    /// The mint associated with this account
+    pub mint: Pubkey,
+    /// The owner of this account.
+    pub owner: Pubkey,
+    /// The amount of tokens this account holds.
+    pub amount: u64,
+    /// If `delegate` is `Some` then `delegated_amount` represents
+    /// the amount authorized by the delegate
+    pub delegate: COption<Pubkey>,
+    /// The account's state
+    pub state: AccountState,
+    /// If is_native.is_some, this is a native token, and the value logs the
+    /// rent-exempt reserve. An Account is required to be rent-exempt, so
+    /// the value is used by the Processor to ensure that wrapped SOL
+    /// accounts do not drop below this threshold.
+    pub is_native: COption<u64>,
+    /// The amount delegated
+    pub delegated_amount: u64,
+    /// Optional authority to close the account.
+    pub close_authority: COption<Pubkey>,
+}
+```
+
+Portfel potrzebuje osobnego konta tokena dla każdego tokena (mint), który chce
+przechowywać, z adresem portfela ustawionym jako właściciel konta tokena. Każdy
+portfel może posiadać wiele kont tokena dla tego samego tokena (mint), ale konto
+tokena może mieć tylko jednego właściciela i przechowywać jednostki tylko
+jednego tokena (mint).
+
+<Frame caption="Relacja kont">
+  <img className="block dark:hidden" src="/docs-assets/assets/docs/core/tokens/token-account-relationship-light.svg" alt="Relacja kont" />
+
+  <img className="hidden dark:block" src="/docs-assets/assets/docs/core/tokens/token-account-relationship.svg" alt="Relacja kont" />
+
+  <img className="block dark:hidden" src="/docs-assets/assets/docs/core/tokens/token-account-relationship-sm-light.svg" alt="Relacja kont" />
+
+  <img className="hidden dark:block" src="/docs-assets/assets/docs/core/tokens/token-account-relationship-sm.svg" alt="Relacja kont" />
+</Frame>
+
+<Info>
+
+Zauważ, że dane każdego token account zawierają pole `owner` wskazujące, kto posiada uprawnienia do tego token account. Różni się to od właściciela programu określonego w bazowym typie
+[Account](/developers/docs/core/accounts/account-structure#account-fields), którym
+jest Token Program dla wszystkich token accounts.
+
+</Info>
+
+### Powiązane konto tokena
+
+Powiązane konta tokenowe upraszczają proces znajdowania adresu konta tokenowego
+dla konkretnego mintu i właściciela. Możesz traktować powiązane konto tokenowe
+jako „domyślne” konto tokenowe dla danego mintu i właściciela.
+
+Powiązane konto tokenowe jest tworzone z adresem wyprowadzonym z adresu
+właściciela i adresu konta mint. Ważne jest, aby zrozumieć, że powiązane konto
+tokenowe to po prostu konto tokenowe o określonym adresie.
+
+Utworzenie ATA wymaga minimalnego salda podlegającego zwrotowi na potrzeby przechowywania konta.
+Płatnik instrukcji finansuje to saldo, nawet jeśli właścicielem ATA jest inny portfel.
+Siehe
+[Koszt ATA i płatnik](/developers/docs/tokens/basics/create-token-account#cost-and-payer)
+aby poznać aktualne koszty i różnice w rozmiarach Token-2022.
+
+To wprowadza kluczowe pojęcie w programowaniu na Solanie:
+[Program Derived Address (PDA)](/developers/docs/core/pda). PDA wyprowadza adres
+deterministycznie na podstawie zdefiniowanych danych wejściowych, co ułatwia
+znalezienie adresu konta.
+
+<Frame caption="Powiązane konto tokenowe">
+  <img className="block dark:hidden" src="/docs-assets/assets/docs/core/tokens/associated-token-account-light.svg" alt="Powiązane konto tokenowe" />
+
+  <img className="hidden dark:block" src="/docs-assets/assets/docs/core/tokens/associated-token-account.svg" alt="Powiązane konto tokenowe" />
+
+  <img className="block dark:hidden" src="/docs-assets/assets/docs/core/tokens/associated-token-account-sm-light.svg" alt="Powiązane konto tokenowe" />
+
+  <img className="hidden dark:block" src="/docs-assets/assets/docs/core/tokens/associated-token-account-sm.svg" alt="Powiązane konto tokenowe" />
+</Frame>
+
+Pamiętaj, że każdy portfel potrzebuje własnego konta tokenowego, aby
+przechowywać tokeny z tego samego mintu.
+
+<Frame caption="Rozszerzone relacje kont">
+  <img className="block dark:hidden" src="/docs-assets/assets/docs/core/tokens/token-account-relationship-ata-light.svg" alt="Rozszerzone relacje kont" />
+
+  <img className="hidden dark:block" src="/docs-assets/assets/docs/core/tokens/token-account-relationship-ata.svg" alt="Rozszerzone relacje kont" />
+
+  <img className="block dark:hidden" src="/docs-assets/assets/docs/core/tokens/token-account-relationship-ata-sm-light.svg" alt="Rozszerzone relacje kont" />
+
+  <img className="hidden dark:block" src="/docs-assets/assets/docs/core/tokens/token-account-relationship-ata-sm.svg" alt="Rozszerzone relacje kont" />
+</Frame>

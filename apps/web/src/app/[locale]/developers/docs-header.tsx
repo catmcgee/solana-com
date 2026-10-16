@@ -23,7 +23,7 @@ import {
 
 /**
  * The docs (Mintlify) header, rebuilt for the /developers landing so moving
- * between /developers and /docs feels like one site. It matches
+ * between /developers and /developers/docs feels like one site. It matches
  * apps/docs/styles/theme.css sections 4-5b at every breakpoint (styles in
  * developers.css, "Docs header"):
  * - >= 1280px: one 4rem row: logo | tabs ... Video tutorials | search,
@@ -108,7 +108,7 @@ export async function DocsHeader({ locale }: { locale: string }) {
     namespace: "developers.landing.header",
   });
   const tabs = getDocsTabs(locale);
-  const docsRoot = localizedHref(locale, "/docs");
+  const docsRoot = localizedHref(locale, "/developers/docs");
   const toggle = { toDark: t("toDark"), toLight: t("toLight") };
 
   return (
