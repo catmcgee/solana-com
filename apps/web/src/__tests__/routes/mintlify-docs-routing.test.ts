@@ -97,8 +97,8 @@ describe("Mintlify rewrites", () => {
       `${M}/developers/docs/core/accounts.md`,
     );
     expectRewrite(
-      "/developers/docs/intro/quick-start/build-first-program",
-      `${M}/developers/docs/intro/quick-start/build-first-program`,
+      "/developers/docs/programs/build-first-program",
+      `${M}/developers/docs/programs/build-first-program`,
     );
   });
 

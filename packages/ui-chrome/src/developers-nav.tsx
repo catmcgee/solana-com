@@ -52,15 +52,6 @@ type DocsTab = {
   external?: boolean;
 };
 
-/** developers/docs/tools sections that the Mintlify nav files under a domain tab. */
-const PAYMENTS_TOOLS = [
-  "/developers/docs/tools/commerce-kit",
-  "/developers/docs/tools/kora",
-  "/developers/docs/tools/solana-pay",
-  "/developers/docs/tools/x402-facilitator",
-];
-const ASSETS_TOOLS = ["/developers/docs/tools/attestations"];
-
 /**
  * The docs tabs, in the order of the Mintlify tab bar (apps/docs
  * navigation/en.json): Start here · Payments · Assets · Markets | How Solana
@@ -73,7 +64,7 @@ export const DOCS_TABS: DocsTab[] = [
     Icon: StartIcon,
     match: [
       "/developers/docs/finance",
-      "/developers/docs/from-ethereum",
+      "/developers/docs/intro/coding-with-agents",
       "/developers/docs/research",
     ],
     ignore: [
@@ -97,17 +88,12 @@ export const DOCS_TABS: DocsTab[] = [
     label: "payments",
     to: "/developers/docs/payments",
     Icon: PaymentsIcon,
-    match: PAYMENTS_TOOLS,
   },
   {
     label: "assets",
     to: "/developers/docs/assets",
     Icon: AssetsIcon,
-    match: [
-      "/developers/docs/tokens",
-      "/developers/docs/tokenization",
-      ...ASSETS_TOOLS,
-    ],
+    match: ["/developers/docs/tokens", "/developers/docs/tokenization"],
   },
   {
     label: "markets",
@@ -125,12 +111,14 @@ export const DOCS_TABS: DocsTab[] = [
     label: "resources",
     to: "/developers/docs/tools",
     Icon: ResourcesIcon,
+    // Every developers/docs/tools page is under Resources > Tools.
     match: [
-      "/developers/docs/intro",
+      "/developers/docs/from-evm",
+      "/developers/docs/intro/installation",
+      "/developers/docs/intro/quick-start",
       "/developers/docs/programs",
       "/developers/docs/frontend",
     ],
-    ignore: [...PAYMENTS_TOOLS, ...ASSETS_TOOLS],
   },
   {
     label: "rpc",
@@ -142,6 +130,7 @@ export const DOCS_TABS: DocsTab[] = [
     label: "videoTutorials",
     to: "/developers/docs/video-guides",
     Icon: VideoIcon,
+    match: ["/developers/bootcamp"],
     external: true,
   },
 ];

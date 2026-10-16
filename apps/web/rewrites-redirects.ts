@@ -338,7 +338,7 @@ const movedDocsRedirects: RedirectInput[] = withMdVariants([
   },
   {
     source: "/docs/intro/quick-start/deploying-programs",
-    destination: "/developers/docs/intro/quick-start/build-first-program",
+    destination: "/developers/docs/programs/build-first-program",
   },
   {
     source: "/docs/intro/quick-start/program-derived-address",
@@ -412,6 +412,26 @@ const movedDocsRedirects: RedirectInput[] = withMdVariants([
   {
     source: "/docs/tools/solana-pay/quickstart",
     destination: "/developers/docs/tools/solana-pay#quick-start",
+  },
+  // Start here / Resources reorganisation (2026-10-16). "Coming from
+  // Ethereum" became "Coming from EVM" (Resources > Set up), and the program
+  // quickstart moved under Write programs. Both the pre-move /docs URL and
+  // the /developers/docs URL it had for a day redirect.
+  {
+    source: "/docs/from-ethereum",
+    destination: "/developers/docs/from-evm",
+  },
+  {
+    source: "/developers/docs/from-ethereum",
+    destination: "/developers/docs/from-evm",
+  },
+  {
+    source: "/docs/intro/quick-start/build-first-program",
+    destination: "/developers/docs/programs/build-first-program",
+  },
+  {
+    source: "/developers/docs/intro/quick-start/build-first-program",
+    destination: "/developers/docs/programs/build-first-program",
   },
 ]);
 

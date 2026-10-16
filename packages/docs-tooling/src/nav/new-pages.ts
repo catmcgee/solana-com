@@ -43,15 +43,14 @@ const path1 = (base: string, steps: [string, string, string][]): NewPage[] =>
   }));
 
 export const NEW_PAGES: readonly NewPage[] = [
-  // Start here
+  // Resources > Set up (was "Coming from Ethereum" under Start here)
   {
-    page: "developers/docs/from-ethereum",
-    title: "Coming from Ethereum",
+    page: "developers/docs/from-evm",
+    title: "Coming from EVM",
     description:
       "How EVM concepts map onto Solana: accounts vs contract storage, programs vs contracts, fees and finality.",
     kind: "hub",
-    brief:
-      "Coming from Ethereum; link to /developers/migrate-to-solana/ethereum.",
+    brief: "Coming from EVM; link to /developers/migrate-to-solana/ethereum.",
   },
   // Payments. The pay-per-call hub (developers/docs/payments/pay-per-call) was merged
   // into developers/docs/payments/agentic-payments/index, an existing page

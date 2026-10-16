@@ -36,7 +36,7 @@ export const IA_TEMPLATE: TemplateTab[] = [
         pages: [
           "developers/docs/index",
           "developers/docs/finance/index", // sidebarTitle: All use cases
-          "developers/docs/from-ethereum",
+          "developers/docs/from-evm",
         ],
       },
     ],
