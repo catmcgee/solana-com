@@ -18,20 +18,20 @@ description: Architecture and data flow of the Private Channels protocol
 
 ## Architecture
 
-Private Channels is composed of four components: two on-chain Solana programs
-(Escrow and Withdraw) and two off-chain services (Gateway and Auth Service).
+Private Channels is composed of four components: two onchain Solana programs
+(Escrow and Withdraw) and two offchain services (Gateway and Auth Service).
 Together they form a state channel protocol where funds live on Mainnet but
-transfers settle off-chain.
+transfers settle offchain.
 
 ### Escrow Program
 
-The Escrow Program is an on-chain Solana program that holds deposited SPL
+The Escrow Program is an onchain Solana program that holds deposited SPL
 tokens. It is the trust anchor of the system: all funds ultimately live in
 escrow until an operator provides a valid Sparse Merkle Tree exclusion proof to
 release them.
 
 - Program ID: `9tgHa1DcnaSSUtmMsst8ovKTe1Gfxzezn27KnH9xXYeU`
-- This ID is compiled into the program binary via `declare_id!()`. Off-chain
+- This ID is compiled into the program binary via `declare_id!()`. Offchain
   services read the same ID at compile time from the generated client crate, not
   from an environment variable.
 - Manages `Instance`, `AllowedMint`, and `Operator` PDAs
@@ -47,7 +47,7 @@ withdrawal is pending. The operator then calls `ReleaseFunds` on the Escrow
 Program with a valid SMT proof to complete settlement.
 
 - Program ID: `J231K9UEpS4y4KAPwGc4gsMNCjKFRMYcQBcjVW7vBhVi`
-- This ID is compiled into the program binary. Off-chain services read the same
+- This ID is compiled into the program binary. Offchain services read the same
   ID at compile time from the generated client crate, not from an environment
   variable.
 
@@ -171,7 +171,7 @@ their state is committed:
 3. **Sequencer** - orders valid transactions deterministically to establish a
    canonical history
 4. **Executor** - executes transactions against the channel's accounts layer
-   (BOB Cache + AccountsDB), updating balances off-chain
+   (BOB Cache + AccountsDB), updating balances offchain
 5. **Settler** - commits accumulated transaction results to PostgreSQL and
    updates the Redis cache; generates new blockhashes for the next block cycle.
    Mainnet settlement (calling `ReleaseFunds`) is handled separately by the
@@ -183,22 +183,22 @@ their state is committed:
 
 Transfers between channel participants are not recorded on Solana Mainnet. Only
 deposits (entering the channel) and final withdrawals (leaving the channel)
-appear on-chain. Counterparty identities and transfer amounts are not visible to
+appear onchain. Counterparty identities and transfer amounts are not visible to
 outside observers during channel operation.
 
 ### Performance
 
-The off-chain pipeline removes Solana's block time from the critical path.
+The offchain pipeline removes Solana's block time from the critical path.
 Transfers confirm when the sequencer processes them, not when a Solana block
 confirms. This enables sub-second finality and throughput beyond Solana's native
 TPS for app-layer transfers.
 
 ### Settlement
 
-Every withdrawal is protected by an on-chain Sparse Merkle Tree proof. The SMT
+Every withdrawal is protected by an onchain Sparse Merkle Tree proof. The SMT
 root is stored in `Instance.withdrawal_transactions_root` on the Escrow Program.
 When `ReleaseFunds` is called, the program first verifies an exclusion proof for
-an unseen nonce against the current on-chain root, then verifies a separate
+an unseen nonce against the current onchain root, then verifies a separate
 inclusion proof for that nonce against the caller-supplied new root. Only after
 both checks pass does it store the new root, making double-spend impossible even
 if an operator key is compromised.
@@ -211,12 +211,12 @@ enables arbitrary operator provisioning. `SetNewAdmin` transfers admin authority
 irreversibly in a single step; protect the admin key accordingly.
 
 **Operator keys** - can call `ReleaseFunds` and `ResetSmtRoot`. They cannot
-release funds without a valid SMT exclusion proof against the current on-chain
-root. The on-chain `verify_smt_exclusion_proof` check is the last line of
+release funds without a valid SMT exclusion proof against the current onchain
+root. The onchain `verify_smt_exclusion_proof` check is the last line of
 defense against unauthorized withdrawals: a compromised operator key alone is
 not sufficient to drain the escrow.
 
-**SMT root** - stored on-chain in `Instance.withdrawal_transactions_root`.
+**SMT root** - stored onchain in `Instance.withdrawal_transactions_root`.
 Updated atomically with each `ReleaseFunds` call. Because each proof must
 reference an unseen nonce, double-spending the same channel balance is
 impossible even if an operator key is compromised.
@@ -229,17 +229,17 @@ cycles.
 ## Operational Key Security
 
 <Warning>
-  The off-chain services use their own signer vocabulary, which is unrelated to
-  the on-chain admin/operator authorities described in the Security Model above.
+  The offchain services use their own signer vocabulary, which is unrelated to
+  the onchain admin/operator authorities described in the Security Model above.
   `ADMIN_PRIVATE_KEY` is required for every operator service and pays
   transaction fees; a separate, optional `OPERATOR_PRIVATE_KEY` supplies the
-  on-chain Operator signature for `ReleaseFunds` and `ResetSmtRoot`, and falls
+  onchain Operator signature for `ReleaseFunds` and `ResetSmtRoot`, and falls
   back to `ADMIN_PRIVATE_KEY`'s value when unset. Never put the protocol-level
   instance admin key (used for `CreateInstance` / `AddOperator` / `SetNewAdmin`)
   into either variable or expose it at runtime; keep that key cold and offline.
 </Warning>
 
-`ReleaseFunds` and `ResetSmtRoot` require two on-chain signatures: the fee payer
+`ReleaseFunds` and `ResetSmtRoot` require two onchain signatures: the fee payer
 (from `ADMIN_PRIVATE_KEY`) and the Operator PDA's authority (from
 `OPERATOR_PRIVATE_KEY`, or `ADMIN_PRIVATE_KEY` if that's unset). This deployment
 guide's devnet walkthrough puts the generated operator keypair into
@@ -275,7 +275,7 @@ not call it without verifying the target address.
     title="Sparse Merkle Tree"
     href="/developers/docs/tools/private-channels/concepts/smt"
   >
-    Understand how withdrawal proofs are verified on-chain.
+    Understand how withdrawal proofs are verified onchain.
   </Card>
   <Card
     title="Instructions"

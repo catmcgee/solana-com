@@ -105,7 +105,7 @@ export const RUNBOOK_SECTIONS = [
             <tr><td>Modules and/or CosmWasm contracts</td><td>Programs</td></tr>
             <tr><td>Module KV stores and shared chain state</td><td>Program-owned accounts and PDAs</td></tr>
             <tr><td>Governance proposal plus chain upgrade</td><td>Governance-controlled authorities and program upgrades</td></tr>
-            <tr><td>Validator set operated by the app chain</td><td>Shared Solana validator set; app teams operate programs and off-chain services</td></tr>
+            <tr><td>Validator set operated by the app chain</td><td>Shared Solana validator set; app teams operate programs and offchain services</td></tr>
             <tr><td>Cross-module or contract invocation</td><td>CPI with explicit account metas</td></tr>
             <tr><td>IBC interoperability</td><td>Bridge or protocol-specific cross-chain integration</td></tr>
             <tr><td>Bech32-encoded account addresses, typically backed by secp256k1 account keys</td><td>Base58-encoded Ed25519 wallet addresses</td></tr>
@@ -154,7 +154,7 @@ Migration plan:
 - Unclaimed token policy</code></pre>
       <h3>Recommended timeline</h3>
       <pre><code class="language-text">Day 0:   Public announcement and forum proposal
-Day 14:  On-chain governance vote opens
+Day 14:  Onchain governance vote opens
 Day 21:  Governance vote closes
 Day 28:  Migration portal opens and exchange work begins
 Day 90:  Chain halts at the pre-announced block height
@@ -228,13 +228,13 @@ The chain will halt at block HEIGHT on DATE.
     tone: "phase",
     html: `
       <h2>4. Phase 2: Token Migration Architecture</h2>
-      <p>For most chain shutdowns, the cleanest design is a snapshot-driven Merkle tree claimer on Solana. Instead of keeping a bridge alive after the Cosmos chain halts, you finalize balances off-chain, commit one Merkle root on Solana, fund a claim vault, and let each user prove their entitlement once.</p>
+      <p>For most chain shutdowns, the cleanest design is a snapshot-driven Merkle tree claimer on Solana. Instead of keeping a bridge alive after the Cosmos chain halts, you finalize balances offchain, commit one Merkle root on Solana, fund a claim vault, and let each user prove their entitlement once.</p>
       <p>A Merkle root is a compact cryptographic commitment to the full claims file. A claim vault is a <a href="/developers/docs/tokens/basics/create-token-account#what-is-an-associated-token-account">token account</a> funded with the migration supply. The claim <a href="/developers/docs/core/programs">program</a> verifies each proof, releases the right <a href="/developers/docs/tokens">SPL token</a> amount, and records that the claim is complete. A working reference is available in the <a href="https://github.com/solana-foundation/program-examples/tree/main/tokens/merkle-tree-token-claimer" target="_blank" rel="noreferrer">example Merkle token claimer</a>.</p>
       <h3>Recommended architecture: Merkle tree claimer</h3>
       <ul>
         <li>Take a final Cosmos snapshot and normalize the balance dataset you intend to honor.</li>
         <li>Convert each claim into a deterministic leaf such as <code>{index, cosmos_address, solana_address, amount}</code> or <code>{index, recipient, amount}</code>.</li>
-        <li>Build the Merkle tree off-chain and publish the root plus the full snapshot artifact for community review.</li>
+        <li>Build the Merkle tree offchain and publish the root plus the full snapshot artifact for community review.</li>
         <li>Deploy a Solana claim program that stores the Merkle root, vault <a href="/developers/docs/references/terminology#authority">authority</a>, <a href="/developers/docs/references/terminology#token-mint">token mint</a> or token-vault accounts, and claim window.</li>
         <li>Require each claimant to submit their amount, leaf index, and Merkle proof, then mark that leaf as claimed in onchain state.</li>
       </ul>
@@ -298,7 +298,7 @@ pub struct ClaimStatus {
       <ul>
         <li>You only need one canonical balance export, not a live cross-chain relay after shutdown.</li>
         <li>Anyone can audit the published claims file and recompute the Merkle root before launch.</li>
-        <li>The on-chain program stays small: proof verification, token release, and replay protection.</li>
+        <li>The onchain program stays small: proof verification, token release, and replay protection.</li>
         <li>Support operations get simpler because each failed claim is tied to a specific leaf, proof, and recipient address.</li>
       </ul>
       <h3>Unclaimed token policy</h3>
@@ -417,7 +417,7 @@ pub struct VestingSchedule {
       </ul>
       <p>You do not have to design this from scratch. The Solana developer bootcamp's <a href="https://github.com/solana-developers/developer-bootcamp-2024/tree/main/project-8-token-vesting" target="_blank" rel="noreferrer">token-vesting project</a> is a buildable Anchor program with exactly this instruction shape — create the schedule accounts, then a Clock-driven claim with cliff handling — and Bonfida's <a href="https://github.com/Bonfida/token-vesting" target="_blank" rel="noreferrer">token-vesting program</a> is a Kudelski-audited implementation deployed on mainnet. If your exported schedules are standard cliff-plus-linear shapes, also consider loading them into an existing vesting product such as <a href="https://lock.jup.ag" target="_blank" rel="noreferrer">Jupiter Lock</a> or <a href="https://streamflow.finance" target="_blank" rel="noreferrer">Streamflow</a> instead of operating a custom program.</p>
       <h3>NFT migration</h3>
-      <p>CW721 metadata is closer to Solana's than it looks. A CW721 token points at off-chain JSON through <code>token_uri</code> (or stores the same fields on-chain in its metadata extension), and those fields follow the OpenSea-style standard. <a href="https://www.metaplex.com/docs/smart-contracts/core/json-schema#json-schema-fields" target="_blank" rel="noreferrer">Metaplex JSON</a> shares the core fields, so <code>name</code>, <code>description</code>, <code>image</code>, <code>animation_url</code>, <code>external_url</code>, and <code>attributes</code> usually carry over unchanged — a well-formed existing <code>token_uri</code> can often be reused as-is.</p>
+      <p>CW721 metadata is closer to Solana's than it looks. A CW721 token points at offchain JSON through <code>token_uri</code> (or stores the same fields onchain in its metadata extension), and those fields follow the OpenSea-style standard. <a href="https://www.metaplex.com/docs/smart-contracts/core/json-schema#json-schema-fields" target="_blank" rel="noreferrer">Metaplex JSON</a> shares the core fields, so <code>name</code>, <code>description</code>, <code>image</code>, <code>animation_url</code>, <code>external_url</code>, and <code>attributes</code> usually carry over unchanged — a well-formed existing <code>token_uri</code> can often be reused as-is.</p>
       <p>Map the differences deliberately: Metaplex JSON also expects a <code>category</code> and a <code>properties.files</code> array with a URI and MIME type per file; royalty configuration moves out of the JSON into onchain royalty settings such as the Metaplex Core Royalties Plugin; and CW721-only fields like <code>background_color</code> and <code>youtube_url</code> have no direct equivalent. Re-host any metadata or media you do not control on durable storage before the source chain halts.</p>
       <ul>
         <li>Pick the <a href="/developers/docs/tokens/metaplex">Solana NFT or digital-asset standard</a> before writing claim logic. For large collections, <a href="https://www.metaplex.com/docs/smart-contracts/bubblegum-v2" target="_blank" rel="noreferrer">Bubblegum compressed NFTs</a> keep mass minting affordable — on the order of 5 SOL all-in for a million assets — but wallets and marketplaces read them through DAS-API indexers rather than plain account fetches, so confirm your target tooling supports them first.</li>
@@ -442,7 +442,7 @@ pub struct VestingSchedule {
         <li><strong>Transaction envelopes are bounded:</strong> large claims, proof payloads, or fan-out jobs may need to be chunked across multiple instructions or batches.</li>
         <li><strong>Compute per transaction is finite:</strong> expensive verification or multi-program flows need budgeting and profiling before production rollout.</li>
         <li><strong>Operational jobs must be restartable:</strong> large migrations should assume retries, partial completion, and resumable execution.</li>
-        <li><strong>Read models often move off-chain:</strong> dashboards, audits, and support tools usually depend on indexed account data rather than on-chain query entrypoints.</li>
+        <li><strong>Read models often move offchain:</strong> dashboards, audits, and support tools usually depend on indexed account data rather than onchain query entrypoints.</li>
       </ul>
     `,
   },
@@ -453,7 +453,7 @@ pub struct VestingSchedule {
     html: `
       <h2>8. Phase 5: Governance Migration</h2>
       <p><a href="https://realms.today" target="_blank" rel="noreferrer">Realms</a> is the main DAO and treasury-management interface for Solana. It sits on top of <a href="https://github.com/solana-labs/solana-program-library/tree/master/governance" target="_blank" rel="noreferrer">SPL Governance</a>, the Solana governance program, and gives you proposal workflows, voting configuration, DAO treasuries, and governed execution for actions such as treasury transfers and <a href="/developers/docs/core/programs/program-deployment">program upgrades</a>.</p>
-      <p>If your Cosmos chain used on-chain governance for signaling, treasury control, or upgrade approval, the closest Solana-native destination is usually a Realm plus one or more governed treasuries. The migration is not one-to-one: Cosmos governance controls chain state, while Solana governance usually controls assets, program authorities, and operational workflows.</p>
+      <p>If your Cosmos chain used onchain governance for signaling, treasury control, or upgrade approval, the closest Solana-native destination is usually a Realm plus one or more governed treasuries. The migration is not one-to-one: Cosmos governance controls chain state, while Solana governance usually controls assets, program authorities, and operational workflows.</p>
       <div class="overflow-x-auto">
         <table>
           <thead>
@@ -463,7 +463,7 @@ pub struct VestingSchedule {
             </tr>
           </thead>
           <tbody>
-            <tr><td>Text proposals</td><td>Snapshot or other off-chain governance process</td></tr>
+            <tr><td>Text proposals</td><td>Snapshot or other offchain governance process</td></tr>
             <tr><td>Parameter changes</td><td>Governed admin program or multisig-controlled program authority</td></tr>
             <tr><td>Upgrade proposals</td><td>Squads or similar controlled upgrade-authority flow</td></tr>
             <tr><td>Community pool</td><td>Realms or treasury multisig</td></tr>
@@ -473,7 +473,7 @@ pub struct VestingSchedule {
       <h3>Realms vs. Squads</h3>
       <p>Both get described as treasury management, which makes them easy to confuse. They solve different problems:</p>
       <ul>
-        <li><strong><a href="https://realms.today" target="_blank" rel="noreferrer">Realms</a> is token-weighted governance.</strong> Voting power comes from community (or council) tokens deposited into the Realm, proposals are voted on by token holders, and passed proposals execute their instructions on-chain. It is the closest analog to the Cosmos <code>x/gov</code> module and community pool.</li>
+        <li><strong><a href="https://realms.today" target="_blank" rel="noreferrer">Realms</a> is token-weighted governance.</strong> Voting power comes from community (or council) tokens deposited into the Realm, proposals are voted on by token holders, and passed proposals execute their instructions onchain. It is the closest analog to the Cosmos <code>x/gov</code> module and community pool.</li>
         <li><strong><a href="https://squads.xyz" target="_blank" rel="noreferrer">Squads</a> is a multisig.</strong> A small, named set of member keys approves transactions against an M-of-N threshold — no token voting involved. It is the tool for operational custody: day-to-day treasury operations, program upgrade authority, and mint or freeze authorities.</li>
       </ul>
       <p>Most teams end up with both: community-scale decisions and the community treasury live in a Realm, while operational authorities and working funds sit in a Squads multisig that is itself accountable to the DAO.</p>

@@ -127,7 +127,7 @@ pub struct Increment&lt;'info&gt; {
 let count = USER_COUNTERS.load(deps.storage, &amp;info.sender)?;</code></pre>
       <p>That CosmWasm map lookup becomes <a href="/developers/docs/core/pda/pda-derivation">PDA derivation</a> plus account deserialization on Solana. The key is the address.</p>
       <h4>Client-side derivation</h4>
-      <p>The derivation is not program-only: any client can compute the same address off-chain and fetch the account directly, so frontends and indexers never need an on-chain registry. With <a href="https://github.com/anza-xyz/kit" target="_blank" rel="noreferrer">@solana/kit</a>, the TypeScript equivalent of the seeds above is:</p>
+      <p>The derivation is not program-only: any client can compute the same address offchain and fetch the account directly, so frontends and indexers never need an onchain registry. With <a href="https://github.com/anza-xyz/kit" target="_blank" rel="noreferrer">@solana/kit</a>, the TypeScript equivalent of the seeds above is:</p>
       <pre><code class="language-typescript">import { getAddressEncoder, getProgramDerivedAddress } from "@solana/kit";
 
 const [counterPda, bump] = await getProgramDerivedAddress({
@@ -194,7 +194,7 @@ tests/
     html: `
       <h2>4. Entry Points: Messages vs Instructions</h2>
       <p>CosmWasm exposes distinct entry points for different classes of work. Native Solana exposes one <a href="/developers/docs/core/instructions">instruction</a> processor that you dispatch yourself, and Anchor rebuilds a multi-handler abstraction on top.</p>
-      <p>There is no separate instantiate step on Solana. Initialization is just another instruction, usually one that creates state accounts and derives any PDA addresses they use. Queries are <a href="/developers/docs/rpc/http/getaccountinfo">off-chain RPC reads</a>, not on-chain handlers; clients fetch account data from an RPC node and decode it locally. <a href="https://github.com/anza-xyz/kit#codecs" target="_blank" rel="noreferrer">Kit's codecs</a> give TypeScript clients composable decoders for turning those raw account bytes back into structured data.</p>
+      <p>There is no separate instantiate step on Solana. Initialization is just another instruction, usually one that creates state accounts and derives any PDA addresses they use. Queries are <a href="/developers/docs/rpc/http/getaccountinfo">offchain RPC reads</a>, not onchain handlers; clients fetch account data from an RPC node and decode it locally. <a href="https://github.com/anza-xyz/kit#codecs" target="_blank" rel="noreferrer">Kit's codecs</a> give TypeScript clients composable decoders for turning those raw account bytes back into structured data.</p>
       <h4>Compare the entry points:</h4>
       <pre><code class="language-rust">#[entry_point]
 pub fn instantiate(
@@ -731,7 +731,7 @@ kora-deploy --program-so ./target/deploy/my_program.so</code></pre>
     tone: "phase",
     html: `
       <h2>14. Full Side-by-Side Example: Counter Contract</h2>
-      <p>A counter contract is a useful migration seed because it forces you to model state layout, authority, initialization, and off-chain reads without too much noise. Authority means the account or PDA your program treats as allowed to perform an action, usually enforced with a signer check, PDA seed check, or stored public key comparison.</p>
+      <p>A counter contract is a useful migration seed because it forces you to model state layout, authority, initialization, and offchain reads without too much noise. Authority means the account or PDA your program treats as allowed to perform an action, usually enforced with a signer check, PDA seed check, or stored public key comparison.</p>
       <pre><code class="language-rust">pub const COUNTS: Map&lt;&amp;Addr, i32&gt; = Map::new("counts");
 
 #[entry_point]
@@ -832,7 +832,7 @@ pub fn process_increment(
 
     Ok(())
 }</code></pre>
-      <p>The important translation is not the arithmetic. It is that the per-user map entry in CosmWasm becomes a per-user PDA account on Solana, and reads happen by deriving that PDA off-chain and fetching the account.</p>
+      <p>The important translation is not the arithmetic. It is that the per-user map entry in CosmWasm becomes a per-user PDA account on Solana, and reads happen by deriving that PDA offchain and fetching the account.</p>
     `,
   },
   {
@@ -856,7 +856,7 @@ pub fn process_increment(
             <tr><td>Factory</td><td>Stores child contract addresses</td><td>Derives pool PDAs from mint seeds</td></tr>
             <tr><td>Pool creation</td><td>Instantiate one contract per pool</td><td>Create one pool account plus vault accounts</td></tr>
             <tr><td>LP token</td><td>Instantiate a CW20 contract</td><td>Create an SPL mint, often PDA-controlled</td></tr>
-            <tr><td>Pool discovery</td><td>Read factory state</td><td>Filter program accounts off-chain</td></tr>
+            <tr><td>Pool discovery</td><td>Read factory state</td><td>Filter program accounts offchain</td></tr>
           </tbody>
         </table>
       </div>
@@ -895,7 +895,7 @@ pub fn process_increment(
       <ul>
         <li>Identify every <code>Item</code> and <code>Map</code> and decide which PDA or account type will replace it.</li>
         <li>Replace <code>instantiate</code> with one or more initialization instructions.</li>
-        <li>Remove on-chain query assumptions. Reads happen through <a href="/developers/docs/rpc">RPC</a>.</li>
+        <li>Remove onchain query assumptions. Reads happen through <a href="/developers/docs/rpc">RPC</a>.</li>
         <li>Map each <code>ExecuteMsg</code> variant to an instruction handler and an account graph.</li>
       </ul>
       <h3>State</h3>
@@ -919,7 +919,7 @@ pub fn process_increment(
         <li>Test PDA derivation, account substitution resistance, stale reads after CPI, and account initialization paths.</li>
         <li>Define a state-migration strategy before the first production upgrade.</li>
         <li>Decide whether upgrade authority will remain active, move to multisig, or be finalized away.</li>
-        <li>Work through the <a href="/developers/docs/tools/production-readiness">production readiness guide</a> before launch — redundant RPC, priority fees and compute budgets for transaction landing, retry and confirmation strategy, key management, and monitoring.</li>
+        <li>Work through the <a href="/developers/docs/tools/production-readiness">production readiness guide</a> before launch — redundant RPC, priority fees, and compute budgets for transaction landing, retry and confirmation strategy, key management, and monitoring.</li>
       </ul>
     `,
   },
@@ -937,7 +937,7 @@ pub fn process_increment(
 export const QUICK_REFERENCE_ROWS = [
   ["Item<T>", "Singleton PDA account"],
   ["Map<K, V>", "PDA per key with deterministic seeds"],
-  ["IndexedMap", "PDAs plus off-chain filtering or secondary index accounts"],
+  ["IndexedMap", "PDAs plus offchain filtering or secondary index accounts"],
   ["SnapshotMap", "Versioned accounts or custom history model"],
   ["instantiate", "initialize instruction with init or init_if_needed"],
   ["execute", "Instruction handlers in #[program]"],

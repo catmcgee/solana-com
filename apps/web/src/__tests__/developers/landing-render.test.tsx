@@ -174,7 +174,7 @@ describe("/developers landing", () => {
     );
     expect(
       screen.getByRole("link", {
-        name: "Templates Starter apps for Next.js, mobile and programs.",
+        name: "Templates Starter apps for Next.js, mobile, and programs.",
       }),
     ).toHaveAttribute("href", "/developers/templates");
   });
