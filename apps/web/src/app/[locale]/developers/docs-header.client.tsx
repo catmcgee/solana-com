@@ -194,12 +194,15 @@ export function DocsSearchField({
         !event.shiftKey &&
         event.key.toLowerCase() === "k"
       ) {
+        // Capture phase, before the Inkeep modal's own Cmd/Ctrl+K handler
+        // (ui-chrome inkeep-chat-button), which would otherwise take the key.
         event.preventDefault();
+        event.stopImmediatePropagation();
         window.location.assign(searchUrl(action, input.current?.value ?? ""));
       }
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
   }, [action]);
 
   return (

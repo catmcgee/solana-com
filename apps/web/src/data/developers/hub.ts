@@ -230,15 +230,33 @@ export const COST_MODEL = {
 
 export type CostBreakdown = { card: number; solana: number; savings: number };
 
+/** Rounds to cents, dropping binary floating-point noise. */
+function toCents(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+/**
+ * Rounds a dollar amount the way `formatUsd` displays it: whole dollars from
+ * $100 up, cents below.
+ */
+export function roundUsd(value: number): number {
+  return value >= 100 ? Math.round(value) : toCents(value);
+}
+
+/**
+ * Monthly costs, each rounded as displayed. The saving is the difference of
+ * the two rounded figures, so the three numbers on the page always add up.
+ */
 export function computeCosts(
   paymentsPerMonth: number,
   averagePaymentUsd: number,
 ): CostBreakdown {
-  const card =
+  const card = roundUsd(
     paymentsPerMonth *
-    (averagePaymentUsd * COST_MODEL.card.percent + COST_MODEL.card.fixedUsd);
-  const solana = paymentsPerMonth * COST_MODEL.solana.feeUsd;
-  return { card, solana, savings: card - solana };
+      (averagePaymentUsd * COST_MODEL.card.percent + COST_MODEL.card.fixedUsd),
+  );
+  const solana = roundUsd(paymentsPerMonth * COST_MODEL.solana.feeUsd);
+  return { card, solana, savings: toCents(card - solana) };
 }
 
 /** Maps a 0–100 slider position to 100…1,000,000 payments (log scale). */
@@ -246,12 +264,18 @@ export function paymentsFromSliderPosition(position: number): number {
   return Math.round(10 ** (2 + (position / 100) * 4) / 10) * 10;
 }
 
+/**
+ * Whole dollars from $100 up, cents below. An amount of $100 or more that
+ * still has cents (a saving: whole-dollar card cost minus a cents-precise
+ * Solana cost) keeps them, so it is never rounded a second time.
+ */
 export function formatUsd(value: number, locale: string): string {
+  const digits = value >= 100 && Number.isInteger(toCents(value)) ? 0 : 2;
   return new Intl.NumberFormat(locale, {
     style: "currency",
     currency: "USD",
-    maximumFractionDigits: value >= 100 ? 0 : 2,
-    minimumFractionDigits: value >= 100 ? 0 : 2,
+    maximumFractionDigits: digits,
+    minimumFractionDigits: digits,
   }).format(value);
 }
 

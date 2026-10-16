@@ -78,6 +78,24 @@ describe("cost calculator model", () => {
     expect(formatUsd(costs.solana, "en")).toBe("$10.00");
   });
 
+  it("shows a saving equal to the difference of the shown costs", () => {
+    // 1,230 x $7: card $618.69 (shown $619), Solana $1.23.
+    const costs = computeCosts(1230, 7);
+    expect(formatUsd(costs.card, "en")).toBe("$619");
+    expect(formatUsd(costs.solana, "en")).toBe("$1.23");
+    expect(formatUsd(costs.savings, "en")).toBe("$617.77");
+    for (let position = 0; position <= 100; position++) {
+      const payments = paymentsFromSliderPosition(position);
+      for (const average of [1, 7, 20, 133, 500]) {
+        const c = computeCosts(payments, average);
+        const shown = (s: string) => Number(s.replace(/[$,]/g, ""));
+        expect(
+          shown(formatUsd(c.card, "en")) - shown(formatUsd(c.solana, "en")),
+        ).toBeCloseTo(shown(formatUsd(c.savings, "en")), 6);
+      }
+    }
+  });
+
   it("maps the payments slider onto 100 to 1,000,000 (log scale)", () => {
     expect(paymentsFromSliderPosition(0)).toBe(100);
     expect(paymentsFromSliderPosition(100)).toBe(1_000_000);
