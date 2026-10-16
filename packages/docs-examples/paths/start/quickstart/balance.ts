@@ -12,12 +12,19 @@ console.log("Balance:", Number(balance) / 1e9, "SOL");
 if (balance < 100_000_000n) {
   // Ask devnet for 1 free test SOL.
   const airdrop = airdropFactory({ rpc, rpcSubscriptions });
-  const signature = await airdrop({
-    recipientAddress: wallet.address,
-    lamports: lamports(1_000_000_000n),
-    commitment: "confirmed",
-  });
-  console.log("Airdrop:", signature);
+  try {
+    const signature = await airdrop({
+      recipientAddress: wallet.address,
+      lamports: lamports(1_000_000_000n),
+      commitment: "confirmed",
+    });
+    console.log("Airdrop:", signature);
+  } catch {
+    console.log(
+      `Airdrop refused (devnet faucets are rate-limited). Get devnet SOL for ${wallet.address} at https://faucet.solana.com, then run this again.`,
+    );
+    process.exit(0);
+  }
 
   const { value: after } = await rpc.getBalance(wallet.address).send();
   console.log("Balance:", Number(after) / 1e9, "SOL");

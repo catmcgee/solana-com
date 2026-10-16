@@ -28,6 +28,9 @@ describe("paths/start/quickstart", () => {
       output: out("send-sol"),
     });
     expect(r.text).toContain("Recipient balance: 0.01 SOL");
+    expect(r.text).toMatch(
+      /^Explorer: https:\/\/explorer\.solana\.com\/tx\/\w+\?cluster=devnet$/m,
+    );
   });
 
   it("3: creates a token and mints 1,000 of it", async () => {
@@ -35,5 +38,8 @@ describe("paths/start/quickstart", () => {
       output: out("create-token"),
     });
     expect(r.text).toContain("Balance: 1000 tokens");
+    expect(r.text).toMatch(
+      /^Explorer: https:\/\/explorer\.solana\.com\/address\/\w+\?cluster=devnet$/m,
+    );
   });
 });

@@ -44,7 +44,7 @@ const createTokenAccount = getCreateAssociatedTokenIdempotentInstruction({
   mint: mint.address,
 });
 
-// 3. Mint 1,000 tokens into it (amounts count the decimals: 1000.00).
+// 3. Mint 1,000 tokens into it. Amounts are in base units: 1000 * 10^2.
 const mintTo = getMintToInstruction({
   mint: mint.address,
   token: tokenAccount,
@@ -62,6 +62,9 @@ const signature = await send(wallet, [
 console.log("Token (mint):", mint.address);
 console.log("Your token account:", tokenAccount);
 console.log("Signature:", signature);
+console.log(
+  `Explorer: https://explorer.solana.com/address/${mint.address}?cluster=devnet`,
+);
 
 const { value } = await rpc.getTokenAccountBalance(tokenAccount).send();
 console.log("Balance:", value.uiAmountString, "tokens");
