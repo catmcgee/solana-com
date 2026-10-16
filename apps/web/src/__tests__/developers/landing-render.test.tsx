@@ -78,9 +78,9 @@ describe("/developers landing", () => {
     );
     expect(
       within(card).getByRole("link", {
-        name: /Cursor, VS Code and Windsurf setup/,
+        name: /Set up Cursor, VS Code, Windsurf, and other agents/,
       }),
-    ).toHaveAttribute("href", "https://mcp.solana.com");
+    ).toHaveAttribute("href", "/ja/developers/docs/intro/coding-with-agents");
     // No tabs and no code sample.
     expect(card.querySelector('[role="tab"], pre')).toBeNull();
   });

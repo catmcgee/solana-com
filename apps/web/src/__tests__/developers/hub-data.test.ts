@@ -156,7 +156,7 @@ describe("build with your agent card", () => {
         command: "codex mcp add solana-mcp --url https://mcp.solana.com/mcp",
       },
     ]);
-    expect(AGENT_SETUP.moreHref).toBe("https://mcp.solana.com");
+    expect(AGENT_SETUP.moreHref).toBe("/developers/docs/intro/coding-with-agents");
   });
 
   it("has no Ethereum or EVM links or copy", () => {

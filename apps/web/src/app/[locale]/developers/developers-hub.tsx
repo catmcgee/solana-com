@@ -226,11 +226,9 @@ function NewTabHint({ text }: { text: string }) {
 function AgentCard({
   t,
   moreHref,
-  newTabText,
 }: {
   t: Translate;
   moreHref: string;
-  newTabText: string;
 }) {
   const row =
     "m-0 flex items-start gap-3 rounded-[10px] border border-[var(--dl-line)] bg-[var(--dl-surface-2)] pe-1.5 ps-3.5";
@@ -307,12 +305,9 @@ function AgentCard({
         </dl>
         <a
           href={moreHref}
-          target="_blank"
-          rel="noopener noreferrer"
           className={`mt-3 inline-flex items-center gap-1 text-sm ${inlineLink}`}
         >
           {t("agent.otherClients")}
-          <NewTabHint text={newTabText} />
         </a>
       </details>
     </section>
@@ -383,8 +378,7 @@ export async function DevelopersHub({
           </div>
           <AgentCard
             t={tt}
-            moreHref={AGENT_SETUP.moreHref}
-            newTabText={newTabText}
+            moreHref={href(AGENT_SETUP.moreHref)}
           />
         </div>
       </section>

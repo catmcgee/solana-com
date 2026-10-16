@@ -85,7 +85,7 @@ export const AGENT_SETUP = {
     },
   ],
   /** Official setup for the other MCP clients (Cursor, VS Code, Windsurf). */
-  moreHref: "https://mcp.solana.com",
+  moreHref: "/developers/docs/intro/coding-with-agents",
 } as const;
 
 /** "Other ways to learn" cards. */

@@ -67,7 +67,7 @@ test.describe("without JavaScript", () => {
             );
           }
           await expect(
-            card.locator('a[href="https://mcp.solana.com"]'),
+            card.locator('a[href$="/developers/docs/intro/coding-with-agents"]'),
           ).toBeVisible();
           const buttons = card.locator("button");
           await expect(buttons).toHaveCount(3);
