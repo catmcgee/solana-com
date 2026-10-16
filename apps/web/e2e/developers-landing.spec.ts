@@ -91,15 +91,9 @@ test.describe("without JavaScript", () => {
             `${prefix}/docs/defi/settle-trade`,
           ]);
 
-          // Stats with visible footnotes and external sources.
+          // Stats render without footnotes or a sources list.
           await expect(page.getByTestId("stats").locator("li")).toHaveCount(4);
-          const sources = page.getByTestId("stat-sources").locator("a");
-          await expect(sources).toHaveCount(4);
-          for (const href of await sources.evaluateAll((els) =>
-            els.map((el) => el.getAttribute("href") ?? ""),
-          )) {
-            expect(href).toMatch(/^https:\/\//);
-          }
+          await expect(page.getByTestId("stat-sources")).toHaveCount(0);
 
           // Calculator defaults and static table are server-rendered.
           await expect(page.getByTestId("calc-card")).not.toBeEmpty();

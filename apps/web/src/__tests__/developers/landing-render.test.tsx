@@ -127,18 +127,13 @@ describe("/developers landing", () => {
     ).toHaveAttribute("href", "/developers/templates");
   });
 
-  it("shows every stat with a visible footnote and source link", async () => {
+  it("shows every stat without footnotes or a sources list", async () => {
     renderWithIntl(await DevelopersHub({ locale: "en", updates: [] }));
-    const sources = screen.getByTestId("stat-sources");
-    for (const [index, stat] of HUB_STATS.entries()) {
+    for (const stat of HUB_STATS) {
       const tile = screen.getByTestId(`stat-${stat.id}`);
-      const footnote = within(tile).getByRole("link");
-      expect(footnote).toHaveTextContent(`[${index + 1}]`);
-      expect(footnote).toHaveAttribute("href", `#dl-source-${stat.id}`);
-      const item = sources.querySelector(`#dl-source-${stat.id}`)!;
-      expect(item.querySelector("a")).toHaveAttribute("href", stat.source.url);
-      expect(item.textContent).toContain("retrieved");
+      expect(within(tile).queryByRole("link")).toBeNull();
     }
+    expect(screen.queryByTestId("stat-sources")).toBeNull();
   });
 
   it("server-renders the calculator defaults and the static table", async () => {

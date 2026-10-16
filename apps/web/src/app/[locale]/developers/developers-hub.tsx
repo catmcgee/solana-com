@@ -463,7 +463,7 @@ export async function DevelopersHub({
             className="m-0 grid list-none gap-3.5 p-0 sm:grid-cols-2 lg:grid-cols-4"
             data-testid="stats"
           >
-            {HUB_STATS.map((stat, index) => (
+            {HUB_STATS.map((stat) => (
               <li
                 key={stat.id}
                 data-testid={`stat-${stat.id}`}
@@ -475,23 +475,6 @@ export async function DevelopersHub({
                 <span className="text-[14.5px] text-[var(--dl-text)]">
                   {t(`why.stats.${stat.labelKey}.label`)}
                 </span>
-                <em className="text-[12.5px] not-italic text-[var(--dl-dim)]">
-                  {stat.id === "uptime"
-                    ? t("why.stats.uptime.detail")
-                    : t("why.asOf", {
-                        date: formatAsOf(stat.asOf, locale),
-                      })}{" "}
-                  <a
-                    href={`#dl-source-${stat.id}`}
-                    aria-label={t("why.sourceLink", {
-                      n: index + 1,
-                      name: stat.source.name,
-                    })}
-                    className={`text-[var(--dl-muted)] underline underline-offset-2 hover:text-[var(--dl-accent-text)] ${focus}`}
-                  >
-                    [{index + 1}]
-                  </a>
-                </em>
               </li>
             ))}
           </ul>
@@ -524,37 +507,6 @@ export async function DevelopersHub({
                 </li>
               ))}
             </ul>
-          </div>
-          <div className="mt-4 text-xs text-[var(--dl-dim)]">
-            <h3 className="m-0 mb-1.5 font-brand text-xs font-medium text-[var(--dl-muted)]">
-              {t("why.sourcesTitle")}
-            </h3>
-            <ol
-              className="m-0 list-decimal space-y-1 ps-5"
-              data-testid="stat-sources"
-            >
-              {HUB_STATS.map((stat) => (
-                <li
-                  key={stat.id}
-                  id={`dl-source-${stat.id}`}
-                  className="scroll-mt-28"
-                >
-                  <a
-                    href={stat.source.url}
-                    rel="noopener noreferrer"
-                    className={`text-[var(--dl-muted)] underline decoration-[var(--dl-line-strong)] underline-offset-[3px] hover:text-[var(--dl-accent-text)] ${focus}`}
-                  >
-                    {stat.source.name}
-                  </a>
-                  {": "}
-                  {t(`why.stats.${stat.labelKey}.label`)} (
-                  {formatAsOf(stat.asOf, locale)}),{" "}
-                  {t("why.retrieved", {
-                    date: formatAsOf(stat.retrievedAt, locale),
-                  })}
-                </li>
-              ))}
-            </ol>
           </div>
         </div>
       </section>
