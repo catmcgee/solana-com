@@ -11,12 +11,10 @@ import { Server } from "@boxicons/react/Server";
 import { type ComponentType, type ReactNode } from "react";
 import { getTranslations } from "@workspace/i18n/server";
 import {
-  AGENT_SETUP,
   COST_MODEL,
   DEVELOPER_NEWSLETTER_FORM_ID,
   HERO_LINKS,
   HUB_STATS,
-  INSTALL_SETUP,
   JOB_PATHS,
   LEARN_ROUTES,
   MORE_USE_CASES,
@@ -205,46 +203,29 @@ function NewTabHint({ text }: { text: string }) {
 }
 
 /**
- * "Set up Solana in one paste": a heading, then the one line a reader pastes
- * into their coding agent in a terminal-style box with a Copy button, then
- * short links to the manual agent setup and the local install. The line is plain,
- * selectable text in the server render; the Copy button turns on after
- * hydration.
+ * The agent setup line: a short heading, then the one line a reader pastes
+ * into their coding agent, in a single-line field with a copy button. The
+ * line is plain, selectable text in the server render; the copy button turns
+ * on after hydration. The manual and local setup options live in the docs.
  */
-function AgentCard({
-  t,
-  moreHref,
-  installHref,
-}: {
-  t: Translate;
-  moreHref: string;
-  installHref: string;
-}) {
+function AgentCard({ t }: { t: Translate }) {
   return (
-    <section aria-labelledby="dl-agent-title" data-testid="agent-card">
+    <section
+      aria-labelledby="dl-agent-title"
+      data-testid="agent-card"
+      className="min-w-0 lg:self-center"
+    >
       <h2
         id="dl-agent-title"
-        className="m-0 mb-4 font-brand text-[22px] font-medium leading-snug tracking-[-0.015em] text-[var(--dl-text)]"
+        className="m-0 mb-3 font-brand text-[15px] font-medium leading-snug text-[var(--dl-text)]"
       >
         {t("agent.title")}
       </h2>
       <AgentPrompt
-        promptLabel={t("agent.promptLabel")}
         label={t("agent.copyPrompt")}
         copyText={t("agent.copy")}
         copiedText={t("agent.copied")}
       />
-      <p className="m-0 mt-4 text-sm leading-[1.55] text-[var(--dl-muted)]">
-        {t("agent.alsoBefore")}{" "}
-        <a href={moreHref} className={inlineLink}>
-          {t("agent.alsoAgents")}
-        </a>{" "}
-        {t("agent.alsoOr")}{" "}
-        <a href={installHref} className={inlineLink}>
-          {t("agent.alsoInstall")}
-        </a>
-        {t("agent.alsoAfter")}
-      </p>
     </section>
   );
 }
@@ -282,8 +263,8 @@ export async function DevelopersHub({
       tabIndex={-1}
       className="overflow-hidden bg-[var(--dl-bg)] font-brand text-base text-[var(--dl-text)] outline-none"
     >
-      {/* Hero: headline, lede and buttons on the left; the agent card on the
-          right, top-aligned. Stacked below lg. */}
+      {/* Hero: headline, lede and buttons on the left; the agent setup line
+          on the right, centred. Stacked below lg. */}
       <section
         aria-labelledby="dl-hero-title"
         className="border-b border-[var(--dl-line)] pb-14 pt-12 md:pb-16 md:pt-16"
@@ -311,11 +292,7 @@ export async function DevelopersHub({
               </a>
             </div>
           </div>
-          <AgentCard
-            t={tt}
-            moreHref={href(AGENT_SETUP.moreHref)}
-            installHref={href(INSTALL_SETUP.href)}
-          />
+          <AgentCard t={tt} />
         </div>
       </section>
 

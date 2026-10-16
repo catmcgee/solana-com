@@ -48,21 +48,13 @@ test.describe("without JavaScript", () => {
           await expect(page.locator("h1")).toHaveCount(1);
           await expect(page.locator("h1")).not.toBeEmpty();
 
-          // Setup card: the one line to paste into a coding agent, plus links
-          // to the docs. The copy button needs JS, so it is hidden and
-          // disabled here.
+          // Setup card: the one line to paste into a coding agent. The copy
+          // button needs JS, so it is hidden and disabled here.
           const card = page.getByTestId("agent-card");
           await expect(card.getByTestId("agent-prompt")).toContainText(
             "Set up Solana for me: fetch and follow this guide",
           );
-          await expect(
-            card.locator(
-              'a[href$="/developers/docs/intro/coding-with-agents"]',
-            ),
-          ).toBeVisible();
-          await expect(
-            card.locator('a[href$="/developers/docs/intro/installation"]'),
-          ).toBeVisible();
+          await expect(card.locator("a")).toHaveCount(0);
           const buttons = card.locator("button");
           await expect(buttons).toHaveCount(1);
           for (const button of await buttons.all()) {
@@ -292,7 +284,7 @@ test.describe("with JavaScript", () => {
     });
     await expect(button).toBeEnabled();
     await button.click();
-    await expect(button).toHaveText("Copied");
+    await expect(button).toHaveAttribute("data-copied", "");
     const copied = await page.evaluate(() => navigator.clipboard.readText());
     // The guide URL follows the site the page is served from (it stays on
     // solana.com on localhost, where the docs' .md pages are not served).
