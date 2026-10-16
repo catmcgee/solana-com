@@ -62,7 +62,7 @@ export interface Block {
   runnable: boolean;
   /** In-browser runner id from run-examples.js (e.g. "generate-keypair"). */
   runner?: string;
-  /** Overrides the default "Output recorded on a local Surfpool network". */
+  /** Overrides the default "Output from a local Surfpool network". */
   outputNote?: string;
   tabs: BlockTab[];
 }

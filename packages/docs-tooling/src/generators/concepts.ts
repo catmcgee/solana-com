@@ -97,13 +97,13 @@ export const CONCEPT_UI = {
   like: "Like:",
   learnMore: "Learn more",
   usedIn: "You've used this in:",
-  notUsed: "Not used in a path yet.",
+  notUsed: "Not used in a tutorial yet.",
   overview: "Overview",
   step: "Step",
   concept: "Concept",
   mentioned: "mentioned",
   notUsedCell: "not used",
-  gap: "not taught in a path",
+  gap: "not taught in a tutorial",
 };
 export type ConceptUi = typeof CONCEPT_UI;
 

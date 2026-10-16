@@ -17,8 +17,11 @@
  * - destinations outside Mintlify (e.g. `/developers`) become absolute
  *   https://solana.com URLs;
  * - apps/web's single Greek regex rule (`/el/:path(...)`) is expanded into
- *   plain Greek catch-alls (GREEK_MIRROR); per-page Greek rules, if any,
- *   are dropped, so a Greek URL may take two hops on the docs host.
+ *   plain Greek catch-alls (GREEK_MIRROR) that point straight at the current
+ *   prefix. Old `/docs/...` pages that moved to a different path also get a
+ *   Greek twin (`/el/docs/old` → new page), listed before the catch-alls, so
+ *   every Greek URL resolves in one hop. Per-page Greek rules from apps/web
+ *   are dropped (the twins replace them).
  */
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
@@ -71,8 +74,8 @@ const GREEK_EXACT_ROOTS = new Set([
  */
 const GREEK_MIRROR: NextRedirect[] = [
   { source: "/el/docs", destination: "/developers/docs" },
-  // Via /docs/:path*, so moved pages still reach their new URL (two hops).
-  { source: "/el/docs/:path*", destination: "/docs/:path*" },
+  // Moved pages are covered by greekDocsMoves(), listed before this.
+  { source: "/el/docs/:path*", destination: "/developers/docs/:path*" },
   { source: "/el/developers/docs", destination: "/developers/docs" },
   {
     source: "/el/developers/docs/:path*",
@@ -93,6 +96,23 @@ const GREEK_MIRROR: NextRedirect[] = [
 
 function isGreekRegexRule(r: NextRedirect) {
   return r.source.startsWith("/el/:path(");
+}
+
+/**
+ * Greek twins of the old-prefix redirects for pages that moved: `/docs/x`
+ * redirects somewhere other than `/developers/docs/x`, so the Greek
+ * catch-all alone would land on a missing page.
+ */
+function greekDocsMoves(redirects: NextRedirect[]): NextRedirect[] {
+  return redirects
+    .filter(
+      (r) =>
+        r.source.startsWith("/docs/") &&
+        r.destination !== `/developers${r.source}` &&
+        !r.has?.length &&
+        !r.missing?.length,
+    )
+    .map((r) => ({ ...r, source: `/el${r.source}`, permanent: true }));
 }
 
 const LOCALE_PARAM = /^\/:locale\([^)]*\)/;
@@ -137,13 +157,19 @@ export function buildMintlifyRedirects(
 ): MintlifyRedirect[] {
   const seen = new Set<string>();
   const out: MintlifyRedirect[] = [];
+  const twins = greekDocsMoves(redirects);
+  const generated = new Set<NextRedirect>(twins);
   const expanded = redirects.flatMap((r) =>
-    isGreekRegexRule(r) ? GREEK_MIRROR : [r],
+    isGreekRegexRule(r) ? [...twins, ...GREEK_MIRROR] : [r],
   );
   for (const r of expanded) {
-    // The per-redirect Greek shortcuts only save a hop; on the docs host the
-    // Greek catch-alls are enough, and the mirror stays small (spec V4).
-    if (r.source.startsWith("/el/") && !r.source.includes(":")) {
+    // apps/web's own per-page Greek shortcuts are dropped; the generated
+    // twins and the Greek catch-alls cover them (spec V4).
+    if (
+      r.source.startsWith("/el/") &&
+      !r.source.includes(":") &&
+      !generated.has(r)
+    ) {
       if (!GREEK_EXACT_ROOTS.has(r.source)) continue;
     }
     const m = toMintlifyRedirect(r);

@@ -284,7 +284,7 @@ describe("generated snippets", () => {
       "/developers/docs/payments/checkout/try-it",
     );
     expect(read("snippets/concepts/en/rpc.used-in.mdx")).toContain(
-      "Not used in a path yet.",
+      "Not used in a tutorial yet.",
     );
     const cov = read("snippets/concepts/en/coverage.mdx");
     expect(cov).toMatch(
@@ -294,7 +294,7 @@ describe("generated snippets", () => {
       /Devnet & mainnet\]\(\/developers\/docs\/references\/clusters\)<\/th><td data-cov="ref">mentioned/,
     );
     expect(cov).toMatch(
-      /\[RPC\]\(\/developers\/docs\/rpc\) <span className="sol-cov-gap">not taught in a path<\/span>/,
+      /\[RPC\]\(\/developers\/docs\/rpc\) <span className="sol-cov-gap">not taught in a tutorial<\/span>/,
     );
   });
 

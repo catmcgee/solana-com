@@ -291,6 +291,38 @@ describe("gen:redirects", () => {
     ]);
   });
 
+  it("adds Greek twins for moved /docs pages before the Greek catch-all", () => {
+    const greek = {
+      source:
+        "/el/:path((?:docs|learn|developers/(?:docs|cookbook|bootcamp|guides|learn))(?:\\.md|/.+)?|developers(?:\\.md)?)",
+      destination: "/:path",
+      permanent: true,
+    };
+    const out = buildMintlifyRedirects([
+      greek,
+      // Moved: gets a Greek twin.
+      {
+        source: "/docs/clients/go",
+        destination: "/developers/docs/clients/community/go",
+      },
+      // Prefix-only move: the catch-all covers it, no twin.
+      {
+        source: "/docs/core/accounts",
+        destination: "/developers/docs/core/accounts",
+      },
+    ]);
+    const sources = out.map((r) => r.source);
+    expect(out).toContainEqual({
+      source: "/el/docs/clients/go",
+      destination: "/developers/docs/clients/community/go",
+      permanent: true,
+    });
+    expect(sources).not.toContain("/el/docs/core/accounts");
+    expect(sources.indexOf("/el/docs/clients/go")).toBeLessThan(
+      sources.indexOf("/el/docs/:path*"),
+    );
+  });
+
   it("expands apps/web's Greek regex rule into plain catch-alls", () => {
     const out = buildMintlifyRedirects([
       {
@@ -300,10 +332,10 @@ describe("gen:redirects", () => {
         permanent: true,
       },
     ]);
-    // Via the old prefix, so moved pages still reach their new URL.
+    // Straight to the current prefix (one hop).
     expect(out).toContainEqual({
       source: "/el/docs/:path*",
-      destination: "/docs/:path*",
+      destination: "/developers/docs/:path*",
       permanent: true,
     });
     expect(out).toContainEqual({

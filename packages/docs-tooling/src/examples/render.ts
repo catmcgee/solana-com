@@ -55,8 +55,7 @@ export interface RenderInput {
   tabs: RenderTab[];
 }
 
-export const DEFAULT_OUTPUT_NOTE =
-  "Output recorded on a local Surfpool network";
+export const DEFAULT_OUTPUT_NOTE = "Output from a local Surfpool network";
 export const RUNNER_NOTE: Record<string, string> = {
   "generate-keypair": "Example output: each run generates a new key pair",
 };

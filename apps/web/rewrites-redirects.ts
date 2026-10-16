@@ -413,6 +413,16 @@ const movedDocsRedirects: RedirectInput[] = withMdVariants([
     source: "/docs/tools/solana-pay/quickstart",
     destination: "/developers/docs/tools/solana-pay#quick-start",
   },
+  // The Kora JSON-RPC "Authentication" page was an unlisted stub; Kora
+  // authentication is documented for operators (2026-10-16).
+  {
+    source: "/docs/tools/kora/json-rpc-api/authentication",
+    destination: "/developers/docs/tools/kora/operators/authentication",
+  },
+  {
+    source: "/developers/docs/tools/kora/json-rpc-api/authentication",
+    destination: "/developers/docs/tools/kora/operators/authentication",
+  },
   // Start here / Resources reorganisation (2026-10-16). "Coming from
   // Ethereum" became "Coming from EVM" (Resources > Set up), and the program
   // quickstart moved under Write programs. Both the pre-move /docs URL and
@@ -1205,7 +1215,7 @@ export default {
     },
     {
       source: "/news/getting-started-with-solana-development",
-      destination: "/developers/docs/intro/dev",
+      destination: "/developers/docs",
     },
     {
       source: "/install",
@@ -1839,11 +1849,11 @@ export default {
     },
     {
       source: "/developers/cookbook/tokens",
-      destination: "/developers/cookbook/tokens/create-mint-account",
+      destination: "/developers/docs/tokens/basics",
     },
     {
       source: "/developers/cookbook/transactions/send-tokens",
-      destination: "developers/cookbook/tokens/transfer-tokens",
+      destination: "/developers/docs/tokens/basics/transfer-tokens",
     },
     {
       source: "/developers/guides/introduction-to-durable-nonces",

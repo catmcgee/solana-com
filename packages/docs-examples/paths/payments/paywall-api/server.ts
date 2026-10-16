@@ -186,7 +186,7 @@ export function createPaywallServer(options: {
       await new Promise((r) => setTimeout(r, 500));
     }
 
-    // Same server-side check as the checkout path: read the settled
+    // Same server-side check as the checkout tutorial: read the settled
     // transaction back and confirm the payTo account received the amount.
     const check = await verifyPayment({
       signature,
