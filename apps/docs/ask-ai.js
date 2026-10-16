@@ -4,8 +4,8 @@
  * project root on every page.
  *
  * - When Mintlify's assistant is available (paid plans render
- *   #assistant-entry, Luma's assistant button next to the search), the pill
- *   opens it.
+ *   #assistant-entry, which styles/theme.css hides from the top bar), the
+ *   pill opens it.
  * - Otherwise (Hobby), the pill opens a small menu: ask Claude or ChatGPT
  *   about the current page (the same links as the page's contextual menu),
  *   or open the docs search.

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * WP11 theme check: a Playwright visual and assertion pass over the Mintlify
- * docs theme (Luma, apps/docs/styles/theme.css + docs.json branding).
+ * docs theme (apps/docs/styles/theme.css + docs.json branding).
  *
  * Moved here from migration/wp11-theme-check.mjs at integration (WP12).
  * Run it after every Mintlify version bump and against the deployed site.
@@ -10,23 +10,18 @@
  *   pnpm --filter @workspace/docs-tooling theme-check --base http://localhost:3003 [--paths /docs,/ar/docs] [--out dir]
  *   BASE=https://<sub>.mintlify.site pnpm --filter @workspace/docs-tooling theme-check
  *
- * For each path x {light, dark} x {JS on, JS off} x {desktop 1440, narrow
- * 1100, mobile 390} it:
+ * For each path x {light, dark} x {JS on, JS off} x {desktop, mobile} it:
  *   - saves a screenshot to --out (default ./theme-shots)
- *   - asserts that the header and page share one colour per mode
- *     (white / #0a0a0b), with no GitHub button in the header
+ *   - asserts that the top bar, tab row and page share one colour per mode
+ *     (white / #0a0a0b), with no GitHub button in the top bar
  *   - with JS, asserts the floating "Ask AI" pill (ask-ai.js) is bottom-right
- *     and Mintlify's floating "Ask a question" bar is hidden
- *   - on path pages, asserts the sidebar path box (numbered, no star)
+ *   - on path pages, asserts the sidebar path box (numbered, ★ on step 2)
  *   - asserts every mermaid fence has its pre-rendered figure (.sol-mermaid)
  *   - asserts that the 4th tab is "Markets" with a divider pseudo-element
- *   - on desktop and narrow, asserts Luma's one-row header: #navbar is 48px
- *     tall, the tabs and the search share that row, no tab has an icon, the
- *     logo is not squeezed, and the sidebar starts below the bar
- *   - on desktop with JS, asserts the header does not depend on our CSS: the
- *     logo, every tab, the search and the theme button sit at the same boxes
- *     (within 0.5px) after the custom <style> blocks are removed, so the
- *     first paint (before those blocks arrive) already shows the final header
+ *   - asserts that an external (http) tab sits at the far end of the tab row
+ *   - on desktop (1440px), asserts the one-row header: #navbar is 4rem tall,
+ *     the tabs and the search share that row, the active-tab underline sits
+ *     on the bar's bottom edge, and the sidebar and TOC start below the bar
  *   - asserts that body links are purple and pass 4.5:1 contrast against the page
  *   - asserts that ABC Diatype and ABC Favorit Mono are the computed families
  *   - for /ar/ paths, asserts that #content-area is rtl and code blocks are ltr
@@ -93,7 +88,6 @@ for (const path of PATHS) {
     for (const js of [true, false]) {
       for (const [vpName, viewport] of [
         ["desktop", { width: 1440, height: 1000 }],
-        ["narrow", { width: 1100, height: 900 }],
         ["mobile", { width: 390, height: 844 }],
       ]) {
         const ctxName = `${path} ${scheme} js=${js} ${vpName}`;
@@ -121,17 +115,13 @@ for (const path of PATHS) {
           const q = (s) => document.querySelector(s);
           const cs = (e) => (e ? getComputedStyle(e) : null);
           const html = document.documentElement;
-          // Luma paints the header colour on an inset layer inside #navbar.
-          const bar =
-            q("#navbar > .bg-background-light") || q("#navbar > div.z-0");
-          const items = [
-            ...document.querySelectorAll(
-              '#navbar nav[aria-label="Main"] > ul > li',
-            ),
-          ];
-          const tabs = items.map((li) => li.querySelector("a"));
-          const fourth = items[3];
-          const row = q('#navbar nav[aria-label="Main"]');
+          const bar = q("#navbar #navbar-transition");
+          const tabs = [...document.querySelectorAll("#navbar .nav-tabs-item")];
+          const fourth = tabs[3];
+          const ext = tabs.find((t) =>
+            /^https?:/.test(t.getAttribute("href") || ""),
+          );
+          const row = q("#navbar .nav-tabs");
           // Body links only: cards, steppers and path cards (.not-prose)
           // draw their own link styles.
           const link =
@@ -155,11 +145,12 @@ for (const path of PATHS) {
             barImage: cs(bar)?.backgroundImage || "",
             barBg: cs(bar)?.backgroundColor || "",
             github: !!q('#navbar a[href^="https://github.com/"]'),
-            // Mintlify's floating "Ask a question" bar must not show: the
-            // "Ask AI" pill (ask-ai.js) replaces it. Luma's assistant button
-            // in the header stays (hiding it would move the header).
+            // Mintlify's own assistant entries must not show: the floating
+            // "Ask AI" pill (ask-ai.js) is the only way in.
             assistantBar: [
-              ...document.querySelectorAll(".chat-assistant-floating-input"),
+              ...document.querySelectorAll(
+                "#assistant-entry, #assistant-entry-mobile, .chat-assistant-floating-input",
+              ),
             ].some((e) => e.getClientRects().length > 0),
             pill: pillBox
               ? {
@@ -192,36 +183,39 @@ for (const path of PATHS) {
               ? getComputedStyle(fourth, "::after").content
               : "",
             tabsVisible: !!row && row.getBoundingClientRect().width > 0,
-            tabIcons: tabs.filter((a) => a?.querySelector("svg")).length,
-            // Luma's one-row header (theme.css section 4).
+            // Distance from the row's end edge (left in RTL).
+            extRight:
+              ext && row
+                ? Math.round(
+                    getComputedStyle(row).direction === "rtl"
+                      ? ext.getBoundingClientRect().left -
+                          row.getBoundingClientRect().left
+                      : row.getBoundingClientRect().right -
+                          ext.getBoundingClientRect().right,
+                  )
+                : null,
+            // One-row header (theme.css 5b, >= 1280px).
             header: (() => {
               const nav = q("#navbar")?.getBoundingClientRect();
               const search = q("#search-bar-entry")?.getBoundingClientRect();
-              const logo = q("#navbar img.nav-logo:not(.hidden)");
-              const visibleLogo =
-                [...document.querySelectorAll("#navbar img.nav-logo")].find(
-                  (i) => i.getClientRects().length && i.width > 0,
-                ) || logo;
-              const side = q("#sidebar-content")?.getBoundingClientRect();
+              const active = q("#navbar .nav-tabs-item > div.bg-primary");
+              const side = q("#sidebar")?.getBoundingClientRect();
+              const toc = q("#table-of-contents")?.getBoundingClientRect();
               if (!nav || !row || !search) return null;
               const tabsBox = row.getBoundingClientRect();
               const mid = (b) => b.top + b.height / 2;
-              const lb = visibleLogo?.getBoundingClientRect();
               return {
                 height: Math.round(nav.height),
                 sameRow: Math.abs(mid(tabsBox) - mid(search)) < 8,
-                // Rendered width vs the width its height asks for.
-                logoSqueeze:
-                  visibleLogo && visibleLogo.naturalHeight
-                    ? Math.round(
-                        (lb.height * visibleLogo.naturalWidth) /
-                          visibleLogo.naturalHeight -
-                          lb.width,
-                      )
-                    : null,
+                underlineGap: active
+                  ? Math.round(
+                      nav.bottom - active.getBoundingClientRect().bottom,
+                    )
+                  : null,
                 sidebarTop: side?.width
                   ? Math.round(side.top - nav.bottom)
                   : null,
+                tocTop: toc?.width ? Math.round(toc.top - nav.bottom) : null,
               };
             })(),
             linkColor: cs(link)?.color || "",
@@ -301,72 +295,22 @@ for (const path of PATHS) {
             );
           if (r.tabCount >= 4 && (!r.fourthAfter || r.fourthAfter === "none"))
             fail(ctxName, "tab divider missing");
-          if (r.tabIcons)
-            fail(
-              ctxName,
-              `${r.tabIcons} tab(s) with an icon (navigation icon)`,
-            );
+          if (r.extRight !== null && r.extRight > 4)
+            fail(ctxName, `external tab not at row end (${r.extRight}px)`);
         }
-        if (vpName !== "mobile" && r.tabsVisible) {
+        if (vpName === "desktop" && r.tabsVisible) {
           const h = r.header;
           if (!h) fail(ctxName, "header elements missing");
           else {
-            if (h.height !== 48)
-              fail(ctxName, `header ${h.height}px tall, expected one 48px row`);
+            if (h.height !== 64)
+              fail(ctxName, `header ${h.height}px tall, expected one 64px row`);
             if (!h.sameRow) fail(ctxName, "tabs and search not on one row");
-            if (h.logoSqueeze === null || h.logoSqueeze > 1)
-              fail(ctxName, `logo squeezed by ${h.logoSqueeze}px`);
+            if (h.underlineGap === null || Math.abs(h.underlineGap) > 2)
+              fail(ctxName, `active tab underline off (${h.underlineGap}px)`);
             if (h.sidebarTop !== null && (h.sidebarTop < 0 || h.sidebarTop > 2))
               fail(ctxName, `sidebar starts ${h.sidebarTop}px from the header`);
-          }
-        }
-        // The header must not depend on our CSS where Luma's row fits: the
-        // same boxes with the custom <style> blocks removed.
-        if (vpName === "desktop" && js && r.tabsVisible) {
-          const boxes = () =>
-            page.evaluate(() =>
-              [
-                "#navbar",
-                "#navbar img.nav-logo",
-                "#localization-select-trigger",
-                ...[
-                  ...document.querySelectorAll(
-                    '#navbar nav[aria-label="Main"] > ul > li > a',
-                  ),
-                ].map(
-                  (_, i) =>
-                    `#navbar nav[aria-label="Main"] > ul > li:nth-child(${i + 1}) > a`,
-                ),
-                "#search-bar-entry",
-                "#assistant-entry",
-                "#theme-preference-menu-trigger",
-              ].map((sel) => {
-                const e = [...document.querySelectorAll(sel)].find(
-                  (x) => x.getClientRects().length,
-                );
-                const b = e?.getBoundingClientRect();
-                return b ? [sel, b.x, b.y, b.width, b.height] : [sel];
-              }),
-            );
-          const withCss = await boxes();
-          await page.evaluate(() =>
-            document
-              .querySelectorAll("style[data-custom-css-index]")
-              .forEach((s) => s.remove()),
-          );
-          await page.waitForTimeout(100);
-          const native = await boxes();
-          for (const [i, a] of withCss.entries()) {
-            const b = native[i];
-            if (a.length !== b.length) {
-              fail(ctxName, `${a[0]} differs without our CSS (present/absent)`);
-              continue;
-            }
-            const d = Math.max(
-              ...a.slice(1).map((v, k) => Math.abs(v - b[k + 1])),
-            );
-            if (d > 0.5)
-              fail(ctxName, `${a[0]} moves ${d.toFixed(1)}px without our CSS`);
+            if (h.tocTop !== null && h.tocTop < 0)
+              fail(ctxName, `TOC starts under the header (${h.tocTop}px)`);
           }
         }
         if (r.linkColor) {

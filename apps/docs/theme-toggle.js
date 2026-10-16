@@ -1,18 +1,17 @@
 /*
  * One-click light/dark toggle for the top bar (2026-10-16), like the old
- * solana.com docs: a click switches straight to the other mode; the label
- * names the mode it switches to ("Switch to dark mode").
+ * solana.com docs: a click switches straight to the other mode, and the icon
+ * shows the mode you would switch to (a moon in light mode, a sun in dark).
  * Mintlify injects every .js file in the project root on every page.
  *
- * Luma's #theme-preference-menu-trigger opens a System/Light/Dark menu.
+ * Mintlify's #theme-preference-menu-trigger opens a System/Light/Dark menu.
  * To keep Mintlify's own theme state (next-themes, localStorage "isDarkMode",
  * html[data-theme-preference]) in sync, this script does not set the theme
  * itself: whenever that menu opens (click, Enter or Space), it picks the item
  * for the opposite of the current mode (html.dark), which also closes the
- * menu. styles/theme.css hides the menu while html[data-sol-theme-toggle] is
- * set. The icon stays Luma's (the current preference: system, sun or moon),
- * so the header's first paint is already final. The default stays "system"
- * until the first click. Without JavaScript the button is unchanged.
+ * menu. styles/theme.css hides the menu and swaps the icon while
+ * html[data-sol-theme-toggle] is set. The default stays "system" until the
+ * first click. Without JavaScript the button is unchanged.
  * FRAGILE: relies on Mintlify's ids #theme-preference-menu-trigger,
  * #theme-preference-menu-content and #theme-preference-menu-item-{light,dark}.
  */
