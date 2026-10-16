@@ -1,7 +1,6 @@
-/**
- * In-memory order store standing in for your database (not shown on the docs
- * page). A real store would persist orders and paid signatures.
- */
+// #region orders
+// An in-memory order store standing in for your database. A real store
+// persists orders and paid signatures.
 import type { Address, Signature } from "@solana/kit";
 
 export interface Order {
@@ -45,3 +44,4 @@ export async function markPaidOnce(
 export async function isSignatureUsed(signature: Signature): Promise<boolean> {
   return paidSignatures.has(signature);
 }
+// #endregion orders

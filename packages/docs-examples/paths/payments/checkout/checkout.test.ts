@@ -9,9 +9,10 @@ import {
 import { beforeAll, describe, expect, it } from "vitest";
 import { fundSol, setTokenBalance } from "../../../test/fixtures/fund";
 import { recordText, runExample } from "../../../test/record";
-import { confirm, demoPay, demoVerify, newOrder } from "./demo";
+import { confirm, demoVerify, newOrder } from "./demo";
 import { getOrder, type Order } from "./orders";
 import { payStore } from "./pay";
+import { run } from "./run";
 import { createCheckoutServer } from "./server";
 import { verifyPayment } from "./verify-payment";
 import { USDC_MINT } from "./config";
@@ -30,15 +31,21 @@ describe("paths/payments/checkout", () => {
     await fundSol(customer.address);
     await setTokenBalance(customer.address, 10_000_000n); // 10 USDC
     await setTokenBalance(store.address, 0n); // the store's USDC account exists
-    order = await newOrder("order-1001", store.address, 1_000_000n);
   });
 
-  it("pay: the customer pays 1 USDC with the order reference", async () => {
-    const r = await runExample(() => demoPay(customer, order), {
-      output: out("pay"),
+  it("run: checkout/run.ts pays an order and confirms it once", async () => {
+    const r = await runExample(() => run(customer, 0), {
+      output: out("run"),
     });
-    paid = r.value;
-    expect(r.succeeded).toEqual([paid]);
+    ({ order, signature: paid } = r.value);
+    expect(r.value.results).toEqual([200, 402]);
+    expect([...new Set(r.succeeded)]).toEqual([paid]);
+    // Step 1 and the browser page show the lines run.ts printed around
+    // payStore().
+    const lines = r.text.split("\n");
+    const from = lines.findIndex((l) => l.startsWith("Paid order-1001"));
+    expect(from).toBeGreaterThan(-1);
+    recordText(out("pay"), lines.slice(from, from + 4).join("\n"));
   });
 
   it("verify: verifyPayment checks amount, mint, recipient and reference", async () => {
@@ -57,7 +64,7 @@ describe("paths/payments/checkout", () => {
 
     const base = {
       signature: paid,
-      storeOwner: store.address,
+      storeOwner: order.storeOwner,
       mint: USDC_MINT,
       amount: order.amount,
       reference: order.reference,
@@ -84,23 +91,22 @@ describe("paths/payments/checkout", () => {
   });
 
   it("route: confirms once, rejects a replay and a short payment", async () => {
+    const order2 = await newOrder("order-1002", store.address, 1_000_000n);
+    const sig2 = await payStore(customer, order2);
+    const order3 = await newOrder("order-1003", store.address, 2_000_000n);
+    const short = await payStore(customer, { ...order3, amount: 1_000_000n });
     const r = await runExample(
       async () => {
-        const first = await confirm(order.id, paid);
-        const replay = await confirm(order.id, paid);
-        const order2 = await newOrder("order-1002", store.address, 2_000_000n);
-        const short = await demoPay(customer, {
-          ...order2,
-          amount: 1_000_000n,
-        });
-        const underpaid = await confirm(order2.id, short);
+        const first = await confirm(order2.id, sig2);
+        const replay = await confirm(order2.id, sig2);
+        const underpaid = await confirm(order3.id, short);
         return { first, replay, underpaid };
       },
       { output: out("route") },
     );
     expect(r.value.first).toEqual({
       status: 200,
-      body: { paid: true, orderId: order.id, signature: paid },
+      body: { paid: true, orderId: order2.id, signature: sig2 },
     });
     expect(r.value.replay).toEqual({
       status: 402,
@@ -122,33 +128,17 @@ describe("paths/payments/checkout", () => {
     );
     const { port } = server.address() as AddressInfo;
     try {
-      const r = await runExample(
-        async () => {
-          const order3 = await newOrder(
-            "order-1003",
-            store.address,
-            1_500_000n,
-          );
-          const sig = await demoPay(customer, order3);
-          const res = await fetch(
-            `http://127.0.0.1:${port}/api/orders/${order3.id}/confirm`,
-            {
-              method: "POST",
-              headers: { "content-type": "application/json" },
-              body: JSON.stringify({ signature: sig }),
-            },
-          );
-          const body = await res.json();
-          console.log(
-            `POST /api/orders/${order3.id}/confirm ->`,
-            res.status,
-            JSON.stringify(body),
-          );
-          return res.status;
+      const order4 = await newOrder("order-1004", store.address, 1_500_000n);
+      const sig = await payStore(customer, order4);
+      const res4 = await fetch(
+        `http://127.0.0.1:${port}/api/orders/${order4.id}/confirm`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ signature: sig }),
         },
-        { output: out("server") },
       );
-      expect(r.value).toBe(200);
+      expect(res4.status).toBe(200);
 
       // Hostile or broken requests get 4xx answers and the server stays up.
       const post = (path: string, body: string) =>
@@ -161,15 +151,15 @@ describe("paths/payments/checkout", () => {
         400,
       );
       expect(
-        (await post("/api/orders/order-1003/confirm", "not json")).status,
+        (await post("/api/orders/order-1004/confirm", "not json")).status,
       ).toBe(400);
       expect(
-        (await post("/api/orders/order-1003/confirm", "null")).status,
+        (await post("/api/orders/order-1004/confirm", "null")).status,
       ).toBe(400);
       expect(
         (
           await post(
-            "/api/orders/order-1003/confirm",
+            "/api/orders/order-1004/confirm",
             JSON.stringify({ signature: 42 }),
           )
         ).status,
@@ -177,9 +167,9 @@ describe("paths/payments/checkout", () => {
       expect((await post("/api/orders/nope/confirm", "{}")).status).toBe(404);
 
       // A second, different valid payment for an already-paid order is refused.
-      const again = await payStore(customer, (await getOrder("order-1003"))!);
+      const again = await payStore(customer, (await getOrder("order-1004"))!);
       const res = await post(
-        "/api/orders/order-1003/confirm",
+        "/api/orders/order-1004/confirm",
         JSON.stringify({ signature: again }),
       );
       expect(res.status).toBe(402);
@@ -193,20 +183,20 @@ describe("paths/payments/checkout", () => {
   const hasSolanaPy =
     spawnSync(python, ["-c", "import solana, solders"]).status === 0;
   it.skipIf(!hasSolanaPy)("python: verify_payment.py agrees", async () => {
-    const run = (amount: bigint) =>
+    const py = (amount: bigint) =>
       spawnSync(
         python,
         [
           fileURLToPath(new URL("./verify_payment.py", import.meta.url)),
           paid,
-          store.address,
+          order.storeOwner,
           String(amount),
           order.reference,
         ],
         { encoding: "utf8", env: { ...process.env } },
       );
-    const ok = run(order.amount);
-    const bad = run(5_000_000n);
+    const ok = py(order.amount);
+    const bad = py(5_000_000n);
     expect(ok.status, ok.stderr).toBe(0);
     expect(ok.stdout.trim()).toBe("paid: True");
     expect(bad.stdout.trim()).toBe(

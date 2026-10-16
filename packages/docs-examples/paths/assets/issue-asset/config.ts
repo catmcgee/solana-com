@@ -12,6 +12,7 @@ import {
   setTransactionMessageLifetimeUsingBlockhash,
   signTransactionMessageWithSigners,
   type Instruction,
+  type Signature,
   type TransactionSigner,
 } from "@solana/kit";
 
@@ -56,5 +57,17 @@ export async function send(
     });
   }
   return signature;
+}
+
+/** The network fee a confirmed transaction paid, in lamports. */
+export async function fee(signature: Signature) {
+  const tx = await rpc
+    .getTransaction(signature, {
+      commitment: "confirmed",
+      encoding: "json",
+      maxSupportedTransactionVersion: 0,
+    })
+    .send();
+  return tx?.meta?.fee ?? 0n;
 }
 // #endregion config

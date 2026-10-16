@@ -25,9 +25,8 @@ import {
 } from "./x402";
 
 /**
- * fetch() that pays: on a 402 it picks the USDC "exact" option, refuses
- * anything above `maxAmount`, signs a USDC transfer to `payTo` and retries
- * with the signed transaction in the X-PAYMENT header.
+ * fetch() that pays: on a 402 it signs a payment for the price and retries
+ * with it in the X-PAYMENT header.
  */
 export async function fetchWithPayment(
   url: string,
@@ -35,8 +34,22 @@ export async function fetchWithPayment(
 ): Promise<Response> {
   const first = await fetch(url);
   if (first.status !== 402) return first;
+  const header = await createPaymentHeader(
+    (await first.json()) as PaymentRequired,
+    options,
+  );
+  return fetch(url, { headers: { "X-PAYMENT": header } });
+}
 
-  const { accepts } = (await first.json()) as PaymentRequired;
+/**
+ * Pick the USDC "exact" option from a 402 answer, refuse anything above
+ * `maxAmount`, and sign a USDC transfer to `payTo`. Returns the X-PAYMENT
+ * header value.
+ */
+export async function createPaymentHeader(
+  { accepts }: PaymentRequired,
+  options: { signer: TransactionSigner; maxAmount: bigint },
+): Promise<string> {
   const option = accepts.find(
     (a) =>
       a.scheme === "exact" && a.network === NETWORK && a.asset === USDC_MINT,
@@ -87,6 +100,6 @@ export async function fetchWithPayment(
     network: option.network,
     payload: { transaction: getBase64EncodedWireTransaction(signed) },
   };
-  return fetch(url, { headers: { "X-PAYMENT": encodeHeader(payment) } });
+  return encodeHeader(payment);
 }
 // #endregion client

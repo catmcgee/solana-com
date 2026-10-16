@@ -13,14 +13,33 @@ import {
 import { beforeAll, describe, expect, it } from "vitest";
 import { fundSol } from "../../../test/fixtures/fund";
 import { runExample } from "../../../test/record";
-import { clawBack, failure, pause, resume } from "./blocked-transfer";
+import {
+  clawBack,
+  failure,
+  pause,
+  resume,
+  sendToUnapproved,
+  sendToUnapprovedWithPreflight,
+  transfer,
+} from "./blocked-transfer";
 import { rpc, send } from "./config";
-import { balanceOf, demoApprove, demoBlocked, demoCreate } from "./demo";
+import { createAsset } from "./create-asset";
 import { approveHolder, openAccount, tokenAccountOf } from "./approve-holder";
 import { run } from "./run";
 import { runConfidential } from "./confidential";
 
 const out = (name: string) => new URL(`./${name}.output.txt`, import.meta.url);
+const json = (v: unknown) =>
+  JSON.stringify(v, (_k, x) => (typeof x === "bigint" ? Number(x) : x));
+
+async function balanceOf(owner: Address, mint: Address) {
+  const { data } = await fetchToken(rpc, await tokenAccountOf(owner, mint));
+  return data.amount;
+}
+
+// Every recorded line below is printed by the functions shown on the pages
+// (create-asset.ts, approve-holder.ts, blocked-transfer.ts, run.ts); the
+// tests only call them in order and print nothing themselves.
 
 describe("paths/assets/issue-asset (Token-2022 restricted asset)", () => {
   let issuer: KeyPairSigner;
@@ -38,7 +57,7 @@ describe("paths/assets/issue-asset (Token-2022 restricted asset)", () => {
   });
 
   it("create: mint with metadata, pausable, permanent delegate, default frozen", async () => {
-    const r = await runExample(() => demoCreate(issuer), {
+    const r = await runExample(() => createAsset(issuer), {
       output: out("create-asset"),
     });
     mint = r.value.mint;
@@ -56,43 +75,67 @@ describe("paths/assets/issue-asset (Token-2022 restricted asset)", () => {
   it("approve: accounts start frozen; the issuer thaws and mints to a holder", async () => {
     const r = await runExample(
       async () => {
-        const a = await demoApprove(
-          issuer,
-          mint,
-          holder.address,
-          1_000_000_000n,
-        );
-        const b = await demoApprove(issuer, mint, approved.address, 0n);
-        return [a, b];
+        const result = [];
+        for (const [owner, amount] of [
+          [holder.address, 1_000_000_000n],
+          [approved.address, 0n],
+        ] as const) {
+          const opened = await openAccount(issuer, mint, owner);
+          expect(opened.state).toBe("Frozen");
+          result.push(await approveHolder(issuer, mint, owner, amount));
+        }
+        return result;
       },
       { output: out("approve-holder") },
     );
     expect(r.value.map((x) => x.state)).toEqual(["Initialized", "Initialized"]);
     expect(r.value[0]!.balance).toBe(1_000_000_000n);
     // The issuer's own treasury account, where the permanent delegate step
-    // moves tokens to (setup, not printed).
+    // moves tokens to (setup, not recorded).
     await openAccount(issuer, mint, issuer.address);
     await approveHolder(issuer, mint, issuer.address);
   });
 
   it("blocked: transfer to a frozen account fails with Custom 17 and still pays the fee", async () => {
     const r = await runExample(
-      () =>
-        demoBlocked(issuer, mint, holder, approved.address, unapproved.address),
+      async () => {
+        await transfer(holder, mint, approved.address, 100_000_000n);
+        await openAccount(issuer, mint, unapproved.address);
+        const blocked = await sendToUnapproved(
+          holder,
+          mint,
+          unapproved.address,
+        );
+        const rejected = await sendToUnapprovedWithPreflight(
+          holder,
+          mint,
+          unapproved.address,
+        );
+        await pause(issuer, mint);
+        const paused = await transfer(
+          holder,
+          mint,
+          approved.address,
+          1_000_000n,
+        ).then(
+          () => "",
+          (e: Error & { cause?: Error }) => (e.cause ?? e).message,
+        );
+        await resume(issuer, mint);
+        await clawBack(issuer, mint, approved.address, 50_000_000n);
+        return { blocked, rejected, paused };
+      },
       { output: out("blocked-transfer"), failedLabel: /Failed signature/ },
     );
-    const { blocked, rejected, pausedError } = r.value;
+    const { blocked, rejected, paused } = r.value;
     expect(r.failed).toEqual([blocked.signature]);
     // Token-2022 AccountFrozen = custom error 17 (0x11).
-    expect(
-      JSON.stringify(blocked.err, (_k, v) =>
-        typeof v === "bigint" ? Number(v) : v,
-      ),
-    ).toBe('{"InstructionError":[0,{"Custom":17}]}');
+    expect(json(blocked.err)).toBe('{"InstructionError":[0,{"Custom":17}]}');
     expect(blocked.fee).toBeGreaterThan(0n);
     expect(blocked.log).toMatch(/Account is frozen/);
     expect(rejected.accountFrozen).toBe(true);
-    expect(pausedError).not.toBe("");
+    // Token-2022 MintPaused = custom error 67 (0x43).
+    expect(paused).toMatch(/#67/);
     expect(await balanceOf(unapproved.address, mint)).toBe(0n);
     expect(await balanceOf(approved.address, mint)).toBe(50_000_000n);
     expect(await balanceOf(holder.address, mint)).toBe(900_000_000n);
@@ -202,13 +245,15 @@ describe("paths/assets/issue-asset (Token-2022 restricted asset)", () => {
   it("run: the page's run.ts script does the whole sequence on a fresh asset", async () => {
     const runner = await generateKeyPairSigner();
     await fundSol(runner.address, 2);
-    const r = await run(runner);
+    const { value: r } = await runExample(() => run(runner), {
+      output: out("run"),
+      failedLabel: /Failed signature/,
+    });
     expect((await failure(r.sent)).err).toBeNull();
-    expect(
-      JSON.stringify((await failure(r.blocked.signature)).err, (_k, v) =>
-        typeof v === "bigint" ? Number(v) : v,
-      ),
-    ).toBe('{"InstructionError":[0,{"Custom":17}]}');
+    expect(json((await failure(r.blocked.signature)).err)).toBe(
+      '{"InstructionError":[0,{"Custom":17}]}',
+    );
+    expect(r.rejected.accountFrozen).toBe(true);
     expect(r.pausedTransferFailed).toBe(true);
     expect((await failure(r.recovered)).err).toBeNull();
     expect(await balanceOf(runner.address, r.mint)).toBe(50_000_000n);

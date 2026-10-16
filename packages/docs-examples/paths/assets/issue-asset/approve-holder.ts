@@ -11,6 +11,9 @@ import {
 } from "@solana-program/token-2022";
 import { rpc, send } from "./config";
 
+/** Base units as LSF (6 decimals), for printing. */
+export const lsf = (amount: bigint) => `${Number(amount) / 1e6} LSF`;
+
 export async function tokenAccountOf(owner: Address, mint: Address) {
   const [ata] = await findAssociatedTokenPda({
     owner,
@@ -37,7 +40,9 @@ export async function openAccount(
     }),
   ]);
   const { data } = await fetchToken(rpc, account);
-  return { account, state: AccountState[data.state] };
+  const state = AccountState[data.state];
+  console.log("Opened", account, "state:", state);
+  return { account, state };
 }
 
 /**
@@ -66,11 +71,16 @@ export async function approveHolder(
       : []),
   ]);
   const { data } = await fetchToken(rpc, account);
-  return {
+  const state = AccountState[data.state];
+  console.log(
+    "Approved",
     account,
-    signature,
-    state: AccountState[data.state],
-    balance: data.amount,
-  };
+    "state:",
+    state,
+    "balance:",
+    lsf(data.amount),
+  );
+  console.log("Signature:", signature);
+  return { account, signature, state, balance: data.amount };
 }
 // #endregion approve

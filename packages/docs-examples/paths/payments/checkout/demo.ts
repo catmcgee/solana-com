@@ -1,31 +1,17 @@
 /**
- * Drives the checkout steps the way a store would and prints what happens.
- * The docs embed what each step prints as its recorded output. Run it against
- * a local Surfpool (`surfpool start`) with
- * RPC_URL=http://127.0.0.1:8899 RPC_SUBSCRIPTIONS_URL=ws://127.0.0.1:8900.
+ * Test helpers for the checkout recordings. They call the code shown on the
+ * pages; `demoVerify` and `confirm` print each call's result the way the
+ * terminal panels on the backend page show it.
  */
 import {
   generateKeyPairSigner,
   type Address,
   type Signature,
-  type TransactionSigner,
 } from "@solana/kit";
-import { rpc, USDC_MINT } from "./config";
+import { USDC_MINT } from "./config";
 import { createOrder, type Order } from "./orders";
-import { payStore } from "./pay";
 import { POST } from "./route";
 import { verifyPayment } from "./verify-payment";
-
-export async function fee(signature: Signature): Promise<bigint> {
-  const tx = await rpc
-    .getTransaction(signature, {
-      commitment: "confirmed",
-      encoding: "json",
-      maxSupportedTransactionVersion: 0,
-    })
-    .send();
-  return tx?.meta?.fee ?? 0n;
-}
 
 export async function newOrder(
   id: string,
@@ -36,19 +22,7 @@ export async function newOrder(
   return createOrder({ id, storeOwner, amount, reference });
 }
 
-/** Step 1: the customer pays. */
-export async function demoPay(customer: TransactionSigner, order: Order) {
-  const signature = await payStore(customer, order);
-  console.log(
-    `Paid ${order.id}: ${Number(order.amount) / 1e6} USDC (${order.amount} base units)`,
-  );
-  console.log("Reference:", order.reference);
-  console.log("Signature:", signature);
-  console.log("Fee:", String(await fee(signature)), "lamports");
-  return signature;
-}
-
-/** Step 2: the backend verifies by signature. */
+/** The backend verifies by signature. */
 export async function demoVerify(
   order: Pick<Order, "id" | "storeOwner" | "amount" | "reference">,
   signature: Signature,
@@ -67,7 +41,7 @@ export async function demoVerify(
   return check;
 }
 
-/** Step 3: the confirm route, called three ways. */
+/** The Next.js confirm route, called with a Request. */
 export async function confirm(orderId: string, signature: string) {
   const res = await POST(
     new Request(`http://localhost/api/orders/${orderId}/confirm`, {

@@ -11,23 +11,30 @@ import {
   createKeyPairSignerFromBytes,
   generateKeyPairSigner,
   lamports,
+  type Address,
   type TransactionSigner,
 } from "@solana/kit";
 import { getTransferSolInstruction } from "@solana-program/system";
-import { approveHolder, openAccount } from "./approve-holder";
+import { fetchToken } from "@solana-program/token-2022";
+import {
+  approveHolder,
+  lsf,
+  openAccount,
+  tokenAccountOf,
+} from "./approve-holder";
 import {
   clawBack,
   pause,
   resume,
   sendToUnapproved,
+  sendToUnapprovedWithPreflight,
   transfer,
 } from "./blocked-transfer";
-import { send } from "./config";
+import { rpc, send } from "./config";
 import { createAsset } from "./create-asset";
 
 export async function run(issuer: TransactionSigner) {
   const { mint } = await createAsset(issuer);
-  console.log("Created the asset. Mint:", mint);
 
   const holder = await generateKeyPairSigner();
   const approved = await generateKeyPairSigner();
@@ -53,13 +60,14 @@ export async function run(issuer: TransactionSigner) {
   }
 
   const sent = await transfer(holder, mint, approved.address, 100_000_000n);
-  console.log("100 LSF to the approved investor: confirmed", sent);
 
+  // The unapproved account exists but stays frozen.
   await openAccount(issuer, mint, unapproved.address);
   const blocked = await sendToUnapproved(holder, mint, unapproved.address);
-  console.log(
-    "1 LSF to an unapproved account: failed onchain",
-    blocked.signature,
+  const rejected = await sendToUnapprovedWithPreflight(
+    holder,
+    mint,
+    unapproved.address,
   );
 
   await pause(issuer, mint);
@@ -67,15 +75,26 @@ export async function run(issuer: TransactionSigner) {
   try {
     await transfer(holder, mint, approved.address, 1_000_000n);
   } catch {
-    pausedTransferFailed = true;
-    console.log("Transfer while paused: rejected");
+    pausedTransferFailed = true; // transfer() printed why
   }
   await resume(issuer, mint);
 
   const recovered = await clawBack(issuer, mint, approved.address, 50_000_000n);
-  console.log("Permanent delegate moved 50 LSF to the issuer:", recovered);
 
-  return { mint, sent, blocked, pausedTransferFailed, recovered };
+  const balance = async (owner: Address) =>
+    lsf((await fetchToken(rpc, await tokenAccountOf(owner, mint))).data.amount);
+  console.log(
+    "Balances: holder",
+    await balance(holder.address),
+    "| approved",
+    await balance(approved.address),
+    "| unapproved",
+    await balance(unapproved.address),
+    "| issuer",
+    await balance(issuer.address),
+  );
+
+  return { mint, sent, blocked, rejected, pausedTransferFailed, recovered };
 }
 
 // Run when started directly (not when imported by the tests).

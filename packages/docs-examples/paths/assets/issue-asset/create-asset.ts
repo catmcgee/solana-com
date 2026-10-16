@@ -16,7 +16,7 @@ import {
   getPreInitializeInstructionsForMintExtensions,
   TOKEN_2022_PROGRAM_ADDRESS,
 } from "@solana-program/token-2022";
-import { rpc, send } from "./config";
+import { fee, rpc, send } from "./config";
 
 /**
  * A restricted asset: onchain metadata, transfers the issuer can pause, a
@@ -82,6 +82,10 @@ export async function createAsset(
     account.data.extensions.__option === "Some"
       ? account.data.extensions.value.map((e) => e.__kind)
       : [];
+  console.log("Mint:", mint.address);
+  console.log("Extensions:", enabled.join(", "));
+  console.log("Signature:", signature);
+  console.log("Fee:", String(await fee(signature)), "lamports");
   return { mint: mint.address, signature, extensions: enabled };
 }
 // #endregion create

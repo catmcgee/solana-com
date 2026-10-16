@@ -13,7 +13,7 @@ import {
   TOKEN_2022_ERROR__ACCOUNT_FROZEN,
 } from "@solana-program/token-2022";
 import { rpc, send } from "./config";
-import { tokenAccountOf } from "./approve-holder";
+import { lsf, tokenAccountOf } from "./approve-holder";
 
 export async function transfer(
   from: TransactionSigner,
@@ -22,20 +22,36 @@ export async function transfer(
   amount: bigint,
   options: { skipPreflight?: boolean; feePayer?: TransactionSigner } = {},
 ) {
-  return send(
-    options.feePayer ?? from,
-    [
-      getTransferCheckedInstruction({
-        source: await tokenAccountOf(from.address, mint),
-        mint,
-        destination: await tokenAccountOf(to, mint),
-        authority: from,
-        amount,
-        decimals: 6,
-      }),
-    ],
-    options,
-  );
+  try {
+    const signature = await send(
+      options.feePayer ?? from,
+      [
+        getTransferCheckedInstruction({
+          source: await tokenAccountOf(from.address, mint),
+          mint,
+          destination: await tokenAccountOf(to, mint),
+          authority: from,
+          amount,
+          decimals: 6,
+        }),
+      ],
+      options,
+    );
+    console.log(`Transfer ${lsf(amount)}: confirmed`);
+    console.log("Signature:", signature);
+    return signature;
+  } catch (error) {
+    // With preflight, the RPC node simulates the transfer and rejects it with
+    // the program's error. With skipPreflight, it lands and fails onchain.
+    const cause = isSolanaError(error) ? error.cause : undefined;
+    console.log(
+      `Transfer ${lsf(amount)}:`,
+      options.skipPreflight
+        ? "failed onchain"
+        : `rejected: ${((cause ?? error) as Error).message}`,
+    );
+    throw error;
+  }
 }
 
 /** What a failed transaction did onchain: its error, the program log and the fee. */
@@ -72,7 +88,16 @@ export async function sendToUnapproved(
   } catch (error) {
     const signature = (error as { signature?: Signature }).signature;
     if (!signature) throw error;
-    return { signature, ...(await failure(signature)) };
+    const failed = { signature, ...(await failure(signature)) };
+    // `err` holds bigints, which JSON.stringify can't print as they are.
+    const json = JSON.stringify(failed.err, (_k, v) =>
+      typeof v === "bigint" ? Number(v) : v,
+    );
+    console.log("Failed signature:", signature);
+    console.log("  err:", json);
+    console.log("  log:", failed.log);
+    console.log("  fee paid anyway:", String(failed.fee), "lamports");
+    return failed;
   }
 }
 
@@ -90,13 +115,15 @@ export async function sendToUnapprovedWithPreflight(
       transactionMessage: Parameters<typeof isToken2022Error>[1];
     };
     const cause = isSolanaError(error) ? error.cause : undefined;
+    const accountFrozen = isToken2022Error(
+      cause,
+      transactionMessage,
+      TOKEN_2022_ERROR__ACCOUNT_FROZEN,
+    );
+    console.log("  accountFrozen:", accountFrozen, "(no fee: it never landed)");
     return {
       code: isSolanaError(error) ? error.context.__code : undefined,
-      accountFrozen: isToken2022Error(
-        cause,
-        transactionMessage,
-        TOKEN_2022_ERROR__ACCOUNT_FROZEN,
-      ),
+      accountFrozen,
       message:
         (cause as Error | undefined)?.message ?? (error as Error).message,
     };
@@ -113,7 +140,7 @@ export async function clawBack(
   holder: Address,
   amount: bigint,
 ) {
-  return send(issuer, [
+  const signature = await send(issuer, [
     getTransferCheckedInstruction({
       source: await tokenAccountOf(holder, mint),
       mint,
@@ -123,13 +150,24 @@ export async function clawBack(
       decimals: 6,
     }),
   ]);
+  console.log(`Permanent delegate moved ${lsf(amount)} from ${holder}`);
+  console.log("Signature:", signature);
+  return signature;
 }
 
 /** Pause every transfer of the asset, then resume. */
 export async function pause(issuer: TransactionSigner, mint: Address) {
-  return send(issuer, [getPauseInstruction({ mint, authority: issuer })]);
+  const signature = await send(issuer, [
+    getPauseInstruction({ mint, authority: issuer }),
+  ]);
+  console.log("Paused the asset. Signature:", signature);
+  return signature;
 }
 export async function resume(issuer: TransactionSigner, mint: Address) {
-  return send(issuer, [getResumeInstruction({ mint, authority: issuer })]);
+  const signature = await send(issuer, [
+    getResumeInstruction({ mint, authority: issuer }),
+  ]);
+  console.log("Resumed the asset. Signature:", signature);
+  return signature;
 }
 // #endregion blocked

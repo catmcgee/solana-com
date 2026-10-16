@@ -2,7 +2,7 @@
 
 <div className="sol-pg" data-pg-src="packages/docs-examples/paths/payments/paywall-api/client.ts" data-pg-open="packages/docs-examples/paths/payments/paywall-api" data-pg-kind="ts" />
 
-```ts client.ts
+```ts paywall-api/client.ts
 import {
   address,
   appendTransactionMessageInstructions,
@@ -29,9 +29,8 @@ import {
 } from "./x402";
 
 /**
- * fetch() that pays: on a 402 it picks the USDC "exact" option, refuses
- * anything above `maxAmount`, signs a USDC transfer to `payTo` and retries
- * with the signed transaction in the X-PAYMENT header.
+ * fetch() that pays: on a 402 it signs a payment for the price and retries
+ * with it in the X-PAYMENT header.
  */
 export async function fetchWithPayment(
   url: string,
@@ -39,8 +38,22 @@ export async function fetchWithPayment(
 ): Promise<Response> {
   const first = await fetch(url);
   if (first.status !== 402) return first;
+  const header = await createPaymentHeader(
+    (await first.json()) as PaymentRequired,
+    options,
+  );
+  return fetch(url, { headers: { "X-PAYMENT": header } });
+}
 
-  const { accepts } = (await first.json()) as PaymentRequired;
+/**
+ * Pick the USDC "exact" option from a 402 answer, refuse anything above
+ * `maxAmount`, and sign a USDC transfer to `payTo`. Returns the X-PAYMENT
+ * header value.
+ */
+export async function createPaymentHeader(
+  { accepts }: PaymentRequired,
+  options: { signer: TransactionSigner; maxAmount: bigint },
+): Promise<string> {
   const option = accepts.find(
     (a) =>
       a.scheme === "exact" && a.network === NETWORK && a.asset === USDC_MINT,
@@ -91,24 +104,6 @@ export async function fetchWithPayment(
     network: option.network,
     payload: { transaction: getBase64EncodedWireTransaction(signed) },
   };
-  return fetch(url, { headers: { "X-PAYMENT": encodeHeader(payment) } });
+  return encodeHeader(payment);
 }
 ```
-
-<div className="sol-term not-prose" data-term="paths/payments/paywall-api/client" data-tab="client.ts" data-kind="block" data-steps="1" data-l-run="Run" data-l-run-step="Run step" data-l-next="Next step" data-l-all="Run all" data-l-again="Run again" data-l-running="Running…" data-l-tx="Sending transaction…" data-l-http="Requesting…" data-l-call="Running…" data-l-confirming="Confirming…" data-l-done="Done" data-l-copied="Copied" data-l-step="Step">
-<div className="sol-term-head"><span className="sol-term-dots" aria-hidden="true"><i></i><i></i><i></i></span><span className="sol-term-title">A paid request, the same payment sent again and a client with a spending cap below the price</span><span className="sol-term-env">Local test network (Surfpool)</span><button type="button" className="sol-term-copy" data-act="copy">Copy</button></div>
-<div className="sol-term-screen" role="region" tabIndex="0" aria-label="A paid request, the same payment sent again and a client with a spending cap below the price: Output">
-<div className="sol-term-step" data-step="1" data-pending="http">
-<div className="sol-term-row sol-term-cmd"><span className="sol-term-ps" aria-hidden="true">\></span> await fetchWithPayment(url, \{ signer\: buyer, maxAmount\: 50\_000n \})</div>
-<div className="sol-term-row sol-term-ln" data-tone="ok">GET /api/forecast (paid) -\> <span className="sol-term-code" data-code="2xx">200</span> `{"city":"Lisbon","tomorrow":"Sunny, 24°C"}`</div>
-<div className="sol-term-row sol-term-ln" data-indent="2">settled <span className="sol-term-k">signature\:</span> <span className="sol-h" title="2dLAyhxCsugLzsXgd34rVcTjaCtvjPbL5aAMcsWbdZbMHzmNA8Z4cf7bSbLCHwwJbjSdP634RjRW92j2Bm8WtLdK"><span className="sol-h-f">2dLAyhxCsugLzsXgd34rVcTjaCtvjPbL5aAMcsWbdZbMHzmNA8Z4cf7bSbLCHwwJbjSdP634RjRW92j2Bm8WtLdK</span><span className="sol-h-s" aria-hidden="true">2dLA…tLdK</span></span></div>
-<div className="sol-term-row sol-term-ln" data-indent="2"><span className="sol-term-k">fee\:</span> 5000 lamports</div>
-<div className="sol-term-row sol-term-cmd"><span className="sol-term-ps" aria-hidden="true">\></span> `await fetch(url, { headers: { "X-PAYMENT": sameXPayment } })`</div>
-<div className="sol-term-row sol-term-ln" data-tone="error">GET /api/forecast (replayed X-PAYMENT) -\> <span className="sol-term-code" data-code="4xx">402</span> payment already used</div>
-<div className="sol-term-row sol-term-cmd"><span className="sol-term-ps" aria-hidden="true">\></span> await fetchWithPayment(url, \{ signer\: buyer, maxAmount\: 5\_000n \})</div>
-<div className="sol-term-row sol-term-ln" data-tone="error">client refused\: price 10000 is above maxAmount 5000; not paying</div>
-<div className="sol-term-result"><span className="sol-term-badge" data-tone="ok">200 OK</span><span className="sol-term-badge" data-tone="error">402 Payment already used</span><span className="sol-term-badge" data-tone="error">Refused\: price above maxAmount</span></div>
-</div>
-</div>
-<div className="sol-term-foot"><button type="button" className="sol-term-btn" data-act="run">Run</button><span className="sol-term-status"></span><span className="sol-term-sr" role="status"></span></div>
-</div>

@@ -15,7 +15,7 @@ import { failure } from "./blocked-transfer";
 import { createAsset } from "./create-asset";
 import { balance, demoPrice, demoSettle, demoUnfunded, holding } from "./demo";
 import { USDC_USD_FEED } from "./price";
-import { run } from "./run";
+import { run } from "./trade-run";
 import { USDC_MINT, type Trade } from "./trade";
 
 const out = (name: string) => new URL(`./${name}.output.txt`, import.meta.url);
@@ -104,13 +104,13 @@ describe("paths/defi/settle-trade (Pyth price + DvP settlement)", () => {
     recordText(out("trade"), `${unfundedText}\n${r.text}`);
   });
 
-  it("run: the page's run.ts does the whole sequence on a fresh asset", async () => {
+  it("run: the page's trade-run.ts does the whole sequence on a fresh asset", async () => {
     const runner = await generateKeyPairSigner();
     await fundSol(runner.address, 2);
     await setTokenBalance(runner.address, 10_000_000n, USDC_MINT);
     await refetchFromMainnet(USDC_USD_FEED);
     const { value: r } = await runExample(() => run(runner), {
-      output: out("run"),
+      output: out("trade-run"),
       failedLabel: /Failed signature/,
     });
     expect(json((await failure(r.failed.signature)).err)).toBe(

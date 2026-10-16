@@ -1,6 +1,6 @@
 // #region run
-// run.ts: price an LSF trade from Pyth, then settle it with the DvP program.
-//   npx tsx run.ts
+// trade-run.ts: price an LSF trade from Pyth, then settle it with DvP.
+//   npx tsx trade-run.ts
 // The issuer key is read from ISSUER_KEYPAIR, or from the Solana CLI default
 // ~/.config/solana/id.json. It needs SOL for fees and 6 USDC for each run,
 // which it sends to the buyer.
@@ -37,7 +37,6 @@ import {
 
 export async function run(issuer: TransactionSigner) {
   const { mint: asset } = await createAsset(issuer);
-  console.log("Created the asset. Mint:", asset);
 
   const seller = await generateKeyPairSigner();
   const buyer = await generateKeyPairSigner();
