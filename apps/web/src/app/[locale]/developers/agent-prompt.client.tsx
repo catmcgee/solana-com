@@ -7,7 +7,8 @@ import { AGENT_PROMPT } from "@/data/developers/hub";
 /**
  * The one line a reader pastes into their coding agent, in a terminal-style
  * box: a title bar with the Copy button, then the line with the guide URL on
- * its own row. The ">" prompt is CSS, so it is never copied or selected. It
+ * its own row, shown without "https://" (Copy copies the full line). The ">"
+ * prompt is CSS, so it is never copied or selected. It
  * is the same line as the docs' Start here banner
  * (apps/docs/snippets/agent-banner.mdx). It points at
  * the production URL in the server render and switches to the current origin
@@ -56,6 +57,7 @@ export function AgentPrompt({
           {/* Wrap only after a slash, never mid-word. */}
           {text
             .slice(AGENT_PROMPT.lead.length + 1)
+            .replace(/^https?:\/\//, "")
             .split("/")
             .map((part, i) => (
               <Fragment key={i}>

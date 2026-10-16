@@ -67,14 +67,15 @@ describe("/developers landing", () => {
   it("server-renders the agent setup line and its two doc links", async () => {
     renderWithIntl(await DevelopersHub({ locale: "ja", updates: [] }), "ja");
     const card = screen.getByTestId("agent-card");
+    // The box shows the URL without "https://"; Copy copies the full line.
     expect(within(card).getByTestId("agent-prompt").textContent).toBe(
-      AGENT_PROMPT.line("https://solana.com"),
+      AGENT_PROMPT.line("https://solana.com").replace("https://", ""),
     );
     expect(
-      within(card).getByRole("link", { name: "set up your agent manually" }),
+      within(card).getByRole("link", { name: "set up manually" }),
     ).toHaveAttribute("href", "/ja/developers/docs/intro/coding-with-agents");
     expect(
-      within(card).getByRole("link", { name: "install the Solana tools locally" }),
+      within(card).getByRole("link", { name: "install locally" }),
     ).toHaveAttribute("href", "/ja/developers/docs/intro/installation");
     // No tabs or raw commands on the landing card; those live in the docs.
     expect(card.querySelector('input[type="radio"]')).toBeNull();

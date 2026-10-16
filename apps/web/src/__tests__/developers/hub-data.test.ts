@@ -155,12 +155,8 @@ describe("developers hub links", () => {
     );
   });
 
-  it("does not use eyebrow copy keys outside the agent card", () => {
-    // The agent card's "Using a coding agent?" line is the one eyebrow the
-    // landing keeps (chosen in the October 2026 hero review).
-    const { agent, ...rest } = landing as Record<string, unknown>;
-    expect(JSON.stringify(rest)).not.toMatch(/"eyebrow"/);
-    expect(Object.keys(agent as object)).toContain("eyebrow");
+  it("does not use eyebrow copy keys", () => {
+    expect(JSON.stringify(landing)).not.toMatch(/"eyebrow"/);
   });
 });
 

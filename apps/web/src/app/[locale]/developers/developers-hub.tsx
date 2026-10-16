@@ -207,7 +207,7 @@ function NewTabHint({ text }: { text: string }) {
 /**
  * "Set up Solana in one paste": a heading, then the one line a reader pastes
  * into their coding agent in a terminal-style box with a Copy button, then
- * links to the manual agent setup and the local install. The line is plain,
+ * short links to the manual agent setup and the local install. The line is plain,
  * selectable text in the server render; the Copy button turns on after
  * hydration.
  */
@@ -222,18 +222,12 @@ function AgentCard({
 }) {
   return (
     <section aria-labelledby="dl-agent-title" data-testid="agent-card">
-      <p className="m-0 mb-2.5 font-[family-name:var(--dl-mono)] text-xs uppercase tracking-[0.08em] text-[var(--dl-dim)]">
-        {t("agent.eyebrow")}
-      </p>
       <h2
         id="dl-agent-title"
-        className="m-0 mb-2 font-brand text-[22px] font-medium leading-snug tracking-[-0.015em] text-[var(--dl-text)]"
+        className="m-0 mb-4 font-brand text-[22px] font-medium leading-snug tracking-[-0.015em] text-[var(--dl-text)]"
       >
         {t("agent.title")}
       </h2>
-      <p className="m-0 mb-5 text-[15px] leading-[1.55] text-[var(--dl-muted)]">
-        {t("agent.body")}
-      </p>
       <AgentPrompt
         promptLabel={t("agent.promptLabel")}
         label={t("agent.copyPrompt")}
