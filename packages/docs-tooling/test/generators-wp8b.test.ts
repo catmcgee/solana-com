@@ -321,14 +321,12 @@ describe("generated snippets", () => {
     );
     const card = read("snippets/paths/en/checkout/card.mdx");
     expect(card).toContain("[Start the tutorial →](/docs/payments/checkout)");
-    // Numbered steps; the first win (step 2) is marked for CSS and readers.
+    // Numbered steps, with no step singled out.
     expect(card).toMatch(
-      /<li data-first="true">\[[^\]]+\]\(\/docs\/payments\/checkout\/browser\) <span className="sol-pcard-first">First win<\/span><\/li>/,
+      /<li>\[[^\]]+\]\(\/docs\/payments\/checkout\/browser\)<\/li>/,
     );
-    const css = read("styles/paths-sidebar.css");
-    expect(css).toContain(
-      'li[data-group-tag][id$="/docs/payments/checkout"]\n  > ul\n  > li:nth-child(2)\n  > a::after',
-    );
+    expect(card).not.toContain("First win");
+    expect(read("styles/paths-sidebar.css")).not.toContain("::after");
   });
 
   it("demo: one server-rendered terminal panel with every recorded line", () => {
