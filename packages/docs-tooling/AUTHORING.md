@@ -419,6 +419,7 @@ without JS it never appears). Patterns:
 | Mermaid                               | keep the fence; convert adds `<div className="sol-mermaid" data-fallback="mermaid">` with the pre-rendered light/dark SVG (run `tsx scripts/render-mermaid.ts` then `python3 scripts/embed-diagram-fonts.py`); caption `.sol-caption`                                                            | hand-written fallback divs                                                                    |
 | iframe / YouTube                      | `<Frame><iframe/></Frame>` plus a plain link right after (no iframe is in the server HTML; nojs.css hides the empty box)                                                                                                                                                                         | iframe alone                                                                                  |
 | Video chapters / video cards          | written by the `video-guides` transform: chapter links in `<div className="sol-chapters" data-video="<id>">` seek the embedded player in place, cards in `<div className="sol-video-modal">` open a dialog (`video-chapters.js`, `styles/video.css`); both are plain `youtu.be` links without JS | links that only work with JS                                                                  |
+| Embedded YouTube video                | write `<Frame><iframe src="https://www.youtube-nocookie.com/embed/<id>" title="…" /></Frame>` and run `convert`: the `video-poster` transform turns it into a server-rendered `a.sol-yt` poster (thumbnail and play button) that `video-chapters.js` swaps for the autoplaying player in place; without JS it links to YouTube. Playlists need a `PLAYLIST_THUMBS` entry | a separate "Watch on YouTube" link (the poster is the link)                                   |
 | Snippets that must render server-side | default-imported MDX snippet with string props, or page-local `export const`                                                                                                                                                                                                                     | `/snippets/*.jsx` components or JSX expression children `{"…"}` inside snippets (client-only) |
 | Code in several languages             | `<CodeGroup>` (titles = tab labels; without JS panels are numbered `1 · …` to match the tab row)                                                                                                                                                                                                 |                                                                                               |
 
@@ -585,11 +586,15 @@ solana.com) before cutover. `mint dev` cannot answer them:
   the reader's browser or on a live network.
 - **Collections (WP7).** Bootcamp lessons carry `{/* bootcamp:video */}`; delete
   that block to re-inject after a curriculum video change. Learn order is
-  `LEARN_ORDER` in `transforms/learn.ts`. `docs/tools/ai` is a live page again
-  (Resources > Set up, and the "AI tools" card on `docs/tools/index`): its
-  content (SendAI Agent Kit, Eliza, GOAT, LangChain, onchain agent programs) was
-  never merged into `intro/coding-with-agents`, so on 2026-10-16 the apps/web
-  redirect and the `tools-ai` retirement transform were removed. oxfmt runs on
+  `LEARN_ORDER` in `transforms/learn.ts`. `docs/tools/ai` ("Build onchain AI agents",
+  Resources > Build apps, and the "Onchain AI agents" card on
+  `docs/tools/index`) is a live page: its content (SendAI Agent Kit, Eliza,
+  GOAT, LangChain, onchain agent programs) is about agents that transact, not
+  coding assistants (`intro/coding-with-agents`, "Build with AI agents"); the
+  two pages link to each other. The bootcamp lessons live in a hidden
+  "Bootcamp" tab (own sidebar at `/developers/bootcamp/**`); the Video
+  tutorials tab lists only the `video-guides` pages, which link to the matching
+  lesson course. oxfmt runs on
   staged EN content at commit, so generator output must be oxfmt-stable (it
   de-indents JSX children after a blank line and re-wraps attributes longer than
   80 characters).
