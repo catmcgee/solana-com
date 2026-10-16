@@ -11,7 +11,6 @@
  *   "account": {
  *     "name": "Accounts", "cat": "The basics",
  *     "short": "Everything on Solana … lives in *accounts* …",  // inline markdown
- *     "like": "Rows in one global key-value table …",          // inline markdown
  *     "href": "/docs/core/accounts",
  *     "label": "New concept"                                   // optional card label
  *   }
@@ -94,7 +93,6 @@ import { loadPaths, pathPages, type PathsSource } from "./paths.ts";
 
 export const CONCEPT_UI = {
   newConcept: "New concept",
-  like: "Like:",
   learnMore: "Learn more",
   usedIn: "You've used this in:",
   notUsed: "Not used in a tutorial yet.",
@@ -112,7 +110,6 @@ export interface ConceptDef {
   name: string;
   cat: string;
   short: string;
-  like: string;
   href: string;
   label?: string;
 }
@@ -123,7 +120,7 @@ export interface ConceptsSource {
 }
 
 const KEY_RE = /^[a-z][a-z0-9-]*$/;
-const FIELDS = new Set(["name", "cat", "short", "like", "href", "label"]);
+const FIELDS = new Set(["name", "cat", "short", "href", "label"]);
 const RESERVED = new Set(["_ui", "$schema"]);
 /** Snippet names the generator uses besides `<key>.mdx`. */
 const RESERVED_KEYS = new Set(["coverage"]);
@@ -161,11 +158,10 @@ export function parseConcepts(
     out.concepts = english.concepts.map((en) => {
       const t = raw[en.key];
       if (!isRecord(t)) return en;
-      const pick = (f: "name" | "cat" | "short" | "like") => {
+      const pick = (f: "name" | "cat" | "short") => {
         const v = t[f];
         if (!str(v)) return en[f];
-        const bad =
-          f === "short" || f === "like" ? checkInlineMarkdown(v) : undefined;
+        const bad = f === "short" ? checkInlineMarkdown(v) : undefined;
         if (bad) {
           err(`${en.key}.${f} ${bad}`);
           return en[f];
@@ -177,7 +173,6 @@ export function parseConcepts(
         name: pick("name"),
         cat: pick("cat"),
         short: pick("short"),
-        like: pick("like"),
         label: str(t.label) ? t.label : en.label,
       };
     });
@@ -194,12 +189,10 @@ export function parseConcepts(
     }
     for (const f of Object.keys(v))
       if (!FIELDS.has(f)) at(`unknown field "${f}"`);
-    for (const f of ["name", "cat", "short", "like", "href"] as const)
+    for (const f of ["name", "cat", "short", "href"] as const)
       if (!str(v[f])) at(`"${f}" must be a non-empty string`);
-    for (const f of ["short", "like"] as const) {
-      const bad = str(v[f]) ? checkInlineMarkdown(v[f]) : undefined;
-      if (bad) at(`"${f}" ${bad}`);
-    }
+    const bad = str(v.short) ? checkInlineMarkdown(v.short) : undefined;
+    if (bad) at(`"short" ${bad}`);
     if (str(v.href) && !/^(\/|https:\/\/)/.test(v.href))
       at(`"href" must be root-relative or https`);
     out.concepts.push({
@@ -207,7 +200,6 @@ export function parseConcepts(
       name: String(v.name ?? ""),
       cat: String(v.cat ?? ""),
       short: String(v.short ?? ""),
-      like: String(v.like ?? ""),
       href: String(v.href ?? ""),
       label: str(v.label) ? v.label : undefined,
     });
@@ -333,7 +325,7 @@ export function renderCard(
 
 ${mdInline(c.short)}
 
-<span className="sol-concept-like">**${mdText(ui.like)}** ${mdInline(c.like)}</span> <span className="sol-concept-more">[${mdText(`${ui.learnMore} →`)}](${localizeHref(docsRoot, c.href, lang)})</span>
+<span className="sol-concept-more">[${mdText(`${ui.learnMore} →`)}](${localizeHref(docsRoot, c.href, lang)})</span>
 </Callout>
 `;
 }

@@ -217,7 +217,6 @@ describe("seeds and registries", () => {
           name: "a",
           cat: "b",
           short: "<b>x</b>",
-          like: "l",
           href: "/x",
           extra: 1,
         },
@@ -291,6 +290,9 @@ describe("generated snippets", () => {
       '**Accounts** <span className="sol-concept-label">New concept</span>',
     );
     expect(card).toContain("[Learn more →](/developers/docs/core/accounts)");
+    // The card ends at "Learn more": no analogy line or divider.
+    expect(card).not.toContain("sol-concept-like");
+    expect(card).not.toContain("Like:");
     expect(read("snippets/concepts/en/mint.short.mdx")).toMatch(
       /\(\*mint authority\*\)/,
     );
