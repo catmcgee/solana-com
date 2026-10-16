@@ -33,7 +33,8 @@ export function AgentPrompt({
         dir="ltr"
         data-testid="agent-prompt"
         title={text}
-        className="min-w-0 flex-1 select-all overflow-x-auto whitespace-nowrap font-[family-name:var(--dl-mono)] !text-[13px] leading-[1.6] text-[var(--dl-text)] [scrollbar-width:thin]"
+        tabIndex={0}
+        className="dl-agent-prompt min-w-0 flex-1 select-all overflow-x-auto whitespace-nowrap font-[family-name:var(--dl-mono)] !text-[13px] leading-[1.6] text-[var(--dl-text)]"
       >
         {text}
       </code>
