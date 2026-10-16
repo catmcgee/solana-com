@@ -1,52 +1,38 @@
 /*
- * "Open in Playground" control on every code block (styles/playground.css).
+ * "Open tutorial in Playground" (styles/playground.css).
  *
- * Mintlify injects this file on every page. It adds one small control to the
- * toolbar of every Mintlify code block (plain and titled fences, CodeGroup
- * panels, Tabs panels, the code above demo terminals, RPC request/response
- * examples), right before Mintlify's own copy button:
+ * Mintlify injects this file on every page. Each tutorial has exactly one
+ * Playground entry point: a block at the top of its intro page (or, for a
+ * single-page tutorial, at the top of the page). Code blocks, demo
+ * terminals, and step pages have none.
  *
- * - ENABLED (a link, new tab) when the block's code comes from a real file in
- *   packages/docs-examples that Solana Playground can import. The generated
- *   example snippets (packages/docs-tooling src/examples/render.ts) put a
- *   hidden marker before each fence, one per tab, in tab order:
- *     <div class="sol-pg" data-pg-src="packages/docs-examples/…/kit.ts"
- *          data-pg-open="packages/docs-examples/…/kit.ts" data-pg-kind="ts">
- *   The link is <origin>/github.com/<SOURCE>/<data-pg-open>; the playground
- *   then reads the files through the GitHub contents API (unauthenticated:
- *   60 requests per hour per reader IP, one request per imported folder).
- * - DISABLED (greyed, aria-disabled, tooltip "Open in Playground: not
- *   available for this snippet yet") for everything else: inline page code,
- *   RPC request/response examples (cURL generated from the Surfpool schema,
- *   no source file), and markers whose kind the playground cannot import
- *   yet (today: all of packages/docs-examples). Recorded outputs of Run
- *   blocks get no control at all. A disabled control never has an href, so there are no dead
- *   links.
+ * - Job tutorials: docs-tooling gen:paths renders the block as
+ *   snippets/paths/<lang>/<key>/playground.mdx, imported once on the
+ *   tutorial's intro page. Single-page tutorials (e.g.
+ *   /developers/docs/programs/build-first-program) write the same markup by
+ *   hand.
+ * - The button is `<a class="sol-pg-tut" data-pg-open="packages/docs-
+ *   examples/…" data-pg-kind="…" data-pg-label="…" data-pg-off="…">`,
+ *   server-rendered DISABLED (no href, greyed, aria-disabled, tooltip).
+ *   data-pg-open is the folder to import, data-pg-kind its kind (computed by
+ *   packages/docs-tooling src/examples/playground.ts).
+ * - This script turns it into a link (new tab) to
+ *   <origin>/github.com/<SOURCE>/<data-pg-open> when the kind is in
+ *   CONFIG.enabledKinds; otherwise it stays disabled with the data-pg-off
+ *   tooltip. The playground then reads the files through the GitHub
+ *   contents API (unauthenticated: 60 requests per hour per reader IP, one
+ *   request per imported folder).
  *
- * Why most blocks are disabled today: the playground's GitHub import only
- * accepts Solana *programs* (Anchor: lib.rs with #[program]; Native: a .rs
- * with entrypoint!; Seahorse) and fails with "Could not identify framework"
- * on client code (TS/JS, Rust binaries, Python), which is what
- * packages/docs-examples holds. CONFIG.enabledKinds lists the kinds that import;
- * add "ts", "js", "rust" or "py" here once the playground supports them (no
- * snippet regeneration needed). Kinds are computed by
- * packages/docs-tooling src/examples/playground.ts.
+ * Why the job tutorials are disabled today: the playground's GitHub import
+ * only accepts Solana *programs* (Anchor: lib.rs with #[program]; Native: a
+ * .rs with entrypoint!; Seahorse) and fails with "Could not identify
+ * framework" on client code (TS/JS, Rust binaries, Python), which is what
+ * their example folders hold. Add "ts", "js", "rust" or "py" to
+ * CONFIG.enabledKinds once the playground supports them (no regeneration
+ * needed).
  *
- * Job tutorials (docs-tooling gen:paths) also get a server-rendered "Open
- * tutorial in Playground" button (.sol-pg-tut): one in the header row of
- * the tutorial stepper on every step page, and a larger one at the top of
- * the step that runs the code on your machine (snippets/paths/<lang>/<key>/
- * playground.mdx). It carries its own data-pg-open (the tutorial's whole
- * example folder, packages/docs-examples/paths/<domain>/<tutorial>) and
- * data-pg-kind (the folder's kind), plus localized data-pg-label /
- * data-pg-off. It is generated disabled; scanTutorials() applies the same
- * enabledKinds rule as the code block markers. Code blocks whose source
- * sits in a tutorial folder open that same folder (a single tutorial file
- * does not run on its own); every other block opens its own file or crate.
- *
- * Without JavaScript nothing changes: the markers are empty and hidden, the
- * code blocks are Mintlify's own, and the tutorial buttons stay disabled
- * (no href, greyed, tooltip).
+ * Without JavaScript the buttons stay disabled (no href, greyed, tooltip),
+ * so there are no dead links.
  */
 (function () {
   if (window.__solPlayground) return;
@@ -62,76 +48,16 @@
     source: "catmcgee/solana-com/tree/mintlify-migration",
     enabledKinds: ["anchor", "native"],
   };
-  var LABEL = "Open in Playground";
-  var UNAVAILABLE = "Not available for this snippet yet";
-  // Shown on hover/focus of a disabled control. It names the action too, so
-  // icon-only controls still say "Open in Playground" to sighted readers.
-  var UNAVAILABLE_TIP = LABEL + ": " + UNAVAILABLE.toLowerCase();
+  var LABEL = "Open tutorial in Playground";
   var SAFE_PATH = /^[\w\-/.]+$/;
 
-  var ICON =
-    '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' +
-    '<rect x="1.75" y="2.25" width="12.5" height="11.5" rx="2.25"></rect>' +
-    '<path d="M6.5 5.75v4.5L10.25 8z"></path></svg>';
-
-  function markersFor(box) {
-    // Markers sit right before the code block (or before the first-child
-    // wrapper Mintlify puts around it).
-    var el = box;
-    for (var depth = 0; el && depth < 4; depth++) {
-      var list = [];
-      var prev = el.previousElementSibling;
-      while (prev && prev.classList.contains("sol-pg")) {
-        list.unshift(prev);
-        prev = prev.previousElementSibling;
-      }
-      if (list.length) return list;
-      if (el.previousElementSibling || !el.parentElement) break;
-      el = el.parentElement;
-    }
-    return [];
-  }
-
-  function activeIndex(box) {
-    var tabs = box.querySelectorAll("[role=tablist] [role=tab]");
-    if (!tabs.length) return { index: 0, count: 1 };
-    for (var i = 0; i < tabs.length; i++)
-      if (tabs[i].getAttribute("aria-selected") === "true")
-        return { index: i, count: tabs.length };
-    return { index: 0, count: tabs.length };
-  }
-
-  /** The playground URL for a marker, or "" when it cannot open. */
-  function hrefOf(m) {
-    if (!m) return "";
-    var open = m.getAttribute("data-pg-open") || "";
-    var kind = m.getAttribute("data-pg-kind") || "";
+  /** The playground URL for a button, or "" when it cannot open. */
+  function hrefOf(btn) {
+    var open = btn.getAttribute("data-pg-open") || "";
+    var kind = btn.getAttribute("data-pg-kind") || "";
     if (!open || !SAFE_PATH.test(open) || open.indexOf("..") !== -1) return "";
     if (CONFIG.enabledKinds.indexOf(kind) === -1) return "";
     return CONFIG.origin + "/github.com/" + CONFIG.source + "/" + open;
-  }
-
-  /** The playground URL for a code block, or "" when it cannot open. */
-  function hrefFor(box) {
-    var markers = markersFor(box);
-    if (!markers.length) return "";
-    var active = activeIndex(box);
-    // A count mismatch means we cannot tell which file a tab shows.
-    if (markers.length !== active.count) return "";
-    return hrefOf(markers[active.index]);
-  }
-
-  /** A demo terminal has one marker (its example folder) right before it. */
-  function termHref(term) {
-    var markers = markersFor(term);
-    return markers.length === 1 ? hrefOf(markers[0]) : "";
-  }
-
-  function makeControl() {
-    var a = document.createElement("a");
-    a.className = "sol-pg-btn";
-    a.innerHTML = ICON + '<span class="sol-pg-label">' + LABEL + "</span>";
-    return a;
   }
 
   function setAttr(el, name, value) {
@@ -140,86 +66,38 @@
     } else if (el.getAttribute(name) !== value) el.setAttribute(name, value);
   }
 
-  function apply(ctl, href) {
-    // Generated tutorial buttons carry their own (localized) wording.
-    var label = ctl.getAttribute("data-pg-label") || LABEL;
-    var off = ctl.getAttribute("data-pg-off") || UNAVAILABLE_TIP;
+  function apply(btn) {
+    var href = hrefOf(btn);
+    // The buttons carry their own (localized) wording.
+    var label = btn.getAttribute("data-pg-label") || LABEL;
+    var off = btn.getAttribute("data-pg-off") || label;
     if (href) {
-      setAttr(ctl, "href", href);
-      setAttr(ctl, "target", "_blank");
-      setAttr(ctl, "rel", "noopener noreferrer");
-      setAttr(ctl, "role", null);
-      setAttr(ctl, "tabindex", null);
-      setAttr(ctl, "aria-disabled", null);
-      setAttr(ctl, "data-tip", label);
-      setAttr(ctl, "aria-label", label + " (opens in a new tab)");
+      setAttr(btn, "href", href);
+      setAttr(btn, "target", "_blank");
+      setAttr(btn, "rel", "noopener noreferrer");
+      setAttr(btn, "role", null);
+      setAttr(btn, "tabindex", null);
+      setAttr(btn, "aria-disabled", null);
+      setAttr(btn, "data-tip", label);
+      setAttr(btn, "aria-label", label + " (opens in a new tab)");
     } else {
-      setAttr(ctl, "href", null);
-      setAttr(ctl, "target", null);
-      setAttr(ctl, "rel", null);
-      setAttr(ctl, "role", "link");
-      setAttr(ctl, "tabindex", "0");
-      setAttr(ctl, "aria-disabled", "true");
-      setAttr(ctl, "data-tip", off);
-      setAttr(ctl, "aria-label", off);
+      setAttr(btn, "href", null);
+      setAttr(btn, "target", null);
+      setAttr(btn, "rel", null);
+      setAttr(btn, "role", "link");
+      setAttr(btn, "tabindex", "0");
+      setAttr(btn, "aria-disabled", "true");
+      setAttr(btn, "data-tip", off);
+      setAttr(btn, "aria-label", off);
     }
-  }
-
-  function boxOf(el) {
-    return el.closest(".code-group") || el.closest(".code-block");
-  }
-
-  /*
-   * Demo terminals (.sol-term, generated by docs-tooling gen:paths) show the
-   * code they run as command lines, sometimes on pages with no code block
-   * (e.g. /developers/docs/payments/checkout/try-it). Their header gets the control too,
-   * before the terminal's own Copy button. gen:paths puts one marker before
-   * each terminal: the example folder its steps run from (kind "ts" etc.,
-   * so disabled until the playground imports client code).
-   */
-  function scanTerminals() {
-    var heads = document.querySelectorAll(".sol-term > .sol-term-head");
-    for (var i = 0; i < heads.length; i++) {
-      var head = heads[i];
-      if (!head.parentElement.querySelector(".sol-term-cmd")) continue;
-      var ctl = head.querySelector(":scope > .sol-pg-btn");
-      if (!ctl) {
-        ctl = makeControl();
-        head.insertBefore(ctl, head.querySelector(":scope > .sol-term-copy"));
-        head.classList.add("sol-term-head-pg");
-      }
-      apply(ctl, termHref(head.parentElement));
-    }
-  }
-
-  /* "Open tutorial in Playground" buttons: the button is its own marker. */
-  function scanTutorials() {
-    var btns = document.querySelectorAll(".sol-pg-tut");
-    for (var i = 0; i < btns.length; i++) apply(btns[i], hrefOf(btns[i]));
   }
 
   function scan() {
-    var copies = document.querySelectorAll(".code-block-copy-button");
-    for (var i = 0; i < copies.length; i++) {
-      var copy = copies[i];
-      var bar = copy.parentElement;
-      var box = boxOf(copy);
-      if (!bar || !box) continue;
-      // Recorded output of a Run block is not code to open.
-      if (box.closest(".sol-run-out")) continue;
-      var ctl = null;
-      for (var c = bar.firstElementChild; c; c = c.nextElementSibling)
-        if (c.classList.contains("sol-pg-btn")) ctl = c;
-      if (!ctl) {
-        ctl = makeControl();
-        bar.insertBefore(ctl, copy);
-      }
-      apply(ctl, hrefFor(box));
-    }
-    scanTerminals();
-    scanTutorials();
+    var btns = document.querySelectorAll(".sol-pg-tut");
+    for (var i = 0; i < btns.length; i++) apply(btns[i]);
   }
 
+  // Mintlify navigates client-side, so new pages arrive as DOM mutations.
   var pending = false;
   function schedule() {
     if (pending) return;
@@ -229,41 +107,38 @@
       scan();
     }, 60);
   }
-
-  if (typeof MutationObserver === "function") {
+  if (typeof MutationObserver === "function")
     new MutationObserver(schedule).observe(document.documentElement, {
       childList: true,
       subtree: true,
-      attributes: true,
-      attributeFilter: ["aria-selected"],
     });
-  }
   if (document.readyState === "loading")
     document.addEventListener("DOMContentLoaded", schedule);
   else schedule();
 
-  function onActivate(event) {
-    var ctl = event.target.closest && event.target.closest(".sol-pg-btn");
-    if (!ctl) return;
-    var box = boxOf(ctl);
-    // Re-resolve at click time so a just-switched tab is never stale.
-    if (ctl.classList.contains("sol-pg-tut")) apply(ctl, hrefOf(ctl));
-    else if (box) apply(ctl, hrefFor(box));
-    else if (ctl.closest(".sol-term"))
-      apply(ctl, termHref(ctl.closest(".sol-term")));
-    if (ctl.getAttribute("aria-disabled") === "true") {
-      event.preventDefault();
-      ctl.focus();
-    }
+  function closestButton(event) {
+    return event.target.closest && event.target.closest(".sol-pg-tut");
   }
-  document.addEventListener("click", onActivate, true);
+  document.addEventListener(
+    "click",
+    function (event) {
+      var btn = closestButton(event);
+      if (!btn) return;
+      apply(btn);
+      if (btn.getAttribute("aria-disabled") === "true") {
+        event.preventDefault();
+        btn.focus();
+      }
+    },
+    true,
+  );
   document.addEventListener(
     "keydown",
     function (event) {
       if (event.key !== " " && event.key !== "Enter") return;
-      var ctl = event.target.closest && event.target.closest(".sol-pg-btn");
+      var btn = closestButton(event);
       // Disabled: swallow; enabled links already follow Enter natively.
-      if (ctl && ctl.getAttribute("aria-disabled") === "true")
+      if (btn && btn.getAttribute("aria-disabled") === "true")
         event.preventDefault();
     },
     true,

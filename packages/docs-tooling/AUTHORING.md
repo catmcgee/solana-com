@@ -536,45 +536,36 @@ solana.com) before cutover. `mint dev` cannot answer them:
   run `pnpm --filter @workspace/docs-tooling examples:build`, then
   `import X from "/snippets/examples/<id>.mdx"` and `<X />`. The old
   `file=...#region=` fence syntax is gone.
-- **Open in Playground.** `apps/docs/playground.js` (styles
-  `styles/playground.css`) adds the control to every code block's toolbar. Only
-  code from a generated example snippet can be enabled: before each fence the
-  generator writes a hidden
-  `<div className="sol-pg" data-pg-src data-pg-open data-pg-kind>` marker
-  (`src/examples/playground.ts`). The link is
-  `<origin>/github.com/<source>/<data-pg-open>`. `source` is the one
-  owner/repo/ref value in `playground.js`
+- **Open tutorial in Playground.** Each tutorial has exactly one Playground
+  entry point: a block at the top of its intro page. Code blocks (cookbook,
+  reference, tutorial steps), demo terminals, the stepper, and step pages have
+  no Playground control; do not add one. `gen:paths` writes the block as
+  `snippets/paths/<lang>/<key>/playground.mdx`. Import it on the intro page
+  only, right after the first paragraph:
+  `import Playground from "/snippets/paths/en/<key>/playground.mdx";` and
+  `<Playground />`. It opens the tutorial's example folder: the folder the demo
+  outputs live in, else the single `packages/docs-examples/paths/*/<key>`
+  folder. Keep a new tutorial's examples in such a folder, named after its key
+  in `paths.en.json` (gen:paths warns when it finds no folder). The wording is
+  shared by every tutorial, in `_ui` (`playground`, `playgroundOff`,
+  `playgroundNote`); there are no per-tutorial overrides. A single-page
+  tutorial writes the same markup by hand at the top of the page (see
+  `programs/build-first-program.mdx`).
+  The button is generated disabled (no href, greyed, tooltip). `playground.js`
+  (styles `styles/playground.css`) turns it into
+  `<origin>/github.com/<source>/<data-pg-open>` when its `data-pg-kind`
+  (`src/examples/playground.ts`) is in `CONFIG.enabledKinds`. `source` is the
+  one owner/repo/ref value in `playground.js`
   (`catmcgee/solana-com/tree/mintlify-migration`, which becomes
   `solana-foundation/solana-com/tree/main` after the merge). Never prefix
   `https://`, because the playground router then rejects the URL. The
   playground's GitHub import only accepts Anchor/Native programs ("Could not
-  identify framework" on TS/JS/Rust-client/Python), so `CONFIG.enabledKinds` is
-  `anchor`, `native`, and every current example is greyed out. Add a kind there
-  when the playground can import it. Linked files must exist at that ref on
-  GitHub. Each import costs one unauthenticated GitHub API call per folder
-  (60/hour per reader IP). Blocks whose source sits in a job tutorial folder
-  (`packages/docs-examples/paths/<domain>/<tutorial>/`) open that whole folder,
-  with the folder's kind, because one tutorial file does not run on its own.
-  Every other block opens its own file (or, for Rust, its crate).
-- **Open tutorial in Playground.** `gen:paths` puts the button in the header row
-  of every tutorial stepper (`stepper-<n>.mdx`) and writes
-  `snippets/paths/<lang>/<key>/playground.mdx`, a larger version for the top of
-  the step that runs the code on your machine. Import it right after the intro
-  paragraph there:
-  `import Playground from "/snippets/paths/en/<key>/playground.mdx";` and
-  `<Playground />`. Both open the tutorial's example folder: the folder the demo
-  outputs live in, else the single `packages/docs-examples/paths/*/<key>`
-  folder. Keep a new tutorial's examples in such a folder, named after its key
-  in `paths.en.json`, and the stepper button needs nothing else (gen:paths warns
-  when it finds no folder). The button is generated disabled, with no href and a
-  tooltip; `playground.js` enables it with the same `CONFIG.enabledKinds` rule.
-  Its wording is in `_ui` (`playground`, `playgroundOff`, `playgroundNote`). A
-  tutorial can set `"playground": { "stepper": false, "label", "note" }` in
-  `paths.en.json`: `stepper: false` drops the stepper button (the Quickstart
-  shows only the block on its intro page), and `label`/`note` replace the `_ui`
-  wording for that tutorial. Solana Playground still cannot import TypeScript
-  folders (checked 2026-10-16: "Could not identify framework"), so the
-  Quickstart button stays greyed with its tooltip.
+  identify framework" on TS/JS/Rust-client/Python, checked 2026-10-16), so
+  `CONFIG.enabledKinds` is `anchor`, `native`: the job tutorials (TypeScript)
+  stay greyed with their tooltip, and "Build your first program" (Anchor) is
+  live. Add a kind there when the playground can import it. Linked folders
+  must exist at that ref on GitHub. Each import costs one unauthenticated
+  GitHub API call per folder (60/hour per reader IP).
 - **Terminal panels (job paths).** A recorded output with a `<stem>.run.json`
   next to its `<stem>.output.txt` renders as a terminal panel
   (`src/lib/terminal.ts`, styles `apps/docs/styles/demo.css`, behaviour
@@ -611,10 +602,9 @@ solana.com) before cutover. `mint dev` cannot answer them:
   `convert --check` fails while a card is missing its arrow.
 - **Program examples in Playground.** `packages/docs-examples/programs/<name>/`
   holds Anchor workspaces whose files a page shows through `blocks.json` (e.g.
-  `programs/build-first-program`, the "Build your first program" page). Their
-  blocks get the `anchor` kind and open the crate folder, so the code block
-  controls and the page's hand-written `.sol-pg-tut` button are live once the
-  files are on the `playground.js` source ref.
+  `programs/build-first-program`, the "Build your first program" page). The
+  page's hand-written `.sol-pg-tut` button opens the program crate and is live
+  once the files are on the `playground.js` source ref.
 - **Navigation (WP6).** Edit `navigation/en.json` by hand, then `nav:build`.
   A tab can list `pages` directly instead of `groups` (Start here does): its
   pages render as plain sidebar entries with no group header, and a nested

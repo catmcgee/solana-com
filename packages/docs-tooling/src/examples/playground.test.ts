@@ -3,15 +3,9 @@ import { buildExamples } from "./build-examples.ts";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { detectProgramKind, folderKind } from "./playground.ts";
 import {
-  detectProgramKind,
-  folderKind,
-  playgroundSource,
-  tutorialFolder,
-} from "./playground.ts";
-import { playgroundMarker, renderSnippet } from "./render.ts";
-import {
-  demoMarker,
+  buildPathOutputs,
   PATH_UI,
   renderPlaygroundBlock,
   renderStepper,
@@ -46,37 +40,6 @@ describe("playground kinds (mirror of the playground's GitHub import)", () => {
       detectProgramKind([["src/main.rs", "fn main() {}"]]),
     ).toBeUndefined();
     expect(detectProgramKind([["a.py", "import solders"]])).toBeUndefined();
-  });
-
-  it("opens TS files on their own and Rust files as their crate", () => {
-    const base = "packages/docs-examples/cookbook/wallets/create-keypair";
-    expect(playgroundSource(`${base}/kit.ts`)).toEqual({
-      src: `${base}/kit.ts`,
-      open: `${base}/kit.ts`,
-      kind: "ts",
-    });
-    expect(playgroundSource(`${base}/rust/src/main.rs`)).toEqual({
-      src: `${base}/rust/src/main.rs`,
-      open: `${base}/rust`,
-      kind: "rust",
-    });
-    expect(playgroundSource(`${base}/python.py`).kind).toBe("py");
-  });
-
-  it("opens a job tutorial file as the whole tutorial folder", () => {
-    const dir = "packages/docs-examples/paths/assets/issue-asset";
-    expect(tutorialFolder(`${dir}/create-asset.ts`)).toBe(dir);
-    expect(tutorialFolder(`${dir}/sub/x.ts`)).toBe(dir);
-    // Not inside a tutorial folder.
-    expect(tutorialFolder("packages/docs-examples/paths/x.ts")).toBeUndefined();
-    expect(
-      tutorialFolder("packages/docs-examples/cookbook/wallets/a/kit.ts"),
-    ).toBeUndefined();
-    expect(playgroundSource(`${dir}/create-asset.ts`)).toEqual({
-      src: `${dir}/create-asset.ts`,
-      open: dir,
-      kind: "ts",
-    });
   });
 });
 
@@ -181,125 +144,60 @@ describe("Open tutorial in Playground (gen:paths)", () => {
     };
     const btn = tutorialButton(PATH_UI, pg);
     expect(btn).toBe(
-      '<a className="sol-pg-btn sol-pg-tut" data-variant="compact" data-pg-open="packages/docs-examples/paths/a/b" data-pg-kind="ts" data-pg-label="Open tutorial in Playground" data-pg-off="Open tutorial in Playground: not available for this tutorial yet" data-tip="Open tutorial in Playground: not available for this tutorial yet" aria-label="Open tutorial in Playground: not available for this tutorial yet" aria-disabled="true" role="link" tabIndex="0"><span className="sol-pg-label">Open tutorial in Playground</span></a>',
+      '<a className="sol-pg-tut" data-pg-open="packages/docs-examples/paths/a/b" data-pg-kind="ts" data-pg-label="Open tutorial in Playground" data-pg-off="Open tutorial in Playground: not available for this tutorial yet" data-tip="Open tutorial in Playground: not available for this tutorial yet" aria-label="Open tutorial in Playground: not available for this tutorial yet" aria-disabled="true" role="link" tabIndex="0">Open tutorial in Playground</a>',
     );
     expect(btn).not.toContain("href");
     // No folder: no source attributes, still disabled.
-    const none = tutorialButton(PATH_UI, undefined, "block");
+    const none = tutorialButton(PATH_UI, undefined);
     expect(none).toContain('data-pg-kind="inline"');
     expect(none).not.toContain("data-pg-open");
     expect(none).toContain('aria-disabled="true"');
   });
 
-  it("puts it in every stepper's header and in playground.mdx", () => {
+  it("renders it only in playground.mdx, never in a stepper", () => {
     const src = { lang: "en", ui: PATH_UI, paths: [] };
     const p = def("checkout", "payments");
     const pg = tutorialSource(p);
-    for (const n of [0, 1]) {
-      const s = renderStepper("/nonexistent", src, p, n, pg);
-      expect(s).toContain(
-        `<div className="sol-stepper-head">${tutorialButton(PATH_UI, pg)}</div>`,
-      );
-      // The button is outside the step navigation landmark.
-      expect(s.indexOf("sol-pg-tut")).toBeLessThan(
-        s.indexOf('role="navigation"'),
-      );
-    }
+    for (const n of [0, 1])
+      expect(renderStepper("/nonexistent", src, p, n)).not.toContain("sol-pg");
     const block = renderPlaygroundBlock(src, p, pg);
     expect(block).toContain('<div className="sol-pg-tutorial not-prose"');
-    expect(block).toContain(tutorialButton(PATH_UI, pg, "block"));
+    expect(block).toContain(tutorialButton(PATH_UI, pg));
+    expect(block).toContain(PATH_UI.playgroundNote);
   });
 });
 
-describe("playground markers in snippets", () => {
-  const pg = {
-    src: "packages/docs-examples/a/kit.ts",
-    open: "packages/docs-examples/a/kit.ts",
-    kind: "ts" as const,
-  };
-  it("renders a hidden marker with the source path", () => {
-    expect(playgroundMarker(pg)).toBe(
-      '<div className="sol-pg" data-pg-src="packages/docs-examples/a/kit.ts" data-pg-open="packages/docs-examples/a/kit.ts" data-pg-kind="ts" />',
-    );
-    expect(playgroundMarker(undefined)).toBe(
-      '<div className="sol-pg" data-pg-kind="inline" />',
-    );
-  });
-
-  it("puts one marker per tab, in tab order, before a CodeGroup", () => {
-    const mdx = renderSnippet({
-      id: "a/b",
-      source: "s",
-      block: { runnable: false, tabs: [] },
-      tabs: [
-        { title: "Kit", lang: "ts", code: "x", playground: pg },
-        { title: "Inline", lang: "ts", code: "y" },
-      ],
-    });
-    const head = mdx.slice(0, mdx.indexOf("<CodeGroup>"));
-    expect(head.match(/className="sol-pg"/g)).toHaveLength(2);
-    expect(head.indexOf('data-pg-kind="ts"')).toBeLessThan(
-      head.indexOf('data-pg-kind="inline"'),
-    );
-  });
-
-  it("puts the marker right before the fence inside each Tab", () => {
-    const mdx = renderSnippet({
-      id: "a/b",
-      source: "s",
-      block: { runnable: true, tabs: [] },
-      tabs: [
-        { title: "Kit", lang: "ts", code: "x", output: "o", playground: pg },
-        { title: "Rust", lang: "rust", code: "y" },
-      ],
-    });
-    expect(mdx).toContain(
-      `<div className="sol-tab-label">Kit</div>\n${playgroundMarker(pg)}\n\n\`\`\`ts\nx`,
-    );
-  });
-
-  it("gives every file-backed tab of every generated snippet a marker", () => {
+describe("no Playground control outside the tutorial block", () => {
+  it("generated example snippets carry no markers", () => {
     const r = buildExamples({ check: true });
-    for (const [rel, text] of r.files) {
-      if (!rel.endsWith(".mdx")) continue;
-      const fences = text.match(/^`{3,}(?!text Output)\w+/gm) ?? [];
-      const markers = text.match(/className="sol-pg"/g) ?? [];
-      expect(markers.length, rel).toBe(fences.length);
-    }
-    for (const entry of Object.values(r.index))
-      for (const t of entry.tabs)
-        if (t.file) expect(t.playground?.open, t.file).toMatch(/^[\w\-/.]+$/);
+    for (const [rel, text] of r.files)
+      expect(text, rel).not.toMatch(/sol-pg|data-pg-/);
   });
 
-  it("marks each path demo terminal with its example folder", () => {
-    const checkout = demoMarker([
-      { label: "Pay", output: "paths/payments/checkout/pay.output.txt" },
-      {
-        label: "Verify",
-        output: "paths/payments/checkout/verify-payment.output.txt",
+  it("only playground.mdx of each path has Playground markup", () => {
+    const src = { lang: "en", ui: PATH_UI, paths: [] as PathDef[] };
+    const p: PathDef = {
+      key: "checkout",
+      tab: "payments",
+      label: "c",
+      job: "j",
+      name: "n",
+      time: "t",
+      intro: "/developers/docs/payments/checkout",
+      steps: [{ href: "/developers/docs/payments/checkout/a", title: "A" }],
+      demo: {
+        component: "checkout",
+        title: "T",
+        steps: [
+          { label: "Pay", output: "paths/payments/checkout/pay.output.txt" },
+        ],
       },
-    ]);
-    expect(checkout).toBe(
-      '<div className="sol-pg" data-pg-src="packages/docs-examples/paths/payments/checkout/pay.ts" data-pg-open="packages/docs-examples/paths/payments/checkout" data-pg-kind="ts" />',
-    );
-    // A variant recording (`<stem>.<variant>.output.txt`) is a slice of
-    // `<stem>`'s run: its source is still `<stem>.ts`.
-    expect(
-      demoMarker([
-        {
-          label: "Verify",
-          output: "paths/payments/checkout/verify-payment.paid.output.txt",
-        },
-      ]),
-    ).toContain(
-      'data-pg-src="packages/docs-examples/paths/payments/checkout/verify-payment.ts"',
-    );
-    expect(
-      demoMarker([{ label: "x", output: "paths/nope/missing.v.output.txt" }]),
-    ).toBe('<div className="sol-pg" data-pg-kind="inline" />');
-    // A step without a source file next to its output: no source.
-    expect(
-      demoMarker([{ label: "x", output: "paths/nope/missing.output.txt" }]),
-    ).toBe('<div className="sol-pg" data-pg-kind="inline" />');
+    };
+    src.paths.push(p);
+    const files = buildPathOutputs("/nonexistent", [src], []);
+    const withPg = [...files]
+      .filter(([, text]) => /sol-pg|data-pg-/.test(text))
+      .map(([f]) => path.basename(f));
+    expect(withPg).toEqual(["playground.mdx"]);
   });
 });

@@ -23,6 +23,7 @@ import {
   examplesRoot,
   initPaths,
   parsePaths,
+  PATH_UI,
   renderPlaygroundBlock,
   renderStepper,
   runPaths,
@@ -262,8 +263,8 @@ describe("seeds and registries", () => {
   });
 });
 
-describe("per-tutorial playground settings", () => {
-  const def = (playground?: unknown) => ({
+describe("Open tutorial in Playground", () => {
+  const def = (extra: Record<string, unknown> = {}) => ({
     q: {
       tab: "start",
       job: "j",
@@ -271,7 +272,7 @@ describe("per-tutorial playground settings", () => {
       time: "~5 min",
       intro: "/developers/docs/q",
       steps: [["/developers/docs/q/a", "A"]],
-      ...(playground === undefined ? {} : { playground }),
+      ...extra,
     },
   });
   const pg = {
@@ -279,62 +280,28 @@ describe("per-tutorial playground settings", () => {
     kind: "ts" as const,
   };
 
-  it("keeps the stepper button by default", () => {
+  it("is only in playground.mdx, never in the stepper", () => {
     const problems: Problem[] = [];
     const src = parsePaths(def(), "p", problems);
     expect(problems).toEqual([]);
-    expect(renderStepper(root, src, src.paths[0]!, 1, pg)).toContain(
-      'className="sol-stepper-head"',
-    );
-  });
-
-  it("drops the stepper button and replaces the wording", () => {
-    const problems: Problem[] = [];
-    const src = parsePaths(
-      def({
-        stepper: false,
-        label: "Open in Playground",
-        note: "Runs in your browser.",
-      }),
-      "p",
-      problems,
-    );
-    expect(problems).toEqual([]);
     const p = src.paths[0]!;
     for (const n of [0, 1])
-      expect(renderStepper(root, src, p, n, pg)).not.toContain("sol-pg");
+      expect(renderStepper(root, src, p, n)).not.toContain("sol-pg");
     const block = renderPlaygroundBlock(src, p, pg);
-    expect(block).toContain("Runs in your browser.");
-    expect(block).toContain('data-pg-label="Open in Playground"');
+    expect(block).toContain(PATH_UI.playgroundNote);
+    expect(block).toContain('data-pg-label="Open tutorial in Playground"');
     expect(block).toContain(
-      'data-tip="Open in Playground: not available for this tutorial yet"',
+      'data-tip="Open tutorial in Playground: not available for this tutorial yet"',
     );
     expect(block).toContain('aria-disabled="true"');
   });
 
-  it("keeps the English stepper flag in locale files", () => {
+  it("has no per-tutorial settings", () => {
     const problems: Problem[] = [];
-    const en = parsePaths(def({ stepper: false }), "p", problems);
-    const ja = parsePaths(
-      { q: { playground: { stepper: true, note: "ブラウザで動きます。" } } },
-      "ja",
-      problems,
-      en,
+    parsePaths(def({ playground: { stepper: false } }), "p", problems);
+    expect(problems.map((p) => p.message).join("\n")).toContain(
+      'unknown field "playground"',
     );
-    expect(ja.paths[0]!.playground).toEqual({
-      stepper: false,
-      label: undefined,
-      note: "ブラウザで動きます。",
-    });
-  });
-
-  it("rejects bad playground settings", () => {
-    const problems: Problem[] = [];
-    parsePaths(def({ stepper: "no", extra: 1, note: "" }), "p", problems);
-    const msgs = problems.map((p) => p.message).join("\n");
-    expect(msgs).toContain("playground.stepper must be true or false");
-    expect(msgs).toContain('playground: unknown field "extra"');
-    expect(msgs).toContain("playground.note must be a non-empty string");
   });
 });
 

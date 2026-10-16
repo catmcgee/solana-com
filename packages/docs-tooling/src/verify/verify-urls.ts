@@ -337,7 +337,7 @@ export function strayAssetsInDocsRoot(
     "apps/docs/run-examples.js",
     // Floating "Ask AI" pill (redesign 2026-10-15; styles/ask-ai.css).
     "apps/docs/ask-ai.js",
-    // "Open in Playground" on every code block (styles/playground.css).
+    // "Open tutorial in Playground" block on tutorial intro pages (styles/playground.css).
     "apps/docs/playground.js",
     // One-click light/dark switch in the header (styles/theme.css).
     "apps/docs/theme-toggle.js",

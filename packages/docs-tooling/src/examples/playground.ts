@@ -1,19 +1,14 @@
 /**
- * "Open in Playground" source markers for generated example snippets.
+ * The kind of a tutorial's example folder, for "Open tutorial in Playground".
  *
- * Every tab of a generated snippet that comes from a real file in
- * packages/docs-examples carries a hidden marker right before its code fence
- * (rendered by `playgroundMarker` in render.ts):
- *
- *   <div className="sol-pg" data-pg-src="packages/docs-examples/.../kit.ts"
- *     data-pg-open="packages/docs-examples/.../kit.ts" data-pg-kind="ts" />
- *
- * apps/docs/playground.js reads it and turns the code block's toolbar control
- * into a link to Solana Playground's GitHub import
- * (`<origin>/github.com/<owner>/<repo>/tree/<ref>/<data-pg-open>`) when
- * `data-pg-kind` is one the playground can import (`CONFIG.enabledKinds` there).
- * Inline tabs (no source file) get a marker without `data-pg-src`, so markers
- * stay index-aligned with the tabs of a `<CodeGroup>`.
+ * Each tutorial has exactly one Playground entry point: the block at the top
+ * of its intro page (`playground.mdx`, rendered by generators/paths.ts). Its
+ * button carries the folder to import (`data-pg-open`) and the folder's kind
+ * (`data-pg-kind`, computed here). apps/docs/playground.js turns it into a
+ * link to Solana Playground's GitHub import
+ * (`<origin>/github.com/<owner>/<repo>/tree/<ref>/<data-pg-open>`) when the
+ * kind is one the playground can import (`CONFIG.enabledKinds` there).
+ * Code blocks and demo terminals have no Playground control.
  *
  * The kind mirrors the playground's own import pipeline (verified against the
  * deployed bundle of https://solana-playground-two.vercel.app, 2026-10-15):
@@ -28,24 +23,11 @@
  * Rust binaries, Python) gets a language kind (`ts`, `js`, `rust`, `py`) that
  * the script leaves disabled until the playground learns to import it.
  *
- * Granularity:
- *   - A file inside a job tutorial's example folder
- *     (`packages/docs-examples/paths/<domain>/<tutorial>/**`) opens that whole
- *     folder: a single tutorial file imports its siblings (config.ts, the
- *     earlier steps) and does not run on its own. The kind is the folder's
- *     (`folderKind`), so every block of a tutorial, its demo terminal and the
- *     generated "Open tutorial in Playground" button (generators/paths.ts)
- *     agree and switch on together.
- *   - Any other Rust file inside a crate (`<crate>/src/**.rs` with a
- *     `<crate>/Cargo.toml`) opens the crate folder (the playground needs the
- *     whole `src/` tree; this is how solana-developers/program-examples links
- *     import).
- *   - Every other file (cookbook, standalone examples) opens on its own.
  * Pure apart from reading the committed example tree; deterministic.
  */
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
-import { repoRoot, toPosix } from "../lib/paths.ts";
+import { toPosix } from "../lib/paths.ts";
 
 export type PlaygroundKind =
   | "anchor"
@@ -57,19 +39,11 @@ export type PlaygroundKind =
   | "py"
   | "other";
 
-export interface PlaygroundSource {
-  /** Repo-relative path of the file the tab's code is sliced from. */
-  src: string;
-  /** Repo-relative file or folder the playground should import. */
-  open: string;
-  kind: PlaygroundKind;
-}
-
 /** File types the playground's GitHub import loads (its language list). */
 const PG_EXTENSIONS = new Set([".js", ".json", ".py", ".rs", ".ts"]);
 const SKIP_DIRS = new Set(["node_modules", "target", ".git"]);
 /** Characters the playground's GitHub URL parser accepts in a path. */
-const PG_PATH = /^[\w\-/.]+$/;
+export const PG_PATH = /^[\w\-/.]+$/;
 
 function listFiles(absDir: string): string[] {
   const out: string[] = [];
@@ -134,19 +108,6 @@ function languageKind(file: string): PlaygroundKind {
   }
 }
 
-/** Repo-relative root of the job tutorial example folders. */
-export const TUTORIALS_REL = "packages/docs-examples/paths";
-
-/**
- * The job tutorial folder (`packages/docs-examples/paths/<domain>/<tutorial>`)
- * that `fileRel` (repo-relative, posix) sits in, or undefined for a file
- * outside one (cookbook, standalone examples, files directly in a domain).
- */
-export function tutorialFolder(fileRel: string): string | undefined {
-  const m = /^(packages\/docs-examples\/paths\/[^/]+\/[^/]+)\/./.exec(fileRel);
-  return m?.[1];
-}
-
 const LANG_ORDER: PlaygroundKind[] = ["ts", "js", "rust", "py"];
 const folderKinds = new Map<string, PlaygroundKind>();
 
@@ -180,52 +141,4 @@ export function folderKind(absDir: string): PlaygroundKind {
   }
   folderKinds.set(absDir, kind ?? "other");
   return kind ?? "other";
-}
-
-/** Marker data for a tab sliced from `fileRel` (repo-relative, posix). */
-export function playgroundSource(fileRel: string): PlaygroundSource {
-  const abs = path.join(repoRoot, fileRel);
-  const tutorial = tutorialFolder(fileRel);
-  if (tutorial && existsSync(path.join(repoRoot, tutorial)))
-    return {
-      src: fileRel,
-      open: tutorial,
-      kind: PG_PATH.test(tutorial)
-        ? folderKind(path.join(repoRoot, tutorial))
-        : "other",
-    };
-  let openAbs = abs;
-  const crate = /^(.*)\/src\/.+\.rs$/.exec(fileRel);
-  if (crate && existsSync(path.join(repoRoot, crate[1]!, "Cargo.toml")))
-    openAbs = path.join(repoRoot, crate[1]!);
-  const open = toPosix(path.relative(repoRoot, openAbs));
-  const files: [string, string][] = (
-    openAbs === abs ? [abs] : listFiles(openAbs)
-  )
-    .filter((f) => PG_EXTENSIONS.has(path.extname(f)))
-    .map((f) => [
-      toPosix(path.relative(openAbs === abs ? path.dirname(abs) : openAbs, f)),
-      readFileSync(f, "utf8"),
-    ]);
-  let kind = detectProgramKind(files) ?? languageKind(fileRel);
-  // The playground's URL parser drops anything else from the path.
-  if (!PG_PATH.test(open)) kind = "other";
-  return { src: fileRel, open, kind };
-}
-
-/**
- * Marker data for a whole example folder (`dirRel`, relative to `root`,
- * posix), e.g. the folder a path demo terminal runs its steps from
- * (generators/paths.ts). `files` are the step sources in that folder, in
- * step order (the first is `src`); the kind is the folder's (`folderKind`).
- */
-export function playgroundFolderSource(
-  dirRel: string,
-  files: string[],
-  root = repoRoot,
-): PlaygroundSource | undefined {
-  const abs = path.join(root, dirRel);
-  if (!files.length || !existsSync(abs)) return undefined;
-  const kind = PG_PATH.test(dirRel) ? folderKind(abs) : "other";
-  return { src: files[0]!, open: dirRel, kind };
 }

@@ -15,11 +15,6 @@
  *     "first": 0,                             // 0-based step that is the "first win"
  *     "steps": [["/docs/payments/checkout/try-it", "Pay as a customer", "optional summary"], …],
  *     "after": { "href": "/docs/payments", "title": "…", "summary": "…" },   // optional
- *     "playground": {                        // optional "Open tutorial in Playground" settings
- *       "stepper": false,                    // no button in the stepper header (default true)
- *       "label": "Open in Playground",       // button text (default _ui.playground)
- *       "note": "…"                          // playground.mdx text (default _ui.playgroundNote)
- *     },
  *     "demo": {                              // optional run-it-yourself panel
  *       "component": "checkout",             // checkout | paywall | asset | trade (stage style)
  *       "title": "Demo Sticker Shop",
@@ -46,19 +41,17 @@
  * - `card.mdx`: the path card for job pickers and hubs.
  * - `start.mdx`: the same card for the path intro, pointing at step 1
  *   (the mockup's "Start building" block under the flow).
- * - "Open tutorial in Playground": every `stepper-<n>.mdx` carries the
- *   compact button in its header row, and `playground.mdx` is the prominent
- *   block for the step that runs the code on your machine (import it at the
- *   top of that page). Both open the tutorial's whole example folder
- *   (`tutorialDir`: the folder the demo outputs live in, else the one
+ * - `playground.mdx`: the tutorial's one "Open tutorial in Playground"
+ *   block. Import it once, at the top of the intro page (index 0); step
+ *   pages, the stepper, and demo terminals have no Playground control. It
+ *   opens the tutorial's whole example folder (`tutorialDir`: the folder the
+ *   demo outputs live in, else the one
  *   `packages/docs-examples/paths/<domain>/<key>`), with the folder's kind
- *   from examples/playground.ts. They are server-rendered disabled (no href,
- *   greyed, tooltip); apps/docs/playground.js enables them when the kind is
- *   in its `CONFIG.enabledKinds`. A path without an example folder gets the
- *   disabled button with no source, and a warning. `playground.stepper:
- *   false` drops the stepper button for one tutorial (the Quickstart, whose
- *   intro page carries the only button), and `playground.label`/`note`
- *   replace the shared `_ui` wording for that tutorial.
+ *   from examples/playground.ts. It is server-rendered disabled (no href,
+ *   greyed, tooltip); apps/docs/playground.js enables it when the kind is in
+ *   its `CONFIG.enabledKinds`. A path without an example folder gets the
+ *   disabled button with no source, and a warning. The wording is shared by
+ *   every tutorial (`_ui.playground`, `playgroundOff`, `playgroundNote`).
  * - `demo.mdx` (when `demo` is set): the terminal panel of
  *   src/lib/terminal.ts, all server-rendered: the stage (one row per
  *   `stage` entry, one pill per progress value), the numbered steps with
@@ -93,10 +86,9 @@ import { repoRoot } from "../lib/paths.ts";
 import { DEFAULT_LOCALE } from "../lib/locales.ts";
 import {
   folderKind,
-  playgroundFolderSource,
+  PG_PATH,
   type PlaygroundKind,
 } from "../examples/playground.ts";
-import { playgroundMarker } from "../examples/render.ts";
 import {
   applyOutputs,
   checkInlineMarkdown,
@@ -157,7 +149,7 @@ export const PATH_UI = {
   playground: "Open tutorial in Playground",
   playgroundOff: "Not available for this tutorial yet",
   playgroundNote:
-    "The files from every step of this tutorial, together in one project.",
+    "Playground runs in your browser, with nothing to install. It opens the files from every step of this tutorial in one project.",
 };
 export type PathUi = typeof PATH_UI;
 
@@ -191,7 +183,6 @@ export interface PathDef {
   first?: number;
   steps: PathStep[];
   after?: PathStep;
-  playground?: PathPlayground;
   demo?: {
     component: DemoKind;
     title: string;
@@ -200,15 +191,6 @@ export interface PathDef {
     steps: DemoStep[];
     checks?: DemoChecks;
   };
-}
-/** Per-tutorial "Open tutorial in Playground" settings. */
-export interface PathPlayground {
-  /** Show the button in the stepper header row. Default true. */
-  stepper: boolean;
-  /** Button text instead of `_ui.playground`. */
-  label?: string;
-  /** playground.mdx text instead of `_ui.playgroundNote`. */
-  note?: string;
 }
 /** A separate panel of refusals next to a demo (no stage, no success). */
 export interface DemoChecks {
@@ -233,7 +215,6 @@ const PATH_FIELDS = new Set([
   "first",
   "steps",
   "after",
-  "playground",
   "demo",
 ]);
 
@@ -326,7 +307,6 @@ export function parsePaths(
       const bad = checkInlineMarkdown(v.summary);
       if (bad) at(`"summary" ${bad}`);
     }
-    const playground = parsePlayground(v.playground, at);
     out.paths.push({
       key,
       tab: String(v.tab ?? ""),
@@ -339,7 +319,6 @@ export function parsePaths(
       first: typeof first === "number" ? first : undefined,
       steps,
       after,
-      ...(playground ? { playground } : {}),
       demo: parseDemo(v.demo, at),
     });
   }
@@ -368,30 +347,6 @@ function parseSteps(v: unknown, at: (m: string) => void): PathStep[] {
     out.push({ href: href!, title: title!, summary: summary || undefined });
   });
   return out;
-}
-
-function parsePlayground(
-  v: unknown,
-  at: (m: string) => void,
-): PathPlayground | undefined {
-  if (v === undefined) return undefined;
-  if (!isRecord(v)) {
-    at(`"playground" must be { stepper?, label?, note? }`);
-    return undefined;
-  }
-  for (const f of Object.keys(v))
-    if (!["stepper", "label", "note"].includes(f))
-      at(`playground: unknown field "${f}"`);
-  if (v.stepper !== undefined && typeof v.stepper !== "boolean")
-    at(`playground.stepper must be true or false`);
-  for (const f of ["label", "note"] as const)
-    if (v[f] !== undefined && !str(v[f]))
-      at(`playground.${f} must be a non-empty string`);
-  return {
-    stepper: v.stepper !== false,
-    label: str(v.label) ? v.label : undefined,
-    note: str(v.note) ? v.note : undefined,
-  };
 }
 
 function parseDemo(v: unknown, at: (m: string) => void): PathDef["demo"] {
@@ -544,7 +499,6 @@ function mergePath(
       : st;
   });
   const ra = isRecord(raw.after) ? raw.after : {};
-  const rp = isRecord(raw.playground) ? raw.playground : {};
   const rd = isRecord(raw.demo) ? raw.demo : {};
   const rds = Array.isArray(rd.steps) ? rd.steps : [];
   const rc = isRecord(rd.checks) ? rd.checks : {};
@@ -570,16 +524,6 @@ function mergePath(
       title: s(ra.title, en.after.title),
       summary: so(ra.summary, en.after.summary),
     },
-    // `stepper` always comes from English; the wording may be translated.
-    ...(en.playground
-      ? {
-          playground: {
-            stepper: en.playground.stepper,
-            label: so(rp.label, en.playground.label),
-            note: so(rp.note, en.playground.note),
-          },
-        }
-      : {}),
     demo: en.demo && {
       ...en.demo,
       title: s(rd.title, en.demo.title),
@@ -650,7 +594,6 @@ export function renderStepper(
   src: PathsSource,
   p: PathDef,
   current: number,
-  pg?: TutorialSource,
 ): string {
   const { ui, lang } = src;
   const label = `${p.name} · ${p.time}`;
@@ -674,13 +617,9 @@ export function renderStepper(
     const sep = (t: string) => `<span className="sol-vh">${t}</span>`;
     return `<li data-state="${state}"${first}><a href="${href}"${aria}><span className="sol-stepper-n">${mdText(`${ui.step} ${n}`)}${marks.map((m) => sep(", ") + m).join("")}${sep(": ")}</span><span className="sol-stepper-t">${mdText(s.title)}</span></a></li>`;
   });
-  const head =
-    p.playground?.stepper === false
-      ? ""
-      : `<div className="sol-stepper-head">${tutorialButton(ui, pg, "compact", p.playground?.label)}</div>\n`;
   return `${hdr(lang)}
 <div className="sol-stepper not-prose" data-path="${p.key}">
-${head}<div className="sol-stepper-nav" role="navigation" ${attr("aria-label", label)}>
+<div className="sol-stepper-nav" role="navigation" ${attr("aria-label", label)}>
 <ol>
 ${items.join("\n")}
 </ol>
@@ -735,7 +674,7 @@ export function tutorialSource(
   const open = `packages/docs-examples/${dir}`;
   return {
     open,
-    kind: /^[\w\-/.]+$/.test(open) ? folderKind(path.join(root, dir)) : "other",
+    kind: PG_PATH.test(open) ? folderKind(path.join(root, dir)) : "other",
   };
 }
 
@@ -748,16 +687,11 @@ export function tutorialSource(
  * Without JavaScript it stays disabled, so it never links to a folder the
  * playground cannot import.
  */
-export function tutorialButton(
-  ui: PathUi,
-  pg: TutorialSource | undefined,
-  variant: "compact" | "block" = "compact",
-  label = ui.playground,
-) {
+export function tutorialButton(ui: PathUi, pg: TutorialSource | undefined) {
+  const label = ui.playground;
   const off = `${label}: ${ui.playgroundOff.charAt(0).toLowerCase()}${ui.playgroundOff.slice(1)}`;
   const attrs = [
-    `className="sol-pg-btn sol-pg-tut"`,
-    `data-variant="${variant}"`,
+    `className="sol-pg-tut"`,
     ...(pg
       ? [attr("data-pg-open", pg.open), attr("data-pg-kind", pg.kind)]
       : [`data-pg-kind="inline"`]),
@@ -769,12 +703,12 @@ export function tutorialButton(
     `role="link"`,
     `tabIndex="0"`,
   ];
-  return `<a ${attrs.join(" ")}><span className="sol-pg-label">${mdText(label)}</span></a>`;
+  return `<a ${attrs.join(" ")}>${mdText(label)}</a>`;
 }
 
 /**
- * `playground.mdx`: the prominent "Open tutorial in Playground" block for
- * the top of the step that runs the tutorial on your machine.
+ * `playground.mdx`: the tutorial's one "Open tutorial in Playground" block,
+ * for the top of its intro page.
  */
 export function renderPlaygroundBlock(
   src: PathsSource,
@@ -784,8 +718,8 @@ export function renderPlaygroundBlock(
   const { ui, lang } = src;
   return `${hdr(lang)}
 <div className="sol-pg-tutorial not-prose" data-path="${p.key}">
-<p className="sol-pg-tutorial-text">${mdText(p.playground?.note ?? ui.playgroundNote)}</p>
-${tutorialButton(ui, pg, "block", p.playground?.label)}
+<p className="sol-pg-tutorial-text">${mdText(ui.playgroundNote)}</p>
+${tutorialButton(ui, pg)}
 </div>
 `;
 }
@@ -893,8 +827,6 @@ export function renderDemo(
     steps: d.steps,
     stage: d.stage,
     success: d.success,
-    // The marker names the tutorial folder; checks share the demo's.
-    markerSteps: d.steps,
   });
 }
 
@@ -913,7 +845,6 @@ export function renderChecks(
     kind: d.component,
     title: c.title,
     steps: c.steps,
-    markerSteps: d.steps,
   });
 }
 
@@ -929,7 +860,6 @@ function renderPanel(
     steps: DemoStep[];
     stage?: TermStageRow[];
     success?: string;
-    markerSteps: DemoStep[];
   },
 ) {
   const { ui, lang } = src;
@@ -989,40 +919,7 @@ function renderPanel(
       /^<div className="sol-term /,
       '<div data-norun="" className="sol-term ',
     );
-  return `${hdr(lang).trimEnd()}\n\n${demoMarker(t.markerSteps, outputsRoot)}\n${panel}\n`;
-}
-
-const STEP_SOURCE_EXTS = [".ts", ".js", ".rs", ".py"];
-
-/**
- * The hidden "Open in Playground" marker before a demo terminal
- * (examples/playground.ts): the folder its steps run from, when they all
- * share one folder and each has a source file `<stem>.{ts,js,rs,py}` next to
- * its recorded output. Without one the marker has no source and
- * playground.js keeps the terminal's control disabled.
- */
-export function demoMarker(steps: DemoStep[], outputsRoot = examplesRoot) {
-  const dirs = new Set(steps.map((s) => path.posix.dirname(s.output)));
-  const sources = steps.map((s) => {
-    const stem = s.output.replace(/\.output\.txt$/, "");
-    // `<stem>.<variant>.output.txt` is a slice of `<stem>.<ext>`'s run.
-    const variant = stem.replace(/(?<=\/[^/.]+)\.[^/.]+$/, "");
-    for (const base of variant === stem ? [stem] : [stem, variant]) {
-      const ext = STEP_SOURCE_EXTS.find((e) =>
-        existsSync(path.join(outputsRoot, base + e)),
-      );
-      if (ext) return `packages/docs-examples/${base}${ext}`;
-    }
-    return undefined;
-  });
-  const dir = [...dirs][0];
-  const pg =
-    dirs.size === 1 && dir && sources.every(Boolean)
-      ? playgroundFolderSource(dir, sources as string[], outputsRoot)
-      : undefined;
-  return playgroundMarker(
-    pg && { ...pg, open: `packages/docs-examples/${pg.open}` },
-  );
+  return `${hdr(lang).trimEnd()}\n\n${panel}\n`;
 }
 
 /** Every generated file for every language. */
@@ -1046,7 +943,7 @@ export function buildPathOutputs(
       for (let n = 0; n <= p.steps.length; n++)
         files.set(
           path.join(dir, `stepper-${n}.mdx`),
-          renderStepper(docsRoot, src, p, n, pg),
+          renderStepper(docsRoot, src, p, n),
         );
       files.set(
         path.join(dir, "playground.mdx"),
