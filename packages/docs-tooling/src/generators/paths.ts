@@ -149,7 +149,7 @@ export const PATH_UI = {
   playground: "Open tutorial in Playground",
   playgroundOff: "Not available for this tutorial yet",
   playgroundNote:
-    "Playground runs in your browser, with nothing to install. It opens the files from every step of this tutorial in one project.",
+    "Playground runs in your browser, with nothing to install. It opens every step of this tutorial in one project, and its built-in AI can explain each step, change the code, and interact with the program.",
 };
 export type PathUi = typeof PATH_UI;
 
