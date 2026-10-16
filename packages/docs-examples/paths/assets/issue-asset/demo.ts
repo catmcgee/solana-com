@@ -5,13 +5,8 @@
  * permanent delegate can move any balance. Each step's prints are the docs'
  * recorded output.
  */
-import type {
-  Address,
-  KeyPairSigner,
-  Signature,
-  TransactionSigner,
-} from "@solana/kit";
-import { fetchMint, fetchToken } from "@solana-program/token-2022";
+import type { Address, Signature, TransactionSigner } from "@solana/kit";
+import { fetchToken } from "@solana-program/token-2022";
 import { approveHolder, openAccount, tokenAccountOf } from "./approve-holder";
 import {
   clawBack,
@@ -24,12 +19,6 @@ import {
 } from "./blocked-transfer";
 import { rpc } from "./config";
 import { createAsset } from "./create-asset";
-import {
-  approveConfidentialHolder,
-  auditorKey,
-  createConfidentialAsset,
-  enableConfidentialAccount,
-} from "./create-confidential-asset";
 
 const json = (v: unknown) =>
   JSON.stringify(v, (_k, x) => (typeof x === "bigint" ? Number(x) : x));
@@ -146,67 +135,4 @@ export async function demoBlocked(
     units(await balanceOf(issuer.address, mint)),
   );
   return { ok, blocked, rejected, pausedError, moved };
-}
-
-/** Optional variant: the same asset with Confidential Balances. */
-export async function demoConfidential(
-  issuer: TransactionSigner,
-  auditor: KeyPairSigner,
-  holder: KeyPairSigner,
-) {
-  const auditorPubkey = await auditorKey(auditor);
-  const asset = await createConfidentialAsset(issuer, auditorPubkey);
-  console.log("Mint:", asset.mint);
-  console.log("Extensions:", asset.extensions.join(", "));
-  const { data } = await fetchMint(rpc, asset.mint);
-  const ct =
-    data.extensions.__option === "Some"
-      ? data.extensions.value.find(
-          (e) => e.__kind === "ConfidentialTransferMint",
-        )
-      : undefined;
-  if (ct?.__kind !== "ConfidentialTransferMint")
-    throw new Error("ConfidentialTransferMint missing");
-  console.log("Auto-approve new accounts:", ct.autoApproveNewAccounts);
-  console.log(
-    "Auditor ElGamal key:",
-    ct.auditorElgamalPubkey.__option === "Some"
-      ? ct.auditorElgamalPubkey.value
-      : "none",
-  );
-  console.log("Signature:", asset.signature);
-
-  const enabled = await enableConfidentialAccount(holder, asset.mint);
-  console.log(
-    "Holder enabled confidential balances on",
-    enabled.account,
-    "state:",
-    enabled.state,
-    "confidential approved:",
-    enabled.confidentialApproved,
-  );
-  console.log("Signature:", enabled.signature);
-
-  const approved = await approveConfidentialHolder(
-    issuer,
-    asset.mint,
-    holder.address,
-  );
-  console.log(
-    "Issuer approved",
-    approved.account,
-    "state:",
-    approved.state,
-    "confidential approved:",
-    approved.confidentialApproved,
-  );
-  console.log("Signature:", approved.signature);
-  return {
-    asset,
-    autoApprove: ct.autoApproveNewAccounts,
-    auditor: ct.auditorElgamalPubkey,
-    auditorPubkey,
-    enabled,
-    approved,
-  };
 }

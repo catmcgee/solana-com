@@ -15,15 +15,10 @@ import { fundSol } from "../../../test/fixtures/fund";
 import { runExample } from "../../../test/record";
 import { clawBack, failure, pause, resume } from "./blocked-transfer";
 import { rpc, send } from "./config";
-import {
-  balanceOf,
-  demoApprove,
-  demoBlocked,
-  demoConfidential,
-  demoCreate,
-} from "./demo";
+import { balanceOf, demoApprove, demoBlocked, demoCreate } from "./demo";
 import { approveHolder, openAccount, tokenAccountOf } from "./approve-holder";
 import { run } from "./run";
+import { runConfidential } from "./confidential";
 
 const out = (name: string) => new URL(`./${name}.output.txt`, import.meta.url);
 
@@ -105,15 +100,12 @@ describe("paths/assets/issue-asset (Token-2022 restricted asset)", () => {
   });
 
   it("confidential: same asset plus ConfidentialTransferMint; the issuer approves each holder", async () => {
-    const [ctIssuer, auditor, ctHolder] = (await Promise.all(
-      [0, 1, 2].map(() => generateKeyPairSigner()),
-    )) as [KeyPairSigner, KeyPairSigner, KeyPairSigner];
+    const ctIssuer = await generateKeyPairSigner();
     await fundSol(ctIssuer.address, 2);
-    await fundSol(ctHolder.address);
-    const r = await runExample(
-      () => demoConfidential(ctIssuer, auditor, ctHolder),
-      { output: out("create-confidential-asset") },
-    );
+    const r = await runExample(() => runConfidential(ctIssuer), {
+      output: out("confidential"),
+    });
+    const ctHolder = r.value.holder;
     expect(r.value.asset.extensions).toEqual(
       expect.arrayContaining([
         "MetadataPointer",
