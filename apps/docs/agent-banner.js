@@ -51,6 +51,8 @@
       line.textContent.indexOf(PROD + "/") !== -1
     )
       line.textContent = line.textContent.split(PROD + "/").join(origin + "/");
+    // The line is truncated to one row (agent-banner.css); show it in full on hover.
+    line.title = line.textContent;
 
     var box = line.parentElement;
     if (!box || box.querySelector(".sol-agent-banner-btn")) return;
