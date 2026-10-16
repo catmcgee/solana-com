@@ -8,11 +8,13 @@
  * | SectionHeading                 | `## title` (+ description / link line)     |
  * | CourseHero                     | `<Card cta arrow>` with subtext + facts    |
  * | CourseList                     | `<Columns cols={2}>` of `<Card>`           |
- * | CourseFacts                    | `**Label:** value · …` paragraph           |
+ * | CourseFacts                    | `<div className="sol-facts">` box around a |
+ * |                                | `**Label:** value · …` paragraph           |
  * | NextUp                         | `<Card title="Next up: …" horizontal>`     |
- * | VideoWithChapters              | `<Frame><iframe/></Frame>` + watch link +  |
- * |                                | `<div className="sol-chapters">` around an |
- * |                                | ordered list of timestamp links            |
+ * | VideoWithChapters              | `<div className="sol-video">`: a           |
+ * |                                | `sol-chapters` panel (ordered list of      |
+ * |                                | timestamp links) beside the `<Frame>`'d    |
+ * |                                | player, then a watch-on-YouTube link       |
  * | VideoChapterList               | `<Columns cols={2}>` of thumbnail `<Card>` |
  * | ProjectCardGrid                | `<Columns cols={3}>` of thumbnail `<Card>` |
  *
@@ -235,7 +237,10 @@ export function convertComponent(
         text(" "),
         f.href ? link(f.href, f.value) : text(f.value),
       ]);
-      return [paragraph(joinParts(parts))];
+      // A bordered summary box (styles/video.css), as on the legacy pages.
+      return [
+        jsx("div", { className: "sol-facts" }, [paragraph(joinParts(parts))]),
+      ];
     }
     case "NextUp": {
       const title = need<string>(str(getAttr(node, "title")), "title");
@@ -256,21 +261,31 @@ export function convertComponent(
         getAttr(node, "chapters"),
         "chapters",
       );
-      return [
-        youtubeFrame(id, title),
-        paragraph([link(youtubeWatchUrl(id), `Watch ${title} on YouTube`)]),
-        paragraph([strong("Chapters")]),
-        jsx("div", { className: "sol-chapters", "data-video": id }, [
-          list(
-            chapters.map((c) => [
-              link(
-                youtubeWatchUrl(id, c.start),
-                `${formatTime(c.start)} ${c.title}`,
-              ),
-            ]),
-            true,
+      // Chapters on the left in a scrolling panel, the player on the right
+      // (stacked, player first, on narrow screens): styles/video.css.
+      const chapterLink = (c: { title: string; start: number }) =>
+        link(youtubeWatchUrl(id, c.start), [
+          jsx(
+            "span",
+            { className: "sol-ch-t" },
+            [text(formatTime(c.start))],
+            false,
           ),
+          text(` ${c.title}`),
+        ]);
+      return [
+        jsx("div", { className: "sol-video", "data-video": id }, [
+          jsx("div", { className: "sol-chapters", "data-video": id }, [
+            list(
+              chapters.map((c) => [chapterLink(c)]),
+              true,
+            ),
+          ]),
+          jsx("div", { className: "sol-video-player" }, [
+            youtubeFrame(id, title),
+          ]),
         ]),
+        paragraph([link(youtubeWatchUrl(id), `Watch ${title} on YouTube`)]),
       ];
     }
     case "VideoChapterList":
