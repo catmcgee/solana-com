@@ -205,13 +205,11 @@ function NewTabHint({ text }: { text: string }) {
 }
 
 /**
- * "Set up in one command": two tabs, "With your AI agent" (`npx add-mcp`,
- * then a link to Build with AI agents for per-agent setup) and "Install
- * manually" (the one-line installer). The tabs are two radio inputs styled
- * as a segmented control, so they switch without JavaScript and arrow keys
- * move between them; the panels follow with `peer-checked`. Every command is
- * plain, selectable text in the server render; the copy buttons turn on
- * after hydration.
+ * "Set up Solana in one paste": a heading, then the one line a reader pastes
+ * into their coding agent in a terminal-style box with a Copy button, then
+ * links to the manual agent setup and the local install. The line is plain,
+ * selectable text in the server render; the Copy button turns on after
+ * hydration.
  */
 function AgentCard({
   t,
@@ -223,26 +221,26 @@ function AgentCard({
   installHref: string;
 }) {
   return (
-    <section
-      aria-labelledby="dl-agent-title"
-      data-testid="agent-card"
-      className={`${card} p-5 md:p-6`}
-    >
+    <section aria-labelledby="dl-agent-title" data-testid="agent-card">
+      <p className="m-0 mb-2.5 font-[family-name:var(--dl-mono)] text-xs uppercase tracking-[0.08em] text-[var(--dl-dim)]">
+        {t("agent.eyebrow")}
+      </p>
       <h2
         id="dl-agent-title"
-        className="m-0 mb-2 font-brand text-lg font-medium leading-snug tracking-[-0.015em] text-[var(--dl-text)]"
+        className="m-0 mb-2 font-brand text-[22px] font-medium leading-snug tracking-[-0.015em] text-[var(--dl-text)]"
       >
         {t("agent.title")}
       </h2>
-      <p className="m-0 mb-4 text-sm leading-[1.55] text-[var(--dl-muted)]">
+      <p className="m-0 mb-5 text-[15px] leading-[1.55] text-[var(--dl-muted)]">
         {t("agent.body")}
       </p>
       <AgentPrompt
+        promptLabel={t("agent.promptLabel")}
         label={t("agent.copyPrompt")}
         copyText={t("agent.copy")}
         copiedText={t("agent.copied")}
       />
-      <p className="m-0 mt-3 text-sm leading-[1.55] text-[var(--dl-muted)]">
+      <p className="m-0 mt-4 text-sm leading-[1.55] text-[var(--dl-muted)]">
         {t("agent.alsoBefore")}{" "}
         <a href={moreHref} className={inlineLink}>
           {t("agent.alsoAgents")}

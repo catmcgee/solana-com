@@ -50,7 +50,7 @@ describe("/developers landing", () => {
       }),
     ).toBeInTheDocument();
     for (const name of [
-      "Set up your coding agent for Solana",
+      "Set up Solana in one paste",
       "What are you building?",
       "Why Solana",
       "What would your payments cost?",
