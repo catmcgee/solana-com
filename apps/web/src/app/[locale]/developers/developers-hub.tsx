@@ -416,25 +416,8 @@ export async function DevelopersHub({
             title={t("picker.title")}
             body={t("picker.body")}
           />
-          <input
-            type="checkbox"
-            id="dl-pause-animations"
-            className="peer sr-only"
-          />
-          <label
-            htmlFor="dl-pause-animations"
-            className="mb-4 inline-flex cursor-pointer select-none items-center gap-2 rounded-lg border border-[var(--dl-line)] px-3 py-1.5 text-[13px] text-[var(--dl-muted)] hover:border-[var(--dl-line-strong)] hover:text-[var(--dl-text)] peer-checked:border-[var(--dl-accent-line)] peer-checked:text-[var(--dl-text)] peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-[var(--dl-accent)] motion-reduce:hidden"
-          >
-            <span
-              aria-hidden
-              className="grid size-3.5 place-items-center rounded-sm border border-[var(--dl-line-strong)] text-[10px] leading-none"
-            >
-              ❚❚
-            </span>
-            {t("picker.pauseAnimations")}
-          </label>
           <ul
-            className="m-0 grid list-none gap-3.5 p-0 md:grid-cols-2 xl:grid-cols-4 peer-checked:[&_*]:![animation:none]"
+            className="m-0 grid list-none gap-3.5 p-0 md:grid-cols-2 xl:grid-cols-4 [&_*]:![animation-iteration-count:1] [&_li:hover_*]:![animation-iteration-count:infinite] [&_li:focus-within_*]:![animation-iteration-count:infinite]"
             data-testid="job-cards"
           >
             {JOB_PATHS.map((job) => {
