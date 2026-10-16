@@ -63,7 +63,6 @@ export const DOCS_TABS: DocsTab[] = [
     to: "/developers/docs",
     Icon: StartIcon,
     match: [
-      "/developers/docs/finance",
       "/developers/docs/intro/coding-with-agents",
       "/developers/docs/quickstart",
       "/developers/docs/research",

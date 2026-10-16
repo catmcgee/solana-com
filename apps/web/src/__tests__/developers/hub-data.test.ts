@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import en from "../../../../../packages/i18n/messages/web/en/common.json";
 import {
@@ -5,6 +7,7 @@ import {
   COST_MODEL,
   HERO_LINKS,
   HUB_STATS,
+  INSTALL_SETUP,
   JOB_PATHS,
   LEARN_ROUTES,
   MORE_USE_CASES,
@@ -157,10 +160,19 @@ describe("developers hub links", () => {
   });
 });
 
-describe("build with your agent card", () => {
+const docsPage = (page: string) =>
+  readFileSync(
+    path.resolve(__dirname, "../../../../docs/developers/docs", `${page}.mdx`),
+    "utf8",
+  );
+
+describe("set up in one command card", () => {
   it("uses the official Solana MCP server URL and commands", () => {
     // Verbatim from https://mcp.solana.com.
     expect(AGENT_SETUP.serverUrl).toBe("https://mcp.solana.com/mcp");
+    expect(AGENT_SETUP.allAgentsCommand).toBe(
+      "npx add-mcp https://mcp.solana.com/mcp",
+    );
     expect(AGENT_SETUP.clients).toEqual([
       {
         id: "claudeCode",
@@ -174,7 +186,31 @@ describe("build with your agent card", () => {
         command: "codex mcp add solana-mcp --url https://mcp.solana.com/mcp",
       },
     ]);
-    expect(AGENT_SETUP.moreHref).toBe("/developers/docs/intro/coding-with-agents");
+    expect(AGENT_SETUP.moreHref).toBe(
+      "/developers/docs/intro/coding-with-agents",
+    );
+  });
+
+  it("uses the one-line installer from Quick installation", () => {
+    expect(INSTALL_SETUP.href).toBe("/developers/docs/intro/installation");
+    expect(docsPage("intro/installation/index")).toContain(
+      INSTALL_SETUP.command,
+    );
+  });
+
+  it("matches the commands on the Build with AI agents page and the Quickstart", () => {
+    const agents = docsPage("intro/coding-with-agents");
+    expect(agents).toContain(AGENT_SETUP.allAgentsCommand);
+    for (const client of AGENT_SETUP.clients)
+      expect(agents).toContain(client.command);
+    const quickstart = docsPage("quickstart");
+    expect(quickstart).toContain(AGENT_SETUP.allAgentsCommand);
+    expect(quickstart).toContain(INSTALL_SETUP.command);
+  });
+
+  it("does not link the removed All use cases page", () => {
+    expect(JSON.stringify(MORE_USE_CASES)).not.toMatch(/docs\/finance/);
+    expect(landing.picker.more).not.toHaveProperty("all");
   });
 
   it("has no Ethereum or EVM links or copy", () => {

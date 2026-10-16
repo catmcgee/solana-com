@@ -457,6 +457,11 @@ const movedDocsRedirects: RedirectInput[] = withMdVariants([
       destination: destination!,
     },
   ]),
+  // The "All use cases" hub was removed (2026-10-16): Start here and the tab
+  // landings (Payments, Assets, Markets) link every page it listed. Exact
+  // paths only: /docs/finance/privacy still exists.
+  { source: "/docs/finance", destination: "/developers/docs" },
+  { source: "/developers/docs/finance", destination: "/developers/docs" },
 ]);
 
 /**

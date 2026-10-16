@@ -16,6 +16,7 @@ import {
   DEVELOPER_NEWSLETTER_FORM_ID,
   HERO_LINKS,
   HUB_STATS,
+  INSTALL_SETUP,
   JOB_PATHS,
   LEARN_ROUTES,
   MORE_USE_CASES,
@@ -217,25 +218,38 @@ function NewTabHint({ text }: { text: string }) {
 }
 
 /**
- * "Build with your agent": the Solana MCP server URL, and the one-line setup
- * commands from https://mcp.solana.com in a native <details> disclosure, so
- * the card stays short and works without JavaScript. Everything is plain,
- * selectable text in the server render; the copy buttons turn on after
- * hydration. A single all-agents command can go above the server URL later.
+ * "Set up in one command": two tabs, "With your AI agent" (`npx add-mcp`,
+ * then a link to Build with AI agents for per-agent setup) and "Install
+ * manually" (the one-line installer). The tabs are two radio inputs styled
+ * as a segmented control, so they switch without JavaScript and arrow keys
+ * move between them; the panels follow with `peer-checked`. Every command is
+ * plain, selectable text in the server render; the copy buttons turn on
+ * after hydration.
  */
 function AgentCard({
   t,
   moreHref,
+  installHref,
 }: {
   t: Translate;
   moreHref: string;
+  installHref: string;
 }) {
   const row =
-    "m-0 flex items-start gap-3 rounded-[10px] border border-[var(--dl-line)] bg-[var(--dl-surface-2)] pe-1.5 ps-3.5";
+    "m-0 flex items-start gap-3 rounded-[10px] border border-[var(--dl-line)] bg-[var(--dl-surface-2)] py-1.5 pe-1.5 ps-3.5";
   const code =
-    "min-w-0 flex-1 self-center select-all font-[family-name:var(--dl-mono)] text-[var(--dl-text)] [overflow-wrap:anywhere]";
-  const label = "mb-1.5 text-[13px] text-[var(--dl-dim)]";
+    "min-w-0 flex-1 self-center select-all font-[family-name:var(--dl-mono)] !text-[13px] leading-[1.6] text-[var(--dl-text)] [overflow-wrap:anywhere]";
+  const body = "m-0 mb-3 text-sm leading-[1.55] text-[var(--dl-muted)]";
+  const tab = `flex-1 cursor-pointer select-none rounded-md px-3 py-1.5 text-center text-sm font-medium text-[var(--dl-muted)] transition-colors hover:text-[var(--dl-text)]`;
   const copy = { copyText: t("agent.copy"), copiedText: t("agent.copied") };
+  const commandRow = (command: string, testId: string, copyLabel: string) => (
+    <div className={row}>
+      <code dir="ltr" data-testid={testId} className={code}>
+        <CommandWords command={command} />
+      </code>
+      <CopyButton text={command} label={copyLabel} {...copy} />
+    </div>
+  );
 
   return (
     <section
@@ -245,71 +259,77 @@ function AgentCard({
     >
       <h2
         id="dl-agent-title"
-        className="m-0 mb-1.5 font-brand text-lg font-medium leading-snug tracking-[-0.015em] text-[var(--dl-text)]"
+        className="m-0 mb-4 font-brand text-lg font-medium leading-snug tracking-[-0.015em] text-[var(--dl-text)]"
       >
         {t("agent.title")}
       </h2>
-      <p className="m-0 mb-4 text-sm leading-[1.55] text-[var(--dl-muted)]">
-        {t("agent.body")}
-      </p>
-      <dl className="m-0">
-        <dt className={label}>{t("agent.serverUrl")}</dt>
-        <dd className={`${row} py-1.5`}>
-          <code
-            dir="ltr"
-            data-testid="agent-server-url"
-            className={`${code} !text-xs leading-[1.5] min-[400px]:!text-[13px] sm:!text-sm`}
-          >
-            {AGENT_SETUP.serverUrl}
-          </code>
-          <CopyButton
-            text={AGENT_SETUP.serverUrl}
-            label={t("agent.copyServerUrl")}
-            {...copy}
-          />
-        </dd>
-      </dl>
-      <details
-        className="group mt-4 border-t border-[var(--dl-line)] pt-3"
-        data-testid="agent-clients"
+      <input
+        type="radio"
+        name="dl-setup"
+        id="dl-setup-agent"
+        value="agent"
+        defaultChecked
+        data-testid="setup-tab-agent"
+        className="peer/agent sr-only"
+      />
+      <input
+        type="radio"
+        name="dl-setup"
+        id="dl-setup-manual"
+        value="manual"
+        data-testid="setup-tab-manual"
+        className="peer/manual sr-only"
+      />
+      <div
+        className={[
+          "mb-4 flex gap-1 rounded-[10px] border border-[var(--dl-line)] bg-[var(--dl-surface-2)] p-1",
+          "peer-checked/agent:[&>label:first-child]:bg-[var(--dl-surface)] peer-checked/agent:[&>label:first-child]:text-[var(--dl-text)] peer-checked/agent:[&>label:first-child]:shadow-[var(--dl-shadow)]",
+          "peer-checked/manual:[&>label:last-child]:bg-[var(--dl-surface)] peer-checked/manual:[&>label:last-child]:text-[var(--dl-text)] peer-checked/manual:[&>label:last-child]:shadow-[var(--dl-shadow)]",
+          "peer-focus-visible/agent:[&>label:first-child]:outline peer-focus-visible/agent:[&>label:first-child]:outline-2 peer-focus-visible/agent:[&>label:first-child]:outline-[var(--dl-accent)]",
+          "peer-focus-visible/manual:[&>label:last-child]:outline peer-focus-visible/manual:[&>label:last-child]:outline-2 peer-focus-visible/manual:[&>label:last-child]:outline-[var(--dl-accent)]",
+        ].join(" ")}
       >
-        <summary
-          className={`flex cursor-pointer list-none items-center gap-1.5 rounded-md text-sm font-medium text-[var(--dl-text)] marker:hidden hover:text-[var(--dl-accent-text)] [&::-webkit-details-marker]:hidden ${focus}`}
-        >
-          <ArrowRight
-            aria-hidden
-            className={`!size-4 text-[var(--dl-dim)] transition-transform group-open:rotate-90 ${arrowDir}`}
-          />
-          {t("agent.oneAgent")}
-        </summary>
-        <dl className="m-0 mt-3 flex flex-col gap-3">
-          {AGENT_SETUP.clients.map((client) => (
-            <div key={client.id}>
-              <dt className={label}>{client.name}</dt>
-              <dd className={`${row} py-1.5`}>
-                <code
-                  dir="ltr"
-                  data-testid={`agent-command-${client.id}`}
-                  className={`${code} !text-[13px] leading-[1.6]`}
-                >
-                  <CommandWords command={client.command} />
-                </code>
-                <CopyButton
-                  text={client.command}
-                  label={t("agent.copyCommand", { client: client.name })}
-                  {...copy}
-                />
-              </dd>
-            </div>
-          ))}
-        </dl>
+        <label htmlFor="dl-setup-agent" className={tab}>
+          {t("agent.tabAgent")}
+        </label>
+        <label htmlFor="dl-setup-manual" className={tab}>
+          {t("agent.tabManual")}
+        </label>
+      </div>
+      <div
+        data-testid="setup-panel-agent"
+        className="hidden peer-checked/agent:block"
+      >
+        <p className={body}>{t("agent.agentBody")}</p>
+        {commandRow(
+          AGENT_SETUP.allAgentsCommand,
+          "agent-command-all",
+          t("agent.copyAgentCommand"),
+        )}
         <a
           href={moreHref}
           className={`mt-3 inline-flex items-center gap-1 text-sm ${inlineLink}`}
         >
           {t("agent.otherClients")}
         </a>
-      </details>
+      </div>
+      <div
+        data-testid="setup-panel-manual"
+        className="hidden peer-checked/manual:block"
+      >
+        <p className={body}>{t("agent.manualBody")}</p>
+        {commandRow(
+          INSTALL_SETUP.command,
+          "install-command",
+          t("agent.copyInstallCommand"),
+        )}
+        <a
+          href={installHref}
+          className={`mt-3 inline-flex items-center gap-1 text-sm ${inlineLink}`}
+        >
+          {t("agent.installGuide")}
+        </a>
+      </div>
     </section>
   );
 }
@@ -379,6 +399,7 @@ export async function DevelopersHub({
           <AgentCard
             t={tt}
             moreHref={href(AGENT_SETUP.moreHref)}
+            installHref={href(INSTALL_SETUP.href)}
           />
         </div>
       </section>

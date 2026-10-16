@@ -17,8 +17,9 @@ const DARK_BG = "rgb(10, 10, 11)";
 const LIGHT_BG = "rgb(255, 255, 255)";
 const MCP_URL = "https://mcp.solana.com/mcp";
 const COMMANDS = {
-  claudeCode: `claude mcp add --transport http solana-mcp ${MCP_URL}`,
-  codex: `codex mcp add solana-mcp --url ${MCP_URL}`,
+  agent: `npx add-mcp ${MCP_URL}`,
+  install:
+    "curl --proto '=https' --tlsv1.2 -sSfL https://solana-install.solana.workers.dev | bash",
 } as const;
 
 async function backgroundOf(page: Page) {
@@ -53,24 +54,29 @@ test.describe("without JavaScript", () => {
           await expect(page.locator("h1")).toHaveCount(1);
           await expect(page.locator("h1")).not.toBeEmpty();
 
-          // Agent card: URL and commands are visible text; the copy buttons
-          // need JS, so they are hidden and disabled.
+          // Setup card: two radio tabs that switch without JS. The commands
+          // are visible text; the copy buttons need JS, so they are hidden
+          // and disabled.
           const card = page.getByTestId("agent-card");
-          await expect(card.getByTestId("agent-server-url")).toHaveText(
-            MCP_URL,
+          await expect(card.getByTestId("agent-command-all")).toHaveText(
+            COMMANDS.agent,
           );
-          // The per-agent commands sit in a native <details>.
-          await card.getByText("Add it to one agent").click();
-          for (const [id, command] of Object.entries(COMMANDS)) {
-            await expect(card.getByTestId(`agent-command-${id}`)).toHaveText(
-              command,
-            );
-          }
           await expect(
-            card.locator('a[href$="/developers/docs/intro/coding-with-agents"]'),
+            card.locator(
+              'a[href$="/developers/docs/intro/coding-with-agents"]',
+            ),
+          ).toBeVisible();
+          await expect(card.getByTestId("install-command")).toBeHidden();
+          await card.locator('label[for="dl-setup-manual"]').click();
+          await expect(card.getByTestId("install-command")).toHaveText(
+            COMMANDS.install,
+          );
+          await expect(card.getByTestId("agent-command-all")).toBeHidden();
+          await expect(
+            card.locator('a[href$="/developers/docs/intro/installation"]'),
           ).toBeVisible();
           const buttons = card.locator("button");
-          await expect(buttons).toHaveCount(3);
+          await expect(buttons).toHaveCount(2);
           for (const button of await buttons.all()) {
             await expect(button).toBeHidden();
             await expect(button).toBeDisabled();
@@ -89,10 +95,10 @@ test.describe("without JavaScript", () => {
             els.map((el) => el.getAttribute("href")),
           );
           expect(hrefs).toEqual([
-            `${prefix}/docs/payments/checkout`,
-            `${prefix}/docs/payments/paywall-api`,
-            `${prefix}/docs/assets/issue-asset`,
-            `${prefix}/docs/defi/settle-trade`,
+            `${prefix}/developers/docs/payments/checkout`,
+            `${prefix}/developers/docs/payments/paywall-api`,
+            `${prefix}/developers/docs/assets/issue-asset`,
+            `${prefix}/developers/docs/defi/settle-trade`,
           ]);
 
           // Stats render without footnotes or a sources list.
@@ -293,13 +299,20 @@ test.describe("with JavaScript", () => {
     const page = await context.newPage();
     await page.goto("/developers");
     const card = page.getByTestId("agent-card");
-    await card.getByText("Add it to one agent").click();
     const targets = [
-      { name: "Copy the server URL", text: MCP_URL },
-      { name: "Copy the Claude Code command", text: COMMANDS.claudeCode },
-      { name: "Copy the Codex command", text: COMMANDS.codex },
+      {
+        tab: "With your AI agent",
+        name: "Copy the add-mcp command",
+        text: COMMANDS.agent,
+      },
+      {
+        tab: "Install manually",
+        name: "Copy the install command",
+        text: COMMANDS.install,
+      },
     ];
-    for (const { name, text } of targets) {
+    for (const { tab, name, text } of targets) {
+      await card.getByText(tab, { exact: true }).click();
       const button = card.getByRole("button", { name });
       await expect(button).toBeEnabled();
       await button.click();

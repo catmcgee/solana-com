@@ -26,7 +26,7 @@ vi.mock("@@/assets/learn/learn-hero.webp", () => ({
 const { DevelopersHub } =
   await import("@/app/[locale]/developers/developers-hub");
 const { LearnLanding } = await import("@/app/[locale]/learn/learn-landing");
-const { AGENT_SETUP, HUB_STATS, JOB_PATHS } =
+const { AGENT_SETUP, HUB_STATS, INSTALL_SETUP, JOB_PATHS } =
   await import("@/data/developers/hub");
 
 function renderWithIntl(ui: ReactElement, locale = "en") {
@@ -50,7 +50,7 @@ describe("/developers landing", () => {
       }),
     ).toBeInTheDocument();
     for (const name of [
-      "Build with your agent",
+      "Set up in one command",
       "What are you building?",
       "Why Solana",
       "What would your payments cost?",
@@ -64,25 +64,28 @@ describe("/developers landing", () => {
     expect(container.querySelector("main#dl-main")).not.toBeNull();
   });
 
-  it("server-renders the MCP URL and commands as plain text", async () => {
+  it("server-renders both setup commands as plain text", async () => {
     renderWithIntl(await DevelopersHub({ locale: "ja", updates: [] }), "ja");
     const card = screen.getByTestId("agent-card");
-    expect(within(card).getByTestId("agent-server-url")).toHaveTextContent(
-      "https://mcp.solana.com/mcp",
+    const agent = within(card).getByTestId("setup-panel-agent");
+    const manual = within(card).getByTestId("setup-panel-manual");
+    expect(within(agent).getByTestId("agent-command-all").textContent).toBe(
+      AGENT_SETUP.allAgentsCommand,
     );
     expect(
-      within(card).getByTestId("agent-command-claudeCode").textContent,
-    ).toBe(AGENT_SETUP.clients[0].command);
-    expect(within(card).getByTestId("agent-command-codex").textContent).toBe(
-      AGENT_SETUP.clients[1].command,
-    );
-    expect(
-      within(card).getByRole("link", {
+      within(agent).getByRole("link", {
         name: /Set up Cursor, VS Code, Windsurf, and other agents/,
       }),
     ).toHaveAttribute("href", "/ja/developers/docs/intro/coding-with-agents");
-    // No tabs and no code sample.
-    expect(card.querySelector('[role="tab"], pre')).toBeNull();
+    expect(within(manual).getByTestId("install-command").textContent).toBe(
+      INSTALL_SETUP.command,
+    );
+    expect(
+      within(manual).getByRole("link", { name: "Installation guide" }),
+    ).toHaveAttribute("href", "/ja/developers/docs/intro/installation");
+    // Per-agent commands live on the Build with AI agents page, not here.
+    expect(card.textContent).not.toContain(AGENT_SETUP.clients[0].command);
+    expect(card.querySelector("pre")).toBeNull();
   });
 
   it("has no Ethereum or EVM links", async () => {
@@ -140,20 +143,20 @@ describe("/developers landing", () => {
     expect(cta.className).toContain("bg-[var(--dl-accent)]");
   });
 
-  it("puts the per-agent commands in a native disclosure", async () => {
+  it("switches the setup tabs with native radio inputs, agent first", async () => {
     renderWithIntl(await DevelopersHub({ locale: "en", updates: [] }));
-    const details = screen.getByTestId("agent-clients");
-    expect(details.tagName).toBe("DETAILS");
-    expect(details.hasAttribute("open")).toBe(false);
-    expect(details.querySelector("summary")).toHaveTextContent(
-      "Add it to one agent",
+    const agentTab = screen.getByRole("radio", { name: "With your AI agent" });
+    const manualTab = screen.getByRole("radio", { name: "Install manually" });
+    expect(agentTab).toBeChecked();
+    expect(manualTab).not.toBeChecked();
+    expect(agentTab.getAttribute("name")).toBe(manualTab.getAttribute("name"));
+    // Each panel is shown by its radio through CSS (peer-checked), so the
+    // tabs work without JavaScript.
+    expect(screen.getByTestId("setup-panel-agent").className).toContain(
+      "peer-checked/agent:block",
     );
-    expect(
-      within(details).getByTestId("agent-command-claudeCode"),
-    ).toBeInTheDocument();
-    // The server URL stays outside, always visible.
-    expect(details.contains(screen.getByTestId("agent-server-url"))).toBe(
-      false,
+    expect(screen.getByTestId("setup-panel-manual").className).toContain(
+      "peer-checked/manual:block",
     );
   });
 

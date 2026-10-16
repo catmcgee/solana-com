@@ -2,7 +2,7 @@
  * Data for the /developers landing (apps/web/src/app/[locale]/developers).
  *
  * Copy lives in `developers.landing` (packages/i18n/messages/web/en/common.json).
- * This file holds destinations, durations and every number the page shows,
+ * This file holds destinations, durations, and every number the page shows,
  * each with a source and a retrieval date. `hub.test.ts` fails when a stat's
  * `retrievedAt` is more than STAT_MAX_AGE_DAYS old, so the figures get
  * re-checked at least twice a year.
@@ -44,7 +44,6 @@ export const MORE_USE_CASES = [
   { id: "games", href: "/developers/docs/assets/games" },
   { id: "agents", href: "/developers/docs/payments/agentic-payments" },
   { id: "programs", href: "/developers/docs/programs" },
-  { id: "all", href: "/developers/docs/finance" },
 ] as const;
 
 /**
@@ -64,14 +63,21 @@ export const HERO_LINKS = {
 } as const;
 
 /**
- * "Build with your agent" hero card. Server URL and commands are copied
- * verbatim from https://mcp.solana.com (checked 2026-10-15); keep them in
- * sync with that page.
+ * "Set up in one command" hero card: two tabs, "With your AI agent"
+ * (`allAgentsCommand`, then a link to Build with AI agents for per-agent
+ * setup) and "Install manually" (`INSTALL_SETUP`). The MCP server URL and
+ * the per-agent commands are copied verbatim from https://mcp.solana.com
+ * (checked 2026-10-15). The Build with AI agents page
+ * (apps/docs/developers/docs/intro/coding-with-agents.mdx) shows the same
+ * commands; hub-data.test.ts fails when the two drift apart.
  */
 export const MCP_SERVER_URL = "https://mcp.solana.com/mcp";
 
 export const AGENT_SETUP = {
   serverUrl: MCP_SERVER_URL,
+  /** add-mcp detects the coding agents in use and adds the server to each. */
+  allAgentsCommand: `npx add-mcp ${MCP_SERVER_URL}`,
+  /** Per-agent commands, shown on the Build with AI agents page. */
   clients: [
     {
       id: "claudeCode",
@@ -84,8 +90,18 @@ export const AGENT_SETUP = {
       command: `codex mcp add solana-mcp --url ${MCP_SERVER_URL}`,
     },
   ],
-  /** Official setup for the other MCP clients (Cursor, VS Code, Windsurf). */
+  /** Per-agent setup, including Cursor, VS Code, and Windsurf. */
   moreHref: "/developers/docs/intro/coding-with-agents",
+} as const;
+
+/**
+ * The one-line installer (Rust, Solana CLI, Anchor, Surfpool, Node.js, and
+ * Yarn), as on the Quick installation page.
+ */
+export const INSTALL_SETUP = {
+  command:
+    "curl --proto '=https' --tlsv1.2 -sSfL https://solana-install.solana.workers.dev | bash",
+  href: "/developers/docs/intro/installation",
 } as const;
 
 /** "Other ways to learn" cards. */
@@ -309,7 +325,7 @@ export function formatStatValue(stat: HubStat, locale: string): string {
 }
 
 /**
- * Formats a stat's `asOf` ("YYYY-MM-DD", "YYYY-MM" or "YYYY-Qn") for display.
+ * Formats a stat's `asOf` ("YYYY-MM-DD", "YYYY-MM", or "YYYY-Qn") for display.
  */
 export function formatAsOf(asOf: string, locale: string): string {
   const quarter = /^(\d{4})-Q([1-4])$/.exec(asOf);
