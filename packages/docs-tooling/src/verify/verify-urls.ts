@@ -275,6 +275,8 @@ export function strayAssetsInDocsRoot(
     "apps/docs/logo-link.js",
     // Live "Try it" on RPC method pages (styles/rpc-try-it.css).
     "apps/docs/rpc-try-it.js",
+    // Opens the docs search for /docs?q= links from the /developers header.
+    "apps/docs/search-handoff.js",
     // Video chapters seek the embedded player; video cards open a dialog
     // (styles/video.css; markup from the video-guides transform).
     "apps/docs/video-chapters.js",
