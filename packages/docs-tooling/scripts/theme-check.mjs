@@ -271,7 +271,7 @@ for (const path of PATHS) {
           );
         if (
           r.pathBox &&
-          (r.pathBox.border !== "1px" || !/\u2605|★/.test(r.pathBox.star))
+          (r.pathBox.border !== "1px" || /\u2605|★/.test(r.pathBox.star))
         )
           fail(ctxName, `sidebar path box off: ${JSON.stringify(r.pathBox)}`);
         if (r.mermaidFences && r.mermaidFigures < r.mermaidFences)
