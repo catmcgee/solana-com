@@ -63,6 +63,13 @@ export const resourceLabel = (label: string) =>
 function embeddedIds(tree: AstNode): string[] {
   const ids: string[] = [];
   walk(tree, (n) => {
+    // The video-poster transform turns the iframe into an `a.sol-yt` poster.
+    if (isJsx(n, "a")) {
+      const id = (n.attributes as { name: string; value: unknown }[]).find(
+        (a) => a.name === "data-video",
+      )?.value;
+      if (typeof id === "string") ids.push(id);
+    }
     if (isJsx(n, "iframe")) {
       const src = (n.attributes as { name: string; value: unknown }[]).find(
         (a) => a.name === "src",

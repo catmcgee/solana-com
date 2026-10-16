@@ -3,15 +3,19 @@
  * the old docs did with VideoWithChapters and VideoModalTrigger. Mintlify
  * injects every .js file in the project root on every page.
  *
- * The markup is written by the video-guides convert transform
- * (packages/docs-tooling/src/convert/transforms/video-guides.ts):
+ * The markup is written by the convert transforms
+ * (packages/docs-tooling/src/convert/transforms/video-guides.ts and
+ * video-poster.ts):
+ * - `a.sol-yt[data-video=<id>]` (every embedded video): a poster thumbnail
+ *   with a play button. A click swaps it for the youtube-nocookie player with
+ *   autoplay, in place (`data-list` plays the playlist instead).
  * - `.sol-chapters[data-video=<id>]` around a list of `youtu.be/<id>?t=<s>`
- *   links: a click seeks the embedded YouTube player for <id> on the same
- *   page (its iframe `src` is swapped to `?start=<s>&autoplay=1`), scrolls it
- *   into view and marks the chapter as current.
- * - `.sol-video-modal` around cards that link to YouTube: a click opens the
- *   video in an autoplaying <dialog>. Closing it (button, Escape, backdrop)
- *   removes the iframe, which stops playback.
+ *   links: a click starts (or seeks) the player for <id> on the same page at
+ *   that second, scrolls it into view and marks the chapter as current.
+ * - `.sol-video-modal` around cards that link to YouTube (and any other card
+ *   linking to a single YouTube video): a click opens the video in an
+ *   autoplaying <dialog>. Closing it (button, Escape, backdrop) removes the
+ *   iframe, which stops playback.
  * Without JavaScript, or with a modifier key / middle click, every link is a
  * plain YouTube link that opens at the same timestamp. Styles:
  * styles/video.css.
@@ -66,6 +70,9 @@
     );
   }
 
+  var ALLOW =
+    "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen; web-share";
+
   function playerFor(id) {
     var frames = document.querySelectorAll("iframe[src]");
     for (var i = 0; i < frames.length; i++) {
@@ -75,13 +82,52 @@
     return null;
   }
 
+  function posterFor(id) {
+    var posters = document.querySelectorAll("a.sol-yt[data-video]:not([hidden])");
+    for (var i = 0; i < posters.length; i++)
+      if (posters[i].getAttribute("data-video") === id) return posters[i];
+    return null;
+  }
+
+  /** Replace a poster with the autoplaying player; returns the iframe. */
+  function play(poster, start) {
+    var id = poster.getAttribute("data-video");
+    var list = poster.getAttribute("data-list");
+    var iframe = document.createElement("iframe");
+    iframe.src = list
+      ? EMBED +
+        "videoseries?list=" +
+        encodeURIComponent(list) +
+        "&autoplay=1&rel=0&modestbranding=1"
+      : src(id, start);
+    iframe.title = poster.getAttribute("aria-label") || "Video";
+    iframe.allow = ALLOW;
+    iframe.setAttribute("allowfullscreen", "");
+    iframe.referrerPolicy = "strict-origin-when-cross-origin";
+    var box = document.createElement("div");
+    box.className = "sol-yt sol-yt-frame";
+    box.setAttribute("data-video", id);
+    box.appendChild(iframe);
+    // Hide the poster rather than remove it: Mintlify's React tree owns it.
+    poster.hidden = true;
+    poster.after(box);
+    iframe.focus({ preventScroll: true });
+    return iframe;
+  }
+
   function seek(list, link, video) {
-    var frame = playerFor(list.getAttribute("data-video") || video.id);
-    if (!frame) return false; // player not rendered: let the link open YouTube
-    var allow = frame.getAttribute("allow") || "";
-    if (!/\bautoplay\b/.test(allow))
-      frame.setAttribute("allow", (allow ? allow + "; " : "") + "autoplay");
-    frame.setAttribute("src", src(video.id, video.start));
+    var id = list.getAttribute("data-video") || video.id;
+    var frame = playerFor(id);
+    if (frame) {
+      var allow = frame.getAttribute("allow") || "";
+      if (!/\bautoplay\b/.test(allow))
+        frame.setAttribute("allow", (allow ? allow + "; " : "") + "autoplay");
+      frame.setAttribute("src", src(video.id, video.start));
+    } else {
+      var poster = posterFor(id);
+      if (!poster) return false; // no player on the page: open YouTube
+      frame = play(poster, video.start);
+    }
     var current = list.querySelectorAll('a[aria-current="true"]');
     for (var i = 0; i < current.length; i++)
       current[i].removeAttribute("aria-current");
@@ -164,8 +210,19 @@
         return;
       var link = e.target.closest && e.target.closest("a[href]");
       if (!link) return;
+      if (link.classList.contains("sol-yt")) {
+        var v = parse(link.getAttribute("href"));
+        if (!v && !link.getAttribute("data-list")) return;
+        play(link, v ? v.start : 0);
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
       var list = link.closest(".sol-chapters");
-      var grid = list ? null : link.closest(".sol-video-modal");
+      var grid =
+        list ||
+        link.closest(".sol-video-modal") ||
+        (link.closest("#content-area") && link.classList.contains("card"));
       if (!list && !grid) return;
       var video = parse(link.getAttribute("href"));
       if (!video) return;
@@ -177,4 +234,35 @@
     },
     true,
   );
+
+  // Posters ship the always-present 480x360 thumbnail; use the sharp
+  // maxresdefault one when the video has it (YouTube answers a missing one
+  // with a 120x90 placeholder).
+  function upgrade(img) {
+    if (img.__solUp) return;
+    img.__solUp = true;
+    var m = /\/vi\/([\w-]{11})\/hqdefault\.jpg$/.exec(img.src);
+    if (!m) return;
+    var hi = new Image();
+    hi.onload = function () {
+      if (hi.naturalWidth > 200) img.src = hi.src;
+    };
+    hi.src = "https://i.ytimg.com/vi/" + m[1] + "/maxresdefault.jpg";
+  }
+  var queued = false;
+  function scan() {
+    queued = false;
+    var imgs = document.querySelectorAll("a.sol-yt img");
+    for (var i = 0; i < imgs.length; i++) upgrade(imgs[i]);
+  }
+  function queue() {
+    if (queued) return;
+    queued = true;
+    requestAnimationFrame(scan);
+  }
+  queue();
+  new MutationObserver(queue).observe(document.documentElement, {
+    childList: true,
+    subtree: true,
+  });
 })();
