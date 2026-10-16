@@ -417,10 +417,7 @@ async fn main() -> Result<()> {
 
 ### Python
 
-This example uses `AsyncToken`, which was removed in newer solana-py releases.
-Install a compatible version with `pip install solana==0.36.12`.
-
-```py Python highlight={53-60} expandable
+```py Python highlight={65-72} expandable
 #!/usr/bin/env python3
 
 import asyncio
@@ -428,24 +425,38 @@ import json
 from solana.rpc.async_api import AsyncClient
 from solders.keypair import Keypair
 from solders.message import Message
-from solders.pubkey import Pubkey
 from solders.system_program import create_account, CreateAccountParams
 from solders.transaction import Transaction
-from spl.token.async_client import AsyncToken
+from solders.token.state import TokenAccount, TokenAccountState
 from spl.token.instructions import (
     create_associated_token_account,
     freeze_account,
-    FreezeAccountParams,
     get_associated_token_address,
     initialize_mint,
-    InitializeMintParams,
     mint_to_checked,
+)
+from spl.token.models import (
+    FreezeAccountParams,
+    InitializeMintParams,
     MintToCheckedParams,
 )
 from spl.token.constants import MINT_LEN, TOKEN_PROGRAM_ID
 
 DECIMALS = 2
 AMOUNT_TO_MINT = 100
+
+def token_account_to_dict(account: TokenAccount) -> dict:
+    return {
+        "mint": str(account.mint),
+        "owner": str(account.owner),
+        "amount": account.amount,
+        "delegate": None if account.delegate is None else str(account.delegate),
+        "delegated_amount": account.delegated_amount,
+        "is_initialized": account.state != TokenAccountState.Uninitialized,
+        "is_frozen": account.state == TokenAccountState.Frozen,
+        "is_native": account.is_native,
+        "close_authority": None if account.close_authority is None else str(account.close_authority),
+    }
 
 async def main():
     rpc = AsyncClient("http://localhost:8899")
@@ -471,8 +482,6 @@ async def main():
             setup_blockhash.value.blockhash,
         )
         await rpc.send_transaction(setup_transaction)
-        token = AsyncToken(rpc, mint.pubkey(), TOKEN_PROGRAM_ID, fee_payer)
-
         freeze_account_instruction = freeze_account(
             FreezeAccountParams(
                 program_id=TOKEN_PROGRAM_ID,  # Token program to invoke.
@@ -489,11 +498,8 @@ async def main():
         )
         result = await rpc.send_transaction(transaction)
 
-        token_account_info = await token.get_account_info(token_account_address)
-        token_account = {
-            key: str(value) if isinstance(value, Pubkey) else value
-            for key, value in token_account_info._asdict().items()
-        }
+        token_account_info = TokenAccount.from_bytes((await rpc.get_account_info(token_account_address)).value.data)
+        token_account = token_account_to_dict(token_account_info)
 
         print("Mint Address:", mint.pubkey())
         print("\nToken Account Address:", token_account_address)

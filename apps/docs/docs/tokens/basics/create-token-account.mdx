@@ -610,10 +610,7 @@ async fn main() -> Result<()> {
 
 ### Python
 
-This example uses `AsyncToken`, which was removed in newer solana-py releases.
-Install a compatible version with `pip install solana==0.36.12`.
-
-```py Python highlight={46-51} expandable
+```py Python highlight={56-61} expandable
 #!/usr/bin/env python3
 
 import asyncio
@@ -621,17 +618,29 @@ import json
 from solana.rpc.async_api import AsyncClient
 from solders.keypair import Keypair
 from solders.message import Message
-from solders.pubkey import Pubkey
 from solders.system_program import create_account, CreateAccountParams
 from solders.transaction import Transaction
-from spl.token.async_client import AsyncToken
+from solders.token.state import TokenAccount, TokenAccountState
 from spl.token.instructions import (
     create_associated_token_account,
     get_associated_token_address,
     initialize_mint,
-    InitializeMintParams,
 )
+from spl.token.models import InitializeMintParams
 from spl.token.constants import MINT_LEN, TOKEN_PROGRAM_ID
+
+def token_account_to_dict(account: TokenAccount) -> dict:
+    return {
+        "mint": str(account.mint),
+        "owner": str(account.owner),
+        "amount": account.amount,
+        "delegate": None if account.delegate is None else str(account.delegate),
+        "delegated_amount": account.delegated_amount,
+        "is_initialized": account.state != TokenAccountState.Uninitialized,
+        "is_frozen": account.state == TokenAccountState.Frozen,
+        "is_native": account.is_native,
+        "close_authority": None if account.close_authority is None else str(account.close_authority),
+    }
 
 async def main():
     rpc = AsyncClient("http://localhost:8899")
@@ -657,8 +666,6 @@ async def main():
             setup_blockhash.value.blockhash,
         )
         await rpc.send_transaction(setup_transaction)
-        token = AsyncToken(rpc, mint.pubkey(), TOKEN_PROGRAM_ID, fee_payer)
-
         create_associated_token_account_instruction = create_associated_token_account(
             payer=fee_payer.pubkey(),  # Account funding account creation.
             owner=owner.pubkey(),  # Account that owns the token account.
@@ -673,11 +680,8 @@ async def main():
         )
         result = await rpc.send_transaction(transaction)
 
-        token_account_info = await token.get_account_info(associated_token_account)
-        token_account = {
-            key: str(value) if isinstance(value, Pubkey) else value
-            for key, value in token_account_info._asdict().items()
-        }
+        token_account_info = TokenAccount.from_bytes((await rpc.get_account_info(associated_token_account)).value.data)
+        token_account = token_account_to_dict(token_account_info)
 
         print("Mint Address:", mint.pubkey())
         print("\nToken Account Address:", associated_token_account)
@@ -1272,10 +1276,7 @@ async fn main() -> Result<()> {
 
 ### Python
 
-This example uses `AsyncToken`, which was removed in newer solana-py releases.
-Install a compatible version with `pip install solana==0.36.12`.
-
-```py Python highlight={46-64} expandable
+```py Python highlight={52-70} expandable
 #!/usr/bin/env python3
 
 import asyncio
@@ -1283,17 +1284,25 @@ import json
 from solana.rpc.async_api import AsyncClient
 from solders.keypair import Keypair
 from solders.message import Message
-from solders.pubkey import Pubkey
 from solders.system_program import create_account, CreateAccountParams
 from solders.transaction import Transaction
-from spl.token.async_client import AsyncToken
-from spl.token.instructions import (
-    initialize_account,
-    InitializeAccountParams,
-    initialize_mint,
-    InitializeMintParams,
-)
+from solders.token.state import TokenAccount, TokenAccountState
+from spl.token.instructions import initialize_account, initialize_mint
+from spl.token.models import InitializeAccountParams, InitializeMintParams
 from spl.token.constants import ACCOUNT_LEN, MINT_LEN, TOKEN_PROGRAM_ID
+
+def token_account_to_dict(account: TokenAccount) -> dict:
+    return {
+        "mint": str(account.mint),
+        "owner": str(account.owner),
+        "amount": account.amount,
+        "delegate": None if account.delegate is None else str(account.delegate),
+        "delegated_amount": account.delegated_amount,
+        "is_initialized": account.state != TokenAccountState.Uninitialized,
+        "is_frozen": account.state == TokenAccountState.Frozen,
+        "is_native": account.is_native,
+        "close_authority": None if account.close_authority is None else str(account.close_authority),
+    }
 
 async def main():
     rpc = AsyncClient("http://localhost:8899")
@@ -1316,8 +1325,6 @@ async def main():
             setup_blockhash.value.blockhash,
         )
         await rpc.send_transaction(setup_transaction)
-        token = AsyncToken(rpc, mint.pubkey(), TOKEN_PROGRAM_ID, fee_payer)
-
         token_account = Keypair()
         token_account_rent = (await rpc.get_minimum_balance_for_rent_exemption(ACCOUNT_LEN)).value
 
@@ -1348,11 +1355,8 @@ async def main():
         )
         result = await rpc.send_transaction(transaction)
 
-        token_account_info = await token.get_account_info(token_account.pubkey())
-        token_account_data = {
-            key: str(value) if isinstance(value, Pubkey) else value
-            for key, value in token_account_info._asdict().items()
-        }
+        token_account_info = TokenAccount.from_bytes((await rpc.get_account_info(token_account.pubkey())).value.data)
+        token_account_data = token_account_to_dict(token_account_info)
 
         print("Mint Address:", mint.pubkey())
         print("\nToken Account Address:", token_account.pubkey())

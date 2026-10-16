@@ -372,10 +372,7 @@ async fn main() -> Result<()> {
 
 ### Python
 
-This example uses `AsyncToken`, which was removed in newer solana-py releases.
-Install a compatible version with `pip install solana==0.36.12`.
-
-```py Python highlight={46-54} expandable
+```py Python highlight={47-55} expandable
 #!/usr/bin/env python3
 
 import asyncio
@@ -383,18 +380,21 @@ import json
 from solana.rpc.async_api import AsyncClient
 from solders.keypair import Keypair
 from solders.message import Message
-from solders.pubkey import Pubkey
 from solders.system_program import create_account, CreateAccountParams
 from solders.transaction import Transaction
-from spl.token.async_client import AsyncToken
-from spl.token.instructions import (
-    AuthorityType,
-    initialize_mint,
-    InitializeMintParams,
-    set_authority,
-    SetAuthorityParams,
-)
+from solders.token.state import Mint
+from spl.token.instructions import AuthorityType, initialize_mint, set_authority
+from spl.token.models import InitializeMintParams, SetAuthorityParams
 from spl.token.constants import MINT_LEN, TOKEN_PROGRAM_ID
+
+def mint_to_dict(mint_account: Mint) -> dict:
+    return {
+        "mint_authority": None if mint_account.mint_authority is None else str(mint_account.mint_authority),
+        "supply": mint_account.supply,
+        "decimals": mint_account.decimals,
+        "is_initialized": mint_account.is_initialized,
+        "freeze_authority": None if mint_account.freeze_authority is None else str(mint_account.freeze_authority),
+    }
 
 async def main():
     rpc = AsyncClient("http://localhost:8899")
@@ -419,8 +419,6 @@ async def main():
             setup_blockhash.value.blockhash,
         )
         await rpc.send_transaction(setup_transaction)
-        token = AsyncToken(rpc, mint.pubkey(), TOKEN_PROGRAM_ID, fee_payer)
-
         set_authority_instruction = set_authority(
             SetAuthorityParams(
                 program_id=TOKEN_PROGRAM_ID,  # Token program to invoke.
@@ -438,11 +436,8 @@ async def main():
         )
         result = await rpc.send_transaction(transaction)
 
-        mint_info = await token.get_mint_info()
-        mint_account = {
-            key: str(value) if isinstance(value, Pubkey) else value
-            for key, value in mint_info._asdict().items()
-        }
+        mint_info = Mint.from_bytes((await rpc.get_account_info(mint.pubkey())).value.data)
+        mint_account = mint_to_dict(mint_info)
 
         print("Mint Address:", mint.pubkey())
         print("Mint Account:")
