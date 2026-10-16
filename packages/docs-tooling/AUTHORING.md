@@ -593,6 +593,17 @@ solana.com) before cutover. `mint dev` cannot answer them:
   staged EN content at commit, so generator output must be oxfmt-stable (it
   de-indents JSX children after a blank line and re-wraps attributes longer than
   80 characters).
+- **Cross-tab cards (2026-10-16, `cross-tab-cards.ts`).** A `<Card>` on a
+  Payments, Assets or Markets page whose href is filed under another tab in
+  `navigation/en.json` gets Mintlify's `arrow` prop (a small ↗, server-rendered,
+  light and dark). After moving pages between tabs run `convert`;
+  `convert --check` fails while a card is missing its arrow.
+- **Program examples in Playground.** `packages/docs-examples/programs/<name>/`
+  holds Anchor workspaces whose files a page shows through `blocks.json` (e.g.
+  `programs/build-first-program`, the "Build your first program" page). Their
+  blocks get the `anchor` kind and open the crate folder, so the code block
+  controls and the page's hand-written `.sol-pg-tut` button are live once the
+  files are on the `playground.js` source ref.
 - **Navigation (WP6).** Edit `navigation/en.json` by hand, then `nav:build`.
   Locale label keys are slugs of the English label path (`labels.ts`), not
   stable ids: renaming or moving an English group silently drops its
