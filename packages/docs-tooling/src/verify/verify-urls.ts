@@ -343,6 +343,8 @@ export function strayAssetsInDocsRoot(
     "apps/docs/theme-toggle.js",
     // Logo link to /developers as a full page load.
     "apps/docs/logo-link.js",
+    // Prerenders /developers when the logo is hovered (Speculation Rules).
+    "apps/docs/prerender-home.js",
     // Live "Try it" on RPC method pages (styles/rpc-try-it.css).
     "apps/docs/rpc-try-it.js",
     // Opens the docs search for /developers/docs?q= links from the /developers header.

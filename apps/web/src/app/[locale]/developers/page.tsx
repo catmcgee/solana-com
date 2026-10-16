@@ -13,6 +13,7 @@ import {
 } from "./structured-data";
 import { DocsFooter } from "./docs-footer";
 import { DocsHeader } from "./docs-header";
+import { DeveloperSpeculationRules } from "./speculation-rules";
 import { DocsThemePrepaint } from "./theme-prepaint";
 import "./developers.css";
 
@@ -54,6 +55,7 @@ export default async function Page({ params }: Props) {
   return (
     <>
       <DocsThemePrepaint />
+      <DeveloperSpeculationRules locale={locale} />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(structuredData) }}
