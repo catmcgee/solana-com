@@ -1,5 +1,9 @@
 import type { NavTopLevelSectionMetadata } from "./nav-types";
 
+/*
+ * The dropdown sections of the solana.com header, in order. "Developers" is a
+ * plain link after Ecosystem (developers-link.tsx), not a section.
+ */
 export const HEADER_SECTION_METADATA: Array<
   Omit<NavTopLevelSectionMetadata, "mobileIcon" | "Content">
 > = [
@@ -13,22 +17,6 @@ export const HEADER_SECTION_METADATA: Array<
       { type: "includes", value: "/learn" },
       { type: "equals", value: "/staking" },
       { type: "equals", value: "/solutions/consumer" },
-    ],
-    contentAlign: "left",
-  },
-  {
-    id: "build",
-    titleKey: "nav.build.title",
-    matchRules: [
-      { type: "includes", value: "/developers" },
-      { type: "equals", value: "/changelog" },
-      { type: "equals", value: "/data" },
-      {
-        type: "includes",
-        value: "/docs",
-        exclude: ["/docs/tools", "/docs/payments/developer-tools"],
-      },
-      { type: "equals", value: "/hackathons" },
     ],
     contentAlign: "left",
   },

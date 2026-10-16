@@ -20,6 +20,7 @@ import { HEADER_SECTIONS } from "./header-sections";
 import { useSwipeDown } from "./hooks/useSwipeDown";
 import { isNavSectionActive } from "./nav-active";
 import { LanguageSelector } from "./language-selector";
+import { DevelopersLink } from "./developers-link";
 
 interface MobileMenuProps {
   expanded: boolean;
@@ -215,6 +216,10 @@ export const MobileMenu = ({
                 onClick={() => setMenu(id)}
               />
             ))}
+            <DevelopersLink
+              onClick={() => setExpanded(false)}
+              className="flex min-h-14 w-full items-center py-4 text-left text-[16px] font-medium !text-white hover:bg-gradient-to-r hover:from-transparent hover:via-[10%] hover:via-white/5 hover:to-transparent"
+            />
             {showLanguage && (
               <div className="py-1">
                 <LanguageSelector

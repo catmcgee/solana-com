@@ -15,18 +15,15 @@ import { shouldShowDevelopersNav } from "./developer-routes";
 
 import SolanaLogo from "./assets/logotype.inline.svg";
 import Moon from "./assets/icons/moon.inline.svg";
-import { isDocsHref } from "./url-config";
+import { DEVELOPERS_LINK, NEW_TAB_PROPS, NewTabMark } from "./developers-link";
 import Sun from "./assets/icons/sun.inline.svg";
 
+/** The header's top level as plain links, in the same order. */
 const NOSCRIPT_LINKS = [
-  { href: "/developers", labelKey: "nav.build.start.items.hub.title" },
-  { href: "/docs", labelKey: "nav.build.start.items.docs.title" },
-  {
-    href: "/developers/cookbook",
-    labelKey: "nav.build.resources.items.cookbook.title",
-  },
-  { href: "/developers/bootcamp", labelKey: "developers.nav.bootcamp" },
-  { href: "/learn", labelKey: "nav.useSolana.wallets.items.learn.title" },
+  { href: "/use-solana", labelKey: "nav.useSolana.title" },
+  { href: "/enterprise", labelKey: "nav.enterprise.title" },
+  { href: "/products", labelKey: "nav.products.title" },
+  { href: "/ecosystem", labelKey: "nav.ecosystem.title" },
 ] as const;
 
 function withLocale(locale: string, path: string) {
@@ -36,8 +33,9 @@ function withLocale(locale: string, path: string) {
 
 /**
  * Plain-link fallback for readers without JavaScript: the dropdown menus and
- * the language selector need JS, so this lists the developer destinations and
- * every language for the current page. React renders <noscript> children only
+ * the language selector need JS, so this lists the header's top level (the
+ * section pages, then Developers in a new tab, as in the header) and every
+ * language for the current page. React renders <noscript> children only
  * in the server HTML, so JS users never see or hydrate it.
  */
 function NoScriptNav({ pathname }: { pathname: string }) {
@@ -54,17 +52,22 @@ function NoScriptNav({ pathname }: { pathname: string }) {
         <ul className="m-0 flex list-none flex-wrap gap-x-5 gap-y-1 p-0">
           {NOSCRIPT_LINKS.map((link) => (
             <li key={link.href}>
-              <a
-                href={withLocale(locale, link.href)}
-                className={linkClass}
-                {...(isDocsHref(link.href)
-                  ? { target: "_blank", rel: "noopener noreferrer" }
-                  : {})}
-              >
+              <a href={withLocale(locale, link.href)} className={linkClass}>
                 {t(link.labelKey)}
               </a>
             </li>
           ))}
+          <li>
+            <a
+              href={withLocale(locale, DEVELOPERS_LINK.href)}
+              className={linkClass}
+              data-nav-item="developers"
+              {...NEW_TAB_PROPS}
+            >
+              {t(DEVELOPERS_LINK.titleKey)}
+              <NewTabMark text={t(DEVELOPERS_LINK.newTabKey)} />
+            </a>
+          </li>
         </ul>
         <ul
           aria-label="Languages"
