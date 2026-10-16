@@ -1105,7 +1105,7 @@ const INTROS: Record<SurfpoolCategory, string> = {
   network:
     "Access network-wide information like epoch data, inflation rates, and performance metrics.",
   admin:
-    "Administrative controls for managing the Surfnet instance and its plugins. These come from the Agave validator admin RPC, and Surfnet implements only `listPlugins`, `startTime`, `loadPlugin`, `reloadPlugin` and `unloadPlugin`. The other Agave admin methods (for example `setIdentity` or `setLogFilter`) return `-32601 Method not found` on Surfnet and are not listed.",
+    "Administrative controls for managing the Surfnet instance and its plugins. These come from the Agave validator admin RPC, and Surfnet implements only `exit`, `listPlugins`, `startTime`, `loadPlugin`, `reloadPlugin` and `unloadPlugin`. The other Agave admin methods (for example `setIdentity` or `setLogFilter`) return `-32601 Method not found` on Surfnet and are not listed.",
   websockets: `Real-time WebSocket subscriptions for monitoring blockchain state changes. Connect to \`${SURFNET_WS}\` when running Surfnet. Surfnet implements \`accountSubscribe\`, \`logsSubscribe\`, \`programSubscribe\`, \`signatureSubscribe\` and \`slotSubscribe\`; \`blockSubscribe\`, \`voteSubscribe\` and \`slotUpdatesSubscribe\` are listed for completeness but are not supported. In every notification the payload is wrapped in \`params.result\`, next to the \`subscription\` id.`,
 };
 
