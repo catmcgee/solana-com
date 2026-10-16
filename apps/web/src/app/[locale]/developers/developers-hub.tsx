@@ -8,7 +8,7 @@ import { Layers } from "@boxicons/react/Layers";
 import { Package } from "@boxicons/react/Package";
 import { School } from "@boxicons/react/School";
 import { Server } from "@boxicons/react/Server";
-import { Fragment, type ComponentType, type ReactNode } from "react";
+import { type ComponentType, type ReactNode } from "react";
 import { getTranslations } from "@workspace/i18n/server";
 import {
   AGENT_SETUP,
@@ -33,7 +33,7 @@ import {
 } from "@/data/developers/hub";
 import type { DeveloperUpdate } from "@/lib/developer-media";
 import { CostCalculator } from "./cost-calculator.client";
-import { CopyButton } from "./copy-button.client";
+import { AgentPrompt } from "./agent-prompt.client";
 import { ExternalArrowIcon } from "./docs-icons";
 import { NewsletterForm } from "./newsletter-form.client";
 
@@ -192,19 +192,6 @@ function TradeVisual({ t }: { t: (key: string) => string }) {
   );
 }
 
-/**
- * Lets a long command wrap between words only (never after the "-" in
- * "--url"). Copying the selection still yields the exact command.
- */
-function CommandWords({ command }: { command: string }) {
-  return command.split(" ").map((word, index) => (
-    <Fragment key={index}>
-      {index > 0 && " "}
-      <span className="whitespace-nowrap">{word}</span>
-    </Fragment>
-  ));
-}
-
 type Translate = (key: string, values?: Record<string, string>) => string;
 
 /** Visually hidden "(opens in a new tab)" plus the decorative arrow. */
@@ -235,22 +222,6 @@ function AgentCard({
   moreHref: string;
   installHref: string;
 }) {
-  const row =
-    "m-0 flex items-start gap-3 rounded-[10px] border border-[var(--dl-line)] bg-[var(--dl-surface-2)] py-1.5 pe-1.5 ps-3.5";
-  const code =
-    "min-w-0 flex-1 self-center select-all font-[family-name:var(--dl-mono)] !text-[13px] leading-[1.6] text-[var(--dl-text)] [overflow-wrap:anywhere]";
-  const body = "m-0 mb-3 text-sm leading-[1.55] text-[var(--dl-muted)]";
-  const tab = `flex-1 cursor-pointer select-none rounded-md px-3 py-1.5 text-center text-sm font-medium text-[var(--dl-muted)] transition-colors hover:text-[var(--dl-text)]`;
-  const copy = { copyText: t("agent.copy"), copiedText: t("agent.copied") };
-  const commandRow = (command: string, testId: string, copyLabel: string) => (
-    <div className={row}>
-      <code dir="ltr" data-testid={testId} className={code}>
-        <CommandWords command={command} />
-      </code>
-      <CopyButton text={command} label={copyLabel} {...copy} />
-    </div>
-  );
-
   return (
     <section
       aria-labelledby="dl-agent-title"
@@ -259,77 +230,29 @@ function AgentCard({
     >
       <h2
         id="dl-agent-title"
-        className="m-0 mb-4 font-brand text-lg font-medium leading-snug tracking-[-0.015em] text-[var(--dl-text)]"
+        className="m-0 mb-2 font-brand text-lg font-medium leading-snug tracking-[-0.015em] text-[var(--dl-text)]"
       >
         {t("agent.title")}
       </h2>
-      <input
-        type="radio"
-        name="dl-setup"
-        id="dl-setup-agent"
-        value="agent"
-        defaultChecked
-        data-testid="setup-tab-agent"
-        className="peer/agent sr-only"
+      <p className="m-0 mb-4 text-sm leading-[1.55] text-[var(--dl-muted)]">
+        {t("agent.body")}
+      </p>
+      <AgentPrompt
+        label={t("agent.copyPrompt")}
+        copyText={t("agent.copy")}
+        copiedText={t("agent.copied")}
       />
-      <input
-        type="radio"
-        name="dl-setup"
-        id="dl-setup-manual"
-        value="manual"
-        data-testid="setup-tab-manual"
-        className="peer/manual sr-only"
-      />
-      <div
-        className={[
-          "mb-4 flex gap-1 rounded-[10px] border border-[var(--dl-line)] bg-[var(--dl-surface-2)] p-1",
-          "peer-checked/agent:[&>label:first-child]:bg-[var(--dl-surface)] peer-checked/agent:[&>label:first-child]:text-[var(--dl-text)] peer-checked/agent:[&>label:first-child]:shadow-[var(--dl-shadow)]",
-          "peer-checked/manual:[&>label:last-child]:bg-[var(--dl-surface)] peer-checked/manual:[&>label:last-child]:text-[var(--dl-text)] peer-checked/manual:[&>label:last-child]:shadow-[var(--dl-shadow)]",
-          "peer-focus-visible/agent:[&>label:first-child]:outline peer-focus-visible/agent:[&>label:first-child]:outline-2 peer-focus-visible/agent:[&>label:first-child]:outline-[var(--dl-accent)]",
-          "peer-focus-visible/manual:[&>label:last-child]:outline peer-focus-visible/manual:[&>label:last-child]:outline-2 peer-focus-visible/manual:[&>label:last-child]:outline-[var(--dl-accent)]",
-        ].join(" ")}
-      >
-        <label htmlFor="dl-setup-agent" className={tab}>
-          {t("agent.tabAgent")}
-        </label>
-        <label htmlFor="dl-setup-manual" className={tab}>
-          {t("agent.tabManual")}
-        </label>
-      </div>
-      <div
-        data-testid="setup-panel-agent"
-        className="hidden peer-checked/agent:block"
-      >
-        <p className={body}>{t("agent.agentBody")}</p>
-        {commandRow(
-          AGENT_SETUP.allAgentsCommand,
-          "agent-command-all",
-          t("agent.copyAgentCommand"),
-        )}
-        <a
-          href={moreHref}
-          className={`mt-3 inline-flex items-center gap-1 text-sm ${inlineLink}`}
-        >
-          {t("agent.otherClients")}
+      <p className="m-0 mt-3 text-sm leading-[1.55] text-[var(--dl-muted)]">
+        {t("agent.alsoBefore")}{" "}
+        <a href={moreHref} className={inlineLink}>
+          {t("agent.alsoAgents")}
+        </a>{" "}
+        {t("agent.alsoOr")}{" "}
+        <a href={installHref} className={inlineLink}>
+          {t("agent.alsoInstall")}
         </a>
-      </div>
-      <div
-        data-testid="setup-panel-manual"
-        className="hidden peer-checked/manual:block"
-      >
-        <p className={body}>{t("agent.manualBody")}</p>
-        {commandRow(
-          INSTALL_SETUP.command,
-          "install-command",
-          t("agent.copyInstallCommand"),
-        )}
-        <a
-          href={installHref}
-          className={`mt-3 inline-flex items-center gap-1 text-sm ${inlineLink}`}
-        >
-          {t("agent.installGuide")}
-        </a>
-      </div>
+        {t("agent.alsoAfter")}
+      </p>
     </section>
   );
 }

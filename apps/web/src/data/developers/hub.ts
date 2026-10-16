@@ -95,6 +95,18 @@ export const AGENT_SETUP = {
 } as const;
 
 /**
+ * The line a reader pastes into their coding agent, as on the docs' Start
+ * here banner. The guide is an agents-only page (developers/docs/intro/
+ * agent-setup.mdx) served as Markdown.
+ */
+export const AGENT_PROMPT = {
+  origin: "https://solana.com",
+  guidePath: "/developers/docs/intro/agent-setup.md",
+  line: (origin: string) =>
+    `Set up Solana for me: fetch and follow this guide ${origin}/developers/docs/intro/agent-setup.md`,
+} as const;
+
+/**
  * The one-line installer (Rust, Solana CLI, Anchor, Surfpool, Node.js, and
  * Yarn), as on the Quick installation page.
  */

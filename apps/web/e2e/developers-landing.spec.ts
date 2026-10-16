@@ -15,12 +15,6 @@ const LOCALES = [
 const SCHEMES = ["light", "dark"] as const;
 const DARK_BG = "rgb(10, 10, 11)";
 const LIGHT_BG = "rgb(255, 255, 255)";
-const MCP_URL = "https://mcp.solana.com/mcp";
-const COMMANDS = {
-  agent: `npx add-mcp ${MCP_URL} -n solana-mcp -g -y`,
-  install:
-    "curl --proto '=https' --tlsv1.2 -sSfL https://solana-install.solana.workers.dev | bash",
-} as const;
 
 async function backgroundOf(page: Page) {
   return page
@@ -54,29 +48,23 @@ test.describe("without JavaScript", () => {
           await expect(page.locator("h1")).toHaveCount(1);
           await expect(page.locator("h1")).not.toBeEmpty();
 
-          // Setup card: two radio tabs that switch without JS. The commands
-          // are visible text; the copy buttons need JS, so they are hidden
-          // and disabled.
+          // Setup card: the one line to paste into a coding agent, plus links
+          // to the docs. The copy button needs JS, so it is hidden and
+          // disabled here.
           const card = page.getByTestId("agent-card");
-          await expect(card.getByTestId("agent-command-all")).toHaveText(
-            COMMANDS.agent,
+          await expect(card.getByTestId("agent-prompt")).toContainText(
+            "Set up Solana for me: fetch and follow this guide",
           );
           await expect(
             card.locator(
               'a[href$="/developers/docs/intro/coding-with-agents"]',
             ),
           ).toBeVisible();
-          await expect(card.getByTestId("install-command")).toBeHidden();
-          await card.locator('label[for="dl-setup-manual"]').click();
-          await expect(card.getByTestId("install-command")).toHaveText(
-            COMMANDS.install,
-          );
-          await expect(card.getByTestId("agent-command-all")).toBeHidden();
           await expect(
             card.locator('a[href$="/developers/docs/intro/installation"]'),
           ).toBeVisible();
           const buttons = card.locator("button");
-          await expect(buttons).toHaveCount(2);
+          await expect(buttons).toHaveCount(1);
           for (const button of await buttons.all()) {
             await expect(button).toBeHidden();
             await expect(button).toBeDisabled();
@@ -292,35 +280,25 @@ test.describe("with JavaScript", () => {
     await context.close();
   });
 
-  test("copy buttons copy the exact strings", async ({ browser }) => {
+  test("the copy button copies the agent setup line", async ({ browser }) => {
     const context = await browser.newContext({
       permissions: ["clipboard-read", "clipboard-write"],
     });
     const page = await context.newPage();
     await page.goto("/developers");
     const card = page.getByTestId("agent-card");
-    const targets = [
-      {
-        tab: "With your AI agent",
-        name: "Copy the add-mcp command",
-        text: COMMANDS.agent,
-      },
-      {
-        tab: "Install manually",
-        name: "Copy the install command",
-        text: COMMANDS.install,
-      },
-    ];
-    for (const { tab, name, text } of targets) {
-      await card.getByText(tab, { exact: true }).click();
-      const button = card.getByRole("button", { name });
-      await expect(button).toBeEnabled();
-      await button.click();
-      await expect(button).toHaveText("Copied");
-      expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
-        text,
-      );
-    }
+    const button = card.getByRole("button", {
+      name: "Copy the setup line for your coding agent",
+    });
+    await expect(button).toBeEnabled();
+    await button.click();
+    await expect(button).toHaveText("Copied");
+    const copied = await page.evaluate(() => navigator.clipboard.readText());
+    // The guide URL follows the site the page is served from (it stays on
+    // solana.com on localhost, where the docs' .md pages are not served).
+    expect(copied).toMatch(
+      /^Set up Solana for me: fetch and follow this guide https?:\/\/\S+\/developers\/docs\/intro\/agent-setup\.md$/,
+    );
     await context.close();
   });
 

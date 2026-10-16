@@ -26,7 +26,7 @@ vi.mock("@@/assets/learn/learn-hero.webp", () => ({
 const { DevelopersHub } =
   await import("@/app/[locale]/developers/developers-hub");
 const { LearnLanding } = await import("@/app/[locale]/learn/learn-landing");
-const { AGENT_SETUP, HUB_STATS, INSTALL_SETUP, JOB_PATHS } =
+const { AGENT_PROMPT, AGENT_SETUP, HUB_STATS, INSTALL_SETUP, JOB_PATHS } =
   await import("@/data/developers/hub");
 
 function renderWithIntl(ui: ReactElement, locale = "en") {
@@ -50,7 +50,7 @@ describe("/developers landing", () => {
       }),
     ).toBeInTheDocument();
     for (const name of [
-      "Set up in one command",
+      "Set up your coding agent for Solana",
       "What are you building?",
       "Why Solana",
       "What would your payments cost?",
@@ -64,28 +64,22 @@ describe("/developers landing", () => {
     expect(container.querySelector("main#dl-main")).not.toBeNull();
   });
 
-  it("server-renders both setup commands as plain text", async () => {
+  it("server-renders the agent setup line and its two doc links", async () => {
     renderWithIntl(await DevelopersHub({ locale: "ja", updates: [] }), "ja");
     const card = screen.getByTestId("agent-card");
-    const agent = within(card).getByTestId("setup-panel-agent");
-    const manual = within(card).getByTestId("setup-panel-manual");
-    expect(within(agent).getByTestId("agent-command-all").textContent).toBe(
-      AGENT_SETUP.allAgentsCommand,
+    expect(within(card).getByTestId("agent-prompt").textContent).toBe(
+      AGENT_PROMPT.line("https://solana.com"),
     );
     expect(
-      within(agent).getByRole("link", {
-        name: /Set up Cursor, VS Code, Windsurf, and other agents/,
-      }),
+      within(card).getByRole("link", { name: "set up your agent manually" }),
     ).toHaveAttribute("href", "/ja/developers/docs/intro/coding-with-agents");
-    expect(within(manual).getByTestId("install-command").textContent).toBe(
-      INSTALL_SETUP.command,
-    );
     expect(
-      within(manual).getByRole("link", { name: "Installation guide" }),
+      within(card).getByRole("link", { name: "install the Solana tools locally" }),
     ).toHaveAttribute("href", "/ja/developers/docs/intro/installation");
-    // Per-agent commands live on the Build with AI agents page, not here.
-    expect(card.textContent).not.toContain(AGENT_SETUP.clients[0].command);
-    expect(card.querySelector("pre")).toBeNull();
+    // No tabs or raw commands on the landing card; those live in the docs.
+    expect(card.querySelector('input[type="radio"]')).toBeNull();
+    expect(card.textContent).not.toContain(AGENT_SETUP.allAgentsCommand);
+    expect(card.textContent).not.toContain(INSTALL_SETUP.command);
   });
 
   it("has no Ethereum or EVM links", async () => {
@@ -141,23 +135,6 @@ describe("/developers landing", () => {
     const cta = screen.getByRole("link", { name: "Pick a tutorial" });
     expect(cta).toHaveAttribute("href", "#picker");
     expect(cta.className).toContain("bg-[var(--dl-accent)]");
-  });
-
-  it("switches the setup tabs with native radio inputs, agent first", async () => {
-    renderWithIntl(await DevelopersHub({ locale: "en", updates: [] }));
-    const agentTab = screen.getByRole("radio", { name: "With your AI agent" });
-    const manualTab = screen.getByRole("radio", { name: "Install manually" });
-    expect(agentTab).toBeChecked();
-    expect(manualTab).not.toBeChecked();
-    expect(agentTab.getAttribute("name")).toBe(manualTab.getAttribute("name"));
-    // Each panel is shown by its radio through CSS (peer-checked), so the
-    // tabs work without JavaScript.
-    expect(screen.getByTestId("setup-panel-agent").className).toContain(
-      "peer-checked/agent:block",
-    );
-    expect(screen.getByTestId("setup-panel-manual").className).toContain(
-      "peer-checked/manual:block",
-    );
   });
 
   it("links the four job cards to the job-path intros", async () => {
