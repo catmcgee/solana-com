@@ -715,6 +715,17 @@ export const mintlifyRewrites: BeforeFilesRewrite[] = [
     destination: `${M}/docs-assets/:path+`,
     locale: false,
   },
+  // Brand fonts (apps/docs/fonts). docs.json `fonts.*.source` must start
+  // with `fonts/` for Mintlify to emit a root-relative URL (/fonts/...;
+  // anything else is re-hosted on its CDN), so the docs, theme.css and the
+  // /developers landing all load them from here and share one cache entry.
+  // Only these names: /fonts/* is otherwise apps/web's public/fonts.
+  {
+    source:
+      "/fonts/:file((?:ABCDiatype|ABCFavoritMono|MonumentExtended)[A-Za-z-]*\\.woff2)",
+    destination: `${M}/fonts/:file`,
+    locale: false,
+  },
   // /llms.txt is the apps/docs/llms.txt override (gen:llms); /llms-full.txt
   // is Mintlify's built-in. Per-section /developers/docs/<section>/llms.txt
   // is an apps/web route, excluded from the /developers/docs rule below.

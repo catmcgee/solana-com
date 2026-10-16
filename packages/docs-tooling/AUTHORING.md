@@ -249,9 +249,11 @@ theme. Brand files are in `apps/docs/docs-assets/brand/`:
   (white wordmark). Both are copied from `packages/ui-chrome`
   `logotype.inline.svg`.
 - `favicon.svg` and `favicon.ico`.
-- `fonts/`: ABC Diatype (300/400/500/700 plus italics), ABC Monument Extended
-  (400/700) and ABC Favorit Mono (variable). All are woff2 copies of
-  `apps/web/src/fonts`.
+- Fonts are in `apps/docs/fonts/` (served at `/fonts/*`, proxied by apps/web):
+  ABC Diatype (300/400/500/700 plus italics), ABC Monument Extended (400/700)
+  and ABC Favorit Mono (variable). All are woff2 copies of `apps/web/src/fonts`.
+  docs.json `fonts.*.source` must start with `fonts/` (see theme.css section
+  1).
 
 Theme rules:
 
