@@ -1,5 +1,5 @@
 // #region burn
-// cargo run --bin burn -- <amount>
+// cargo run --release --bin burn -- <amount>
 use anyhow::Result;
 use gated_token::{
     arg, ata, env, load_keypair, mint_decimals, rpc, send, to_base_units, TOKEN_2022,

@@ -1,5 +1,5 @@
 // #region allowlist-add
-// cargo run --bin allowlist-add -- <wallet>
+// cargo run --release --bin allowlist-add -- <wallet>
 use anyhow::Result;
 use gated_token::{acl, arg_pubkey, env, load_keypair, rpc, send};
 use solana_sdk::signature::Signer;

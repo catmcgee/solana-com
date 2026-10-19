@@ -1,5 +1,5 @@
 // #region allowlist-remove
-// cargo run --bin allowlist-remove -- <wallet>
+// cargo run --release --bin allowlist-remove -- <wallet>
 use anyhow::Result;
 use gated_token::{acl, arg_pubkey, ata, env, load_keypair, rpc, send, token_account_state};
 use solana_sdk::signature::Signer;

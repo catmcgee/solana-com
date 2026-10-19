@@ -1,5 +1,5 @@
 // #region fetch-list
-// cargo run --bin fetch-list
+// cargo run --release --bin fetch-list
 use anyhow::{anyhow, Result};
 use gated_token::{acl, env, rpc};
 use solana_account_decoder_client_types::UiAccountEncoding;

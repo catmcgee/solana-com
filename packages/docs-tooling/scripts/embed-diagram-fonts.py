@@ -32,7 +32,7 @@ from fontTools.ttLib import TTFont
 
 ROOT = Path(__file__).resolve().parents[3]
 ASSETS = ROOT / "apps" / "docs" / "docs-assets"
-FONTS = ASSETS / "brand" / "fonts"
+FONTS = ROOT / "apps" / "docs" / "fonts"
 SKIP = {"brand", "img", "legacy-siblings"}
 FACES = {
     # weight range -> font file. 600 (the diagrams' "bold") uses Medium,

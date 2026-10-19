@@ -38,7 +38,7 @@ import type { AstNode } from "../src/types.ts";
 
 const docsRoot = path.join(repoRoot, "apps", "docs");
 const outDir = path.join(docsRoot, "docs-assets", "assets", "docs", "mermaid");
-const fonts = path.join(docsRoot, "docs-assets", "brand", "fonts");
+const fonts = path.join(docsRoot, "fonts");
 // mermaid is not a dependency of this package (it ships with the docs
 // toolchain in the pnpm store); use the newest copy there, or MERMAID_JS.
 function findMermaid(): string {

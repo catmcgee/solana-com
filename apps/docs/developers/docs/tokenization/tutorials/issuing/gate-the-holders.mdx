@@ -16,6 +16,7 @@ related:
 "twitter:title": Allowlist Token Holders with Token ACL on Solana
 ---
 
+import WireGate from "/snippets/examples/paths/assets/gated-token/wire-gate.mdx";
 import AllowlistAdd from "/snippets/examples/paths/assets/gated-token/allowlist-add.mdx";
 import FetchList from "/snippets/examples/paths/assets/gated-token/fetch-list.mdx";
 import Mint from "/snippets/examples/paths/assets/gated-token/mint.mdx";
@@ -42,20 +43,23 @@ swap the gate program, or reclaim the freeze authority from Token ACL.
 ```mermaid
 flowchart TD
   accTitle: How Token ACL thaws a holder's account
-  accDescr: A new holder account opens frozen. Anyone can send a permissionless thaw to the Token ACL program, which asks the gate program. The gate reads the allowlist, which the list operator maintains, and approves the thaw only if the wallet is on it; otherwise the account stays frozen and the transaction fails.
+  accDescr: A new holder account opens frozen. Anyone can send a permissionless thaw to the Token ACL program, which asks the gate program; the Token ACL config authority can also freeze or thaw directly, swap the gate, or reclaim the freeze authority. The gate reads the list and approves the thaw only if the wallet qualifies; otherwise the account stays frozen and the transaction fails. In allowlist mode only listed wallets qualify; in blocklist mode every wallet qualifies except listed ones. An issuer can also write a custom gate. The list operator maintains the list, driven by offchain checks such as KYC and sanctions screening, and by attestations.
   H["New holder account<br/>Opens frozen"] -->|permissionless thaw| ACL["Token ACL program<br/>Holds the freeze authority<br/>Does not decide who qualifies"]
-  ACL -->|asks| G["Gate program<br/>Is the wallet on the list?"]
-  G -.-> L["Allowlist<br/>Read by the gate, one entry per wallet"]
-  LO["List operator<br/>Issuer or transfer agent"] -->|adds and removes wallets| L
+  CA["Token ACL config authority<br/>Fee payer in this tutorial<br/>Can freeze or thaw directly, swap the gate, or reclaim the freeze authority"] -.-> ACL
+  ACL -->|asks| G["Gate program<br/>Does the wallet qualify?"]
+  ACL -.->|or asks| CG["Custom gate<br/>Issuer-written logic, for example<br/>onchain identity checks"]
+  G -.-> L["List, one entry per wallet<br/>Allowlist mode: listed wallets qualify<br/>Blocklist mode: unlisted wallets qualify"]
+  K["Offchain checks<br/>KYC and sanctions screening<br/>Attestations"] --> LO["List operator<br/>Issuer, transfer agent, or provider"]
+  LO -->|adds and removes wallets| L
   G -->|yes| OK["Account thawed<br/>Later transfers are ordinary transfers"]
   G -->|no| NO["Account stays frozen<br/>The transaction fails"]
   class G focal
 ```
 
-<div className="sol-mermaid" data-fallback="mermaid" data-mermaid="026c5fd42f1b">
-  <img className="block dark:hidden" src="/docs-assets/assets/docs/mermaid/026c5fd42f1b-light.svg" alt="How Token ACL thaws a holder's account. A new holder account opens frozen. Anyone can send a permissionless thaw to the Token ACL program, which asks the gate program. The gate reads the allowlist, which the list operator maintains, and approves the thaw only if the wallet is on it; otherwise the account stays frozen and the transaction fails." />
+<div className="sol-mermaid" data-fallback="mermaid" data-mermaid="2b7f15c6b6bf">
+  <img className="block dark:hidden" src="/docs-assets/assets/docs/mermaid/2b7f15c6b6bf-light.svg" alt="How Token ACL thaws a holder's account. A new holder account opens frozen. Anyone can send a permissionless thaw to the Token ACL program, which asks the gate program; the Token ACL config authority can also freeze or thaw directly, swap the gate, or reclaim the freeze authority. The gate reads the list and approves the thaw only if the wallet qualifies; otherwise the account stays frozen and the transaction fails. In allowlist mode only listed wallets qualify; in blocklist mode every wallet qualifies except listed ones. An issuer can also write a custom gate. The list operator maintains the list, driven by offchain checks such as KYC and sanctions screening, and by attestations." />
 
-  <img className="hidden dark:block" src="/docs-assets/assets/docs/mermaid/026c5fd42f1b.svg" alt="How Token ACL thaws a holder's account. A new holder account opens frozen. Anyone can send a permissionless thaw to the Token ACL program, which asks the gate program. The gate reads the allowlist, which the list operator maintains, and approves the thaw only if the wallet is on it; otherwise the account stays frozen and the transaction fails." />
+  <img className="hidden dark:block" src="/docs-assets/assets/docs/mermaid/2b7f15c6b6bf.svg" alt="How Token ACL thaws a holder's account. A new holder account opens frozen. Anyone can send a permissionless thaw to the Token ACL program, which asks the gate program; the Token ACL config authority can also freeze or thaw directly, swap the gate, or reclaim the freeze authority. The gate reads the list and approves the thaw only if the wallet qualifies; otherwise the account stays frozen and the transaction fails. In allowlist mode only listed wallets qualify; in blocklist mode every wallet qualifies except listed ones. An issuer can also write a custom gate. The list operator maintains the list, driven by offchain checks such as KYC and sanctions screening, and by attestations." />
 </div>
 
 <Steps titleSize="h3">
@@ -70,10 +74,48 @@ confirms it: the freeze authority is `$MINT_CONFIG`, a program-derived address
 of the Token ACL program (`TACLkU6CiCdkQN2MjoyDkVg2yAH9zkxiHDsiztQ52TP`), not
 the program ID itself.
 
-If the freeze authority is your own key, the mint was created without Token
-ACL; Token ACL's create config instruction, signed by that key, can still take
-it over. If it is none, a freeze authority cannot be restored once it is unset,
-nothing can thaw an account, and the mint cannot be gated. Create a new one.
+If the freeze authority is anything else, the mint was created without Token
+ACL, and nothing can thaw an account through the gate. Whether that can be
+fixed depends on what the freeze authority is.
+
+<Accordion title="Wiring the gate on a mint created without it">
+
+Start from the freeze authority in the `inspect-mint` output:
+
+- **Your own key**: recoverable. Token ACL's create config instruction, signed
+  by that key, takes the freeze authority over. Run the script below.
+- **None**: a freeze authority cannot be restored once it is unset. Nothing can
+  thaw an account, so the mint cannot be gated. Create a new one.
+- **Any other address**: whoever holds that key has to sign the create config
+  instruction. If nobody can sign for it, create a new mint.
+
+The script does what `enableSrfc37: true` does at creation, in one transaction
+signed by the fee payer as the current freeze authority. It is written for the
+Mosaic SDK project from
+[before you start](/developers/docs/tokenization/tutorials/issuing#before-you-start).
+Save it as `wire-gate.ts` and run it with `$MINT` exported:
+
+<WireGate />
+
+Export the two addresses it prints, then run `inspect-mint` again to confirm
+the freeze authority is now the Token ACL mint config:
+
+```bash Terminal
+export LIST=<the allowlist>
+export MINT_CONFIG=<the freeze authority>
+```
+
+<Warning>
+Do not move the freeze authority by hand first, for example with
+`spl-token authorize $MINT freeze <address>`. Token ACL's create config
+instruction must be signed by the current freeze authority, and it moves the
+authority itself. A freeze authority set by hand to the Token ACL program or to
+the mint config address cannot sign: create config then fails with custom
+program error `0x0` (`InvalidAuthority`), nothing can move the freeze authority
+again, and the mint cannot be gated.
+</Warning>
+
+</Accordion>
 
 </Step>
 

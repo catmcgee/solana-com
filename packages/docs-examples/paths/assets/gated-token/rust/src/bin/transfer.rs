@@ -1,5 +1,5 @@
 // #region transfer
-// cargo run --bin transfer -- <recipient> <amount>
+// cargo run --release --bin transfer -- <recipient> <amount>
 use anyhow::Result;
 use gated_token::{
     acl, arg, arg_pubkey, ata, env, load_keypair, mint_decimals, rpc, send, to_base_units,

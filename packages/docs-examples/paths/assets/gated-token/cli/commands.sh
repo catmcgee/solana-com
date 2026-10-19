@@ -10,9 +10,6 @@ spl-token address --token $MINT --owner $CUSTODIAN --verbose \
 # #endregion address
 
 # #region display
-export CUSTODY_ATA=$(spl-token address --token $MINT --owner $CUSTODIAN \
-  --verbose --url ${RPC_URL:-devnet} \
-  | awk '/Associated token address/ {print $NF}')
 spl-token display $CUSTODY_ATA --url ${RPC_URL:-devnet}
 # #endregion display
 
@@ -33,17 +30,21 @@ YAML
 spl-token display $CUSTODY_ATA -C ~/.config/solana/finalized.yml
 # #endregion display-finalized
 
+# #region address-outsider
+spl-token address --token $MINT --owner $OUTSIDER --verbose \
+  --url ${RPC_URL:-devnet}
+# #endregion address-outsider
+
 # #region display-outsider
-export OUTSIDER_ATA=$(spl-token address --token $MINT --owner $OUTSIDER \
-  --verbose --url ${RPC_URL:-devnet} \
-  | awk '/Associated token address/ {print $NF}')
 spl-token display $OUTSIDER_ATA --url ${RPC_URL:-devnet}
 # #endregion display-outsider
 
+# #region address-vault
+spl-token address --token $MINT --owner $VAULT --verbose \
+  --url ${RPC_URL:-devnet}
+# #endregion address-vault
+
 # #region display-vault
-export VAULT_ATA=$(spl-token address --token $MINT --owner $VAULT \
-  --verbose --url ${RPC_URL:-devnet} \
-  | awk '/Associated token address/ {print $NF}')
 spl-token display $VAULT_ATA --url ${RPC_URL:-devnet}
 # #endregion display-vault
 

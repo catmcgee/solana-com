@@ -1,5 +1,5 @@
 // #region thaw
-// cargo run --bin thaw -- <wallet>
+// cargo run --release --bin thaw -- <wallet>
 use anyhow::Result;
 use gated_token::{acl, arg_pubkey, ata, env, load_keypair, rpc, send};
 use solana_sdk::signature::Signer;

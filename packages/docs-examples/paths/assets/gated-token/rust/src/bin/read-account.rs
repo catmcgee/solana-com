@@ -1,5 +1,5 @@
 // #region read-account
-// cargo run --bin read-account -- <token account> [commitment]
+// cargo run --release --bin read-account -- <token account> [commitment]
 use anyhow::{anyhow, Result};
 use gated_token::{arg, arg_pubkey, rpc_with};
 use solana_commitment_config::CommitmentConfig;

@@ -40,24 +40,26 @@ low-privilege operations key for metadata.
 ```mermaid
 flowchart LR
   accTitle: Who holds each authority on the tutorial mint
-  accDescr: The fee payer holds the mint, Confidential Balances, and Scaled UI Amount authorities and the Token ACL config and allowlist. The freeze authority belongs to the Token ACL mint config. Pause, permanent delegate, permissioned burn, and metadata each have their own key.
+  accDescr: The fee payer holds the mint, Confidential Balances, and Scaled UI Amount authorities and the Token ACL config and allowlist. The freeze authority belongs to the Token ACL mint config, and it also governs the default account state. Pause, permanent delegate, permissioned burn, and metadata each have their own key. Two settings are not used on this mint: an optional auditor key, which the Confidential Balances authority can set and which decrypts transfer amounts without signing anything, and a transfer hook, which the tokenized-security template does not include.
   P["Fee payer<br/>tokenization-demo.json"] --> A1["Mint, Confidential Balances, Scaled UI Amount<br/>Token ACL config and allowlist authority"]
-  T["Token ACL mint config<br/>PDA of the Token ACL program"] --> A2["Freeze authority<br/>Freezes and thaws accounts"]
+  A1 -.->|can set| AUD["Auditor key, optional<br/>Not set on this mint<br/>Decrypts transfer amounts, not a signer"]
+  T["Token ACL mint config<br/>PDA of the Token ACL program"] --> A2["Freeze authority<br/>Freezes and thaws accounts<br/>Also governs the default account state"]
   K1["pause.json"] --> A3["Pause authority<br/>Halts mint, burn, and transfer"]
   K2["delegate.json"] --> A4["Permanent delegate<br/>Moves or burns any holder's balance"]
   K3["burn.json"] --> A5["Permissioned burn authority<br/>Co-signs every burn"]
   K4["metadata.json"] --> A6["Metadata and metadata pointer<br/>Changes name, symbol, and URI"]
+  H["Transfer hook authority<br/>Not in this template"] -.-> HP["Hook program<br/>Would run on every transfer"]
   class T focal
 ```
 
-<div className="sol-mermaid" data-fallback="mermaid" data-mermaid="6edd51495148">
-  <img className="block dark:hidden" src="/docs-assets/assets/docs/mermaid/6edd51495148-light.svg" alt="Who holds each authority on the tutorial mint. The fee payer holds the mint, Confidential Balances, and Scaled UI Amount authorities and the Token ACL config and allowlist. The freeze authority belongs to the Token ACL mint config. Pause, permanent delegate, permissioned burn, and metadata each have their own key." />
+<div className="sol-mermaid" data-fallback="mermaid" data-mermaid="be0803dfbb67">
+  <img className="block dark:hidden" src="/docs-assets/assets/docs/mermaid/be0803dfbb67-light.svg" alt="Who holds each authority on the tutorial mint. The fee payer holds the mint, Confidential Balances, and Scaled UI Amount authorities and the Token ACL config and allowlist. The freeze authority belongs to the Token ACL mint config, and it also governs the default account state. Pause, permanent delegate, permissioned burn, and metadata each have their own key. Two settings are not used on this mint: an optional auditor key, which the Confidential Balances authority can set and which decrypts transfer amounts without signing anything, and a transfer hook, which the tokenized-security template does not include." />
 
-  <img className="hidden dark:block" src="/docs-assets/assets/docs/mermaid/6edd51495148.svg" alt="Who holds each authority on the tutorial mint. The fee payer holds the mint, Confidential Balances, and Scaled UI Amount authorities and the Token ACL config and allowlist. The freeze authority belongs to the Token ACL mint config. Pause, permanent delegate, permissioned burn, and metadata each have their own key." />
+  <img className="hidden dark:block" src="/docs-assets/assets/docs/mermaid/be0803dfbb67.svg" alt="Who holds each authority on the tutorial mint. The fee payer holds the mint, Confidential Balances, and Scaled UI Amount authorities and the Token ACL config and allowlist. The freeze authority belongs to the Token ACL mint config, and it also governs the default account state. Pause, permanent delegate, permissioned burn, and metadata each have their own key. Two settings are not used on this mint: an optional auditor key, which the Confidential Balances authority can set and which decrypts transfer amounts without signing anything, and a transfer hook, which the tokenized-security template does not include." />
 
-  <img className="block dark:hidden" src="/docs-assets/assets/docs/mermaid/6edd51495148-sm-light.svg" alt="Who holds each authority on the tutorial mint. The fee payer holds the mint, Confidential Balances, and Scaled UI Amount authorities and the Token ACL config and allowlist. The freeze authority belongs to the Token ACL mint config. Pause, permanent delegate, permissioned burn, and metadata each have their own key." />
+  <img className="block dark:hidden" src="/docs-assets/assets/docs/mermaid/be0803dfbb67-sm-light.svg" alt="Who holds each authority on the tutorial mint. The fee payer holds the mint, Confidential Balances, and Scaled UI Amount authorities and the Token ACL config and allowlist. The freeze authority belongs to the Token ACL mint config, and it also governs the default account state. Pause, permanent delegate, permissioned burn, and metadata each have their own key. Two settings are not used on this mint: an optional auditor key, which the Confidential Balances authority can set and which decrypts transfer amounts without signing anything, and a transfer hook, which the tokenized-security template does not include." />
 
-  <img className="hidden dark:block" src="/docs-assets/assets/docs/mermaid/6edd51495148-sm.svg" alt="Who holds each authority on the tutorial mint. The fee payer holds the mint, Confidential Balances, and Scaled UI Amount authorities and the Token ACL config and allowlist. The freeze authority belongs to the Token ACL mint config. Pause, permanent delegate, permissioned burn, and metadata each have their own key." />
+  <img className="hidden dark:block" src="/docs-assets/assets/docs/mermaid/be0803dfbb67-sm.svg" alt="Who holds each authority on the tutorial mint. The fee payer holds the mint, Confidential Balances, and Scaled UI Amount authorities and the Token ACL config and allowlist. The freeze authority belongs to the Token ACL mint config, and it also governs the default account state. Pause, permanent delegate, permissioned burn, and metadata each have their own key. Two settings are not used on this mint: an optional auditor key, which the Confidential Balances authority can set and which decrypts transfer amounts without signing anything, and a transfer hook, which the tokenized-security template does not include." />
 </div>
 
 <Warning>
@@ -122,8 +124,10 @@ The mint carries the extension set of Mosaic's `tokenized-security` template:
 
 **Permissioned burn** makes redemption a two-party operation: a holder cannot
 extinguish their own balance without the burn authority signing alongside
-them. It suits a redemption process with an offchain settlement leg, and it is
-fixed at creation. If holders must be able to burn on their own, leave it out.
+them. It suits a redemption process with an offchain settlement leg. It can
+only be added at creation. Clearing its authority later lets holders burn
+alone, and the authority cannot be set again. If holders must be able to burn
+on their own from the start, leave it out.
 
 **Scaled UI Amount** lets an accrual or a corporate action change every
 holder's displayed balance without a transfer. It can only be enabled when the
@@ -160,8 +164,9 @@ Check three things:
 
 1. **The freeze authority is `$MINT_CONFIG`**, the Token ACL mint config for
    this mint, and not your own key or none. `tokenAcl` is `true`. If it is
-   anything else, Token ACL did not take the freeze authority and the mint
-   cannot be gated; create a new one.
+   anything else, Token ACL did not take the freeze authority; see
+   [confirm the gate is in place](/developers/docs/tokenization/tutorials/issuing/gate-the-holders#confirm-the-gate-is-in-place)
+   for when that can be fixed.
 2. **The gate is the gate program with permissionless thaw on.** The Kit,
    Web3.js v3, and Rust scripts print `gatingProgram`
    (`GATEzzqxhJnsWF6vHRsgtixxSB8PaQdcqGEVTEHWiULz`) and
@@ -171,8 +176,10 @@ Check three things:
    `permissionedBurnAuthority`, and `updateAuthority` for metadata). The mint
    authority is your fee payer, as noted above.
 
-The SDK's `patterns` field lists `tokenized-security`, and also `stablecoin`,
-because the mint carries every extension of Mosaic's stablecoin template too.
+The SDK's `patterns` field lists `tokenized-security`, and also `stablecoin`:
+in Mosaic SDK 0.2.0, `inspectToken` reports `stablecoin` for any mint with
+metadata, a permanent delegate, a default account state, and Confidential
+Balances, and this mint has all four.
 
 If an operational authority came back as your fee payer rather than the key
 you passed, create a new mint rather than correcting it; on devnet or a local

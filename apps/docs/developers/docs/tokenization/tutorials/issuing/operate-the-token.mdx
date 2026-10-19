@@ -26,6 +26,7 @@ import ForceTransfer from "/snippets/examples/paths/assets/gated-token/force-tra
 import Burn from "/snippets/examples/paths/assets/gated-token/burn.mdx";
 import ForceBurn from "/snippets/examples/paths/assets/gated-token/force-burn.mdx";
 import AllowlistRemove from "/snippets/examples/paths/assets/gated-token/allowlist-remove.mdx";
+import AddressOutsider from "/snippets/examples/paths/assets/gated-token/address-outsider.mdx";
 import ReadOffboarded from "/snippets/examples/paths/assets/gated-token/read-offboarded.mdx";
 
 You have a mint and an allowlist. This step runs each power an issuer operates
@@ -119,8 +120,10 @@ day-to-day operations keys reaches it.
 This mint carries permissioned burn, so a holder cannot burn their own balance
 alone: the burn authority co-signs. On this mint, that is the redemption path:
 the holder instructs, the issuer confirms the offchain leg has settled, and the
-two signatures extinguish the position together. Token-2022 rejects a plain
-`Burn` or `BurnChecked` on this mint. Save this as `burn.ts` (in Rust,
+two signatures extinguish the position together. While the extension has a
+burn authority, Token-2022 rejects a plain `Burn` or `BurnChecked` on this mint
+with `InvalidInstruction`; a burn has to use the extension's own burn
+instruction, which the burn authority signs. Save this as `burn.ts` (in Rust,
 `src/bin/burn.rs`) and run it with `1`.
 
 <Burn />
@@ -143,8 +146,9 @@ source through the gate first, which works only while the wallet is on the
 list; for an offboarded wallet, re-add it for the duration of the burn.
 
 <Warning>
-Permissioned burn is fixed at creation and cannot be removed without a new
-mint. Pointing the permissioned burn authority at the permanent delegate's key
+Permissioned burn can only be added at creation, and the extension stays on
+the mint. Its authority can sign a `SetAuthority` that clears it, which lets
+holders burn alone again and cannot be undone. Pointing the permissioned burn authority at the permanent delegate's key
 at creation lets one signer cover both roles on a forced burn; keeping them
 separate, as this tutorial does, means two signatures stand behind every
 reduction of supply. Both designs are in use.
@@ -166,20 +170,30 @@ then neither receive nor send. Save this as `allowlist-remove.ts` (in Rust,
 
 <AllowlistRemove />
 
-Read the account back. Its balance is intact and its state is `Frozen`. The
-outsider received 1 and then 10 tokens, and 1 was burned: `spl-token` shows
-10, and the scripts print the amount in base units, 10000000 at six decimals.
-The `spl-token` command derives the outsider's token account address first.
-The scripts take that address as their argument. They need the Token-2022
-client, so they run in the Kit, Web3.js v3, or Rust project; with the Mosaic
-SDK, use `spl-token`. Save this as `read-account.ts` (in Rust,
-`src/bin/read-account.rs`) and run it with the address that
-`spl-token address --token $MINT --owner $OUTSIDER --verbose --url ${RPC_URL:-devnet}`
-prints, or that the
+Read the account back. The reads take the outsider's token account, not the
+wallet, so derive its address first:
+
+<AddressOutsider />
+
+`spl-token address --verbose` prints two lines. Export the address on the
+`Associated token address` line as `OUTSIDER_ATA`:
+
+```bash Terminal
+export OUTSIDER_ATA=<the associated token address>
+```
+
+Then read it with `spl-token`, or with a `read-account` script. The scripts
+need the Token-2022 client, so they run in the Kit, Web3.js v3, or Rust
+project; with the Mosaic SDK, use `spl-token`. Save this as `read-account.ts`
+(in Rust, `src/bin/read-account.rs`) and run it with `$OUTSIDER_ATA`. The
 [custodian tutorial's](/developers/docs/tokenization/tutorials/custodian#derive-the-token-account-address-before-it-exists)
-`derive-ata` script prints.
+`derive-ata` script derives the same address from code.
 
 <ReadOffboarded />
+
+The balance is intact and the state is `Frozen`. The outsider received 1 and
+then 10 tokens, and 1 was burned: `spl-token` shows `Balance: 10`, and the
+scripts print the amount in base units, `10000000` at six decimals.
 
 Two limits to plan around. The scripts freeze the wallet's associated token
 account only; a wallet holding the token in other accounts needs each frozen

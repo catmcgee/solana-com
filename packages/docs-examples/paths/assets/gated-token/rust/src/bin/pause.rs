@@ -1,5 +1,5 @@
 // #region pause
-// cargo run --bin pause
+// cargo run --release --bin pause
 use anyhow::Result;
 use gated_token::{env, load_keypair, rpc, send, TOKEN_2022};
 use solana_sdk::signature::Signer;

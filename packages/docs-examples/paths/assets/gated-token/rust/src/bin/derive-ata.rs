@@ -1,5 +1,5 @@
 // #region derive-ata
-// cargo run --bin derive-ata -- <wallet>
+// cargo run --release --bin derive-ata -- <wallet>
 use anyhow::Result;
 use gated_token::{arg_pubkey, ata, env};
 

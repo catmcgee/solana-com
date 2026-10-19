@@ -1,5 +1,5 @@
 // #region force-transfer
-// cargo run --bin force-transfer -- <from wallet> <to wallet> <amount>
+// cargo run --release --bin force-transfer -- <from wallet> <to wallet> <amount>
 use anyhow::Result;
 use gated_token::{
     acl, arg, arg_pubkey, ata, env, load_keypair, mint_decimals, rpc, send, to_base_units,

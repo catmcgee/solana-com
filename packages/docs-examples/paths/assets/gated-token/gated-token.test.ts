@@ -37,6 +37,7 @@ import {
   type Address,
 } from "@solana/kit";
 import { Surfnet } from "@solana/surfpool-1.6";
+import { findMintConfigPda } from "@solana/token-acl-sdk";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { recordText } from "../../../test/record";
 
@@ -314,7 +315,10 @@ async function runChain(
     record: "read-account.offboarded",
   });
   expect(offboarded).toContain("State: Frozen");
-  await cli("display.offboarded", "display-outsider");
+  await cli("address-outsider", "address-outsider");
+  await cli("display.offboarded", "display-outsider", {
+    OUTSIDER_ATA: outsiderAta,
+  });
 
   // Hold it as a custodian.
   const custodian = keys["demo-custodian"];
@@ -328,7 +332,7 @@ async function runChain(
   await cli("address", "address");
   await step("allowlist-add", [custodian]);
   await step("mint", [custodian, "500"]);
-  await cli("display.thawed", "display");
+  await cli("display.thawed", "display", { CUSTODY_ATA: custodyAta });
   expect(
     await step("read-account", [custodyAta], {
       by: readImpl,
@@ -373,7 +377,8 @@ async function runChain(
     by: readImpl,
     record: "read-account.vault",
   });
-  await cli("display.vault", "display-vault");
+  await cli("address-vault", "address-vault");
+  await cli("display.vault", "display-vault", { VAULT_ATA: vaultAta });
   await step("pause", []);
   await step("transfer", [vault, "1"], {
     record: "transfer.vault-paused",
@@ -468,6 +473,107 @@ describe("paths/assets/gated-token (tokenization tutorials)", () => {
   it("Mosaic SDK", { timeout: 900_000 }, async () => {
     await runChain(tsImpl("mosaic"), { readImpl: tsImpl("kit") });
   });
+
+  // The recovery on the gate-the-holders page: a mint created frozen by
+  // default but without Token ACL gets the gate wired by wire-gate.ts while its
+  // freeze authority is still a key; once the freeze authority has been moved
+  // by hand (spl-token authorize), nothing can sign for it and wire-gate fails.
+  it.skipIf(!splToken)(
+    "Mosaic SDK: wire the gate on an existing mint",
+    { timeout: 300_000 },
+    async () => {
+      const { home, keys } = await makeHome();
+      const env: NodeJS.ProcessEnv = {
+        ...process.env,
+        HOME: home,
+        RPC_URL: rpcUrl,
+        RPC_SUBSCRIPTIONS_URL: wsUrl,
+      };
+      const payerFile = join(home, ".config/solana/tokenization-demo.json");
+      const splTokenRun = async (args: string[]) => {
+        const run = await spawnText(
+          splToken!,
+          [...args, "--fee-payer", payerFile, "--url", rpcUrl],
+          home,
+          env,
+        );
+        expect(run.code, `spl-token ${args.join(" ")}:\n${run.all}`).toBe(0);
+        return run.text;
+      };
+      // A mint without the gate: accounts open frozen and the freeze
+      // authority is the fee payer's key.
+      const ungatedMint = async () => {
+        const created = await splTokenRun([
+          "create-token",
+          "--program-2022",
+          "--enable-freeze",
+          "--default-account-state",
+          "frozen",
+          "--decimals",
+          "6",
+          "--mint-authority",
+          keys["tokenization-demo"],
+        ]);
+        const mint = created.match(/Address:\s+(\S+)/)?.[1];
+        expect(mint, created).toBeDefined();
+        return mint!;
+      };
+      const mosaic = tsImpl("mosaic");
+
+      const mint = await ungatedMint();
+      const wired = await mosaic.exec("wire-gate", [], { ...env, MINT: mint });
+      expect(wired.code, wired.all).toBe(0);
+      await checkSignatures(wired.text, true);
+      recordText(
+        new URL("./mosaic/wire-gate.output.txt", import.meta.url),
+        wired.text,
+      );
+      const mintConfig = field(
+        wired.text,
+        "Freeze authority \\(Token ACL mint config\\)",
+      );
+      const inspected = await mosaic.exec("inspect-mint", [], {
+        ...env,
+        MINT: mint,
+      });
+      expect(inspected.text).toContain(`freezeAuthority: '${mintConfig}'`);
+      expect(inspected.text).toContain("tokenAcl: true");
+      // The gate works: an allowlisted holder's account opens through it.
+      const listEnv = {
+        ...env,
+        MINT: mint,
+        LIST: field(wired.text, "Allowlist"),
+      };
+      const holder = keys["demo-holder"];
+      for (const [script, args] of [
+        ["allowlist-add", [holder]],
+        ["mint", [holder, "5"]],
+      ] as const) {
+        const run = await mosaic.exec(script, [...args], listEnv);
+        expect(run.code, run.all).toBe(0);
+        await checkSignatures(run.text, true);
+      }
+
+      // Moved by hand to the mint config address: unrecoverable.
+      const stuck = await ungatedMint();
+      const [stuckConfig] = await findMintConfigPda({
+        mint: stuck as Address,
+      });
+      await splTokenRun([
+        "authorize",
+        stuck,
+        "freeze",
+        stuckConfig,
+        "--authority",
+        payerFile,
+      ]);
+      const failed = await mosaic.exec("wire-gate", [], { ...env, MINT: stuck });
+      expect(failed.code).not.toBe(0);
+      expect(failed.text).toContain("Failed:");
+      await checkSignatures(failed.text, false);
+      rmSync(home, { recursive: true, force: true });
+    },
+  );
 
   it("Kit", { timeout: 900_000 }, async () => {
     await runChain(tsImpl("kit"), { withCli: true });

@@ -1,5 +1,5 @@
 // #region create
-// cargo run --bin create-the-mint
+// cargo run --release --bin create-the-mint
 use anyhow::{anyhow, Result};
 use gated_token::{acl, load_keypair, rpc, send, TOKEN_2022};
 use solana_sdk::signature::{Keypair, Signer};

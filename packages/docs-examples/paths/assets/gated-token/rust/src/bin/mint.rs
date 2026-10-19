@@ -1,5 +1,5 @@
 // #region mint
-// cargo run --bin mint -- <recipient> <amount>
+// cargo run --release --bin mint -- <recipient> <amount>
 use anyhow::Result;
 use gated_token::{
     acl, arg, arg_pubkey, env, load_keypair, mint_decimals, rpc, send, to_base_units, TOKEN_2022,

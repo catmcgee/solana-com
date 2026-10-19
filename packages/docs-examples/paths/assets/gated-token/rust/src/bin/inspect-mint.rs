@@ -1,5 +1,5 @@
 // #region inspect
-// cargo run --bin inspect-mint
+// cargo run --release --bin inspect-mint
 use anyhow::Result;
 use gated_token::{acl, env, rpc};
 use solana_sdk::pubkey::Pubkey;
