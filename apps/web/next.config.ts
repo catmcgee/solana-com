@@ -285,8 +285,11 @@ export default withSentryConfig(withBotId(moduleExports), {
   _experimental: {
     thirdPartyOriginStackFrames: true,
   },
-  disableLogger: true,
-  automaticVercelMonitors: true,
+  // Webpack builds only (`next build --webpack`); Turbopack has neither.
+  webpack: {
+    treeshake: { removeDebugLogging: true },
+    automaticVercelMonitors: true,
+  },
   sourcemaps: {
     disable:
       process.env.VERCEL_ENV !== "production" || !process.env.SENTRY_AUTH_TOKEN,

@@ -109,8 +109,11 @@ export default withSentryConfig(withNextIntl(nextConfig), {
   project: "javascript-nextjs",
   silent: !process.env.CI,
   widenClientFileUpload: true,
-  disableLogger: true,
-  automaticVercelMonitors: true,
+  // Webpack builds only (`next build --webpack`); Turbopack has neither.
+  webpack: {
+    treeshake: { removeDebugLogging: true },
+    automaticVercelMonitors: true,
+  },
   sourcemaps: {
     disable:
       process.env.VERCEL_ENV !== "production" || !process.env.SENTRY_AUTH_TOKEN,
