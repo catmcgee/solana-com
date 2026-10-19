@@ -40,7 +40,12 @@ export default async function RootLayout({ children, params }: Props) {
   const messages = await loadMergedMessages({ app: "web", locale });
   const googleTagManagerID = config.siteMetadata.googleTagManagerID;
   return (
-    <html lang={locale} dir={direction} suppressHydrationWarning>
+    <html
+      lang={locale}
+      dir={direction}
+      data-scroll-behavior="smooth"
+      suppressHydrationWarning
+    >
       <body suppressHydrationWarning>
         <GoogleTagManagerNoScript containerId={googleTagManagerID} />
         <NextIntlClientProvider messages={messages} locale={locale}>

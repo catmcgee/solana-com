@@ -4,6 +4,23 @@ import { withSentryConfig } from "@sentry/nextjs";
 
 const assetPrefix = "/templates-assets";
 
+const svgrOptions = {
+  svgoConfig: {
+    plugins: [
+      {
+        name: "preset-default",
+        params: {
+          overrides: {
+            removeViewBox: false,
+            removeUselessStrokeAndFill: false,
+            cleanupIds: false,
+          },
+        },
+      },
+    ],
+  },
+};
+
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   trailingSlash: false,
@@ -13,32 +30,34 @@ const nextConfig: NextConfig = {
     NEXT_PUBLIC_APP_NAME: "templates",
   },
 
+  // Turbopack (the Next.js 16 default bundler): `*.inline.svg` imports are
+  // React components through SVGR, and every other `.svg` import is a URL
+  // string, as the webpack config below gives `next build --webpack`.
+  turbopack: {
+    rules: {
+      "*.svg": [
+        {
+          condition: { path: /\.inline\.svg$/ },
+          loaders: [{ loader: "@svgr/webpack", options: svgrOptions }],
+          as: "*.js",
+        },
+        {
+          condition: { not: { path: /\.inline\.svg$/ } },
+          type: "asset",
+        },
+      ],
+    },
+  },
+
   webpack(config) {
-    // Handle inline SVGs
     config.module.rules.push({
       test: /\.inline\.svg$/,
       use: {
         loader: "@svgr/webpack",
-        options: {
-          svgoConfig: {
-            plugins: [
-              {
-                name: "preset-default",
-                params: {
-                  overrides: {
-                    removeViewBox: false,
-                    removeUselessStrokeAndFill: false,
-                    cleanupIds: false,
-                  },
-                },
-              },
-            ],
-          },
-        },
+        options: svgrOptions,
       },
     });
 
-    // Handle regular SVGs as assets
     config.module.rules.push({
       test: /(?<!inline)\.svg$/,
       type: "asset",

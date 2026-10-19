@@ -6,7 +6,7 @@
  * elements deep in <body>, after the header markup. On its own the browser
  * first paints Mintlify's default two-row header, then reflows it into our
  * one-row header when theme.css arrives. A rewrite cannot change the body, so
- * src/middleware.ts serves docs HTML documents through `proxyDocsDocument`
+ * src/proxy.ts serves docs HTML documents through `proxyDocsDocument`
  * instead of the beforeFiles rewrite:
  *
  * 1. fetch the same upstream URL the rewrite would (`resolveMintlifyUpstream`,

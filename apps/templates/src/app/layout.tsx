@@ -49,6 +49,7 @@ export default async function RootLayout({ children }: Props) {
     <html
       lang={locale}
       dir={direction}
+      data-scroll-behavior="smooth"
       className="dark"
       suppressHydrationWarning
     >

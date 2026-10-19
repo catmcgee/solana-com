@@ -12,8 +12,25 @@ import { getSecurityHeaders } from "./src/lib/security-headers";
 
 // X-Frame-Options, nosniff, X-XSS-Protection, frame-ancestors, plus
 // X-Robots-Tag: noindex on previews. Shared with the docs head injection in
-// src/middleware.ts, which builds its own docs HTML responses.
+// src/proxy.ts, which builds its own docs HTML responses.
 const securityHeaders = getSecurityHeaders();
+
+const svgrOptions = {
+  svgoConfig: {
+    plugins: [
+      {
+        name: "preset-default",
+        params: {
+          overrides: {
+            removeViewBox: false,
+            removeUselessStrokeAndFill: false,
+            cleanupIds: false,
+          },
+        },
+      },
+    ],
+  },
+};
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
@@ -21,7 +38,7 @@ const nextConfig: NextConfig = {
   trailingSlash: false,
   transpilePackages: ["gsap"],
   // The Mintlify rewrite table, for the docs head injection in
-  // src/middleware.ts: it fetches a docs page from the same upstream URL the
+  // src/proxy.ts: it fetches a docs page from the same upstream URL the
   // beforeFiles rewrite would use. Inlined at build time, like the rewrites.
   env: {
     DOCS_MINTLIFY_REWRITES: JSON.stringify(
@@ -77,27 +94,31 @@ const nextConfig: NextConfig = {
     return existingRedirects;
   },
 
+  // Turbopack (the Next.js 16 default bundler): `*.inline.svg` imports are
+  // React components through SVGR, and every other `.svg` import is a URL
+  // string, as the webpack config below gives `next build --webpack`.
+  turbopack: {
+    rules: {
+      "*.svg": [
+        {
+          condition: { path: /\.inline\.svg$/ },
+          loaders: [{ loader: "@svgr/webpack", options: svgrOptions }],
+          as: "*.js",
+        },
+        {
+          condition: { not: { path: /\.inline\.svg$/ } },
+          type: "asset",
+        },
+      ],
+    },
+  },
+
   webpack(config) {
     config.module.rules.push({
       test: /\.inline\.svg$/,
       use: {
         loader: "@svgr/webpack",
-        options: {
-          svgoConfig: {
-            plugins: [
-              {
-                name: "preset-default",
-                params: {
-                  overrides: {
-                    removeViewBox: false,
-                    removeUselessStrokeAndFill: false,
-                    cleanupIds: false,
-                  },
-                },
-              },
-            ],
-          },
-        },
+        options: svgrOptions,
       },
     });
 
@@ -110,6 +131,17 @@ const nextConfig: NextConfig = {
   },
 
   images: {
+    // Next.js 16 allows only quality 75 by default; these are the `quality`
+    // props the app's next/image components use.
+    qualities: [75, 90, 100],
+    // Next.js 16 rejects local image URLs with a query string unless a
+    // pattern allows it. The first entry is the Next.js 16 default (any local
+    // path, no query); the second keeps the /api/media/image proxy
+    // (src/lib/media/solution-news.ts), whose `path` query varies per image.
+    localPatterns: [
+      { pathname: "**", search: "" },
+      { pathname: "/api/media/image" },
+    ],
     remotePatterns: [
       {
         protocol: "https",

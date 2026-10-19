@@ -119,6 +119,7 @@ export default async function RootLayout({ children, params }: Props) {
     <html
       lang={locale}
       dir={direction}
+      data-scroll-behavior="smooth"
       className={`dark ${spaceGrotesk.variable} ${abcDiatype.variable}`}
       suppressHydrationWarning
     >

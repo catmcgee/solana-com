@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { MINTLIFY_ORIGIN } from "@@/apps-urls";
 import { mintlifyRewrites } from "@@/rewrites-redirects";
-import middleware from "@@/src/middleware";
+import middleware from "@@/src/proxy";
 import {
   DOCS_FONT_PRELOADS,
   DOCS_HEAD_HEADER,

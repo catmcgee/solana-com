@@ -86,10 +86,7 @@ export function handleDocsRequest(
   return NextResponse.next();
 }
 
-export default async function middleware(
-  req: NextRequest,
-  event: NextFetchEvent,
-) {
+export default async function proxy(req: NextRequest, event: NextFetchEvent) {
   const { pathname } = req.nextUrl;
   const pathSegments = pathname.split("/").filter(Boolean);
   const normalizedPathname = getPathnameWithoutLocale(pathname);
@@ -199,5 +196,4 @@ export const config = {
     "/:locale/developers/:section(docs|cookbook|bootcamp)/:path*",
     "/:path((?:[a-zA-Z]{2}(?:-[a-zA-Z]+)?/)?(?:[dD][oO][cC][sS]|[lL][eE][aA][rR][nN]|[dD][eE][vV][eE][lL][oO][pP][eE][rR][sS])(?:/[^.]*)?\\.[mM][dD])",
   ],
-  runtime: "nodejs",
 };

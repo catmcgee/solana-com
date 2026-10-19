@@ -1,7 +1,7 @@
 /**
  * Path rules for the docs URL space that apps/web proxies to Mintlify
  * (spec §8, WP9). Pure functions only: this module is imported by
- * `src/middleware.ts` and by `rewrites-redirects.ts`, so it must not touch
+ * `src/proxy.ts` and by `rewrites-redirects.ts`, so it must not touch
  * the filesystem or any Next.js runtime API.
  */
 import { defaultLocale, locales } from "@workspace/i18n/config";

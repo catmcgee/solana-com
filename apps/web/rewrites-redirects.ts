@@ -656,7 +656,7 @@ const chainMigrationRedirects: RedirectInput[] = [
  * analytics beyond the basics (Pro), static export/self-hosting (Enterprise).
  *
  * Rollback: point MINTLIFY_ORIGIN at the last Fumadocs deployment URL and
- * revert this block plus the docs part of src/middleware.ts.
+ * revert this block plus the docs part of src/proxy.ts.
  *
  * Build-time inputs from the docs: the locale-fallback rewrites below
  * (apps/docs files), /developers/docs/<section>/llms.txt and the sitemap

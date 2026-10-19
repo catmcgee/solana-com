@@ -7,7 +7,7 @@ import path from "node:path";
  * repo. Build-time only: deployed functions do not ship the repo.
  */
 export function findRepoRoot(start = process.cwd()): string | null {
-  let dir = path.resolve(start);
+  let dir = path.resolve(/*turbopackIgnore: true*/ start);
   for (;;) {
     if (fs.existsSync(path.join(dir, "pnpm-workspace.yaml"))) return dir;
     const parent = path.dirname(dir);

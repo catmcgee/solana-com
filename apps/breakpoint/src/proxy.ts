@@ -3,9 +3,11 @@ import {
   routingWithoutDetection,
 } from "@workspace/i18n/middleware";
 
-export default createMiddleware(routingWithoutDetection, {
+const proxy = createMiddleware(routingWithoutDetection, {
   preserveProxiedLocaleCookie: true,
 });
+
+export default proxy;
 
 export const config = {
   // The app is served at /breakpoint in production, while the standalone

@@ -6,7 +6,7 @@ import middleware, {
   config,
   handleDocsRequest,
   isProxiedPath,
-} from "@@/src/middleware";
+} from "@@/src/proxy";
 import {
   canonicalDocsPath,
   getDocsPathInfo,
