@@ -32,11 +32,16 @@ processor through a shared API with no uptime guarantee.
   access.
 </Danger>
 
-When choosing an RPC provider, look for:
+When choosing an RPC provider, compare:
 
-- **Reliability**: SLAs with uptime guarantees (99.9%+)
-- **Latency**: Geographic proximity to your users
-- **Features**: Transaction landing features, indexing, priority fee APIs
+- **Reliability**: an SLA with an uptime commitment
+- **Latency**: geographic proximity to your users and servers
+- **Method coverage**: the RPC methods your workload needs, and historical
+  depth that covers your reconciliation period
+- **Transaction landing**: staked connections, priority fee APIs, and bundle
+  support where your workload depends on them
+- **Credential handling**: separate keys per environment, and a way to rotate
+  them
 
 For a full list of RPC providers, see the
 [RPC Infrastructure Providers](https://solana.com/rpc) guide.
@@ -332,6 +337,12 @@ Solana offers three confirmation levels. In traditional finance terms:
 - **Large withdrawals**: Wait for `finalized`
 - **Compliance/audit**: Always record `finalized` status
 
+A `confirmed` block can in principle still be superseded, so anything that
+feeds a book of record waits for `finalized`.
+[Settlement and finality](/developers/docs/defi/finality) covers how many slots
+each level takes, why a blockhash should be fetched at one level and a result
+judged at another, and why protocol finality is not legal finality.
+
 For more on checking transaction status, see
 [Interacting with Solana](/developers/docs/payments/interacting-with-solana).
 
@@ -427,6 +438,18 @@ for complete implementation.
 
 ## Security
 
+### Authority Custody
+
+An issued asset has authorities (mint, freeze, pause, metadata, and any
+delegate), and losing one can be unrecoverable. Before mainnet, check that:
+
+- No authority is a single hot key on a single machine.
+- Each authority is held by the smallest party that needs it, rather than one
+  key holding everything. See
+  [program and authority design](/developers/docs/tokenization/design/program-and-authority-design).
+- Someone other than the original engineer can run a recovery, and that path
+  has been rehearsed.
+
 ### Key Management
 
 - **Never expose private keys in frontend code.** Use backend signing, hardware
@@ -485,6 +508,42 @@ Set up alerts for:
 For real-time transaction monitoring at scale, see our
 [Indexing Guide](/developers/docs/payments/accept-payments/indexing).
 
+Take network figures, such as liveness history and validator counts, from
+live sources rather than documentation:
+[status.solana.com](https://status.solana.com) for cluster status and
+incidents, [validators.app](https://www.validators.app) for the validator set
+and stake distribution, [solana.com/data](https://solana.com/data) for network
+activity, and the
+[improvement documents](https://github.com/solana-foundation/solana-improvement-documents)
+for proposed and accepted protocol changes.
+
+### Reconciliation
+
+Reconciliation, separately from monitoring, checks that your records match the
+chain:
+
+- Record the transaction signature and the commitment level at which you
+  accepted it, for every state change that matters.
+- Order your own records by slot, not by wall-clock time.
+- Reconcile against the chain rather than against your own optimistic writes,
+  and against a custodian's view where one holds the asset. See
+  [custody integration](/developers/docs/tokenization/custody/custody-integration).
+- Alert on transactions that were sent and never confirmed, which leave your
+  records and the chain out of step.
+
+### Security Programs
+
+- **[STRIDE](https://stride.asymmetric.re)** (Solana Trust, Resilience and
+  Infrastructure for DeFi Enterprises): security assessments of Solana
+  protocols, with findings published, run by Asymmetric Research with the
+  Solana Foundation. An assessment covers a protocol rather than an issuer's
+  mint, so it is relevant to the venues an asset composes with.
+- **SIRN** (Solana Incident Response Network): security firms that coordinate
+  the response to active incidents.
+
+Both are described in the
+[Solana ecosystem security announcement](https://solana.com/news/solana-ecosystem-security).
+
 ### Verify Addresses
 
 Every token and program has exactly one correct address on mainnet. Spoofed
@@ -520,8 +579,9 @@ Allowlisting the right addresses protects against spoofed tokens, but it does
 not protect against sending to the wrong _kind_ of account. A recipient address
 can be a wallet, a token account, a mint, or a program, and each requires
 different handling. Native SOL sent to anything other than a wallet leaves the
-sender's control — lost outright for a mint or program, recoverable only by the
-account owner for a token account — with no failed transaction to warn the user.
+sender's control (lost for a program; for a Token-2022 mint, recoverable only
+by its mint authority; for a token account, recoverable only by the account
+owner), with no failed transaction to warn the user.
 
 <Warning>
   **Validate recipients before sending**
@@ -549,6 +609,12 @@ account owner for a token account — with no failed transaction to warn the use
 - [ ] Key management reviewed (no keys in frontend)
 - [ ] Transaction monitoring and alerting active
 - [ ] Load tested at expected volume
+- [ ] The commitment level your books treat as settled, written down
+- [ ] Every authority held in auditable signing infrastructure, with a
+      rehearsed recovery path
+- [ ] Signatures and commitment levels recorded for every material state
+      change
+- [ ] Reconciliation running against the chain and against any custodian
 
 ## Deploying Programs
 
