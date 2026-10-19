@@ -1,16 +1,11 @@
 import {
   MEDIA_APP_URL,
-  MINTLIFY_ORIGIN,
   templatesAppUrl,
   ACCELERATE_APP_URL,
   BREAKPOINT_APP_URL,
 } from "./apps-urls";
 import { locales } from "@workspace/i18n/config";
 import { MINTLIFY_LOCALE_PATTERN } from "./src/lib/docs-edge/paths";
-import {
-  buildFallbackRewrites,
-  loadLocaleFallbacks,
-} from "./src/lib/docs-edge/fallbacks";
 
 const LOCALE_REGEX = locales.join("|");
 
@@ -622,216 +617,12 @@ const chainMigrationRedirects: RedirectInput[] = [
 ];
 
 /*
- * =============================================================================
- * MINTLIFY: the developer docs are hosted by Mintlify (decisions.md, spec §8)
- * =============================================================================
- *
- * solana.com/developers/docs, /<locale>/developers/docs, /learn/<article>,
- * /developers/cookbook and /developers/bootcamp are served by the Mintlify
- * deployment at
- * MINTLIFY_ORIGIN (apps-urls.ts; default: the *.mintlify.site preview). The
- * value is read when next.config loads, so it is baked in at build time and
- * must be listed in turbo.json `solana-com#build` env (Turbo strict env mode
- * drops undeclared variables and leaves them out of the cache key; see
- * migration/wp9-edge-turbo.patch). The
- * project is on Mintlify's free Hobby plan, so it is root-hosted: no custom
- * domain and no subpath setting, and every Mintlify file path equals its
- * public path. This app sits in front, so all redirects, normalisation,
- * markdown analytics and security headers live here (spec D6).
- *
- * RECOMMENDATION: upgrade to Mintlify Enterprise and use its static export
- * to self-host the docs on Vercel. That removes the third-party proxy hop,
- * puts the docs under our own CDN, caching, headers and logs, and lets the
- * docs deploy atomically with this app. `mint export` already produced a
- * static bundle locally without logging in, but Mintlify's documentation
- * describes self-hosting as an Enterprise-only feature, so we do not rely on
- * it under the Hobby plan. To switch: deploy the exported bundle as its own
- * Vercel project and point MINTLIFY_ORIGIN at it. This table stays the same;
- * the export emits .html files, so add `cleanUrls` (or equivalent rewrites)
- * on that host, and re-check search, the assistant and analytics, which are
- * configured differently for self-hosted bundles.
- *
- * Features that need a paid Mintlify plan (not used here): custom domain or
- * subpath hosting (Pro), the AI assistant (Pro), preview deployments and
- * analytics beyond the basics (Pro), static export/self-hosting (Enterprise).
- *
- * Rollback: point MINTLIFY_ORIGIN at the last Fumadocs deployment URL and
- * revert this block plus the docs part of src/proxy.ts.
- *
- * Build-time inputs from the docs: the locale-fallback rewrites below
- * (apps/docs files), /developers/docs/<section>/llms.txt and the sitemap
- * (packages/docs-tooling/generated) are fixed when this app builds. turbo.json
- * lists apps/docs pages and packages/docs-tooling/generated as
- * `solana-com#build` inputs so that a docs-only commit still redeploys this
- * app (scripts/vercel-ignore.mjs runs `turbo query affected`).
- *
- * Not proxied on purpose: Mintlify's /sitemap.xml and /robots.txt (apps/web
- * serves its own; packages/sitemap reads the docs manifest), /mcp (phase 2),
- * /api/request (no API playground), /opengraph/* (only /opengraph/developers
- * survives, as an apps/web route), and /learn and /developers themselves
- * (apps/web landings, WP10).
- *
- * Mintlify requires that the proxy does not forward the public Host header.
- * Vercel's external rewrites send the destination host, which satisfies
- * that; re-check on staging (spec §8.2 "Proxy headers").
+ * The developer docs (/developers/docs, /developers/cookbook,
+ * /developers/bootcamp, /learn/<article> and their locale copies) are pages
+ * of this app (Fumadocs, src/app/[locale]/developers/docs etc.), so they
+ * need no rewrites: only the redirects above and src/proxy.ts (canonical
+ * paths, Markdown twins).
  */
-const M = MINTLIFY_ORIGIN;
-/**
- * Docs sections whose index page Mintlify does not serve at its own path
- * (see the rewrite in `mintlifyRewrites`).
- */
-export const MINTLIFY_INDEX_SHADOWED = ["tools"] as const;
-
-/** `/:locale(ar|de|...)` for the 17 Mintlify locales (el is redirected). */
-const L = `:locale(${MINTLIFY_LOCALE_PATTERN})`;
-
-type BeforeFilesRewrite = {
-  source: string;
-  destination: string;
-  locale: false;
-};
-
-// Rules are object literals with a literal `source` on purpose:
-// scripts/validate-content.mjs and packages/sitemap read sources from this
-// file's syntax tree.
-export const mintlifyRewrites: BeforeFilesRewrite[] = [
-  // Mintlify runtime and assets. POSTs must pass through as well: Mintlify's
-  // client analytics posts to /_mintlify/api/v1/e. Pages request their JS
-  // and CSS from /mintlify-assets/_next/static/* (checked on a live
-  // *.mintlify.site), so they never collide with this app's /_next.
-  {
-    source: "/_mintlify/:path*",
-    destination: `${M}/_mintlify/:path*`,
-    locale: false,
-  },
-  {
-    source: "/mintlify-assets/:path+",
-    destination: `${M}/mintlify-assets/:path+`,
-    locale: false,
-  },
-  // Content images (spec §1.4: /assets/X -> /docs-assets/assets/X, ...).
-  {
-    source: "/docs-assets/:path+",
-    destination: `${M}/docs-assets/:path+`,
-    locale: false,
-  },
-  // Brand fonts (apps/docs/fonts). docs.json `fonts.*.source` must start
-  // with `fonts/` for Mintlify to emit a root-relative URL (/fonts/...;
-  // anything else is re-hosted on its CDN), so the docs, theme.css and the
-  // /developers landing all load them from here and share one cache entry.
-  // Only these names: /fonts/* is otherwise apps/web's public/fonts.
-  {
-    source:
-      "/fonts/:file((?:ABCDiatype|ABCFavoritMono|MonumentExtended)[A-Za-z-]*\\.woff2)",
-    destination: `${M}/fonts/:file`,
-    locale: false,
-  },
-  // /llms.txt is the apps/docs/llms.txt override (gen:llms); /llms-full.txt
-  // is Mintlify's built-in. Per-section /developers/docs/<section>/llms.txt
-  // is an apps/web route, excluded from the /developers/docs rule below.
-  { source: "/llms.txt", destination: `${M}/llms.txt`, locale: false },
-  {
-    source: "/llms-full.txt",
-    destination: `${M}/llms-full.txt`,
-    locale: false,
-  },
-  // English fallbacks for untranslated locale pages (spec §5.10). Derived
-  // from apps/docs file existence at build time; must precede the generic
-  // locale rules. Empty at the release gate.
-  ...buildFallbackRewrites(loadLocaleFallbacks(), M),
-  // Section index pages whose sub-pages come EARLIER in the Mintlify nav
-  // than the index itself (developers/docs/tools/commerce-kit/** sits in the
-  // Payments tab, developers/docs/tools/index in Resources).
-  // /docs/tokenization used to be listed too; its index was merged into
-  // /developers/docs/assets#tokenization and is now a redirect. For such a
-  // path Mintlify
-  // answers 307 to the first nav page under the prefix instead of serving
-  // the index (seen on `mint dev`, WP12 crawl); `/<section>/index` serves
-  // it. Keep MINTLIFY_INDEX_SHADOWED in sync with docs-tooling's
-  // `nav verify` warning list.
-  // One rule for English and the 17 locales (keeps the route count < 1000).
-  {
-    source: `/:prefix((?:(?:${MINTLIFY_LOCALE_PATTERN})/)?developers/docs)/:section(${MINTLIFY_INDEX_SHADOWED.join("|")})`,
-    destination: `${M}/:prefix/:section/index`,
-    locale: false,
-  },
-  // Docs, at /developers/docs since 2026-10-16 (the old /docs URLs are
-  // redirects, see docsPrefixMoveRedirects; redirects run before rewrites).
-  // Mintlify answers `.md` twins and `Accept: text/markdown` itself.
-  // `:page(x|x\\.md)` folds each bare URL and its `.md` twin into one rule
-  // (an optional param can't be used: Next can't fill an unmatched one into
-  // the destination). Only these prefixes are proxied: /developers itself
-  // and every other /developers/* page stay apps/web routes.
-  {
-    source: "/developers/:page(docs|docs\\.md)",
-    destination: `${M}/developers/:page`,
-    locale: false,
-  },
-  {
-    source: "/developers/docs/:path((?![^/]+/llms\\.txt$).*)",
-    destination: `${M}/developers/docs/:path`,
-    locale: false,
-  },
-  {
-    source: `/${L}/developers/:page(docs|docs\\.md)`,
-    destination: `${M}/:locale/developers/:page`,
-    locale: false,
-  },
-  {
-    source: `/${L}/developers/docs/:path*`,
-    destination: `${M}/:locale/developers/docs/:path*`,
-    locale: false,
-  },
-  // Learn articles. The /learn landing is an apps/web page (WP10).
-  { source: "/learn/:path+", destination: `${M}/learn/:path+`, locale: false },
-  {
-    source: `/${L}/learn/:path+`,
-    destination: `${M}/:locale/learn/:path+`,
-    locale: false,
-  },
-  // Cookbook is English only; localized URLs keep serving English, as today.
-  {
-    source: "/developers/:page(cookbook|cookbook\\.md)",
-    destination: `${M}/developers/:page`,
-    locale: false,
-  },
-  {
-    source: "/developers/cookbook/:path*",
-    destination: `${M}/developers/cookbook/:path*`,
-    locale: false,
-  },
-  {
-    source: `/${L}/developers/:page(cookbook|cookbook\\.md)`,
-    destination: `${M}/developers/:page`,
-    locale: false,
-  },
-  {
-    source: `/${L}/developers/cookbook/:path*`,
-    destination: `${M}/developers/cookbook/:path*`,
-    locale: false,
-  },
-  // Bootcamp
-  {
-    source: "/developers/:page(bootcamp|bootcamp\\.md)",
-    destination: `${M}/developers/:page`,
-    locale: false,
-  },
-  {
-    source: "/developers/bootcamp/:path*",
-    destination: `${M}/developers/bootcamp/:path*`,
-    locale: false,
-  },
-  {
-    source: `/${L}/developers/:page(bootcamp|bootcamp\\.md)`,
-    destination: `${M}/:locale/developers/:page`,
-    locale: false,
-  },
-  {
-    source: `/${L}/developers/bootcamp/:path*`,
-    destination: `${M}/:locale/developers/bootcamp/:path*`,
-    locale: false,
-  },
-];
 
 export default {
   rewrites: {
@@ -1089,8 +880,6 @@ export default {
         destination: `${templatesAppUrl}/developers/templates/:path*`,
         locale: false,
       },
-      // Docs (Mintlify): see the MINTLIFY block above `mintlifyRewrites`.
-      ...mintlifyRewrites,
     ],
     afterFiles: [],
     fallback: [],
@@ -2083,7 +1872,7 @@ export default {
       destination: "https://solana.stackexchange.com",
     },
     // The locale-only faq.mdx files were removed (R8); their `.md` twins
-    // would otherwise reach Mintlify and 404.
+    // would otherwise 404.
     {
       source: "/docs/programs/faq.md",
       destination: "https://solana.stackexchange.com",

@@ -15,7 +15,7 @@ import { DocsFooter } from "./docs-footer";
 import { DocsHeader } from "./docs-header";
 import { DeveloperSpeculationRules } from "./speculation-rules";
 import { DocsThemePrepaint } from "./theme-prepaint";
-import "./developers.css";
+import "./docs-chrome.css";
 
 type Props = { params: Promise<{ locale: string }> };
 

@@ -7,7 +7,13 @@
  *   The page shows the images; the fence stays in the source and in the
  *   Markdown twin (this runs on HTML only), but is not rendered. A fence
  *   without a figure after it is kept as a code block.
+ * - Steps: every <Step> gets an anchor id from its title (as the docs have
+ *   published them, unique on the page), and in <Steps titleSize="h2|h3">
+ *   the title becomes a real heading, so it is listed in "On this page"
+ *   under its section, as before. The Step component renders that heading
+ *   as its title.
  */
+import { docsSlugBase } from "./remark-docs-compat.mjs";
 function isWhitespace(node) {
   return node.type === "text" && !node.value.trim();
 }
@@ -45,6 +51,65 @@ function strip(parent) {
   for (const child of parent.children) strip(child);
 }
 
+function attr(node, name) {
+  const a = node.attributes?.find?.(
+    (x) => x.type === "mdxJsxAttribute" && x.name === name,
+  );
+  return typeof a?.value === "string" ? a.value : undefined;
+}
+
+function walk(node, visit) {
+  visit(node);
+  for (const child of node.children ?? []) walk(child, visit);
+}
+
+function stepTitles(tree) {
+  const used = new Map();
+  walk(tree, (node) => {
+    if (node.type === "element" && /^h[1-6]$/.test(node.tagName)) {
+      const id = node.properties?.id;
+      if (typeof id === "string") used.set(id, (used.get(id) ?? 0) + 1);
+    }
+  });
+  const unique = (base) => {
+    let id = base;
+    let n = used.get(base) ?? 0;
+    if (n > 0) {
+      do id = `${base}-${++n}`;
+      while (used.has(id));
+    }
+    used.set(base, n || 1);
+    used.set(id, 1);
+    return id;
+  };
+  walk(tree, (node) => {
+    if (node.type !== "mdxJsxFlowElement" || node.name !== "Steps") return;
+    const size = attr(node, "titleSize");
+    for (const step of node.children ?? []) {
+      if (step.type !== "mdxJsxFlowElement" || step.name !== "Step") continue;
+      const title = attr(step, "title");
+      if (!title) continue;
+      const id = unique(docsSlugBase(title));
+      step.attributes.push({
+        type: "mdxJsxAttribute",
+        name: "data-step-id",
+        value: id,
+      });
+      if (size === "h2" || size === "h3") {
+        step.children.unshift({
+          type: "element",
+          tagName: size,
+          properties: { id, dataStepTitle: "" },
+          children: [{ type: "text", value: title }],
+        });
+      }
+    }
+  });
+}
+
 export function rehypeDocsCompat() {
-  return (tree) => strip(tree);
+  return (tree) => {
+    strip(tree);
+    stepTitles(tree);
+  };
 }

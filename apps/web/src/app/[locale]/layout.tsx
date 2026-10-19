@@ -21,6 +21,7 @@ import {
   GoogleTagManagerNoScript,
 } from "@solana-com/ui-chrome";
 import { ChromeWrapper } from "@/components/ChromeWrapper";
+import { NotOnDocsPages } from "@/components/NotOnDocsPages";
 import Script from "next/script";
 import { Header, Footer } from "@solana-com/ui-chrome";
 
@@ -62,7 +63,9 @@ export default async function RootLayout({ children, params }: Props) {
                 <Footer />
               </ChromeWrapper>
               <PersistentPodcastPlayer />
-              <InkeepChatButton />
+              <NotOnDocsPages>
+                <InkeepChatButton />
+              </NotOnDocsPages>
               <Script
                 id="signals-script"
                 strategy="afterInteractive"

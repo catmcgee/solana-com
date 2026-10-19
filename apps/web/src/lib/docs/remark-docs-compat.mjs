@@ -133,10 +133,24 @@ function inlineSnippets(processor, tree, file, seen = new Set()) {
   visit(tree);
 }
 
+function hasApiExamples(node) {
+  if (
+    (node.type === "mdxJsxFlowElement" || node.type === "mdxJsxTextElement") &&
+    (node.name === "RequestExample" || node.name === "ResponseExample")
+  )
+    return true;
+  return (node.children ?? []).some(hasApiExamples);
+}
+
 export function remarkDocsCompat() {
   const processor = this;
   return (tree, file) => {
     inlineSnippets(processor, tree, file);
+    // RPC method pages: the page shows its examples in a column of their own.
+    if (hasApiExamples(tree)) {
+      file.data["mdx-export"] ??= [];
+      file.data["mdx-export"].push({ name: "apiExamples", value: true });
+    }
   };
 }
 

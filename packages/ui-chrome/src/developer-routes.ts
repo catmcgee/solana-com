@@ -45,14 +45,28 @@ export function shouldShowDocsSidebarToggle(
 }
 
 /**
- * The /developers landing (exact path, any locale) wears the docs chrome:
- * its own docs-style header and footer instead of the solana.com Header and
- * Footer, and the docs' light/dark theme, stored where Mintlify stores it
- * (localStorage "isDarkMode") so one choice applies to both. ThemeProvider
- * leaves <html> alone there; apps/web's docs header owns the theme.
+ * Pages that wear the docs chrome instead of the solana.com Header and
+ * Footer: the /developers landing (exact path, any locale) and the developer
+ * docs (/developers/docs, /developers/cookbook, /developers/bootcamp,
+ * /learn/<article>; the /learn landing keeps the site chrome). They use the
+ * docs' light/dark theme, stored in localStorage "isDarkMode", so one choice
+ * applies to all of them. ThemeProvider leaves <html> alone there; apps/web's
+ * docs header owns the theme.
  */
 export function isDocsChromeRoute(pathname: string | null | undefined) {
-  return isExactRoute(pathname, "/developers");
+  return isExactRoute(pathname, "/developers") || isDocsPageRoute(pathname);
+}
+
+/** The developer docs pages (not the /developers landing). */
+export function isDocsPageRoute(pathname: string | null | undefined) {
+  if (!pathname) return false;
+  const path = getPathnameWithoutLocale(pathname.split(/[?#]/)[0]!);
+  return (
+    matchesRouteSegment(path, "/developers/docs") ||
+    matchesRouteSegment(path, "/developers/cookbook") ||
+    matchesRouteSegment(path, "/developers/bootcamp") ||
+    /^\/learn\/[^/]/.test(path)
+  );
 }
 
 /**

@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { languages } from "@workspace/i18n/config";
 import { getTranslations } from "@workspace/i18n/server";
 import {
@@ -22,24 +23,29 @@ import {
 } from "./docs-icons";
 
 /**
- * The docs (Mintlify) header, rebuilt for the /developers landing so moving
- * between /developers and /developers/docs feels like one site. It matches
- * apps/docs/styles/theme.css sections 4-5b at every breakpoint (styles in
- * developers.css, "Docs header"):
- * - >= 1280px: one 4rem row: logo | tabs ... Video tutorials | search,
- *   theme, language. 1280-1439px: the search is an icon button.
- * - 1024-1279px: a 4rem row (logo, search, theme, language) over a 3rem tab
- *   row with icons.
- * - < 1024px: logo and search icon, then a menu row that opens the tabs, the
- *   theme switch and the languages.
- * The logo is the home link (/developers); no tab is active here. Tabs and
- * labels come from the docs navigation (data/developers/docs-nav.ts) and
- * open in the same tab. Works without JavaScript (see docs-header.client.tsx).
+ * The docs header, shared by the /developers landing and every docs page
+ * (/developers/docs, /developers/cookbook, /developers/bootcamp, /learn/*),
+ * so moving between them is one site. ONE row at every width (styles in
+ * docs-chrome.css, "Docs header"):
+ * - >= 1440px: logo | tabs ... Video tutorials | search field, theme,
+ *   language;
+ * - 1280-1439px: the same, the search an icon button;
+ * - 1024-1279px: compact: smaller logo, tighter tabs without icons, search
+ *   icon, theme, language code;
+ * - < 1024px: logo, search icon and the menu button, which opens the tabs,
+ *   the current section's pages (docs pages), the languages and the theme.
+ * The logo is the home link (/developers). On docs pages the current tab is
+ * marked (`activeTab`), and a hidden tab (Bootcamp, Learn) is appended while
+ * one of its pages is shown, as before. Tabs and labels come from the docs
+ * navigation (data/developers/docs-nav.ts). Works without JavaScript (see
+ * docs-header.client.tsx): the menus are <details>, the search field a GET
+ * form to the docs.
  */
 
 const HEADER_ID = "dh";
 
-function languageHref(code: string) {
+function languageHref(code: string, paths?: Record<string, string>) {
+  if (paths?.[code]) return paths[code];
   return code === "en" ? "/developers" : `/${code}/developers`;
 }
 
@@ -47,23 +53,28 @@ function LanguageMenu({
   locale,
   label,
   className = "dh-lang",
+  paths,
 }: {
   locale: string;
   label: string;
   className?: string;
+  paths?: Record<string, string>;
 }) {
   const current = languages[locale as keyof typeof languages] ?? locale;
   return (
     <details className={className}>
       <summary aria-label={`${label}: ${current}`}>
-        <span>{current}</span>
+        <span className="dh-lang-name">{current}</span>
+        <span className="dh-lang-code" aria-hidden="true">
+          {locale.toUpperCase()}
+        </span>
         <ChevronDownIcon />
       </summary>
       <ul className="dh-lang-list" aria-label={label}>
         {Object.entries(languages).map(([code, name]) => (
           <li key={code}>
             <a
-              href={languageHref(code)}
+              href={languageHref(code, paths)}
               hrefLang={code}
               lang={code}
               aria-current={code === locale ? "true" : undefined}
@@ -77,7 +88,15 @@ function LanguageMenu({
   );
 }
 
-function Tabs({ tabs, label }: { tabs: DocsTab[]; label: string }) {
+function Tabs({
+  tabs,
+  label,
+  activeTab,
+}: {
+  tabs: DocsTab[];
+  label: string;
+  activeTab?: string;
+}) {
   return (
     <nav className="dh-tabs" aria-label={label}>
       <ul>
@@ -91,7 +110,12 @@ function Tabs({ tabs, label }: { tabs: DocsTab[]; label: string }) {
               .filter(Boolean)
               .join(" ")}
           >
-            <a href={tab.href} className="dh-tab" data-tab={tab.key}>
+            <a
+              href={tab.href}
+              className="dh-tab"
+              data-tab={tab.key}
+              aria-current={tab.key === activeTab ? "location" : undefined}
+            >
               <TabIcon icon={tab.icon} />
               <span>{tab.label}</span>
             </a>
@@ -102,18 +126,42 @@ function Tabs({ tabs, label }: { tabs: DocsTab[]; label: string }) {
   );
 }
 
-export async function DocsHeader({ locale }: { locale: string }) {
+export async function DocsHeader({
+  locale,
+  tabs: tabsProp,
+  activeTab,
+  menu,
+  languagePaths,
+  inPageSearch = false,
+}: {
+  locale: string;
+  /** Tabs to show (default: the docs' visible tabs for `locale`). */
+  tabs?: DocsTab[];
+  /** Key of the current tab (docs pages). */
+  activeTab?: string;
+  /** Extra content for the < 1024px menu (the docs sidebar). */
+  menu?: ReactNode;
+  /** Language links for the current page (default: /developers). */
+  languagePaths?: Record<string, string>;
+  /** Docs pages search in place; /developers hands off to the docs. */
+  inPageSearch?: boolean;
+}) {
   const t = await getTranslations({
     locale,
     namespace: "developers.landing.header",
   });
-  const tabs = getDocsTabs(locale);
+  const tabs = tabsProp ?? getDocsTabs(locale);
   const docsRoot = localizedHref(locale, "/developers/docs");
   const toggle = { toDark: t("toDark"), toLight: t("toLight") };
 
   return (
-    <header id={HEADER_ID} className="dh" data-docs-header="">
-      <a href="#dl-main" className="dh-skip">
+    <header
+      id={HEADER_ID}
+      className="dh"
+      data-docs-header=""
+      data-has-active={activeTab ? "" : undefined}
+    >
+      <a href={activeTab ? "#content-area" : "#dl-main"} className="dh-skip">
         {t("skip")}
       </a>
       <div className="dh-bar">
@@ -124,37 +172,47 @@ export async function DocsHeader({ locale }: { locale: string }) {
         >
           <SolanaLogo gradientId="dh-logo-g" developers />
         </a>
-        <Tabs tabs={tabs} label={t("sections")} />
+        <Tabs tabs={tabs} label={t("sections")} activeTab={activeTab} />
         <div className="dh-tools">
-          <DocsSearchField action={docsRoot} prompt={DOCS_SEARCH_PROMPT} />
+          <DocsSearchField
+            action={docsRoot}
+            prompt={DOCS_SEARCH_PROMPT}
+            inPage={inPageSearch}
+          />
           <a
             href={docsSearchHref(locale)}
             className="dh-search-icon"
             aria-label={DOCS_SEARCH_PROMPT}
+            data-docs-search-open={inPageSearch ? "" : undefined}
           >
             <SearchIcon />
           </a>
           <ThemeToggle {...toggle} />
-          <LanguageMenu locale={locale} label={t("language")} />
+          <LanguageMenu
+            locale={locale}
+            label={t("language")}
+            paths={languagePaths}
+          />
+          <details className="dh-mobile">
+            <summary aria-label={t("menu")}>
+              <MenuIcon />
+            </summary>
+            <div className="dh-mobile-panel">
+              <Tabs tabs={tabs} label={t("sections")} activeTab={activeTab} />
+              {menu ? <div className="dh-mobile-nav">{menu}</div> : null}
+              <div className="dh-mobile-tools">
+                <LanguageMenu
+                  locale={locale}
+                  label={t("language")}
+                  className="dh-lang dh-lang-mobile"
+                  paths={languagePaths}
+                />
+                <ThemeToggle {...toggle} className="dh-theme dh-theme-mobile" />
+              </div>
+            </div>
+          </details>
         </div>
       </div>
-      <details className="dh-mobile">
-        <summary aria-label={t("menu")}>
-          <MenuIcon />
-          <span>{t("current")}</span>
-        </summary>
-        <div className="dh-mobile-panel">
-          <Tabs tabs={tabs} label={t("sections")} />
-          <div className="dh-mobile-tools">
-            <LanguageMenu
-              locale={locale}
-              label={t("language")}
-              className="dh-lang dh-lang-mobile"
-            />
-            <ThemeToggle {...toggle} className="dh-theme dh-theme-mobile" />
-          </div>
-        </div>
-      </details>
       <HeaderMenus rootId={HEADER_ID} />
     </header>
   );

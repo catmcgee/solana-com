@@ -10,7 +10,7 @@ import { SOCIAL_ICONS, SocialIcon, SolanaLogo } from "./docs-icons";
  * The docs footer (Mintlify's, styled by apps/docs/styles/theme.css section
  * 15), rebuilt for /developers instead of the solana.com mega-footer: logo
  * and socials, then the link columns from docs.json `footer`, then a
- * hairline and the legal links. Styles in developers.css ("Docs footer").
+ * hairline and the legal links. Styles in docs-chrome.css ("Docs footer").
  */
 
 export async function DocsFooter({ locale }: { locale: string }) {

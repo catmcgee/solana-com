@@ -16,7 +16,7 @@
  *   html[data-dh-js] so the header shows its JS-only toggle. The header's
  *   ThemeToggle (docs-header.client.tsx) applies the same rule after
  *   client-side navigation, where inline scripts do not run. Without JS,
- *   developers.css follows prefers-color-scheme.
+ *   docs-chrome.css follows prefers-color-scheme.
  *
  * Rendered from the page rather than [locale]/layout.tsx because the layout
  * cannot see the pathname; this keeps each script on its own routes.

@@ -1,14 +1,31 @@
 // trigger preview build
 import createNextIntlPlugin from "next-intl/plugin";
 import { withBotId } from "botid/next/config";
-import rewritesAndRedirectsJson, {
-  mintlifyRewrites,
-} from "./rewrites-redirects";
+import rewritesAndRedirectsJson from "./rewrites-redirects";
 import type { NextConfig } from "next";
 import type { Redirect, Rewrite } from "next/dist/lib/load-custom-routes";
 import withBundleAnalyzer from "@next/bundle-analyzer";
 import { withSentryConfig } from "@sentry/nextjs";
+import { createMDX } from "fumadocs-mdx/next";
 import { getSecurityHeaders } from "./src/lib/security-headers";
+
+/** Link / x-llms-txt headers on docs pages (agent discovery). */
+const DOCS_AGENT_HEADERS = [
+  {
+    key: "Link",
+    value:
+      '</llms.txt>; rel="llms-txt", </llms-full.txt>; rel="llms-full-txt", </.well-known/mcp/server-card.json>; rel="mcp-server-card"',
+  },
+  { key: "x-llms-txt", value: "/llms.txt" },
+];
+const DOCS_HEADER_SOURCES = [
+  "/developers/:section(docs|cookbook|bootcamp)",
+  "/developers/:section(docs|cookbook|bootcamp)/:path*",
+  "/:locale/developers/:section(docs|cookbook|bootcamp)",
+  "/:locale/developers/:section(docs|cookbook|bootcamp)/:path*",
+  "/learn/:path+",
+  "/:locale/learn/:path+",
+];
 
 // X-Frame-Options, nosniff, X-XSS-Protection, frame-ancestors, plus
 // X-Robots-Tag: noindex on previews. Shared with the docs head injection in
@@ -36,18 +53,9 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   productionBrowserSourceMaps: false,
   trailingSlash: false,
+  // Pages are TypeScript only; MDX is compiled by Fumadocs for the docs.
+  pageExtensions: ["tsx", "ts", "jsx", "js"],
   transpilePackages: ["gsap"],
-  // The Mintlify rewrite table, for the docs head injection in
-  // src/proxy.ts: it fetches a docs page from the same upstream URL the
-  // beforeFiles rewrite would use. Inlined at build time, like the rewrites.
-  env: {
-    DOCS_MINTLIFY_REWRITES: JSON.stringify(
-      mintlifyRewrites.map(({ source, destination }) => ({
-        source,
-        destination,
-      })),
-    ),
-  },
   // The epoch1000 OG card reads font files from disk at request time
   outputFileTracingIncludes: {
     "/api/epoch1000/og": ["./assets/fonts/epoch1000/*.woff"],
@@ -215,25 +223,15 @@ const nextConfig: NextConfig = {
           },
         ],
       },
-      // The docs head stylesheet (src/lib/docs-edge/head-inject.ts) is
-      // requested as /docs-head.css?v=<content hash>, so it can be cached
-      // for a year.
-      {
-        source: "/docs-head.css",
-        headers: [
-          {
-            key: "Cache-Control",
-            value: "public, max-age=31536000, immutable",
-          },
-        ],
-      },
-      // Applies to every path, including the docs that rewrites-redirects.ts
-      // proxies to Mintlify (/docs, /:locale/docs, /learn/*,
-      // /developers/{cookbook,bootcamp}, /_mintlify, /mintlify-assets,
-      // /docs-assets): X-Frame-Options, nosniff, X-XSS-Protection and
-      // frame-ancestors, plus X-Robots-Tag: noindex on previews (spec §5.12).
-      // No cache headers are added for docs paths; Mintlify's own
-      // Cache-Control passes through.
+      // Docs pages and their Markdown twins point agents at the docs
+      // indexes and the MCP server (only what this app serves).
+      ...DOCS_HEADER_SOURCES.map((source) => ({
+        source,
+        headers: DOCS_AGENT_HEADERS,
+      })),
+      // Applies to every path, docs included: X-Frame-Options, nosniff,
+      // X-XSS-Protection and frame-ancestors, plus X-Robots-Tag: noindex on
+      // previews (spec §5.12).
       {
         source: "/:path*",
         headers: securityHeaders,
@@ -270,9 +268,12 @@ const nextConfig: NextConfig = {
 
 const moduleExports = (): NextConfig => {
   const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
+  // Fumadocs MDX compiles the developer docs (source.config.ts).
+  const withMDX = createMDX();
   const plugins = [
     withBundleAnalyzer({ enabled: process.env.ANALYZE === "true" }),
     withNextIntl,
+    withMDX,
   ];
   return plugins.reduce<NextConfig>((acc, next) => next(acc), nextConfig);
 };

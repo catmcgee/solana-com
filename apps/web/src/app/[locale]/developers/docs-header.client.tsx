@@ -53,7 +53,7 @@ function currentTheme(): Theme {
  * icon is the mode a click switches to (moon in light mode, sun in dark), and
  * the choice is stored in localStorage "isDarkMode", which Mintlify reads on
  * /developers/docs, so it carries over both ways. Until the first click the theme
- * follows the system. Hidden without JavaScript (developers.css).
+ * follows the system. Hidden without JavaScript (docs-chrome.css).
  */
 export function ThemeToggle({
   toDark,
@@ -163,22 +163,33 @@ function searchUrl(base: string, query: string) {
   return q ? `${base}?q=${encodeURIComponent(q)}` : `${base}?search=1`;
 }
 
+/** Event a docs page's search dialog listens for (docs-search.client.tsx). */
+export const DOCS_SEARCH_OPEN_EVENT = "docs-search:open";
+
+export function openDocsSearch(query = "") {
+  window.dispatchEvent(
+    new CustomEvent(DOCS_SEARCH_OPEN_EVENT, { detail: { query } }),
+  );
+}
+
 /**
- * The docs search field. It cannot search from here, so it hands off to the
- * docs: clicking it, or ⌘K / Ctrl+K anywhere on the page, goes to
- * `<docs>?search=1` (or `?q=<text>` once something is typed), where
- * apps/docs/search-handoff.js opens Mintlify's search with the text.
- * Keyboard focus alone does not navigate (WCAG 3.2.1 On Focus): keyboard
- * users can type and press Enter. Without JavaScript the form submits to
- * `<docs>?q=<text>`.
+ * The docs search field. On a docs page (`inPage`) it opens the docs search
+ * dialog: on click, on Enter, and on ⌘K / Ctrl+K anywhere on the page.
+ * On /developers it cannot search, so it hands off to the docs: it goes to
+ * `<docs>?search=1` (or `?q=<text>` once something is typed), where the
+ * docs page opens its search with the text. Keyboard focus alone does not
+ * navigate (WCAG 3.2.1 On Focus): keyboard users can type and press Enter.
+ * Without JavaScript the form submits to `<docs>?q=<text>`.
  */
 export function DocsSearchField({
   action,
   prompt,
+  inPage = false,
 }: {
   /** Localized docs root, e.g. "/developers/docs" or "/ja/developers/docs". */
   action: string;
   prompt: string;
+  inPage?: boolean;
 }) {
   const input = useRef<HTMLInputElement>(null);
   const [mac, setMac] = useState(false);
@@ -187,6 +198,10 @@ export function DocsSearchField({
   useEffect(() => {
     setReady(true);
     setMac(/Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent));
+    const go = (query: string) => {
+      if (inPage) openDocsSearch(query);
+      else window.location.assign(searchUrl(action, query));
+    };
     const onKey = (event: KeyboardEvent) => {
       if (
         (event.metaKey || event.ctrlKey) &&
@@ -198,12 +213,33 @@ export function DocsSearchField({
         // (ui-chrome inkeep-chat-button), which would otherwise take the key.
         event.preventDefault();
         event.stopImmediatePropagation();
-        window.location.assign(searchUrl(action, input.current?.value ?? ""));
+        go(input.current?.value ?? "");
       }
     };
+    // The search icon (narrow headers) and other openers on docs pages.
+    const onClick = (event: MouseEvent) => {
+      if (!inPage || event.defaultPrevented || event.button !== 0) return;
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
+        return;
+      const opener = (event.target as Element | null)?.closest?.(
+        "[data-docs-search-open]",
+      );
+      if (!opener) return;
+      event.preventDefault();
+      openDocsSearch();
+    };
     window.addEventListener("keydown", onKey, true);
-    return () => window.removeEventListener("keydown", onKey, true);
-  }, [action]);
+    document.addEventListener("click", onClick);
+    return () => {
+      window.removeEventListener("keydown", onKey, true);
+      document.removeEventListener("click", onClick);
+    };
+  }, [action, inPage]);
+
+  const go = (query: string) => {
+    if (inPage) openDocsSearch(query);
+    else window.location.assign(searchUrl(action, query));
+  };
 
   return (
     <form
@@ -214,7 +250,7 @@ export function DocsSearchField({
       data-ready={ready ? "" : undefined}
       onSubmit={(event) => {
         event.preventDefault();
-        window.location.assign(searchUrl(action, input.current?.value ?? ""));
+        go(input.current?.value ?? "");
       }}
     >
       <svg
@@ -242,9 +278,7 @@ export function DocsSearchField({
         placeholder={prompt}
         autoComplete="off"
         enterKeyHint="search"
-        onClick={(event) =>
-          window.location.assign(searchUrl(action, event.currentTarget.value))
-        }
+        onClick={(event) => go(event.currentTarget.value)}
       />
       <kbd aria-hidden="true">{mac ? "⌘K" : "Ctrl K"}</kbd>
     </form>

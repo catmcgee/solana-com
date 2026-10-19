@@ -9,7 +9,7 @@ import { localizedHref } from "@/data/developers/hub";
  *   (`moderate`). Links with a query (the search hand-off,
  *   /developers/docs?q=...) are skipped: search-handoff.js would open the
  *   search dialog inside a page the reader may never see.
- * Paired with the cross-document view transition in developers.css and
+ * Paired with the cross-document view transition in docs-chrome.css and
  * apps/docs/styles/theme.css (section 18), the header stays put. Browsers
  * without Speculation Rules ignore the script type and navigate normally.
  * apps/docs/prerender-home.js does the reverse (docs logo -> /developers).

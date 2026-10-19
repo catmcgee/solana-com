@@ -7,8 +7,8 @@ const CUSTOM_LAYOUT_PATTERNS = ["/playgg"];
 
 /**
  * Renders the solana.com Header/Footer except on pages with their own chrome:
- * /playgg, and the /developers landing, which has the docs header and footer
- * (developers/docs-header.tsx, docs-footer.tsx).
+ * /playgg, and the /developers landing and the docs pages, which have the
+ * docs header and footer (developers/docs-header.tsx, docs-footer.tsx).
  */
 export function ChromeWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();

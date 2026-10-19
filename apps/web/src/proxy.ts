@@ -8,10 +8,6 @@ import {
   getMarkdownRequestSource,
 } from "@/lib/docs-edge/paths";
 import { trackMarkdownRequest } from "@/lib/docs-edge/markdown-analytics";
-import {
-  isDocumentNavigation,
-  proxyDocsDocument,
-} from "@/lib/docs-edge/head-inject";
 
 // The main web app uses routing with locale detection enabled
 // and doesn't need preserveProxiedLocaleCookie since it's the source of truth
@@ -22,12 +18,6 @@ export function isProxiedPath(normalizedPathname: string) {
     normalizedPathname.startsWith("/accelerate") ||
     normalizedPathname.startsWith("/breakpoint") ||
     normalizedPathname.startsWith("/developers/templates") ||
-    normalizedPathname.startsWith("/developers/cookbook") ||
-    normalizedPathname.startsWith("/developers/bootcamp") ||
-    normalizedPathname.startsWith("/developers/docs") ||
-    normalizedPathname.startsWith("/docs") ||
-    // /learn itself is an apps/web page (WP10); articles are Mintlify.
-    normalizedPathname.startsWith("/learn/") ||
     (normalizedPathname.startsWith("/news") &&
       !normalizedPathname.startsWith("/newsletter")) ||
     normalizedPathname.startsWith("/changelog") ||
@@ -42,16 +32,14 @@ export function isProxiedPath(normalizedPathname: string) {
 }
 
 /**
- * Docs paths proxied to Mintlify (spec §5.5, §5.8). The old docs app's
- * middleware did this work; Mintlify cannot, so apps/web does it before the
- * beforeFiles rewrite hands the request to Mintlify:
+ * Docs paths (/developers/{docs,cookbook,bootcamp}, /learn/<article>, their
+ * locale copies and `.md` twins), rendered by this app (Fumadocs). Before
+ * the locale routing below:
  * 1. one 308 to the canonical path (lowercase, one locale, no `/en`);
- * 2. record markdown requests (`.md` or `Accept: text/markdown`) in PostHog
- *    without delaying the response;
- * 3. `NextResponse.next()`, so the rewrite in rewrites-redirects.ts runs.
- *    For HTML document navigations the default export then serves the page
- *    itself instead, with our header CSS injected into <head>
- *    (lib/docs-edge/head-inject.ts); every other request keeps the rewrite.
+ * 2. Markdown requests (`<page>.md` or `Accept: text/markdown`) are recorded
+ *    in PostHog without delaying the response and rewritten to the Markdown
+ *    route (/api/markdown/<path>), as the docs app on origin/main did.
+ * Everything else returns null and takes the normal locale routing.
  * Greek (`/el/...`) docs URLs never get here: next.config redirects run
  * before middleware.
  */
@@ -81,9 +69,16 @@ export function handleDocsRequest(
     event.waitUntil(
       trackMarkdownRequest({ route, source, locale: info.locale }),
     );
+    const url = req.nextUrl.clone();
+    url.pathname = `/api/markdown${info.locale ? `/${info.locale}` : ""}${route}`;
+    return NextResponse.rewrite(url);
   }
 
-  return NextResponse.next();
+  // Files under the docs (per-section /llms.txt) are routes of their own,
+  // outside the locale segment.
+  if (/\/[^/]+\.[a-z0-9]+$/i.test(pathname)) return NextResponse.next();
+
+  return null;
 }
 
 export default async function proxy(req: NextRequest, event: NextFetchEvent) {
@@ -92,17 +87,7 @@ export default async function proxy(req: NextRequest, event: NextFetchEvent) {
   const normalizedPathname = getPathnameWithoutLocale(pathname);
 
   const docsResponse = handleDocsRequest(req, event);
-  if (docsResponse) {
-    if (
-      docsResponse.headers.get("x-middleware-next") === "1" &&
-      isDocumentNavigation(req)
-    ) {
-      // Falls back to the rewrite when no rule matches or Mintlify is down.
-      const injected = await proxyDocsDocument(req);
-      if (injected) return injected;
-    }
-    return docsResponse;
-  }
+  if (docsResponse) return docsResponse;
 
   // Skip i18n for paths that are proxied to other Vercel apps via rewrites
   // These paths are handled by their respective app's middleware
@@ -169,15 +154,13 @@ export default async function proxy(req: NextRequest, event: NextFetchEvent) {
 export const config = {
   // Exclude paths that are proxied to other Vercel apps (handled by their own middleware)
   // Also exclude api routes, static files, and Next.js internals.
-  // `learn/` (not `learn`): the /learn landing is an apps/web page.
   // Matchers must be literals (Next.js analyses them statically).
   matcher: [
     "/SKILL.md",
     "/skill.md",
-    "/((?!api|opengraph|_next|_vercel|accelerate|breakpoint|changelog|docs|learn/|news(?!letter)|reports|podcasts|upgrade|upgrades|media-assets|templates-assets|mintlify-assets|_mintlify|.*\\..*).*)",
-    // Docs paths proxied to Mintlify (handleDocsRequest), including `.md`
-    // twins, which the generic matcher above skips (it ignores any path with
-    // a dot). Mixed-case paths without a dot reach the generic matcher; the
+    "/((?!api|opengraph|mcp(?:/|$)|_next|_vercel|accelerate|breakpoint|changelog|docs|news(?!letter)|reports|podcasts|upgrade|upgrades|media-assets|templates-assets|.*\\..*).*)",
+    // Docs paths (handleDocsRequest), including `.md` twins, which the
+    // generic matcher above skips (it ignores any path with a dot). Mixed-case paths without a dot reach the generic matcher; the
     // last entry catches mixed-case `.md` twins (/DOCS/x.md, /FR/Learn/y.md)
     // so they get the same 308 to the lowercase path.
     "/docs",
