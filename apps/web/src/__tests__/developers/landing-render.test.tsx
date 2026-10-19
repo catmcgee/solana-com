@@ -146,7 +146,7 @@ describe("/developers landing", () => {
     const cards = within(screen.getByTestId("job-cards")).getAllByRole("link");
     expect(cards[0]).toHaveAttribute(
       "href",
-      "/ja/developers/docs/payments/checkout",
+      "/ja/developers/docs/assets/issue-asset",
     );
     expect(
       screen.getByRole("link", {

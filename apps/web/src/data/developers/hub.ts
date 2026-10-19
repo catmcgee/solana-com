@@ -11,10 +11,10 @@
 /** Job paths. `href` points at the path intro page in the Mintlify docs. */
 export const JOB_PATHS = [
   {
-    id: "payments",
-    href: "/developers/docs/payments/checkout",
-    firstResult: "5 min",
-    total: "30 min",
+    id: "asset",
+    href: "/developers/docs/assets/issue-asset",
+    firstResult: "10 min",
+    total: "45 min",
   },
   {
     id: "payPerCall",
@@ -23,10 +23,10 @@ export const JOB_PATHS = [
     total: "30 min",
   },
   {
-    id: "asset",
-    href: "/developers/docs/assets/issue-asset",
-    firstResult: "10 min",
-    total: "45 min",
+    id: "payments",
+    href: "/developers/docs/payments/checkout",
+    firstResult: "5 min",
+    total: "30 min",
   },
   {
     id: "trade",
