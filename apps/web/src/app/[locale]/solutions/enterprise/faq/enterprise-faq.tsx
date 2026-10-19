@@ -183,7 +183,7 @@ export function EnterpriseFaqPage() {
             }}
             placeholder={t("search.placeholder")}
             aria-label={t("search.label")}
-            className="bg-transparent border-none outline-none text-white text-[15px] w-full placeholder:text-white/40"
+            className="bg-transparent border-none outline-hidden text-white text-[15px] w-full placeholder:text-white/40"
           />
         </div>
         <div className="text-[13px] text-white/40 mt-2 min-h-[19px]">
@@ -210,7 +210,7 @@ export function EnterpriseFaqPage() {
               id="faq-topic"
               value={activeTopic}
               onChange={(event) => setActiveTopic(event.target.value)}
-              className="w-full appearance-none bg-white/[0.04] border border-white/10 rounded-[14px] px-4 py-3 pr-10 text-[15px] text-white outline-none cursor-pointer transition-colors focus:border-[#9945FF]"
+              className="w-full appearance-none bg-white/[0.04] border border-white/10 rounded-[14px] px-4 py-3 pr-10 text-[15px] text-white outline-hidden cursor-pointer transition-colors focus:border-[#9945FF]"
             >
               <option value="all" className="bg-[#101014] text-white">
                 {t("nav.optionWithCount", {

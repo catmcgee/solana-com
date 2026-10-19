@@ -163,7 +163,7 @@ export const Projects = ({
                             href={project.href}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="mt-4 block w-fit whitespace-nowrap text-sm md:text-base uppercase underline underline-offset-4 decoration-current focus:outline-none focus:ring-2 focus:ring-primary-500 rounded-sm"
+                            className="mt-4 block w-fit whitespace-nowrap text-sm md:text-base uppercase underline underline-offset-4 decoration-current focus:outline-hidden focus:ring-2 focus:ring-primary-500 rounded-sm"
                             aria-label={`Learn more about ${t(`${base}.name`)}`}
                           >
                             Learn More

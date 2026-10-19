@@ -108,7 +108,7 @@ export const Community: React.FC<CommunityProps> = ({
               <a
                 key={index}
                 href={item.href}
-                className="flex max-md:flex-row md:flex-col items-start gap-3 md:gap-12 px-4 py-5 md:px-6 md:py-8 rounded-xl bg-nd-border-light hover:bg-nd-mid-em-text-alpha/20 backdrop-blur-[8px] text-inherit"
+                className="flex max-md:flex-row md:flex-col items-start gap-3 md:gap-12 px-4 py-5 md:px-6 md:py-8 rounded-xl bg-nd-border-light hover:bg-white/20 backdrop-blur-[8px] text-inherit"
                 rel="noopener noreferrer"
                 target="_blank"
               >

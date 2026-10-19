@@ -261,7 +261,7 @@ export async function DevelopersHub({
     <main
       id="dl-main"
       tabIndex={-1}
-      className="overflow-hidden bg-[var(--dl-bg)] font-brand text-base text-[var(--dl-text)] outline-none"
+      className="overflow-hidden bg-[var(--dl-bg)] font-brand text-base text-[var(--dl-text)] outline-hidden"
     >
       {/* Hero: headline, lede and buttons on the left; the agent setup line
           on the right, centred. Stacked below lg. */}

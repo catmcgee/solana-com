@@ -79,7 +79,7 @@ export const IconButton = ({
       className={[
         "all-[unset] box-border cursor-pointer",
         "inline-flex items-center justify-center rounded-full",
-        "text-white backdrop-blur-[6px] transition-colors [&>svg]:opacity-[0.64] hover:[&>svg]:opacity-[1]",
+        "text-white backdrop-blur-[6px] transition-colors [&>svg]:opacity-[0.64] [&>svg]:hover:opacity-[1]",
         sizeClass,
         variantClasses,
         className ?? "",

@@ -111,7 +111,7 @@ export function DocsCodeSnippet({
           type="button"
           onClick={copyToClipboard}
           aria-label={copied ? "Copied code snippet" : "Copy code snippet"}
-          className="inline-flex items-center rounded p-1 text-white/60 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+          className="inline-flex items-center rounded p-1 text-white/60 transition-colors hover:text-white focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-sky-300"
         >
           {copied ? (
             <Check className="size-4" aria-hidden />

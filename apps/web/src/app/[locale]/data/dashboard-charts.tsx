@@ -331,7 +331,7 @@ function ProviderBarChart({
               {formatValue(item.value, valueLabel, locale)}
             </span>
           </div>
-          <div className="h-3 overflow-hidden bg-nd-border-light/30">
+          <div className="h-3 overflow-hidden bg-[#ECE4FD]/30">
             <div
               className="h-full transition-[width] duration-500 ease-out"
               style={{
@@ -459,7 +459,7 @@ function KpiSummaryTooltip({
       <TooltipTrigger asChild>
         <button
           aria-label={summary}
-          className="inline-flex h-5 w-5 shrink-0 items-center justify-center text-nd-mid-em-text/70 transition-colors hover:text-nd-high-em-text focus-visible:outline-none focus-visible:text-nd-high-em-text"
+          className="inline-flex h-5 w-5 shrink-0 items-center justify-center text-nd-mid-em-text/70 transition-colors hover:text-nd-high-em-text focus-visible:outline-hidden focus-visible:text-nd-high-em-text"
           type="button"
         >
           <Info aria-hidden="true" className="h-3.5 w-3.5" />
@@ -510,7 +510,7 @@ function ChartSkeleton({
         </div>
         <div className="h-3 w-12 rounded-sm bg-nd-border-light animate-pulse" />
       </div>
-      <div className="h-[352px] animate-pulse bg-nd-border-light/40" />
+      <div className="h-[352px] animate-pulse bg-[#ECE4FD]/40" />
       <ChartOrdinal index={index} />
     </article>
   );

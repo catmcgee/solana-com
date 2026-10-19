@@ -687,7 +687,7 @@ export function DeliveryVsPaymentPage({
                 <div className="grid border-t border-white/[0.12]">
                   {relatedStories.map((story) => (
                     <Link
-                      className="group grid grid-cols-[minmax(120px,0.45fr)_1fr_1.05fr_max-content] items-baseline gap-5 border-b border-white/[0.12] py-[22px] text-white transition-colors motion-reduce:transition-none hover:border-nd-highlight-green/65 focus-visible:border-nd-highlight-green/65 focus-visible:outline-none max-sm:grid-cols-[1fr_max-content] max-sm:gap-x-4 max-sm:gap-y-2"
+                      className="group grid grid-cols-[minmax(120px,0.45fr)_1fr_1.05fr_max-content] items-baseline gap-5 border-b border-white/[0.12] py-[22px] text-white transition-colors motion-reduce:transition-none hover:border-nd-highlight-green/65 focus-visible:border-nd-highlight-green/65 focus-visible:outline-hidden max-sm:grid-cols-[1fr_max-content] max-sm:gap-x-4 max-sm:gap-y-2"
                       href={story.href}
                       key={story.href}
                     >
