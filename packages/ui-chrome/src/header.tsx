@@ -15,7 +15,7 @@ import { shouldShowDevelopersNav } from "./developer-routes";
 
 import SolanaLogo from "./assets/logotype.inline.svg";
 import Moon from "./assets/icons/moon.inline.svg";
-import { DEVELOPERS_LINK } from "./developers-link";
+import { DEVELOPERS_LINK, NEW_TAB_PROPS, NewTabMark } from "./developers-link";
 import Sun from "./assets/icons/sun.inline.svg";
 
 /** The header's top level as plain links, in the same order. */
@@ -62,8 +62,10 @@ function NoScriptNav({ pathname }: { pathname: string }) {
               href={withLocale(locale, DEVELOPERS_LINK.href)}
               className={linkClass}
               data-nav-item="developers"
+              {...NEW_TAB_PROPS}
             >
               {t(DEVELOPERS_LINK.titleKey)}
+              <NewTabMark text={t(DEVELOPERS_LINK.newTabKey)} />
             </a>
           </li>
         </ul>
