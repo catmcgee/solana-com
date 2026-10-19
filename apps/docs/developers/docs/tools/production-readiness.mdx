@@ -1,36 +1,30 @@
 ---
 title: Production Readiness
 sidebarTitle: "Production readiness"
-description: Moving from devnet testing to mainnet deployment
+description:
+  "What to decide before an application moves from devnet to mainnet: RPC,
+  transaction landing, authority custody, monitoring, and reconciliation."
 ---
 
 Building locally and testing on devnet are great ways to get started with Solana
 payments. However, when you're ready to deploy to Mainnet, you need to be aware
 of the mainnet's nuances. Devnet forgives mistakes. Mainnet doesn't. This guide
-covers the differences that matter to ensure your users have a smooth
-experience.
+covers the differences that matter once real value moves.
 
 | Devnet                          | Mainnet                                                                               |
 | ------------------------------- | ------------------------------------------------------------------------------------- |
 | Free SOL from faucets           | [Acquire real SOL](https://solana.com/ecosystem/explore?categories=exchange) for fees |
 | Low competition for block space | Priority fees matter                                                                  |
-| Transactions land easily        | Transaction configuration is critical                                                 |
+| Transactions land easily        | Transaction configuration affects whether they land                                   |
 | Public RPC is fine              | Production RPC required                                                               |
 | Devnet keypairs and mints       | Different keys and token mints—update your config                                     |
 
 ## RPC Infrastructure
 
 [Public endpoints](/developers/docs/references/clusters#solana-public-rpc-endpoints)
-(`api.mainnet.solana.com`) are rate-limited with no SLA. They're fine for
-development but will fail production payment flows—like trying to run a payment
-processor through a shared API with no uptime guarantee.
-
-<Danger>
-  **Never use public RPC for production**
-
-  Use a [private RPC provider](https://solana.com/rpc) for reliable, low-latency
-  access.
-</Danger>
+(`api.mainnet.solana.com`) are rate-limited and carry no SLA. They suit
+development and are not intended for production workloads. Use a
+[private RPC provider](https://solana.com/rpc) for production.
 
 When choosing an RPC provider, compare:
 
@@ -111,15 +105,18 @@ landing rates:
 - Fetch with `confirmed` commitment
 - Store the `lastValidBlockHeight` returned by `getLatestBlockhash`—this tells
   you when your transaction expires
-- Blockhashes expire after ~150 blocks (~60-90 seconds)
+- A blockhash is valid for 150 blocks, about 30 seconds at 200ms slots. For
+  converting slots to wall-clock time, see
+  [settlement and finality](/developers/docs/defi/finality)
 
 **Send options:**
 
 - `maxRetries: 0` — Disable automatic RPC retries. Handle retries yourself so
   you can refresh the blockhash when needed.
-- `skipPreflight: true` — Bypass simulation before sending. Use this when you've
-  already validated the transaction and want lowest latency. Keep it `false`
-  during development to catch errors early.
+- `skipPreflight: true` — Bypass simulation before sending. Use it only when the
+  transaction has already been simulated, for example to estimate its compute
+  units. Otherwise keep it `false` so simulation catches errors before a fee is
+  spent.
 
 ```typescript
 import { createSolanaRpc } from "@solana/kit";
@@ -139,7 +136,7 @@ const signature = await rpc
   .sendTransaction(encodedTransaction, {
     encoding: "base64",
     maxRetries: 0n, // Handle retries yourself
-    skipPreflight: true, // Skip simulation for speed (use false during dev)
+    skipPreflight: true, // Only after the transaction has been simulated
     preflightCommitment: "confirmed"
   })
   .send();
@@ -152,11 +149,10 @@ const { lastValidBlockHeight } = latestBlockhash;
 ### Use Priority Fees
 
 Every Solana transaction requires a transaction fee, paid in SOL. Transaction
-fees are split into two parts: the base fee and the priority fee. The base fee
-compensates validators for processing the transaction. The priority fee is an
-optional fee, to increase the chance that the current leader will process your
-transaction. Think of it like express shipping: you pay more for faster, more
-reliable delivery.
+fees are split into two parts: the base fee and the priority fee. Half of the
+base fee is burned and half goes to the validator that processes the
+transaction. The priority fee is an optional fee that increases the chance the
+current leader will process your transaction.
 
 **How fees work:**
 
@@ -165,11 +161,11 @@ Total fee = Base fee (5,000 lamports per signature) + Priority fee
 Priority fee = Compute units x Price per unit (micro-lamports per compute unit)
 ```
 
-**Real-world costs:**
-
-- Simple USDC transfer: ~$0.001-0.005 during normal conditions
-- During congestion: ~$0.01-0.05
-- Peak congestion: Can spike higher
+The base fee is a protocol constant; see
+[transaction fees](/developers/docs/core/fees). Priority fee levels move with
+demand, so read the current distribution from
+[`getRecentPrioritizationFees`](/developers/docs/rpc/http/getrecentprioritizationfees)
+or a provider's fee API rather than from documentation.
 
 **Sample Implementation:**
 
@@ -203,10 +199,16 @@ guide:
 ### Optimize Compute Units
 
 Compute on Solana is effectively a measure of the amount of work the program is
-doing. There is a limit on the amount of compute that can be used in a
-transaction (currently 1.4 million compute units), and a limit on the amount of
-compute that can be used per account per block (currently 100 million compute
-units).
+doing. A transaction may use at most 1.4 million compute units, a fixed cap. The
+per-block and per-writable-account limits are feature-gated
+([SIMD-0286](https://github.com/solana-foundation/solana-improvement-documents/blob/main/proposals/0286-raise-block-limits-to-100M.md),
+[SIMD-0306](https://github.com/solana-foundation/solana-improvement-documents/blob/main/proposals/0306-raise-account-cu-limits.md))
+and scale with the slot time under
+[SIMD-0525](https://github.com/solana-foundation/solana-improvement-documents/blob/main/proposals/0525-reduce-slot-times.md).
+At the current 200ms target they are 50 million compute units per block and 20
+million per writable account per block. Verify the current values against the
+active feature gates; [compute budget](/developers/docs/core/fees/compute-budget)
+explains the mechanism.
 
 When you submit a transaction, you need to estimate the amount of compute that
 will be used, and set the compute unit limit accordingly - this is effectively a
@@ -250,10 +252,10 @@ avoid the overhead of estimating the compute units every time.
 
 ### Jito Bundles
 
-Jito bundles are a tool for managing atomic execution of multiple transactions.
-This is achieved by sending multiple transactions to the Jito network with a
-tip. Tips can be used to incentivize the Jito network to include your
-transactions in a block.
+Jito bundles group several transactions so that they execute atomically and in
+order when a Jito-connected leader includes them. Bundles are submitted to the
+Jito network with a tip, which is an incentive for inclusion rather than a
+guarantee of it.
 
 **Resources:**
 
@@ -264,15 +266,17 @@ transactions in a block.
 ### Retry Strategies
 
 Transactions can fail for many reasons. Unlike traditional payment APIs that
-return success/failure immediately, blockchain transactions require confirmation
+return success/failure immediately, a Solana transaction requires confirmation
 tracking.
 
 **Key concepts:**
 
-- **Blockhash expiration**: Transactions are valid for ~150 blocks (~60-90
-  seconds)
-- **Idempotency**: The same signed transaction always produces the same
-  signature—resubmitting is safe
+- **Blockhash expiration**: A transaction is valid for 150 blocks from its
+  blockhash, about 30 seconds at 200ms slots
+- **Idempotency**: Resubmitting the same signed transaction is safe; it carries
+  the same signature and executes at most once. A transaction rebuilt with a new
+  blockhash is a new transaction, so rebuild only after the original's blockhash
+  has expired
 - **Exponential backoff**: Avoid overwhelming the network with rapid retries
 
 ```typescript
@@ -296,8 +300,8 @@ const sendAndConfirmTransaction = sendAndConfirmTransactionFactory({
 try {
   await sendAndConfirmTransaction(signedTransaction, {
     commitment: "confirmed",
-    // Optional: abort after 75 seconds
-    abortSignal: AbortSignal.timeout(75_000)
+    // Optional: abort after 45 seconds
+    abortSignal: AbortSignal.timeout(45_000)
   });
 } catch (e) {
   if (isSolanaError(e, SOLANA_ERROR__BLOCK_HEIGHT_EXCEEDED)) {
@@ -321,24 +325,19 @@ signaling that you need to rebuild the transaction with a fresh blockhash.
 
 ## Understanding Confirmation Levels
 
-Solana offers three confirmation levels. In traditional finance terms:
+Solana exposes three commitment levels:
 
-| Level       | Solana Definition         | Traditional Equivalent | Use Case               |
-| ----------- | ------------------------- | ---------------------- | ---------------------- |
-| `processed` | In a block, not yet voted | Pending authorization  | Real-time UI updates   |
-| `confirmed` | Supermajority voted       | Cleared funds          | **Most payments**      |
-| `finalized` | Rooted, irreversible      | Settled funds          | High-value, compliance |
+| Level       | Definition                | Use case                             |
+| ----------- | ------------------------- | ------------------------------------ |
+| `processed` | In a block, not yet voted | Immediate interface feedback only    |
+| `confirmed` | Supermajority voted       | User-facing display                  |
+| `finalized` | Rooted                    | Anything that feeds a book of record |
 
-**When to use each:**
-
-- **UI updates**: Show `processed` for immediate feedback ("Payment submitted")
-- **Credit user account**: Wait for `confirmed` (safe for most transactions)
-- **Ship physical goods**: Wait for `finalized`
-- **Large withdrawals**: Wait for `finalized`
-- **Compliance/audit**: Always record `finalized` status
-
-A `confirmed` block can in principle still be superseded, so anything that
-feeds a book of record waits for `finalized`.
+Until [Alpenglow](https://solana.com/upgrades/alpenglow) activates on mainnet
+(epoch 1064, starting 21 October 2026), a `confirmed` block can in principle
+still be superseded, so anything that feeds a book of record waits for
+`finalized`, about 32 slots later. After activation, `confirmed` and
+`finalized` are equivalent and finality takes roughly 150 milliseconds.
 [Settlement and finality](/developers/docs/defi/finality) covers how many slots
 each level takes, why a blockhash should be fetched at one level and a result
 judged at another, and why protocol finality is not legal finality.
@@ -456,8 +455,8 @@ delegate), and losing one can be unrecoverable. Before mainnet, check that:
   wallets, multisignature wallets, or key management services.
 - **Separate hot and cold wallets.** Hot wallet for operations, cold for
   treasury.
-- **Backup all production keys.** Store encrypted backups in multiple secure
-  locations. Losing a key means losing access permanently.
+- **Back up all production keys.** Store encrypted backups in multiple secure
+  locations. A key lost without a backup cannot be recovered.
 - **Use different keys for devnet and mainnet.** Your devnet keys shouldn't be
   your mainnet keys. Use environment-based configuration to ensure the right
   keys load for each network.
@@ -559,12 +558,14 @@ them during testing, or worse, ship devnet addresses to production.
 
 Some common stablecoin mints are:
 
-| Token | Issuer | Mint Address                                   |
-| ----- | ------ | ---------------------------------------------- |
-| USDC  | Circle | `EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v` |
-| USDT  | Tether | `Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB` |
-| PYUSD | PayPal | `2b1kV6DkPAnxd5ixfnxCpjxmKwqjjaYmCZfHsFu24GXo` |
-| USDG  | Paxos  | `2u1tszSeqZ3qBWF3uNGPFc8TzMk2tdiwknnRMWGWjGWH` |
+| Token | Issuer             | Mint Address                                   |
+| ----- | ------------------ | ---------------------------------------------- |
+| USDC  | Circle             | `EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v` |
+| USDT  | Tether             | `Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB` |
+| PYUSD | Paxos (for PayPal) | `2b1kV6DkPAnxd5ixfnxCpjxmKwqjjaYmCZfHsFu24GXo` |
+| USDG  | Paxos              | `2u1tszSeqZ3qBWF3uNGPFc8TzMk2tdiwknnRMWGWjGWH` |
+
+Confirm each against the issuer's own published address before use.
 
 Program addresses matter too. Sending instructions to the wrong program will
 fail—or worse, result in irreversible loss of funds. The Token Program addresses
@@ -600,7 +601,7 @@ owner), with no failed transaction to warn the user.
 - [ ] Priority fees implemented with dynamic pricing
 - [ ] Retry logic handles blockhash expiration
 - [ ] Confirmation level appropriate for use case
-- [ ] All common errors handled gracefully
+- [ ] All common errors handled
 - [ ] Gasless configured (if applicable)
 - [ ] Mainnet token addresses verified (not devnet mints)
 - [ ] Recipient address validation before sending (wallet vs token account vs

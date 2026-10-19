@@ -111,11 +111,11 @@ max processing age, the transaction is not processed.
 > valid for processing.
 
 Since [slots](/developers/docs/references/terminology#slot) (aka the time period a
-validator can produce a block) are configured to last about
-[400ms](https://github.com/anza-xyz/agave/blob/cb2fd2b632f16a43eff0c27af7458e4e97512e31/sdk/program/src/clock.rs#L107-L109),
-but may fluctuate between 400ms and 600ms, a given blockhash can only be used by
-transactions for about 60 to 90 seconds before it will be considered expired by
-the runtime.
+validator can produce a block) target 200ms on mainnet (reduced from 400ms by
+[SIMD-0525](https://github.com/solana-foundation/solana-improvement-documents/blob/main/proposals/0525-reduce-slot-times.md),
+completed in October 2026), but run slightly longer in practice and are
+sometimes skipped, a given blockhash can only be used by transactions for about
+30 seconds before it will be considered expired by the runtime.
 
 ### Example of transaction expiration
 
@@ -199,10 +199,10 @@ more than 151 blocks old.
 ## Transaction confirmation tips
 
 As mentioned before, blockhashes expire after a time period of only 151 blocks
-which can pass as quickly as **one minute** when slots are processed within the
-target time of 400ms.
+which can pass in about **30 seconds** when slots are processed within the
+target time of 200ms.
 
-One minute is not a lot of time considering that a client needs to fetch a
+Thirty seconds is not a lot of time considering that a client needs to fetch a
 recent blockhash, wait for the user to sign, and finally hope that the
 broadcasted transaction reaches a leader that is willing to accept it. Let's go
 through some tips to help avoid confirmation failures due to transaction
@@ -240,11 +240,15 @@ But feel free to consider the other options:
   blockchain.
 - Using the [default commitment](/developers/docs/rpc#configuring-state-commitment) level
   `finalized` will eliminate any risk that the blockhash you choose will belong
-  to a dropped fork. The tradeoff is that there is typically at least a 32 slot
-  difference between the most recent confirmed block and the most recent
+  to a dropped fork. The tradeoff is that, until
+  [Alpenglow](https://solana.com/upgrades/alpenglow) activates on mainnet
+  (epoch 1064, starting 21 October 2026), there is typically at least a 32
+  slot difference between the most recent confirmed block and the most recent
   finalized block. This tradeoff is pretty severe and effectively reduces the
-  expiration of your transactions by about 13 seconds but this could be even
-  more during unstable cluster conditions.
+  expiration of your transactions by about 32 slots (roughly 6 to 7 seconds at
+  200ms slots, a fifth of the window) but this could be even more during
+  unstable cluster conditions. After activation, `confirmed` and `finalized`
+  are equivalent, so this gap goes away.
 
 ### Use an appropriate preflight commitment level
 

@@ -18,11 +18,14 @@ related:
 
 <Info>
 Solana exposes three commitment levels. A system of record should mark a
-transfer settled at `finalized`. On mainnet today a block is finalized once 31
-further blocks have been built on top of it, so the finalized head trails the
-tip of the chain by at least 32 slots (the block plus the 31 above it), and by
-more when slots are skipped. An interface may show a user a result at
-`confirmed`, which is reached sooner.
+transfer settled at `finalized`. Until
+[Alpenglow](https://solana.com/upgrades/alpenglow) activates on mainnet (epoch
+1064, starting 21 October 2026), a block is finalized once 31 further blocks
+have been built on top of it, so the finalized head trails the tip of the chain
+by at least 32 slots (the block plus the 31 above it), and by more when slots
+are skipped. An interface may show a user a result at `confirmed`, which is
+reached sooner. After activation, `confirmed` and `finalized` are equivalent
+and finality takes roughly 150 milliseconds.
 [Transaction confirmation and expiration](/developers/cookbook/transactions/confirmation)
 explains this in more detail.
 </Info>
@@ -45,42 +48,58 @@ explains this in more detail.
 | `confirmed` | A supermajority of stake has voted for that block            | Typically 1 to 2 slots | Yes, in principle              |
 | `finalized` | The block is rooted and a supermajority has built on it      | 31 further blocks      | Only by a supermajority attack |
 
+These are the TowerBFT figures that apply on mainnet until Alpenglow activates.
+[After Alpenglow](#after-alpenglow) describes what changes.
+
 ### Express these in slots
 
 **Record the slot count, derive the wall-clock time, and state the slot time
 you assumed.**
 [SIMD-0525](https://github.com/solana-foundation/solana-improvement-documents/blob/main/proposals/0525-reduce-slot-times.md)
-proposes reducing the target slot time from 400ms to 200ms in four
-feature-gated steps. The feature gates active on the cluster are the
-authoritative state, and [solana.com/200ms](https://solana.com/200ms) shows the
-live slot time on mainnet. In client code, read the slot time from the cluster,
-not from an SDK constant such as `DEFAULT_MS_PER_SLOT`.
+reduced the target slot time from 400ms to 200ms in four feature-gated steps.
+The final step took effect on mainnet at epoch 1053 (9 October 2026), so the
+target slot time on mainnet is now 200ms; observed slots run slightly longer
+because the network does not hit the target exactly.
+[solana.com/200ms](https://solana.com/200ms) shows the live slot time on
+mainnet. In client code, read the slot time from the cluster (for example with
+`getRecentPerformanceSamples`), not from an SDK constant such as
+`DEFAULT_MS_PER_SLOT`, which can differ from the cluster's current value.
 
-| Target slot time | Status as of October 2026         | 31 blocks, no skipped slots |
-| ---------------- | --------------------------------- | --------------------------- |
-| 400ms            | Mainnet                           | About 12.4s                 |
-| 350ms            | First step in SIMD-0525           | About 10.9s                 |
-| 300ms            | Second step in SIMD-0525          | About 9.3s                  |
-| 250ms            | Third step in SIMD-0525           | About 7.75s                 |
-| 200ms            | Final step in SIMD-0525           | About 6.2s                  |
+| Target slot time | SIMD-0525 step                        | 31 blocks, no skipped slots |
+| ---------------- | ------------------------------------- | --------------------------- |
+| 400ms            | Original target                       | About 12.4s                 |
+| 350ms            | First step                            | About 10.9s                 |
+| 300ms            | Second step                           | About 9.3s                  |
+| 250ms            | Third step                            | About 7.75s                 |
+| 200ms            | Final step; mainnet since epoch 1053  | About 6.2s                  |
 
 ## After Alpenglow
 
 [Alpenglow (SIMD-0326)](https://github.com/solana-foundation/solana-improvement-documents/blob/main/proposals/0326-alpenglow.md)
-replaces TowerBFT with a new voting protocol. As of October 2026 it is active
-on devnet and testnet, and mainnet still runs TowerBFT. The 32-slot rule on
-this page applies until Alpenglow activates on mainnet.
+replaces TowerBFT with a new voting protocol. It has been active on devnet
+since 25 September 2026 and activates on mainnet in epoch 1064, which starts
+on Wednesday, 21 October 2026, at approximately 15:00 UTC. The 32-slot rule on
+this page applies until then. See
+[the Alpenglow upgrade page](https://solana.com/upgrades/alpenglow) for the
+current activation status and the migration checklist.
 
 Under Alpenglow, validators send votes directly to each other rather than as
 transactions. A block is finalized in one of two ways: by a fast-finalization
 certificate when 80% of stake votes for it in one round, or by a finalization
 certificate after two rounds of votes from 60% of stake. Finality no longer
-depends on later blocks being built on top.
+depends on later blocks being built on top, and takes roughly 150 milliseconds
+instead of 32 slots. `confirmed` and `finalized` become equivalent; `confirmed`
+remains available and is planned for removal in a later release.
 
-|                            | TowerBFT (mainnet as of October 2026)     | Alpenglow (after activation)                                   |
+**Don't move to `finalized`-only reads before activation.** Until Alpenglow is
+live on mainnet, `finalized` still means waiting for 31 further blocks. Once it
+is live, point new code at `finalized`, and re-check any timeout, retry, or
+interface delay you tuned around TowerBFT finality.
+
+|                            | TowerBFT (mainnet until epoch 1064)       | Alpenglow (mainnet from epoch 1064)                            |
 | -------------------------- | ----------------------------------------- | -------------------------------------------------------------- |
 | How finality is reached    | 31 further blocks built on the block      | A finalization certificate for the block                       |
-| Time to finality           | 31 further blocks                         | One or two rounds of votes                                     |
+| Time to finality           | 31 further blocks                         | One or two rounds of votes, roughly 150 milliseconds           |
 | Level for a book of record | `finalized`                               | `finalized`                                                    |
 | What to record             | Slot, commitment level, slot time assumed | Slot, commitment level, consensus protocol active at that slot |
 
@@ -89,7 +108,7 @@ depends on later blocks being built on top.
 | Use                                               | Level       | Basis                                                               |
 | ------------------------------------------------- | ----------- | ------------------------------------------------------------------- |
 | A system of record, releasing an asset            | `finalized` | Reversal needs a supermajority of stake acting against the protocol |
-| User-facing feedback                              | `confirmed` | Reached sooner; the block can still be superseded                   |
+| User-facing feedback                              | `confirmed` | Reached sooner; until Alpenglow, the block can still be superseded  |
 | Interface feedback where a reversal is acceptable | `processed` | One leader's view; routinely superseded                             |
 
 A block that is not finalized can be superseded in normal operation: the
@@ -117,11 +136,11 @@ transaction does and does not complete.
 ### Blockhash commitment and the validity window
 
 A transaction is valid only while the blockhash it references is recent: the
-blockhash is valid for 150 blocks (about 150 slots when none are skipped), and
-the runtime rejects anything older. If you fetch that blockhash at
-`finalized`, you start from a block that is already at least 32 slots old, so
-roughly a fifth of the 150-block window is gone before you have signed
-anything.
+blockhash is valid for 150 blocks (about 150 slots when none are skipped, or
+about 30 seconds at 200ms slots), and the runtime rejects anything older. Until
+Alpenglow activates on mainnet, if you fetch that blockhash at `finalized`, you
+start from a block that is already at least 32 slots old, so roughly a fifth of
+the 150-block window is gone before you have signed anything.
 
 **Fetch the blockhash at `confirmed`** so the transaction gets its full window,
 and use `finalized` to decide whether the result counts.
@@ -156,16 +175,19 @@ The statements below cover Solana's settlement properties. Each can be checked
 independently:
 
 1. Three commitment levels exist, with the meanings above.
-2. On mainnet as of October 2026, finality is reached once 31 further blocks
-   have been built on the block, so the finalized head trails the tip by at
-   least 32 slots. Slot time is a protocol parameter (400ms on mainnet as of
-   October 2026); state the slot time assumed alongside any wall-clock figure.
+2. On mainnet until Alpenglow activates (epoch 1064, 21 October 2026),
+   finality is reached once 31 further blocks have been built on the block, so
+   the finalized head trails the tip by at least 32 slots. Under Alpenglow, a
+   block is final once it has a finalization certificate, roughly 150
+   milliseconds. Slot time is a protocol parameter (a 200ms target on mainnet
+   since 9 October 2026); state the slot time assumed alongside any wall-clock
+   figure.
 3. Finality rests on economic assumptions about the distribution of stake, and
    is probabilistic in that sense.
 4. Legal finality is a separate question determined by jurisdiction, and the
    protocol makes no claim about it.
 5. Finality depends on the consensus protocol active at the relevant slots:
-   TowerBFT on mainnet as of October 2026, or Alpenglow from its mainnet
+   TowerBFT on mainnet before epoch 1064, or Alpenglow from its mainnet
    activation slot.
 
 For network liveness history, validator counts, and concentration measures,
