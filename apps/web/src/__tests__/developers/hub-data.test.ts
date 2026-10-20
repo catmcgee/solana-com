@@ -55,9 +55,11 @@ describe("developers hub stats", () => {
     expect(formatStatValue(supply, "en")).toBe("$16.7B");
     const uptime = HUB_STATS.find((s) => s.id === "uptime")!;
     expect(formatStatValue(uptime, "en")).toBe("100%");
-    const daily = HUB_STATS.find((s) => s.id === "dailyTransactions")!;
-    expect(formatStatValue(daily, "en")).toBe("120M");
-    expect(formatStatValue(daily, "ja")).not.toBe("120M");
+    const assets = HUB_STATS.find((s) => s.id === "tokenizedAssets")!;
+    expect(formatStatValue(assets, "en")).toBe("$4.3B");
+    const dex = HUB_STATS.find((s) => s.id === "dexVolume")!;
+    expect(formatStatValue(dex, "en")).toBe("$200B+");
+    expect(formatStatValue(dex, "ja")).not.toBe("$200B+");
   });
 
   it("formats as-of dates", () => {

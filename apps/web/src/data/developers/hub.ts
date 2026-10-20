@@ -139,12 +139,27 @@ export const WHY_REASONS = [
  * Companies named under "In production at". Product-owner approved list from
  * the redesign mockup. Names only, no logos.
  */
+/**
+ * Firms with public announcements of live products on Solana, across
+ * payments, assets, and markets. Each name needs a public source:
+ * - BlackRock: BUIDL fund on Solana (The Block, 2025-03-25,
+ *   https://www.theblock.co/post/348048/solana-becomes-7th-blockchain-onboard-blackrocks-yield-bearing-money-market).
+ * - Franklin Templeton: FOBXX / BENJI on Solana (Decrypt, 2025-02-12,
+ *   https://decrypt.co/305641/franklin-templeton-money-market-fund-solana).
+ * - Apollo: ACRED tokenized credit fund on Solana (The Block,
+ *   https://www.theblock.co/post/337992/apollo-and-blackrock-backed-securitize-launching-access-to-tokenized-credit-fund-on-various-chains-like-solana-ethereum).
+ * - Kraken: xStocks tokenized equities on Solana (Business Wire, 2025-05-22,
+ *   https://www.businesswire.com/news/home/20250522493630/en/Kraken-Partners-with-Backed-to-Launch-xStocks-on-Solana-Bringing-Tokenized-Equities-to-the-Masses).
+ */
 export const PRODUCTION_USERS = [
   "Visa",
   "Stripe",
   "PayPal",
   "Western Union",
-  "Worldpay",
+  "BlackRock",
+  "Franklin Templeton",
+  "Apollo",
+  "Kraken",
 ] as const;
 
 export type StatSource = { name: string; url: string };
@@ -185,31 +200,31 @@ export const HUB_STATS: readonly HubStat[] = [
     note: "Source: “As of August 9, 2026, that figure stands at $16.7 billion.”",
   },
   {
-    id: "stablecoinVolume",
-    value: 650_000_000_000,
+    id: "tokenizedAssets",
+    value: 4_300_000_000,
     format: "usd-compact",
-    suffix: "+",
-    labelKey: "stablecoinVolume",
+    labelKey: "tokenizedAssets",
     source: {
-      name: "stake.fish",
-      url: "https://blog.stake.fish/the-state-of-solana-in-2026/",
+      name: "FinanceFeeds (RWA.xyz data)",
+      url: "https://financefeeds.com/solanas-tokenized-real-world-asset-market-surges-from-700-million-to-4-3-billion-in-one-year/",
     },
-    retrievedAt: "2026-10-13",
-    asOf: "2026-02",
-    note: "Source: “$650B+” in stablecoin transactions during February 2026 (published 2026-04-21).",
+    retrievedAt: "2026-10-20",
+    asOf: "2026-09-30",
+    note: "Source: Solana's distributed tokenized real-world asset value reached $4.3 billion on September 30, 2026, per RWA.xyz data cited in an October 1 SEC filing (published 2026-10-16).",
   },
   {
-    id: "dailyTransactions",
-    value: 120_000_000,
-    format: "compact",
-    labelKey: "dailyTransactions",
+    id: "dexVolume",
+    value: 200_000_000_000,
+    format: "usd-compact",
+    suffix: "+",
+    labelKey: "dexVolume",
     source: {
-      name: "Crypto Briefing",
-      url: "https://cryptobriefing.com/solana-14-billion-transactions-q3-2026/",
+      name: "DefiLlama",
+      url: "https://defillama.com/dexs/chain/solana",
     },
-    retrievedAt: "2026-10-13",
+    retrievedAt: "2026-10-20",
     asOf: "2026-Q3",
-    note: "Source: “Average daily transactions came in at 120 million” for Q3 2026 (published 2026-10-01).",
+    note: "Source: DefiLlama's Solana DEX volume for July to September 2026 sums to $202.5 billion (api.llama.fi/overview/dexs/solana, retrieved 2026-10-20).",
   },
   {
     id: "uptime",
