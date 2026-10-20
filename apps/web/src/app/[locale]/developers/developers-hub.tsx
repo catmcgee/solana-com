@@ -78,7 +78,7 @@ const ROUTE_ICONS: Record<LearnRouteId, IconComponent> = {
   docs: BookOpen,
   bootcamp: School,
   templates: Package,
-  cookbook: CodeAlt,
+  playground: CodeAlt,
 };
 
 function SectionHead({
@@ -559,25 +559,46 @@ export async function DevelopersHub({
           <ul className="m-0 grid list-none gap-3 p-0 sm:grid-cols-2 lg:grid-cols-4">
             {LEARN_ROUTES.map((route) => {
               const Icon = ROUTE_ICONS[route.id];
+              const body = (
+                <>
+                  <span className="grid size-9 place-items-center rounded-[10px] border border-[var(--dl-purple-line)] bg-[var(--dl-purple-soft)] text-[var(--dl-purple-text)]">
+                    <Icon aria-hidden className="!size-[18px]" />
+                  </span>
+                  <h3 className="mb-1 mt-5 font-brand text-base font-medium tracking-[-0.01em] text-[var(--dl-text)]">
+                    {t(`routes.items.${route.id}.title`)}
+                  </h3>
+                  <p className="m-0 text-sm leading-normal text-[var(--dl-muted)]">
+                    {t(`routes.items.${route.id}.body`)}
+                  </p>
+                </>
+              );
+              // No href yet: greyed out, not a link, marked "Coming soon".
+              if (!route.href)
+                return (
+                  <li key={route.id} className="flex">
+                    <div
+                      aria-disabled="true"
+                      data-testid={`route-${route.id}`}
+                      className="relative block w-full cursor-default select-none rounded-2xl border border-[var(--dl-line)] bg-[var(--dl-surface)] px-5 pb-6 pt-5 opacity-55 grayscale"
+                    >
+                      <span className="absolute end-5 top-6 rounded-full border border-[var(--dl-line-strong)] px-2 py-0.5 text-xs text-[var(--dl-dim)]">
+                        {t("routes.comingSoon")}
+                      </span>
+                      {body}
+                    </div>
+                  </li>
+                );
               return (
                 <li key={route.id} className="flex">
                   <a
                     href={href(route.href)}
                     className={`group relative block w-full px-5 pb-6 pt-5 ${cardLink}`}
                   >
-                    <span className="grid size-9 place-items-center rounded-[10px] border border-[var(--dl-purple-line)] bg-[var(--dl-purple-soft)] text-[var(--dl-purple-text)]">
-                      <Icon aria-hidden className="!size-[18px]" />
-                    </span>
                     <ArrowRight
                       aria-hidden
                       className={`absolute end-5 top-6 !size-4 text-[var(--dl-dim)] transition-transform group-hover:text-[var(--dl-accent-text)] motion-safe:group-hover:translate-x-0.5 ${arrowDir}`}
                     />
-                    <h3 className="mb-1 mt-5 font-brand text-base font-medium tracking-[-0.01em] text-[var(--dl-text)]">
-                      {t(`routes.items.${route.id}.title`)}
-                    </h3>
-                    <p className="m-0 text-sm leading-normal text-[var(--dl-muted)]">
-                      {t(`routes.items.${route.id}.body`)}
-                    </p>
+                    {body}
                   </a>
                 </li>
               );

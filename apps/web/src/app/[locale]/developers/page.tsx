@@ -42,11 +42,18 @@ export default async function Page({ params }: Props) {
         description: t(`picker.cards.${job.id}.body`),
         path: job.href,
       })),
-      ...LEARN_ROUTES.map((route) => ({
-        name: t(`routes.items.${route.id}.title`),
-        description: t(`routes.items.${route.id}.body`),
-        path: route.href,
-      })),
+      // Coming-soon routes (no href yet) are not listed.
+      ...LEARN_ROUTES.flatMap((route) =>
+        route.href
+          ? [
+              {
+                name: t(`routes.items.${route.id}.title`),
+                description: t(`routes.items.${route.id}.body`),
+                path: route.href,
+              },
+            ]
+          : [],
+      ),
     ],
   });
 

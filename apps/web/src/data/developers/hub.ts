@@ -117,13 +117,19 @@ export const INSTALL_SETUP = {
   href: "/developers/docs/intro/installation",
 } as const;
 
-/** "Other ways to learn" cards. */
-export const LEARN_ROUTES = [
+/**
+ * "Other ways to learn" cards. A route without an `href` is shown greyed
+ * out as "Coming soon" (the new Solana Playground, until it launches).
+ */
+export const LEARN_ROUTES: readonly {
+  id: "docs" | "bootcamp" | "templates" | "playground";
+  href?: string;
+}[] = [
   { id: "docs", href: "/developers/docs" },
   { id: "bootcamp", href: "/developers/bootcamp" },
   { id: "templates", href: "/developers/templates" },
-  { id: "cookbook", href: "/developers/cookbook" },
-] as const;
+  { id: "playground" },
+];
 
 export type LearnRouteId = (typeof LEARN_ROUTES)[number]["id"];
 
