@@ -115,7 +115,7 @@ const dissolvedGuideRedirects: RedirectInput[] = withMdVariants([
   },
   {
     source: "/developers/guides/dapps",
-    destination: "/developers/bootcamp/fullstack-apps",
+    destination: "/developers/docs/video-guides/2026-developer-bootcamp",
   },
   {
     source: "/developers/guides/depin",
@@ -490,18 +490,43 @@ const anchoredMdTwinRedirects: RedirectInput[] = [
 ];
 
 /**
- * /developers/learn was renamed to /developers/bootcamp. This lived only in
- * the deleted apps/docs/src/middleware.ts (spec §5.8). The wildcard also
- * matches `.md` twins, because `:path*` segments may contain dots.
+ * The Developer Bootcamp lives in Video tutorials: /developers/bootcamp is
+ * the 2026 Developer Bootcamp video page, with the Video tutorials sidebar.
+ * The old lesson-by-lesson pages (and /developers/learn, its earlier name)
+ * go to the matching video page in one hop. Temporary while the docs are in
+ * preview; make them permanent at launch.
  */
-const bootcampRenameRedirects: RedirectInput[] = [
+const VIDEO = "/developers/docs/video-guides";
+const bootcampRedirects: RedirectInput[] = [
   ...withMdVariants([
-    { source: "/developers/learn", destination: "/developers/bootcamp" },
+    {
+      source: "/developers/bootcamp",
+      destination: `${VIDEO}/2026-developer-bootcamp`,
+      permanent: false,
+    },
+    {
+      source: "/developers/learn",
+      destination: `${VIDEO}/2026-developer-bootcamp`,
+      permanent: false,
+    },
   ]),
-  {
-    source: "/developers/learn/:path*",
-    destination: "/developers/bootcamp/:path*",
-  },
+  ...["bootcamp", "learn"].flatMap((base): RedirectInput[] => [
+    {
+      source: `/developers/${base}/solana-crashcourse/:path*`,
+      destination: `${VIDEO}/solana-crash-course`,
+      permanent: false,
+    },
+    {
+      source: `/developers/${base}/depin/:path*`,
+      destination: `${VIDEO}/building-depin-projects`,
+      permanent: false,
+    },
+    {
+      source: `/developers/${base}/:path*`,
+      destination: `${VIDEO}/2026-developer-bootcamp`,
+      permanent: false,
+    },
+  ]),
 ];
 
 /**
@@ -810,27 +835,6 @@ export const mintlifyRewrites: BeforeFilesRewrite[] = [
     destination: `${M}/developers/cookbook/:path*`,
     locale: false,
   },
-  // Bootcamp
-  {
-    source: "/developers/:page(bootcamp|bootcamp\\.md)",
-    destination: `${M}/developers/:page`,
-    locale: false,
-  },
-  {
-    source: "/developers/bootcamp/:path*",
-    destination: `${M}/developers/bootcamp/:path*`,
-    locale: false,
-  },
-  {
-    source: `/${L}/developers/:page(bootcamp|bootcamp\\.md)`,
-    destination: `${M}/:locale/developers/:page`,
-    locale: false,
-  },
-  {
-    source: `/${L}/developers/bootcamp/:path*`,
-    destination: `${M}/:locale/developers/bootcamp/:path*`,
-    locale: false,
-  },
 ];
 
 export default {
@@ -1115,7 +1119,7 @@ export default {
     ...dissolvedGuideRedirects,
     ...movedDocsRedirects,
     ...anchoredMdTwinRedirects,
-    ...bootcampRenameRedirects,
+    ...bootcampRedirects,
     ...docsTagRedirects,
     ...chainMigrationRedirects,
     {

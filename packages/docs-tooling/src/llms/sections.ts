@@ -22,6 +22,5 @@ export const SECTION_NOTES: Record<string, string> = {
 export const INDEX_SECTIONS: { heading: string; prefix: string }[] = [
   { heading: "Core documentation", prefix: "/developers/docs" },
   { heading: "Cookbook", prefix: "/developers/cookbook" },
-  { heading: "Bootcamp", prefix: "/developers/bootcamp" },
   { heading: "Learn", prefix: "/learn" },
 ];

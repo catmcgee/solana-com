@@ -109,7 +109,10 @@ describe("docs sitemap", () => {
       "https://solana.com/fr/developers/docs/core/accounts",
     );
     expect(urls).toContain("https://solana.com/developers/cookbook");
-    expect(urls).toContain("https://solana.com/ja/developers/bootcamp");
+    // The bootcamp redirects to Video tutorials, so it is not listed.
+    expect(urls.some((url) => url.includes("/developers/bootcamp"))).toBe(
+      false,
+    );
     // /el/data is an apps/web page; only Greek docs URLs are gone.
     expect(
       urls.filter(

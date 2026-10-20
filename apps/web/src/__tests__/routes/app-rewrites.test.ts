@@ -84,9 +84,6 @@ describe("Cross-app rewrites", () => {
     expect(expectSourceIndex("/developers/templates/:path*")).toBeLessThan(
       expectSourceIndex("/developers/cookbook/:path*"),
     );
-    expect(expectSourceIndex("/developers/templates/:path*")).toBeLessThan(
-      expectSourceIndex("/developers/bootcamp/:path*"),
-    );
   });
 
   it("keeps specific Accelerate asset rewrites before the generic fallback", () => {

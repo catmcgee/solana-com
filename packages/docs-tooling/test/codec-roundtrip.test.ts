@@ -137,7 +137,7 @@ describe("mdx codec round-trip on real content", () => {
     expect(files).toHaveLength(SAMPLE_SIZE);
     const keys = files.map((f) => layoutKey(f)!);
     expect(new Set(keys.map((k) => k.collection))).toEqual(
-      new Set(["docs", "cookbook", "bootcamp", "learn"]),
+      new Set(["docs", "cookbook", "learn"]),
     );
     expect(new Set(keys.map((k) => k.locale)).size).toBeGreaterThanOrEqual(8);
   });

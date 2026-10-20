@@ -216,8 +216,6 @@ describe("upstream URL", () => {
       "/developers/cookbook",
       "/developers/cookbook/wallets/create-keypair",
       "/ko/developers/cookbook/wallets/create-keypair",
-      "/developers/bootcamp",
-      "/ko/developers/bootcamp/fullstack-apps",
     ]) {
       const rewrite = resolveRewrite(p);
       expect(rewrite.kind, p).toBe("rewrite");

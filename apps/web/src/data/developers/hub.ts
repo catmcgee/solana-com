@@ -120,7 +120,10 @@ export const INSTALL_SETUP = {
 /** "Other ways to learn" cards. */
 export const LEARN_ROUTES = [
   { id: "docs", href: "/developers/docs" },
-  { id: "bootcamp", href: "/developers/bootcamp" },
+  {
+    id: "bootcamp",
+    href: "/developers/docs/video-guides/2026-developer-bootcamp",
+  },
   { id: "templates", href: "/developers/templates" },
   { id: "cookbook", href: "/developers/cookbook" },
 ] as const;

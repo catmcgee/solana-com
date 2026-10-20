@@ -61,9 +61,11 @@ describe("bootcamp curriculum coverage", () => {
     c.lessons.map((l) => `developers/bootcamp/${c.slug}/${l.slug}.mdx`),
   );
 
-  it("every curriculum lesson has an English page", () => {
+  it("has no lesson pages: the bootcamp lives in Video tutorials", () => {
+    // /developers/bootcamp/** redirects to /developers/docs/video-guides/*
+    // (apps/web/rewrites-redirects.ts), so the lesson pages are gone.
     for (const rel of lessons)
-      expect(existsSync(path.join(docsRoot, rel)), rel).toBe(true);
+      expect(existsSync(path.join(docsRoot, rel)), rel).toBe(false);
   });
 
   it("every lesson page resolves to a curriculum lesson with a video", () => {
