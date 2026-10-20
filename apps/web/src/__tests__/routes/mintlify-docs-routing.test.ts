@@ -276,18 +276,6 @@ describe("Mintlify rewrites", () => {
     );
   });
 
-  it("proxies the bootcamp, localized", () => {
-    expectRewrite("/developers/bootcamp", `${M}/developers/bootcamp`);
-    expectRewrite(
-      "/developers/bootcamp/fullstack-apps",
-      `${M}/developers/bootcamp/fullstack-apps`,
-    );
-    expectRewrite(
-      "/es/developers/bootcamp/fullstack-apps.md",
-      `${M}/es/developers/bootcamp/fullstack-apps.md`,
-    );
-  });
-
   it("drops the retired docs-app rewrites", () => {
     const sources = rewritesAndRedirects.rewrites.beforeFiles.map(
       (rewrite) => rewrite.source,
@@ -405,20 +393,43 @@ describe("Docs redirects", () => {
     }
   });
 
-  it("redirects the old /developers/learn section to the bootcamp", () => {
-    expectRedirect("/developers/learn", "/developers/bootcamp");
-    expectRedirect("/developers/learn.md", "/developers/bootcamp.md");
+  it("sends the bootcamp and its old lessons to the Video tutorials pages", () => {
+    const V = "/developers/docs/video-guides";
+    expectRedirect(
+      "/developers/bootcamp",
+      `${V}/2026-developer-bootcamp`,
+      false,
+    );
+    expectRedirect(
+      "/developers/bootcamp.md",
+      `${V}/2026-developer-bootcamp.md`,
+      false,
+    );
+    expectRedirect(
+      "/developers/bootcamp/fullstack-apps/x402",
+      `${V}/2026-developer-bootcamp`,
+      false,
+    );
+    expectRedirect(
+      "/developers/bootcamp/solana-crashcourse/developer-roadmap",
+      `${V}/solana-crash-course`,
+      false,
+    );
+    expectRedirect(
+      "/developers/bootcamp/depin",
+      `${V}/building-depin-projects`,
+      false,
+    );
+    expectRedirect("/developers/learn", `${V}/2026-developer-bootcamp`, false);
     expectRedirect(
       "/developers/learn/fullstack-apps",
-      "/developers/bootcamp/fullstack-apps",
+      `${V}/2026-developer-bootcamp`,
+      false,
     );
     expectRedirect(
-      "/developers/learn/fullstack-apps.md",
-      "/developers/bootcamp/fullstack-apps.md",
-    );
-    expectRedirect(
-      "/pt/developers/learn/fullstack-apps",
       "/pt/developers/bootcamp/fullstack-apps",
+      `/pt${V}/2026-developer-bootcamp`,
+      false,
     );
   });
 

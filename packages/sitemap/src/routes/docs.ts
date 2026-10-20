@@ -35,11 +35,7 @@ const docsRoot = path.join(repoRoot, "apps", "docs");
 /** Locales Mintlify serves (decisions.md drops Greek). */
 export const DOCS_LOCALES = locales.filter((locale) => locale !== "el");
 
-const COLLECTION_ROOTS = new Set([
-  "/developers/docs",
-  "/developers/cookbook",
-  "/developers/bootcamp",
-]);
+const COLLECTION_ROOTS = new Set(["/developers/docs", "/developers/cookbook"]);
 
 export interface DocsManifestPage {
   url: string;
@@ -118,12 +114,7 @@ export function readDocsManifest(
  */
 function walkDocsTree(): DocsManifestPage[] {
   const pages: DocsManifestPage[] = [];
-  const collections = [
-    "developers/docs",
-    "learn",
-    "developers/cookbook",
-    "developers/bootcamp",
-  ];
+  const collections = ["developers/docs", "learn", "developers/cookbook"];
   for (const lang of DOCS_LOCALES) {
     for (const collection of collections) {
       if (collection === "developers/cookbook" && lang !== defaultLocale) {
@@ -167,7 +158,7 @@ export const docsRoutes: RouteGenerator = () => {
     // Localized collection roots. Cookbook is English-only content, but
     // /<loc>/developers/cookbook is served (English) and was listed before.
     const rootEntries = DOCS_LOCALES.flatMap((locale) =>
-      ["/developers/cookbook", "/developers/bootcamp"].map((root) =>
+      ["/developers/cookbook"].map((root) =>
         createEntry(locale === defaultLocale ? root : `/${locale}${root}`, {
           changeFrequency: "weekly",
           priority: 0.8,

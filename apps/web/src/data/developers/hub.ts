@@ -126,7 +126,10 @@ export const LEARN_ROUTES: readonly {
   href?: string;
 }[] = [
   { id: "docs", href: "/developers/docs" },
-  { id: "bootcamp", href: "/developers/bootcamp" },
+  {
+    id: "bootcamp",
+    href: "/developers/docs/video-guides/2026-developer-bootcamp",
+  },
   { id: "templates", href: "/developers/templates" },
   { id: "playground" },
 ];
