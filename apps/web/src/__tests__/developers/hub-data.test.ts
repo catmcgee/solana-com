@@ -54,7 +54,7 @@ describe("developers hub stats", () => {
     const supply = HUB_STATS.find((s) => s.id === "stablecoinSupply")!;
     expect(formatStatValue(supply, "en")).toBe("$16.7B");
     const uptime = HUB_STATS.find((s) => s.id === "uptime")!;
-    expect(formatStatValue(uptime, "en")).toBe("30+");
+    expect(formatStatValue(uptime, "en")).toBe("100%");
     const daily = HUB_STATS.find((s) => s.id === "dailyTransactions")!;
     expect(formatStatValue(daily, "en")).toBe("120M");
     expect(formatStatValue(daily, "ja")).not.toBe("120M");

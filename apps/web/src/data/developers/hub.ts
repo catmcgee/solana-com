@@ -213,9 +213,9 @@ export const HUB_STATS: readonly HubStat[] = [
   },
   {
     id: "uptime",
-    value: 30,
+    value: 100,
     format: "integer",
-    suffix: "+",
+    suffix: "%",
     labelKey: "uptime",
     source: {
       name: "Crypto Briefing",
@@ -223,7 +223,7 @@ export const HUB_STATS: readonly HubStat[] = [
     },
     retrievedAt: "2026-10-13",
     asOf: "2026-08-10",
-    note: "Source: 30 consecutive months without a network-wide outage; last outage 2024-02-06 (published 2026-08-10).",
+    note: "Source: no network-wide outage since 2024-02-06, so 100% uptime for more than 2 years (30 consecutive months as of 2026-08-10).",
   },
 ] as const;
 
