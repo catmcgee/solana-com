@@ -490,6 +490,27 @@ const anchoredMdTwinRedirects: RedirectInput[] = [
 ];
 
 /**
+ * Quick installation moved into the Quickstart's "Follow along manually"
+ * tab (2026-10-21). Temporary while the docs are in preview.
+ */
+const installRedirects: RedirectInput[] = withMdVariants([
+  {
+    source: "/developers/docs/intro/installation",
+    destination: "/developers/docs/quickstart",
+    permanent: false,
+  },
+  {
+    source: "/developers/docs/intro/installation/index",
+    destination: "/developers/docs/quickstart",
+    permanent: false,
+  },  {
+    source: "/docs/intro/installation",
+    destination: "/developers/docs/quickstart",
+    permanent: false,
+  },
+]);
+
+/**
  * The Developer Bootcamp lives in Video tutorials: /developers/bootcamp is
  * the 2026 Developer Bootcamp video page, with the Video tutorials sidebar.
  * The old lesson-by-lesson pages (and /developers/learn, its earlier name)
@@ -1119,6 +1140,7 @@ export default {
     ...dissolvedGuideRedirects,
     ...movedDocsRedirects,
     ...anchoredMdTwinRedirects,
+    ...installRedirects,
     ...bootcampRedirects,
     ...docsTagRedirects,
     ...chainMigrationRedirects,
@@ -1239,15 +1261,15 @@ export default {
     },
     {
       source: "/install",
-      destination: "/developers/docs/intro/installation",
+      destination: "/developers/docs/quickstart",
     },
     {
       source: "/cli",
-      destination: "/developers/docs/intro/installation#install-the-solana-cli",
+      destination: "/developers/docs/quickstart",
     },
     {
       source: "/setup",
-      destination: "/developers/docs/intro/installation",
+      destination: "/developers/docs/quickstart",
     },
     {
       source: "/simd",
@@ -1355,7 +1377,7 @@ export default {
     },
     {
       source: "/developers/guides/getstarted/setup-local-development",
-      destination: "/developers/docs/intro/installation",
+      destination: "/developers/docs/quickstart",
     },
     {
       source: "/environment",
@@ -1433,19 +1455,19 @@ export default {
     },
     {
       source: "/developers/guides/getstarted/setup-local-development",
-      destination: "/developers/docs/intro/installation",
+      destination: "/developers/docs/quickstart",
     },
     {
       source: "/docs/install",
-      destination: "/developers/docs/intro/installation",
+      destination: "/developers/docs/quickstart",
     },
     {
       source: "/install",
-      destination: "/developers/docs/intro/installation",
+      destination: "/developers/docs/quickstart",
     },
     {
       source: "/setup",
-      destination: "/developers/docs/intro/installation",
+      destination: "/developers/docs/quickstart",
     },
     {
       source: "/docs/programs/debugging",
@@ -2063,7 +2085,7 @@ export default {
     },
     {
       source: "/docs/toolkit/:path*",
-      destination: "/developers/docs/intro/installation",
+      destination: "/developers/docs/quickstart",
     },
     {
       source: "/developers/cookbook/tokens/create-nft",

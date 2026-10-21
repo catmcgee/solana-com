@@ -114,7 +114,7 @@ export const DOCS_TABS: DocsTab[] = [
     // Every developers/docs/tools page is under Resources > Tools.
     match: [
       "/developers/docs/from-evm",
-      "/developers/docs/intro/installation",
+      "/developers/docs/quickstart",
       "/developers/docs/programs",
       "/developers/docs/frontend",
     ],
