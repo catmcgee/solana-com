@@ -193,11 +193,9 @@ describe("set up in one command card", () => {
     );
   });
 
-  it("uses the one-line installer from Quick installation", () => {
-    expect(INSTALL_SETUP.href).toBe("/developers/docs/intro/installation");
-    expect(docsPage("intro/installation/index")).toContain(
-      INSTALL_SETUP.command,
-    );
+  it("uses the one-line installer from the Quickstart's manual install tab", () => {
+    expect(INSTALL_SETUP.href).toBe("/developers/docs/quickstart");
+    expect(docsPage("quickstart")).toContain(INSTALL_SETUP.command);
   });
 
   it("matches the commands on the Build with AI agents page and the Quickstart", () => {

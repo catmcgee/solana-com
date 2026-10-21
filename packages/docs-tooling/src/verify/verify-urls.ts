@@ -355,6 +355,8 @@ export function strayAssetsInDocsRoot(
     // Copy button and origin swap for the Start here agent banner
     // (styles/agent-banner.css).
     "apps/docs/agent-banner.js",
+    // Puts the reader's OS first in .sol-os-tabs groups (Quickstart install).
+    "apps/docs/os-tabs.js",
     "apps/docs/styles/",
   ],
 ) {

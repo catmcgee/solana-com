@@ -109,12 +109,12 @@ export const AGENT_PROMPT = {
 
 /**
  * The one-line installer (Rust, Solana CLI, Anchor, Surfpool, Node.js, and
- * Yarn), as on the Quick installation page.
+ * Yarn), as in the Quickstart's "Follow along manually" tab.
  */
 export const INSTALL_SETUP = {
   command:
     "curl --proto '=https' --tlsv1.2 -sSfL https://solana-install.solana.workers.dev | bash",
-  href: "/developers/docs/intro/installation",
+  href: "/developers/docs/quickstart",
 } as const;
 
 /**
