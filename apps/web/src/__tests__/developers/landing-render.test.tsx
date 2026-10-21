@@ -55,7 +55,6 @@ describe("/developers landing", () => {
       "Why Solana",
       "What would your payments cost?",
       "Other ways to learn",
-      "Solana developer update",
     ]) {
       expect(
         screen.getByRole("heading", { level: 2, name }),
@@ -205,7 +204,15 @@ describe("/developers landing", () => {
     const empty = renderWithIntl(
       await DevelopersHub({ locale: "en", updates: [] }),
     );
-    expect(empty.container.querySelector("#updates")).toBeNull();
+    // The email sign-up always shows; the posts and "All news" only with a feed.
+    expect(
+      within(
+        empty.container.querySelector("#updates") as HTMLElement,
+      ).getByRole("heading", { level: 3, name: "Solana developer update" }),
+    ).toBeInTheDocument();
+    expect(
+      empty.container.querySelector('[data-testid="updates-all"]'),
+    ).toBeNull();
     empty.unmount();
 
     renderWithIntl(
@@ -229,6 +236,7 @@ describe("/developers landing", () => {
       "href",
       "/news/agave-3-1",
     );
+    expect(screen.getByTestId("updates-all")).toHaveAttribute("href", "/news");
   });
 
   it("has no eyebrow labels or left-border accents", async () => {

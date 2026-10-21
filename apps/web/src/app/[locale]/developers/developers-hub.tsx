@@ -58,13 +58,16 @@ const inlineLink = `text-[var(--dl-link)] underline decoration-[var(--dl-link-un
 /** Docs card (styles/stepper.css .sol-dpick > a): hairline, purple lift. */
 const card =
   "rounded-2xl border border-[var(--dl-line)] bg-[var(--dl-surface)] shadow-[var(--dl-shadow)]";
+/** Where "All news" under the developer updates goes. */
+const UPDATES_ALL_HREF = "/news";
+
 const cardLink = `${card} text-[var(--dl-text)] no-underline transition-[border-color,box-shadow,transform] duration-150 hover:border-[var(--dl-purple-line)] hover:text-[var(--dl-text)] hover:shadow-[var(--dl-lift)] motion-safe:hover:-translate-y-px ${focus}`;
 /** Docs buttons (--solui-cta; .sol-term-btn[data-variant=secondary]). */
 const buttonBase = `inline-flex h-10 items-center gap-2 rounded-lg px-4 text-sm font-semibold no-underline transition-colors ${focus}`;
 const primaryButton = `${buttonBase} bg-[var(--dl-accent)] text-[var(--dl-on-accent)] hover:bg-[var(--dl-accent-hover)] hover:text-[var(--dl-on-accent)]`;
 const secondaryButton = `${buttonBase} border border-[var(--dl-line-strong)] bg-transparent text-[var(--dl-text)] hover:border-[var(--dl-dim)] hover:bg-[var(--dl-soft)] hover:text-[var(--dl-text)]`;
 const iconTile =
-  "grid size-9 place-items-center rounded-[10px] bg-[var(--dl-icon-tile)] text-[var(--dl-icon-glyph)]";
+  "grid size-9 place-items-center rounded-[10px] border border-[var(--dl-icon-line)] bg-[var(--dl-icon-tile)] text-[var(--dl-icon-glyph)]";
 const arrowDir = "rtl:-scale-x-100";
 
 const JOB_ICONS: Record<JobPathId, IconComponent> = {
@@ -629,74 +632,81 @@ export async function DevelopersHub({
         </div>
       </section>
 
-      {/* Developer updates (hidden when the Media feed is empty) */}
-      {updates.length > 0 && (
-        <section
-          id="updates"
-          aria-labelledby="dl-updates-title"
-          className="scroll-mt-32 border-t border-[var(--dl-line)] py-16 md:py-20"
-        >
-          <div className={container}>
-            <SectionHead
-              id="dl-updates-title"
-              title={t("updates.title")}
-              body={t("updates.body")}
-            />
-            <ul className="m-0 grid list-none gap-3 p-0 md:grid-cols-2 lg:grid-cols-4">
-              {updates.slice(0, 4).map((update) => (
-                <li key={update.href} className="flex">
-                  <a
-                    href={update.href}
-                    className={`group flex w-full flex-col gap-2 p-5 ${cardLink}`}
-                  >
-                    <span className="text-xs text-[var(--dl-dim)]">
-                      {t(`updates.kinds.${update.kind}`)}
-                      {update.publishedAt
-                        ? ` · ${formatAsOf(update.publishedAt.slice(0, 10), locale)}`
-                        : ""}
-                    </span>
-                    <h3 className="m-0 font-brand text-base font-medium leading-snug text-[var(--dl-text)]">
-                      {update.title}
-                    </h3>
-                    <p className="m-0 line-clamp-3 text-sm text-[var(--dl-muted)]">
-                      {update.description}
-                    </p>
-                    <span className="mt-auto inline-flex items-center gap-1.5 pt-2 text-sm font-medium text-[var(--dl-accent-text)]">
-                      {t("updates.read")}
-                      <ArrowRight
-                        aria-hidden
-                        className={`!size-4 ${arrowDir}`}
-                      />
-                    </span>
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </section>
-      )}
-
-      {/* Newsletter */}
+      {/* Developer updates: the email sign-up first, so it's seen, then the
+          latest posts from the Media feed (hidden when it's empty), then a
+          link to all news. */}
       <section
-        id="newsletter"
-        aria-labelledby="dl-news-title"
-        className="pb-20 pt-4"
+        id="updates"
+        aria-labelledby="dl-updates-title"
+        className="scroll-mt-32 border-t border-[var(--dl-line)] pb-20 pt-16 md:pt-20"
       >
         <div className={container}>
-          <div className="flex flex-col items-start justify-between gap-6 rounded-2xl border border-[var(--dl-line)] px-6 py-8 [background:var(--dl-news)] md:flex-row md:items-center md:px-10 md:py-9">
+          <SectionHead
+            id="dl-updates-title"
+            title={t("updates.title")}
+            body={t("updates.body")}
+          />
+          <div
+            id="newsletter"
+            className="mb-6 flex flex-col items-start justify-between gap-5 rounded-2xl border border-[var(--dl-line)] px-6 py-6 [background:var(--dl-news)] md:flex-row md:items-center md:px-8"
+          >
             <div>
-              <h2
+              <h3
                 id="dl-news-title"
-                className="m-0 mb-1.5 font-brand text-[22px] font-medium tracking-[-0.02em] text-[var(--dl-text)]"
+                className="m-0 mb-1 font-brand text-lg font-medium tracking-[-0.015em] text-[var(--dl-text)]"
               >
                 {t("newsletter.title")}
-              </h2>
+              </h3>
               <p className="m-0 text-[15px] text-[var(--dl-muted)]">
                 {t("newsletter.body")}
               </p>
             </div>
             <NewsletterForm formId={DEVELOPER_NEWSLETTER_FORM_ID} />
           </div>
+          {updates.length > 0 && (
+            <>
+              <ul className="m-0 grid list-none gap-3 p-0 md:grid-cols-2 lg:grid-cols-4">
+                {updates.slice(0, 4).map((update) => (
+                  <li key={update.href} className="flex">
+                    <a
+                      href={update.href}
+                      className={`group flex w-full flex-col gap-2 p-5 ${cardLink}`}
+                    >
+                      <span className="text-xs text-[var(--dl-dim)]">
+                        {t(`updates.kinds.${update.kind}`)}
+                        {update.publishedAt
+                          ? ` · ${formatAsOf(update.publishedAt.slice(0, 10), locale)}`
+                          : ""}
+                      </span>
+                      <h3 className="m-0 font-brand text-base font-medium leading-snug text-[var(--dl-text)]">
+                        {update.title}
+                      </h3>
+                      <p className="m-0 line-clamp-3 text-sm text-[var(--dl-muted)]">
+                        {update.description}
+                      </p>
+                      <span className="mt-auto inline-flex items-center gap-1.5 pt-2 text-sm font-medium text-[var(--dl-accent-text)]">
+                        {t("updates.read")}
+                        <ArrowRight
+                          aria-hidden
+                          className={`!size-4 ${arrowDir}`}
+                        />
+                      </span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-6 flex justify-center">
+                <a
+                  href={UPDATES_ALL_HREF}
+                  className={secondaryButton}
+                  data-testid="updates-all"
+                >
+                  {t("updates.all")}
+                  <ArrowRight aria-hidden className={`!size-4 ${arrowDir}`} />
+                </a>
+              </div>
+            </>
+          )}
         </div>
       </section>
     </main>
