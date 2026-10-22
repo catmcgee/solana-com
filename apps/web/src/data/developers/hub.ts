@@ -8,7 +8,7 @@
  * re-checked at least twice a year.
  */
 
-/** Job paths. `href` points at the path intro page in the Mintlify docs. */
+/** Job paths. `href` points at the path intro page in the docs. */
 export const JOB_PATHS = [
   {
     id: "asset",
@@ -47,7 +47,7 @@ export const MORE_USE_CASES = [
 ] as const;
 
 /**
- * Prefix docs-owned paths with the locale. Mintlify serves /<loc>/developers/docs/* and
+ * Prefix docs-owned paths with the locale. The docs serve /<loc>/developers/docs/* and
  * /<loc>/developers/{bootcamp,cookbook}/*; templates and hash links stay
  * unprefixed.
  */

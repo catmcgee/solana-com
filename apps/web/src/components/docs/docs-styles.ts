@@ -3,7 +3,7 @@
  * docs routes load them): the docs chrome shared with /developers, the base
  * layout and content styles, then the feature stylesheets kept in
  * apps/docs/styles (theme tokens and overrides, path boxes, demos, ...), in
- * the order the docs have always applied them (Mintlify's inline order).
+ * the order the docs have always applied them.
  */
 import "@/app/[locale]/developers/docs-chrome.css";
 import "./docs.css";

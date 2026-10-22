@@ -1,8 +1,8 @@
 /**
  * Icons for the docs header and footer on /developers. The tab icons are the
- * Lucide icons the docs tabs use (apps/docs/navigation/en.json `icon`,
- * docs.json `icons.library: "lucide"`), so the 1024-1279px tab row and the
- * mobile menu look like Mintlify's. Lucide is ISC licensed.
+ * Lucide icons the docs tabs use (apps/docs/navigation/en.json `icon`, Lucide
+ * names), so the 1024-1279px tab row and the mobile menu look like the
+ * docs. Lucide is ISC licensed.
  */
 import type { ReactNode } from "react";
 import type { DocsTabIcon } from "@/data/developers/docs-nav";

@@ -211,7 +211,7 @@ test.describe("with JavaScript", () => {
     await expect(html).toHaveClass(/\bdark\b/);
     await expect(toggle).toHaveAttribute("aria-label", "Switch to light mode");
     expect(await backgroundOf(page)).toBe(DARK_BG);
-    // Stored where Mintlify keeps it, so /docs opens dark too.
+    // Stored where the docs read it, so /developers/docs opens dark too.
     expect(await page.evaluate(() => localStorage.getItem("isDarkMode"))).toBe(
       "dark",
     );
@@ -234,7 +234,7 @@ test.describe("with JavaScript", () => {
 
   test("uses a choice made in the docs", async ({ browser }) => {
     const context = await browser.newContext({ colorScheme: "dark" });
-    // What Mintlify stores after "Switch to light mode" on /docs.
+    // What the docs store after "Switch to light mode".
     await context.addInitScript(() => {
       localStorage.setItem("isDarkMode", "light");
     });

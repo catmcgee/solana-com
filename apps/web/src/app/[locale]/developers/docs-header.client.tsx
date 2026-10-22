@@ -34,7 +34,7 @@ function systemTheme(): Theme {
     : "light";
 }
 
-/** Same rule as DOCS_THEME_PREPAINT_SCRIPT and Mintlify (next-themes). */
+/** Same rule as DOCS_THEME_PREPAINT_SCRIPT and the docs pages. */
 function applyPreference(preference: Preference) {
   const theme = preference === "system" ? systemTheme() : preference;
   const html = document.documentElement;

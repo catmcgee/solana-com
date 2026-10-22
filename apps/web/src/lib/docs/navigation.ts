@@ -1,6 +1,6 @@
 /**
- * Docs navigation: apps/docs/navigation/<locale>.json (the Mintlify
- * `navigation` schema the docs are organised in) turned into
+ * Docs navigation: apps/docs/navigation/<locale>.json (the `navigation`
+ * schema the docs are organised in) turned into
  * - a nav model the docs chrome renders (top tabs, sidebar sections,
  *   collapsible groups, tutorial path boxes), and
  * - a Fumadocs page tree per locale (one root folder per tab), used with
@@ -14,9 +14,7 @@
  * The first-level groups of a tab are sidebar sections (a small heading);
  * nested groups are collapsible, open when `expanded` or when they hold the
  * current page; `tag` groups are the tutorial path boxes. Hidden tabs are
- * not in the tab bar unless the current page belongs to one. The structure
- * follows the reference adapter in @fumapress/mintlify (MIT), written here
- * against our own nav model instead of depending on it.
+ * not in the tab bar unless the current page belongs to one.
  */
 import type * as PageTree from "fumadocs-core/page-tree";
 import { defaultLocale } from "@workspace/i18n/config";

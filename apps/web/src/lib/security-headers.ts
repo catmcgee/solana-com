@@ -1,8 +1,6 @@
 /**
- * Response security headers for every apps/web path, including the docs that
- * rewrites-redirects.ts proxies to Mintlify. next.config.ts applies them
- * through `headers()`; the docs head injection (lib/docs-edge/head-inject.ts)
- * builds its own responses in middleware and sets them itself.
+ * Response security headers for every apps/web path, including the docs.
+ * next.config.ts applies them through `headers()`.
  *
  * Preview (staging) deployments stay out of search engines. VERCEL_ENV is set
  * by `vercel build` and at runtime; NEXT_PUBLIC_VERCEL_ENV only when system

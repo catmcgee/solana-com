@@ -37,7 +37,7 @@ function renderWithIntl(ui: ReactElement, locale = "en") {
   );
 }
 
-/** The visible docs tabs, straight from Mintlify's navigation. */
+/** The visible docs tabs, straight from the docs navigation. */
 const visibleTabs = (enNav.tabs as { tab: string; hidden?: boolean }[]).filter(
   (tab) => !tab.hidden,
 );

@@ -53,7 +53,7 @@ function withAgentLinks<T extends Response>(res: T): T {
 // and doesn't need preserveProxiedLocaleCookie since it's the source of truth
 const handleI18nRouting = createMiddleware(routing);
 
-// The developer docs keep the locale of the URL, as on Mintlify: an
+// The developer docs keep the locale of the URL, as before: an
 // unprefixed (English) docs URL serves English and never redirects to the
 // locale cookie (set by visiting a translated page) or Accept-Language.
 const handleDocsI18nRouting = createMiddleware(routingWithoutDetection);

@@ -53,7 +53,7 @@ type DocsTab = {
 };
 
 /**
- * The docs tabs, in the order of the Mintlify tab bar (apps/docs
+ * The docs tabs, in the order of the docs tab bar (apps/docs
  * navigation/en.json): Start here · Payments · Assets · Markets | How Solana
  * works · Resources · API · Video tutorials ↗ (right-aligned).
  */

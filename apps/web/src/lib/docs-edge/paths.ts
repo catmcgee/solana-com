@@ -1,33 +1,33 @@
 /**
- * Path rules for the docs URL space that apps/web proxies to Mintlify
- * (spec §8, WP9). Pure functions only: this module is imported by
+ * Path rules for the docs URL space (spec §8, WP9), which apps/web serves
+ * itself (Fumadocs). Pure functions only: this module is imported by
  * `src/proxy.ts` and by `rewrites-redirects.ts`, so it must not touch
  * the filesystem or any Next.js runtime API.
  */
 import { defaultLocale, locales } from "@workspace/i18n/config";
 
 /**
- * Locales dropped by the migration (decisions.md: Mintlify has no `el`).
- * Their docs URLs redirect to the English page instead of being proxied.
+ * Locales the docs are not translated into (decisions.md: no `el`).
+ * Their docs URLs redirect to the English page.
  */
 export const DROPPED_DOCS_LOCALES: readonly string[] = ["el"];
 
 /**
- * Non-default locales whose docs Mintlify serves (17). Folder names and
- * public URLs keep these codes even where Mintlify's language code differs
- * (ja -> jp, zh -> cn, pt -> pt-BR); Mintlify only uses its own code in
+ * Non-default locales the docs are served in (17). Folder names and
+ * public URLs keep these codes even where docs.json's language code differs
+ * (ja -> jp, zh -> cn, pt -> pt-BR); that code appears only in
  * `navigation.languages`, never in page paths.
  */
-export const MINTLIFY_LOCALES: readonly string[] = locales.filter(
+export const DOCS_TRANSLATED_LOCALES: readonly string[] = locales.filter(
   (locale) =>
     locale !== defaultLocale && !DROPPED_DOCS_LOCALES.includes(locale),
 );
 
 /** `ar|de|...|zh`, for `:locale(...)` constraints in rewrite sources. */
-export const MINTLIFY_LOCALE_PATTERN = MINTLIFY_LOCALES.join("|");
+export const DOCS_TRANSLATED_LOCALE_PATTERN = DOCS_TRANSLATED_LOCALES.join("|");
 
 /**
- * Path prefixes (without a locale) served by Mintlify. `/learn` itself is the
+ * Path prefixes (without a locale) of docs pages. `/learn` itself is the
  * apps/web landing (WP10), so only articles below it are docs paths.
  * `/docs` moved to `/developers/docs` (2026-10-16); the old prefix is only
  * redirects now (next.config, before middleware), but stays listed so that a
@@ -63,11 +63,11 @@ function matchesPrefix(pathname: string, prefix: string) {
 }
 
 /**
- * True when `restLower` (lowercase, locale removed) is a path that Mintlify
- * serves: `/developers/{docs,cookbook,bootcamp}[...]` (and the old `/docs`),
+ * True when `restLower` (lowercase, locale removed) is a docs path:
+ * `/developers/{docs,cookbook,bootcamp}[...]` (and the old `/docs`),
  * `/learn/<article>`, plus their `.md` twins.
  */
-export function isMintlifyContentPath(restLower: string) {
+export function isDocsContentPath(restLower: string) {
   const path = stripMd(restLower);
   if (path.startsWith(LEARN_ARTICLE_PREFIX) && path.length > 7) return true;
   return DOCS_COLLECTION_PREFIXES.some((prefix) => matchesPrefix(path, prefix));
@@ -75,7 +75,7 @@ export function isMintlifyContentPath(restLower: string) {
 
 /**
  * Splits `pathname` into an optional locale and the rest, when the rest is a
- * docs path served by Mintlify (case-insensitive, so that `/Docs/X` is
+ * docs path (case-insensitive, so that `/Docs/X` is
  * recognised and can be normalised). Returns null for everything else.
  */
 export function getDocsPathInfo(pathname: string): DocsPathInfo | null {
@@ -85,7 +85,7 @@ export function getDocsPathInfo(pathname: string): DocsPathInfo | null {
   const hasLocale = locales.includes(firstLower);
   const rest = hasLocale ? `/${segments.slice(2).join("/")}` : pathname;
 
-  if (!isMintlifyContentPath(rest.toLowerCase())) return null;
+  if (!isDocsContentPath(rest.toLowerCase())) return null;
 
   return { locale: hasLocale ? first : null, rest };
 }
@@ -130,8 +130,8 @@ export type MarkdownRequestSource = "accept-header" | "md-extension";
 
 /**
  * Classifies a request for the PostHog `docs_markdown_requested` event
- * (ported from the old docs-app middleware). Mintlify itself answers both
- * forms; apps/web only records them.
+ * (ported from the old docs-app middleware). The docs routes answer both
+ * forms; the middleware only records them.
  */
 export function getMarkdownRequestSource(
   pathname: string,

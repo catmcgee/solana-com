@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { templatesAppUrl } from "@@/apps-urls";
 import rewritesAndRedirects from "@@/rewrites-redirects";
 import { findRepoRoot } from "@/lib/docs-edge/repo-root";
-import { MINTLIFY_LOCALES as DOCS_LOCALES } from "@/lib/docs-edge/paths";
+import { DOCS_TRANSLATED_LOCALES as DOCS_LOCALES } from "@/lib/docs-edge/paths";
 import {
   resolve,
   resolveRedirect,
@@ -77,15 +77,16 @@ function expectAppWebRoute(pathname: string) {
 }
 
 describe("No docs proxy", () => {
-  it("rewrites nothing to Mintlify any more", () => {
+  it("rewrites no docs path to another origin", () => {
     const rewrites = [
       ...rewritesAndRedirects.rewrites.beforeFiles,
       ...rewritesAndRedirects.rewrites.afterFiles,
       ...rewritesAndRedirects.rewrites.fallback,
     ];
-    for (const r of rewrites) expect(r.destination).not.toMatch(/mintlify/);
-    for (const source of ["/_mintlify/:path*", "/mintlify-assets/:path+"])
-      expect(rewrites.map((r) => r.source)).not.toContain(source);
+    const docsSource =
+      /(^|\/)(developers\/(docs|cookbook|bootcamp)|docs|learn)(\/|$|\.md)/;
+    for (const r of rewrites.filter((r) => docsSource.test(r.source)))
+      expect(r.destination).not.toMatch(/^https?:\/\//);
   });
 });
 

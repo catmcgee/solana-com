@@ -291,7 +291,7 @@ describe("/developers landing", () => {
 });
 
 describe("/learn landing", () => {
-  it("lists the ten tutorials in order with Mintlify links", async () => {
+  it("lists the ten tutorials in order with docs links", async () => {
     renderWithIntl(await LearnLanding({ locale: "fr" }), "fr");
     const links = within(screen.getByTestId("learn-tutorials")).getAllByRole(
       "link",

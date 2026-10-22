@@ -5,7 +5,7 @@ import {
   BREAKPOINT_APP_URL,
 } from "./apps-urls";
 import { locales } from "@workspace/i18n/config";
-import { MINTLIFY_LOCALE_PATTERN } from "./src/lib/docs-edge/paths";
+import { DOCS_TRANSLATED_LOCALE_PATTERN } from "./src/lib/docs-edge/paths";
 
 const LOCALE_REGEX = locales.join("|");
 
@@ -559,7 +559,7 @@ const bootcampRedirects: RedirectInput[] = [
 ];
 
 /**
- * /docs/tags/<tag> never had pages; the tags index is a hidden Mintlify page
+ * /docs/tags/<tag> never had pages; the tags index is a hidden docs page
  * (spec §5.3). Temporary, so the index can grow real tag pages later. The
  * old /docs prefix gets its own rule so it takes one hop, not two.
  */
@@ -587,7 +587,7 @@ const docsTagRedirects: RedirectInput[] = [
  * `/en/docs/x` goes straight to the unprefixed English URL.
  * Greek (/el/docs/...) is handled by greekDocsRedirects, which runs first.
  */
-const DOCS_MOVE_LOCALES = `:locale(${MINTLIFY_LOCALE_PATTERN})`;
+const DOCS_MOVE_LOCALES = `:locale(${DOCS_TRANSLATED_LOCALE_PATTERN})`;
 const docsPrefixMoveRedirects: RedirectInput[] = [
   { source: "/docs", destination: "/developers/docs" },
   { source: "/docs.md", destination: "/developers/docs.md" },
@@ -610,7 +610,7 @@ const docsPrefixMoveRedirects: RedirectInput[] = [
 ].map((r) => ({ ...r, permanent: true, localize: false as const }));
 
 /**
- * Greek (el) docs were dropped: Mintlify has no `el` (decisions.md). One rule,
+ * Greek (el) docs were dropped (decisions.md). One rule,
  * placed first, sends every el-prefixed docs collection URL (and its `.md`
  * twin) to the same path without `/el`:
  *   /el/docs[.md|/*], /el/learn[.md|/*], /el/developers[.md] and

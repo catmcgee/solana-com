@@ -16,7 +16,7 @@ const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME;
  * Routes not matching will use <a> tags for full page load.
  */
 const APP_INTERNAL_ROUTES: Record<string, RegExp> = {
-  // docs (Mintlify) handles: /developers/docs/*, /learn/<slug>, /developers/cookbook/*,
+  // docs handles: /developers/docs/*, /learn/<slug>, /developers/cookbook/*,
   // /developers/bootcamp/*, and the old /docs/* (redirects to /developers/docs).
   // The /developers and /learn landings are served by apps/web.
   docs: /^\/docs(?:\/|$)|^\/learn\/[^/]|^\/developers\/(?:docs|cookbook|bootcamp)(?:\/|$)/,
@@ -76,8 +76,8 @@ export function shouldUseNextLink(href: string): boolean {
 }
 
 /**
- * True for links into the developer docs (served by Mintlify behind the
- * apps/web proxy): /developers/docs, /<locale>/developers/docs, the
+ * True for links into the developer docs (served by apps/web with
+ * Fumadocs): /developers/docs, /<locale>/developers/docs, the
  * cookbook, the bootcamp and the /learn lessons (not the /learn landing).
  * The old /docs and /<locale>/docs prefixes still count: apps/web redirects
  * them to /developers/docs. These always open in a new tab.

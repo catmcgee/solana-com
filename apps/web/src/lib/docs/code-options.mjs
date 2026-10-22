@@ -1,12 +1,12 @@
 /**
  * Shiki options for docs code blocks (Fumadocs rehype-code).
  *
- * Themes and markup follow the docs as they were on Mintlify: dual themes
+ * Themes and markup follow the docs as they have always been: dual themes
  * github-light / github-dark-dimmed with the light colours inline and the
  * dark ones in `--shiki-dark` (html.dark swaps them, see docs CSS), and
  * `line-highlight` / `line-focus` classes on highlighted or focused lines.
  *
- * Fence meta keeps the Mintlify syntax the content is written in:
+ * Fence meta keeps the syntax the content is written in:
  *   ```lang Title {1-3} highlight={4,6-7} focus={2} expandable wrap lines
  *   ```lang title="Title" ...
  * The parsed values become <pre> attributes (Shiki copies `meta` keys onto
@@ -32,7 +32,7 @@ export function parseRanges(value) {
 }
 
 /**
- * Mintlify fence meta -> attributes. Bare words before the first
+ * Docs fence meta -> attributes. Bare words before the first
  * attribute or `{range}` form the title ("bash Install the CLI").
  */
 export function parseDocsMeta(meta) {

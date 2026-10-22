@@ -1,6 +1,6 @@
 /**
  * Ordered /learn tutorials, ported from apps/docs/src/utils/learn-tutorials.ts.
- * The pages themselves are served by Mintlify at /learn/<slug>; titles and
+ * The pages themselves are docs pages at /learn/<slug>; titles and
  * descriptions come from learn.tutorials.items.<slug> in the web messages.
  */
 export const learnTutorials = [

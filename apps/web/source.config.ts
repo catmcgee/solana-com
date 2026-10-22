@@ -1,6 +1,5 @@
 /**
- * Fumadocs MDX collections for the developer docs (rendered natively by this
- * app since phase 2a; Mintlify is no longer used).
+ * Fumadocs MDX collections for the developer docs (rendered by this app).
  *
  * The content stays where it is, in apps/docs:
  * - `docs`: every English page under apps/docs/developers/{docs,cookbook}
@@ -30,7 +29,7 @@ import { DOCS_LOCALES } from "./src/lib/docs/locales.mjs";
 
 const docsDir = "../docs";
 
-/** Frontmatter used by the docs (Mintlify conventions, kept as written). */
+/** Frontmatter used by the docs (kept as written). */
 const schema = pageSchema
   .extend({
     sidebarTitle: z.string().optional(),

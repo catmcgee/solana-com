@@ -13,7 +13,7 @@ const arrowDir = "rtl:-scale-x-100";
 
 /**
  * /learn landing, ported from apps/docs (learn-page-content.tsx) to a server
- * component. The tutorial pages stay in the docs (Mintlify) at /learn/<slug>.
+ * component. The tutorial pages stay in the docs at /learn/<slug>.
  * Shares the [data-dev-landing] light/dark variables with /developers.
  */
 export async function LearnLanding({ locale }: { locale: string }) {

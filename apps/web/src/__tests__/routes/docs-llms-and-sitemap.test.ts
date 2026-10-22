@@ -101,7 +101,7 @@ describe("docs sitemap", () => {
     expect(entries[2].alternates).toBeUndefined();
   });
 
-  it("lists the Mintlify docs from the manifest, without Greek", async () => {
+  it("lists the docs pages from the manifest, without Greek", async () => {
     const urls = (await docsRoutes()).map((entry) => entry.url);
     expect(urls).toContain("https://solana.com/developers/docs");
     expect(urls).toContain("https://solana.com/developers/docs/core/accounts");

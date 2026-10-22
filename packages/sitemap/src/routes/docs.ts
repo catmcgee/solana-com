@@ -13,7 +13,7 @@ import {
 } from "../utils";
 
 /**
- * Docs pages served by Mintlify (spec §5.11, WP9). The page list comes from
+ * Docs pages (spec §5.11, WP9). The page list comes from
  * packages/docs-tooling/generated/pages.json (`gen:manifest`), which carries
  * titles, git lastmod and the noindex flag. Each page gets hreflang
  * alternates for every language that has its own translation.
@@ -32,7 +32,7 @@ const pagesManifestPath = path.join(
 );
 const docsRoot = path.join(repoRoot, "apps", "docs");
 
-/** Locales Mintlify serves (decisions.md drops Greek). */
+/** Locales the docs are served in (decisions.md drops Greek). */
 export const DOCS_LOCALES = locales.filter((locale) => locale !== "el");
 
 const COLLECTION_ROOTS = new Set(["/developers/docs", "/developers/cookbook"]);
@@ -109,7 +109,7 @@ export function readDocsManifest(
 }
 
 /**
- * Fallback when pages.json has not been generated: walk the Mintlify tree
+ * Fallback when pages.json has not been generated: walk the docs tree
  * (English at apps/docs/<collection>, locales at apps/docs/<loc>/<collection>).
  */
 function walkDocsTree(): DocsManifestPage[] {

@@ -2,10 +2,10 @@
  * The docs header and footer, as shown on the /developers landing
  * (apps/web/src/app/[locale]/developers/docs-header.tsx, docs-footer.tsx).
  *
- * Everything here is read at build time from the Mintlify project, so the
- * landing cannot drift from the docs:
+ * Everything here is read at build time from the docs content (apps/docs),
+ * so the landing cannot drift from the docs:
  * - tabs, their order, icons and first pages: apps/docs/navigation/en.json
- *   (hidden tabs are skipped, as Mintlify does);
+ *   (hidden tabs are skipped, as in the docs);
  * - tab labels per locale: apps/docs/navigation/labels/<loc>.json, keyed the
  *   way docs-tooling keys them (slug of the English tab name; see
  *   packages/docs-tooling/src/nav/labels.ts), falling back to English;
@@ -101,7 +101,7 @@ export function labelSlug(s: string): string {
 }
 
 /**
- * First page of a tab, as Mintlify links it
+ * First page of a tab, as the docs tab bar links it
  * ("developers/docs/payments/index" -> "/developers/docs/payments").
  */
 function firstPage(node: unknown): string | null {
