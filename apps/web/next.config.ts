@@ -9,24 +9,6 @@ import { withSentryConfig } from "@sentry/nextjs";
 import { createMDX } from "fumadocs-mdx/next";
 import { getSecurityHeaders } from "./src/lib/security-headers";
 
-/** Link / x-llms-txt headers on docs pages (agent discovery). */
-const DOCS_AGENT_HEADERS = [
-  {
-    key: "Link",
-    value:
-      '</llms.txt>; rel="llms-txt", </llms-full.txt>; rel="llms-full-txt", </.well-known/mcp/server-card.json>; rel="mcp-server-card"',
-  },
-  { key: "x-llms-txt", value: "/llms.txt" },
-];
-const DOCS_HEADER_SOURCES = [
-  "/developers/:section(docs|cookbook)",
-  "/developers/:section(docs|cookbook)/:path*",
-  "/:locale/developers/:section(docs|cookbook)",
-  "/:locale/developers/:section(docs|cookbook)/:path*",
-  "/learn/:path+",
-  "/:locale/learn/:path+",
-];
-
 // X-Frame-Options, nosniff, X-XSS-Protection, frame-ancestors, plus
 // X-Robots-Tag: noindex on previews. Shared with the docs head injection in
 // src/proxy.ts, which builds its own docs HTML responses.
@@ -252,12 +234,6 @@ const nextConfig: NextConfig = {
           },
         ],
       },
-      // Docs pages and their Markdown twins point agents at the docs
-      // indexes and the MCP server (only what this app serves).
-      ...DOCS_HEADER_SOURCES.map((source) => ({
-        source,
-        headers: DOCS_AGENT_HEADERS,
-      })),
       // Applies to every path, docs included: X-Frame-Options, nosniff,
       // X-XSS-Protection and frame-ancestors, plus X-Robots-Tag: noindex on
       // previews (spec §5.12).

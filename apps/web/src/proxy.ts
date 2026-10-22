@@ -9,6 +9,24 @@ import {
 } from "@/lib/docs-edge/paths";
 import { trackMarkdownRequest } from "@/lib/docs-edge/markdown-analytics";
 
+/**
+ * Agent discovery on docs pages and their Markdown twins: the llms.txt
+ * indexes and the MCP server card, next to the locale alternates the i18n
+ * middleware sends in the same header.
+ */
+export const DOCS_AGENT_LINKS =
+  '</llms.txt>; rel="llms-txt", </llms-full.txt>; rel="llms-full-txt", </.well-known/mcp/server-card.json>; rel="mcp-server-card"';
+
+function withAgentLinks<T extends Response>(res: T): T {
+  const link = res.headers.get("link");
+  res.headers.set(
+    "link",
+    link ? `${link}, ${DOCS_AGENT_LINKS}` : DOCS_AGENT_LINKS,
+  );
+  res.headers.set("x-llms-txt", "/llms.txt");
+  return res;
+}
+
 // The main web app uses routing with locale detection enabled
 // and doesn't need preserveProxiedLocaleCookie since it's the source of truth
 const handleI18nRouting = createMiddleware(routing);
@@ -71,7 +89,7 @@ export function handleDocsRequest(
     );
     const url = req.nextUrl.clone();
     url.pathname = `/api/markdown${info.locale ? `/${info.locale}` : ""}${route}`;
-    return NextResponse.rewrite(url);
+    return withAgentLinks(NextResponse.rewrite(url));
   }
 
   // Files under the docs (per-section /llms.txt) are routes of their own,
@@ -148,6 +166,7 @@ export default async function proxy(req: NextRequest, event: NextFetchEvent) {
 
   const response = await handleI18nRouting(req);
 
+  if (getDocsPathInfo(pathname)) return withAgentLinks(response);
   return response;
 }
 
