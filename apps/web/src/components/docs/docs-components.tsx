@@ -1060,7 +1060,7 @@ function Anchor({
 
 function Table(props: ComponentProps<"table">) {
   // A <table> written in a page renders as written.
-  if (!(props as Record<string, unknown>)["data-md-table"])
+  if ((props as Record<string, unknown>)["data-md-table"] === undefined)
     return <table {...props} />;
   return (
     <div className="table-wrap" data-table-wrapper="true">
