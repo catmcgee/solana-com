@@ -134,7 +134,7 @@ function PaymentVisual({ t }: { t: (key: string) => string }) {
 
 function ApiVisual() {
   const line =
-    "rounded-lg border border-[var(--dl-line)] bg-[var(--dl-surface-2)] px-2.5 py-1.5 motion-safe:animate-[dl-line_4.8s_infinite]";
+    "rounded-lg border border-[var(--dl-line)] bg-[var(--dl-surface-2)] px-2.5 py-1.5 motion-safe:animate-[dl-step_4.8s_infinite]";
   return (
     <div
       dir="ltr"
@@ -144,13 +144,13 @@ function ApiVisual() {
         <b className="font-semibold text-[var(--dl-code-fn)]">GET</b>{" "}
         /api/forecast
       </div>
-      <div className={`${line} [animation-delay:.6s]`}>
+      <div className={`${line} ![animation-delay:1.2s]`}>
         <span className="text-[var(--dl-code-num)]">402</span> price: $0.001
       </div>
-      <div className={`${line} [animation-delay:1.2s]`}>
+      <div className={`${line} ![animation-delay:2.4s]`}>
         <span className="text-[var(--dl-good)]">paid</span> 0.001 USDC
       </div>
-      <div className={`${line} [animation-delay:1.8s]`}>
+      <div className={`${line} ![animation-delay:3.6s]`}>
         <span className="text-[var(--dl-good)]">200</span>{" "}
         {'{ "sky": "clear" }'}
       </div>
@@ -243,7 +243,7 @@ function AssetVisual({ t }: { t: (key: string) => string }) {
           </span>
           <b className="shrink-0 text-[var(--dl-good)]">✓</b>
         </div>
-        <div className={`${row} [animation-delay:2s]`}>
+        <div className={`${row} ![animation-delay:2s]`}>
           <span className="truncate">→ {t("picker.visuals.assetUnknown")}</span>
           <b className="shrink-0 text-[var(--dl-danger)]">✕</b>
         </div>
@@ -262,9 +262,9 @@ function TradeVisual({ t }: { t: (key: string) => string }) {
     <div className="flex flex-col items-center gap-2.5">
       <div dir="ltr" className="flex items-center gap-2.5">
         <span className={leg}>2 NVDAx →</span>
-        <span className={`${leg} [animation-delay:2s]`}>← USDC</span>
+        <span className={leg}>← USDC</span>
       </div>
-      <span className="font-[family-name:var(--dl-mono)] text-xs text-[var(--dl-accent-text)]">
+      <span className="font-[family-name:var(--dl-mono)] text-xs text-[var(--dl-accent-text)] motion-safe:animate-[dl-tag_4s_infinite]">
         {t("picker.visuals.tradeTag")}
       </span>
     </div>
@@ -390,7 +390,7 @@ export async function DevelopersHub({
             body={t("picker.body")}
           />
           <ul
-            className="m-0 grid list-none gap-3.5 p-0 md:grid-cols-2 xl:grid-cols-4 [&_*]:![animation-iteration-count:1] [&_li:hover_*]:![animation-iteration-count:infinite] [&_li:focus-within_*]:![animation-iteration-count:infinite]"
+            className="m-0 grid list-none gap-3.5 p-0 md:grid-cols-2 xl:grid-cols-4"
             data-testid="job-cards"
           >
             {JOB_PATHS.map((job) => {
