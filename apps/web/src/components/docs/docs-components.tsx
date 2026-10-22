@@ -1028,7 +1028,14 @@ function Heading({
   );
 }
 
-function Anchor({ href = "", children, ...rest }: ComponentProps<"a">) {
+/** Markdown links carry the "link" class the docs styles select on. */
+function Anchor({
+  href = "",
+  children,
+  className,
+  ...rest
+}: ComponentProps<"a">) {
+  rest = { ...rest, className: className ? `link ${className}` : "link" };
   if (isDocsHref(href))
     return (
       <DocsLink href={href} {...rest}>
