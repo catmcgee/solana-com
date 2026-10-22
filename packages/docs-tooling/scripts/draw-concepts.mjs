@@ -1989,13 +1989,14 @@ const FIGURES = {
         }),
       );
     });
-    // Label backing: lifelines are dotted and run under message labels.
+    // Lifelines are cut where a label crosses them (6px clear above and
+    // below), instead of running under a tight backing that still read as
+    // a line through the text.
+    const holes = [];
     const back = (x, y, s, anchor) => {
-      const tw = s.length * 5.9 + 8;
+      const tw = s.length * 6.2 + 8;
       const lx = anchor === "middle" ? x - tw / 2 : x - 4;
-      p.front.push(
-        `<rect x="${n(lx)}" y="${n(y - 8)}" width="${n(tw)}" height="16" fill="${c.page}"/>`,
-      );
+      holes.push({ x0: lx, x1: lx + tw, y0: y - 8 - 6, y1: y + 8 + 6 });
     };
     const label = (x, y, s, o = {}) => {
       back(x, y, s, o.anchor);
@@ -2069,11 +2070,27 @@ const FIGURES = {
     y += 16;
     // Lifelines, under everything.
     const end = y - 8;
-    LANES.forEach((l, i) =>
+    LANES.forEach((l, i) => {
+      const x = cx(i);
+      const cuts = holes
+        .filter((h) => x > h.x0 && x < h.x1)
+        .sort((a, b) => a.y0 - b.y0)
+        .reduce((acc, h) => {
+          const last = acc[acc.length - 1];
+          if (last && h.y0 - last.y1 < 24) last.y1 = Math.max(last.y1, h.y1);
+          else acc.push({ y0: h.y0, y1: h.y1 });
+          return acc;
+        }, []);
+      let d = "";
+      let from = top + hh;
+      for (const k of [...cuts, { y0: end, y1: end }]) {
+        if (k.y0 > from) d += `M${n(x + 0.5)} ${n(from)}V${n(k.y0)}`;
+        from = Math.max(from, k.y1);
+      }
       p.back.unshift(
-        `<path d="M${n(cx(i) + 0.5)} ${top + hh}V${n(end)}" stroke="${l.yours ? c.accent : c.line}" stroke-width="${l.yours ? 1.25 : 1}" stroke-dasharray="2 4"/>`,
-      ),
-    );
+        `<path d="${d}" stroke="${l.yours ? c.accent : c.line}" stroke-width="${l.yours ? 1.25 : 1}" stroke-dasharray="2 4"/>`,
+      );
+    });
     return [W, end + 24, FLOW_LABEL];
   },
 
