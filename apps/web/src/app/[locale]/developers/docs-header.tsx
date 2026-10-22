@@ -12,7 +12,6 @@ import { localizedHref } from "@/data/developers/hub";
 import {
   DocsSearchField,
   HeaderMenus,
-  ThemeChoice,
   ThemeToggle,
 } from "./docs-header.client";
 import {
@@ -261,7 +260,10 @@ export async function DocsHeader({
                       >
                         <SolanaLogo gradientId="dh-drawer-logo-g" developers />
                       </a>
-                      <ThemeChoice />
+                      <ThemeToggle
+                        {...toggle}
+                        className="dh-theme dh-theme-mobile"
+                      />
                     </div>
                     <div className="dh-drawer-selects">
                       <LanguageMenu

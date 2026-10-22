@@ -326,68 +326,6 @@ export function DocsSearchField({
  * Closes the header's <details> menus (language, mobile menu) on Escape, on
  * a click outside, and when another one opens. Renders nothing.
  */
-
-/**
- * System / light / dark switch in the docs' phone menu, as the docs menu has
- * had it. Stores the same preference as ThemeToggle ("system" clears it).
- */
-export function ThemeChoice({ className = "dh-theme-choice" }) {
-  const [preference, setPreference] = useState<Preference | null>(null);
-  useEffect(() => {
-    setPreference(readPreference());
-    const observer = new MutationObserver(() =>
-      setPreference(readPreference()),
-    );
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ["class"],
-    });
-    return () => observer.disconnect();
-  }, []);
-  return (
-    <div className={className}>
-      {THEME_CHOICES.map(({ value, label, paths }) => (
-        <button
-          key={value}
-          type="button"
-          aria-label={label}
-          aria-pressed={preference === value}
-          className="dh-theme-option"
-          onClick={() => {
-            try {
-              if (value === "system")
-                window.localStorage.removeItem(DOCS_THEME_STORAGE_KEY);
-              else window.localStorage.setItem(DOCS_THEME_STORAGE_KEY, value);
-            } catch {
-              // Storage blocked: the choice still applies to this page view.
-            }
-            applyPreference(value);
-            setPreference(value);
-          }}
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="18"
-            height="18"
-            viewBox="0 0 18 18"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-            focusable="false"
-          >
-            {paths.map((d) => (
-              <path key={d} d={d} />
-            ))}
-          </svg>
-        </button>
-      ))}
-    </div>
-  );
-}
-
 export function HeaderMenus({ rootId }: { rootId: string }) {
   useEffect(() => {
     const root = document.getElementById(rootId);

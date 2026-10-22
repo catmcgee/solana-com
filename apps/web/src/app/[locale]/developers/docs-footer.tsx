@@ -10,7 +10,6 @@ import {
   SocialIcon,
   SolanaLogo,
 } from "./docs-icons";
-import { ThemeChoice } from "./docs-header.client";
 
 /**
  * The docs footer (Mintlify's, styled by apps/docs/styles/theme.css section
@@ -85,10 +84,7 @@ export async function DocsFooter({
         </div>
         <div className="df-bottom">
           <p>{t("copyright", { year: String(new Date().getFullYear()) })}</p>
-          {developers ? (
-            // The docs footer ends with the theme switch, as before.
-            <ThemeChoice className="df-theme-choice" />
-          ) : (
+          {developers ? null : (
             <ul>
               <li>
                 <a href={localizedHref(locale, "/privacy-policy")}>
