@@ -47,7 +47,7 @@ export function DocsScripts() {
       ))}
       <script
         type="speculationrules"
-        // Prerender /developers on logo hover (was prerender-home.js).
+        // Prerender /developers on logo hover.
         dangerouslySetInnerHTML={{
           __html: JSON.stringify({
             prerender: [

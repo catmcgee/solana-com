@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 /**
- * WP11 theme check: a Playwright visual and assertion pass over the Mintlify
- * docs theme (apps/docs/styles/theme.css + docs.json branding).
+ * WP11 theme check: a Playwright visual and assertion pass over the docs
+ * theme (apps/docs/styles/theme.css, rendered by apps/web).
  *
  * Moved here from migration/wp11-theme-check.mjs at integration (WP12).
- * Run it after every Mintlify version bump and against the deployed site.
+ * Run it after theme changes and against the deployed site.
  *
  * Usage:
- *   pnpm --filter @workspace/docs-tooling theme-check --base http://localhost:3003 [--paths /docs,/ar/docs] [--out dir]
- *   BASE=https://<sub>.mintlify.site pnpm --filter @workspace/docs-tooling theme-check
+ *   pnpm --filter @workspace/docs-tooling theme-check --base http://localhost:3000 [--paths /developers/docs,/ar/developers/docs] [--out dir]
+ *   BASE=https://<preview>.vercel.app pnpm --filter @workspace/docs-tooling theme-check
  *
  * For each path x {light, dark} x {JS on, JS off} x {desktop, mobile} it:
  *   - saves a screenshot to --out (default ./theme-shots)
@@ -27,9 +27,8 @@
  *   - for /ar/ paths, asserts that #content-area is rtl and code blocks are ltr
  *   - with JS off, asserts that no code block is clipped (expandable blocks
  *     are un-collapsed by styles/nojs.css) and no inert "See all" button shows
- * It exits 1 if any assertion fails. Without JS, Mintlify always ships
- * class="dark", so the "light, JS off" run is expected to render dark. The
- * script checks that, rather than treating it as a failure.
+ * It exits 1 if any assertion fails. Without JS the theme class is not
+ * set from the stored choice, so the theme is checked only with JS.
  */
 import { mkdirSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -59,7 +58,7 @@ const BASE = (args.base || process.env.BASE || "http://localhost:3000").replace(
 const PATHS = (
   args.paths ||
   process.env.PATHS ||
-  "/docs,/docs/payments,/docs/payments/checkout/browser,/docs/payments/agentic-payments/x402,/ar/docs"
+  "/developers/docs,/developers/docs/payments,/developers/docs/payments/checkout/browser,/developers/docs/payments/agentic-payments/x402,/ar/developers/docs"
 ).split(",");
 const OUT = args.out || "theme-shots";
 mkdirSync(OUT, { recursive: true });
@@ -145,13 +144,7 @@ for (const path of PATHS) {
             barImage: cs(bar)?.backgroundImage || "",
             barBg: cs(bar)?.backgroundColor || "",
             github: !!q('#navbar a[href^="https://github.com/"]'),
-            // Mintlify's own assistant entries must not show: the floating
-            // "Ask AI" pill (ask-ai.js) is the only way in.
-            assistantBar: [
-              ...document.querySelectorAll(
-                "#assistant-entry, #assistant-entry-mobile, .chat-assistant-floating-input",
-              ),
-            ].some((e) => e.getClientRects().length > 0),
+
             pill: pillBox
               ? {
                   right: Math.round(innerWidth - pillBox.right),
@@ -246,8 +239,6 @@ for (const path of PATHS) {
           };
         });
 
-        if (!js && !r.dark)
-          fail(ctxName, "expected Mintlify's no-JS dark class");
         // Without JS every line of every code block must be readable
         // (nojs.css un-collapses `expandable` blocks).
         if (!js && r.clippedCode)
@@ -262,8 +253,6 @@ for (const path of PATHS) {
         if (r.pageBg !== want && r.pageBg !== "rgba(0, 0, 0, 0)")
           fail(ctxName, `page ${r.pageBg}, expected ${want}`);
         if (r.github) fail(ctxName, "GitHub button in the top bar");
-        if (r.assistantBar)
-          fail(ctxName, "Mintlify assistant entry or bottom bar visible");
         if (js && (!r.pill || r.pill.right > 32 || r.pill.bottom > 32))
           fail(
             ctxName,

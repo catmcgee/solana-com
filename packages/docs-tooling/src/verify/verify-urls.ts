@@ -331,7 +331,12 @@ export function layoutKey(
   return null;
 }
 
-/** JS/CSS that Mintlify would inject on every page (WP1 acceptance). */
+/**
+ * Stray JS/CSS in the docs content root (WP1 acceptance). The allowed
+ * scripts are copied to /docs-scripts/ by apps/web
+ * (scripts/copy-docs-static.mjs); the styles are imported by
+ * components/docs/docs-styles.ts.
+ */
 export function strayAssetsInDocsRoot(
   allow: readonly string[] = [
     "apps/docs/run-examples.js",
@@ -339,26 +344,15 @@ export function strayAssetsInDocsRoot(
     "apps/docs/ask-ai.js",
     // "Open tutorial in Playground" block on tutorial intro pages (styles/playground.css).
     "apps/docs/playground.js",
-    // One-click light/dark switch in the header (styles/theme.css).
-    "apps/docs/theme-toggle.js",
-    // Logo link to /developers as a full page load.
-    "apps/docs/logo-link.js",
-    // Prerenders /developers when the logo is hovered (Speculation Rules).
-    "apps/docs/prerender-home.js",
     // Live "Try it" on RPC method pages (styles/rpc-try-it.css).
     "apps/docs/rpc-try-it.js",
-    // Opens the docs search for /developers/docs?q= links from the /developers header.
-    "apps/docs/search-handoff.js",
     // Video chapters seek the embedded player; video cards open a dialog
     // (styles/video.css; markup from the video-guides transform).
     "apps/docs/video-chapters.js",
     // Copy button and origin swap for the Start here agent banner
     // (styles/agent-banner.css).
     "apps/docs/agent-banner.js",
-    // Puts the reader's OS first in .sol-os-tabs groups (Quickstart install).
-    "apps/docs/os-tabs.js",
-    // Imported by MDX pages, not injected globally. tx-walkthrough.jsx is the
-    // static stand-in for the walkthrough that apps/web renders in React.
+    // MDX snippets imported by pages.
     "apps/docs/snippets/",
     "apps/docs/styles/",
   ],

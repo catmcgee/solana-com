@@ -1,7 +1,7 @@
 /**
  * Residual-syntax scan (spec §4.4.2, WP12): proves no Fumadocs / Code Hike
- * construct survived `convert`, and that nothing Mintlify drops from the
- * server HTML (raw `<details>`, `<noscript>`, `<abbr>`) is emitted.
+ * construct survived `convert`, and that the content keeps out the raw HTML
+ * it has never used (`<details>`, `<noscript>`, `<abbr>`).
  *
  * Line scanner over every published page (apps/docs/**\/*.mdx|md outside
  * snippets/) plus every snippet. It tracks code fences, so:
@@ -75,7 +75,7 @@ export const PATTERNS: ResidualPattern[] = [
     "VideoWithChapters",
     "VideoChapterList",
     "ProjectCardGrid",
-    // Raw HTML that Mintlify strips from the server HTML (setup probe).
+    // Raw HTML the content keeps out (setup probe).
     "details",
     "noscript",
     "abbr",
@@ -150,17 +150,18 @@ export const PATTERNS: ResidualPattern[] = [
     id: "frontmatter url",
     where: "frontmatter",
     re: /^url:/,
-    // WP6's nav-only stub: an external sidebar link (Mintlify `url`).
+    // WP6's nav-only stub: an external sidebar link (`url`).
     allow: (file) => /(^|\/)docs\/tools\/microscope\.mdx$/.test(file),
   },
 ];
 
 /**
- * Mintlify built-in components (https://mintlify.com/docs/components). Any
- * other capitalized JSX tag must be imported in the same file (snippets);
+ * Components the docs content may use without an import (the docs MDX
+ * components, apps/web components/docs/docs-components.tsx). Any other
+ * capitalized JSX tag must be imported in the same file (snippets);
  * otherwise it is a leftover Fumadocs/Code Hike component.
  */
-export const MINTLIFY_COMPONENTS = new Set([
+export const DOCS_COMPONENTS = new Set([
   "Accordion",
   "AccordionGroup",
   "Badge",
@@ -196,12 +197,13 @@ export const MINTLIFY_COMPONENTS = new Set([
   "Tree",
   "Tree.File",
   "Tree.Folder",
+  "TxWalkthrough",
   "Update",
   "View",
   "Warning",
 ]);
 export const UNKNOWN_COMPONENT =
-  "unknown JSX component (not Mintlify, not imported)";
+  "unknown JSX component (not a docs component, not imported)";
 
 export interface ResidualHit {
   pattern: string;
@@ -306,7 +308,7 @@ export function scanSource(file: string, src: string, patterns = PATTERNS) {
       // Inside a quoted attribute value (e.g. type="Array<RpcKeyedAccount>").
       if ((prose.slice(0, m.index).match(/"/g)?.length ?? 0) % 2 === 1)
         continue;
-      if (!MINTLIFY_COMPONENTS.has(name) && !imported.has(name.split(".")[0]!))
+      if (!DOCS_COMPONENTS.has(name) && !imported.has(name.split(".")[0]!))
         report(unknown, i, line);
     }
     for (const p of patterns) {

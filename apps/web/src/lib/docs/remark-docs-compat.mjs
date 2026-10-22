@@ -1,7 +1,7 @@
 /**
- * remark-docs-compat: lets the docs content (apps/docs, written for the
- * Mintlify conventions it was authored in) compile with Fumadocs MDX
- * unchanged.
+ * remark-docs-compat: lets the docs content (apps/docs, written in its own
+ * MDX conventions: absolute /snippets imports, docs heading slugs) compile
+ * with Fumadocs MDX unchanged.
  *
  * - Snippets: `import X from "/snippets/a/b.mdx"` plus `<X />` in the page.
  *   Each `<X />` is replaced by the snippet's own MDX tree (parsed with this
@@ -10,10 +10,10 @@
  *   from snippets reach the TOC, and the processed Markdown (`.md` twins,
  *   llms-full.txt) contains the snippet text, as it did before.
  *   Snippets may import other snippets; those are inlined the same way.
- * - Component stand-ins: `import { X } from "/snippets/x.jsx"` is a
- *   Mintlify-only fallback for a component that apps/web provides in the
- *   docs MDX components (components/docs/docs-components.tsx). The import is
- *   dropped, so `<X>` resolves to the real component here.
+ * - Component imports: `import { X } from "/snippets/x.jsx"` names a
+ *   component that apps/web provides in the docs MDX components
+ *   (components/docs/docs-components.tsx). The import is dropped, so `<X>`
+ *   resolves to the real component here.
  * - Heading ids follow the slugs the docs have always published (kept by
  *   `docsSlug`, used through remarkHeading's `slug` option in
  *   source.config.ts), so existing #anchors keep working.
@@ -199,7 +199,7 @@ function inlineSnippets(processor, tree, file, seen = new Set(), root = file) {
   visit(tree);
 }
 
-/** Drop `/snippets/*.jsx` imports (Mintlify stand-ins, see above). */
+/** Drop `/snippets/*.jsx` imports (component imports, see above). */
 function dropStandInImports(tree) {
   const isStandIn = (statement) =>
     statement.type === "ImportDeclaration" &&

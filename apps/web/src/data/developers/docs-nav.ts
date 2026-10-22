@@ -157,8 +157,8 @@ export function getDocsTabs(locale: string): DocsTab[] {
 export const DOCS_SEARCH_PROMPT: string = docsConfig.search.prompt;
 
 /**
- * Where the /developers search field sends readers. apps/docs
- * search-handoff.js opens the docs search on arrival and types `query`.
+ * Where the /developers search field sends readers. The docs search
+ * (components/docs) opens on arrival and types `query`.
  */
 export function docsSearchHref(locale: string, query = ""): string {
   const docs = localizedHref(locale, "/developers/docs");

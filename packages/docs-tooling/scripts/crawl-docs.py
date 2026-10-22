@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
 Crawl every page in packages/docs-tooling/generated/pages.json against a
-running Mintlify server (`mint dev` or a *.mintlify.site preview) and check
+running docs server (apps/web `next dev` / `next start`, or a Vercel preview) and check
 that each answers HTTP 200 and that its HTML carries the page title (H1 /
 <title>). WP12 integration check.
 
-  python3 scripts/crawl-mint.py --base http://localhost:3333 [--jobs 8] [--out FILE] [--lang en]
+  python3 scripts/crawl-docs.py --base http://localhost:3000 [--jobs 8] [--out FILE] [--lang en]
 """
 import argparse
 import concurrent.futures as cf
@@ -20,7 +20,7 @@ import urllib.request
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 ap = argparse.ArgumentParser()
-ap.add_argument("--base", default="http://localhost:3333")
+ap.add_argument("--base", default="http://localhost:3000")
 ap.add_argument("--jobs", type=int, default=8)
 ap.add_argument("--out", default="/tmp/wp12-crawl.json")
 ap.add_argument("--lang")

@@ -69,7 +69,7 @@ export function TabsClient({
   const root = useRef<HTMLDivElement>(null);
   // OS tabs (<div className="sol-os-tabs"> around macOS / Linux / Windows
   // tabs): the reader's OS moves first and is selected. Without JavaScript,
-  // or on another OS, the content order stays (was apps/docs/os-tabs.js).
+  // or on another OS, the content order stays.
   const [osFirst, setOsFirst] = useState(-1);
   useEffect(() => {
     if (!root.current?.closest(".sol-os-tabs")) return;

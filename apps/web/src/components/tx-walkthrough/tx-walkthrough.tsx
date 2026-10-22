@@ -10,8 +10,7 @@
  * Registered in the docs MDX components (components/docs/docs-components)
  * and mounted on How Solana works (apps/docs/developers/docs/core/index.mdx)
  * around the static transaction-flow diagram, which it draws live. Children
- * (that static diagram, for Mintlify and the Markdown twin) are not
- * rendered here.
+ * (that static diagram, for the Markdown twin) are not rendered here.
  */
 import { highlight } from "fumadocs-core/highlight";
 import fixture from "../../../../../packages/docs-examples/paths/defi/settle-trade/settle-walkthrough.json";

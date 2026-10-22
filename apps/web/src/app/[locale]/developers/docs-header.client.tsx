@@ -85,10 +85,10 @@ const THEME_CHOICES: { value: Preference; label: string; paths: string[] }[] = [
 ];
 
 /**
- * One-click light/dark switch, like the docs (apps/docs/theme-toggle.js): the
+ * One-click light/dark switch, the same on /developers and the docs: the
  * icon is the mode a click switches to (moon in light mode, sun in dark), and
- * the choice is stored in localStorage "isDarkMode", which Mintlify reads on
- * /developers/docs, so it carries over both ways. Until the first click the theme
+ * the choice is stored in localStorage "isDarkMode", which the docs also read
+ * (theme-prepaint.tsx), so it carries over both ways. Until the first click the theme
  * follows the system. Hidden without JavaScript (docs-chrome.css).
  */
 export function ThemeToggle({

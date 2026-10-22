@@ -1122,7 +1122,6 @@ export const docsComponents = {
   Badge,
   Icon,
   Tree,
-  // apps/web only; Mintlify uses the /snippets/tx-walkthrough.jsx stand-in.
   TxWalkthrough,
 };
 

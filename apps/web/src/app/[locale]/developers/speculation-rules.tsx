@@ -1,18 +1,18 @@
 import { localizedHref } from "@/data/developers/hub";
 
 /**
- * Speculation Rules for /developers, so moving into the docs (Mintlify,
- * proxied on this origin) is close to instant:
+ * Speculation Rules for /developers, so moving into the docs (same app, but
+ * a full page load) is close to instant:
  * - the docs home is prefetched as soon as the page loads (`immediate`);
  * - any link on the page to the docs or the cookbook (the header tabs, the
  *   hub's cards) is prerendered when the reader hovers it or presses on it
  *   (`moderate`). Links with a query (the search hand-off,
- *   /developers/docs?q=...) are skipped: search-handoff.js would open the
- *   search dialog inside a page the reader may never see.
+ *   /developers/docs?q=...) are skipped: the docs would open the search
+ *   dialog inside a page the reader may never see.
  * Paired with the cross-document view transition in docs-chrome.css and
  * apps/docs/styles/theme.css (section 18), the header stays put. Browsers
  * without Speculation Rules ignore the script type and navigate normally.
- * apps/docs/prerender-home.js does the reverse (docs logo -> /developers).
+ * components/docs/docs-scripts.tsx does the reverse (docs logo -> /developers).
  */
 export function getDeveloperSpeculationRules(locale: string) {
   const prefix = locale === "en" ? "" : `/${locale}`;
