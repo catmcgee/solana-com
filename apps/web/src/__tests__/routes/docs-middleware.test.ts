@@ -5,6 +5,7 @@ import { tryToParsePath } from "next/dist/lib/try-to-parse-path";
 import middleware, {
   config,
   handleDocsRequest,
+  isDeveloperDocsPath,
   isProxiedPath,
 } from "@@/src/proxy";
 import {
@@ -339,5 +340,48 @@ describe("middleware matcher", () => {
     ]) {
       expect(matchesMiddleware(path), path).toBe(false);
     }
+  });
+});
+
+describe("docs locale cookie", () => {
+  const spanish = { cookie: "SOLANA_LOCALE=es", "accept-language": "es" };
+  const run = (path: string, headers: Record<string, string> = {}) =>
+    middleware(
+      request(path, headers),
+      fakeEvent() as unknown as Parameters<typeof middleware>[1],
+    );
+
+  it("serves English docs URLs in English despite a Spanish cookie", async () => {
+    for (const path of ["/developers/docs", "/developers/docs/core/accounts"]) {
+      const res = await run(path, spanish);
+      expect(res.headers.get("location"), path).toBeNull();
+      expect(res.headers.get("x-middleware-rewrite"), path).toBe(
+        `https://solana.com/en${path}`,
+      );
+    }
+  });
+
+  it("keeps translated docs URLs translated", async () => {
+    const res = await run("/es/developers/docs/core", spanish);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("location")).toBeNull();
+    // Visiting a translated page still records the choice for the site.
+    const fresh = await run("/es/developers/docs/core");
+    expect(fresh.headers.get("set-cookie")).toContain("SOLANA_LOCALE=es");
+  });
+
+  it("still follows the cookie on the rest of solana.com", async () => {
+    const res = await run("/developers", spanish);
+    expect(res.headers.get("location")).toBe(
+      "https://solana.com/es/developers",
+    );
+  });
+
+  it("recognises only /developers/docs paths", () => {
+    expect(isDeveloperDocsPath("/developers/docs")).toBe(true);
+    expect(isDeveloperDocsPath("/es/developers/docs/core")).toBe(true);
+    expect(isDeveloperDocsPath("/developers/docsx")).toBe(false);
+    expect(isDeveloperDocsPath("/developers/cookbook")).toBe(false);
+    expect(isDeveloperDocsPath("/developers")).toBe(false);
   });
 });

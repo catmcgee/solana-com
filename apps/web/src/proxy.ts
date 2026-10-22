@@ -1,4 +1,8 @@
-import { createMiddleware, routing } from "@workspace/i18n/middleware";
+import {
+  createMiddleware,
+  routing,
+  routingWithoutDetection,
+} from "@workspace/i18n/middleware";
 import { NextFetchEvent, NextRequest, NextResponse } from "next/server";
 import { locales } from "@workspace/i18n/config";
 import { getPathnameWithoutLocale } from "@workspace/i18n/pathname";
@@ -30,6 +34,19 @@ function withAgentLinks<T extends Response>(res: T): T {
 // The main web app uses routing with locale detection enabled
 // and doesn't need preserveProxiedLocaleCookie since it's the source of truth
 const handleI18nRouting = createMiddleware(routing);
+
+// The developer docs keep the locale of the URL, as on Mintlify: an
+// unprefixed (English) docs URL serves English and never redirects to the
+// locale cookie (set by visiting a translated page) or Accept-Language.
+const handleDocsI18nRouting = createMiddleware(routingWithoutDetection);
+
+export function isDeveloperDocsPath(pathname: string) {
+  const rest = getDocsPathInfo(pathname)?.rest.toLowerCase();
+  return (
+    rest !== undefined &&
+    (rest === "/developers/docs" || rest.startsWith("/developers/docs/"))
+  );
+}
 
 export function isProxiedPath(normalizedPathname: string) {
   return (
@@ -164,7 +181,9 @@ export default async function proxy(req: NextRequest, event: NextFetchEvent) {
     req.nextUrl.searchParams.delete("slug");
   }
 
-  const response = await handleI18nRouting(req);
+  const response = isDeveloperDocsPath(pathname)
+    ? await handleDocsI18nRouting(req)
+    : await handleI18nRouting(req);
 
   if (getDocsPathInfo(pathname)) return withAgentLinks(response);
   return response;
