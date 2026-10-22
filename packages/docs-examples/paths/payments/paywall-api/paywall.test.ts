@@ -8,7 +8,7 @@ import { createPaywallServer } from "./server";
 import { NETWORK } from "./x402";
 
 const out = (name: string) => new URL(`./${name}.output.txt`, import.meta.url);
-const PRICE = 10_000n; // 0.01 USDC
+const PRICE = 1_000n; // 0.001 USDC
 
 describe("paths/payments/paywall-api (x402-style)", () => {
   let buyer: KeyPairSigner;

@@ -27,7 +27,8 @@
  * `<span className="sol-h" title=full>` holding the full value and a
  * middle-ellipsis short form (CSS shows the full one without JS); `key:`
  * tokens, HTTP status codes after `->` and whole-line tones (error, ok, warn)
- * are marked for tinting. The text itself is the recorded output, unchanged.
+ * are marked for tinting. URLs stay whole, as plain (inline code) text that
+ * is never a link. The text itself is the recorded output, unchanged.
  */
 import { existsSync, readFileSync } from "node:fs";
 
@@ -147,12 +148,17 @@ export function termLiteral(s: string) {
   const m = /^(\s*)([\s\S]*?)(\s*)$/.exec(s)!;
   const [, lead, body, trail] = m;
   if (!body) return termText(s);
+  return `${termText(lead!)}${codeSpan(body)}${termText(trail!)}`;
+}
+
+/** An inline code span holding `body` verbatim (no leading/trailing space). */
+function codeSpan(body: string) {
   let longest = 0;
   for (const r of body.matchAll(/`+/g))
     longest = Math.max(longest, r[0].length);
   const ticks = "`".repeat(longest + 1);
   const pad = /^`|`$/.test(body) ? " " : "";
-  return `${termText(lead!)}${ticks}${pad}${body}${pad}${ticks}${termText(trail!)}`;
+  return `${ticks}${pad}${body}${pad}${ticks}`;
 }
 
 /** A JSX string attribute (quotes picked so no escaping is needed). */
@@ -183,6 +189,8 @@ const TOKEN_RE = new RegExp(
     `(?<=^|\\s)([A-Za-z][\\w-]*:)(?=\\s|$)`,
     // 3, 4: HTTP status after an arrow
     `(->\\s)(\\d{3})\\b`,
+    // 5: a URL, without trailing punctuation
+    `(?<![\\w/])(https?:\\/\\/[^\\s"'<>\`]*[^\\s"'<>\`.,;:!?)])`,
   ].join("|"),
   "g",
 );
@@ -199,7 +207,9 @@ export function shortB58(v: string) {
 /** Whole-line tone of a recorded output line. */
 export function lineTone(line: string): Tone | undefined {
   if (
-    /\b(failed|rejected|refused|error|mismatch|already used)\b/i.test(line) ||
+    /\b(failed|rejected|refused|blocked|error|mismatch|already used)\b/i.test(
+      line,
+    ) ||
     /^\s*err:/.test(line) ||
     /"paid":false|\bpaid: [Ff]alse\b/.test(line)
   )
@@ -234,7 +244,15 @@ export function termInline(text: string) {
     const i = m.index!;
     plain += text.slice(last, i);
     last = i + m[0].length;
-    if (m[1]) {
+    if (m[5]) {
+      // A URL stays whole and plain: inline code, which GFM never autolinks
+      // and the typography pass leaves alone (styles/demo.css makes it read
+      // like the rest of the line). Recorded runs are on Surfpool, so a link to the
+      // transaction or account would point at nothing on devnet, and the
+      // base58 highlighting would otherwise split the URL and cut its link.
+      flush();
+      out += codeSpan(m[5]);
+    } else if (m[1]) {
       const v = m[1];
       flush();
       out += `<span className="sol-h" title="${v}"><span className="sol-h-f">${v}</span><span className="sol-h-s" aria-hidden="true">${shortB58(v)}</span></span>`;

@@ -252,8 +252,7 @@ theme. Brand files are in `apps/docs/docs-assets/brand/`:
 - Fonts are in `apps/docs/fonts/` (served at `/fonts/*`, proxied by apps/web):
   ABC Diatype (300/400/500/700 plus italics), ABC Monument Extended (400/700)
   and ABC Favorit Mono (variable). All are woff2 copies of `apps/web/src/fonts`.
-  docs.json `fonts.*.source` must start with `fonts/` (see theme.css section
-  1).
+  docs.json `fonts.*.source` must start with `fonts/` (see theme.css section 1).
 
 Theme rules:
 
@@ -411,17 +410,17 @@ server-renders inactive Tabs/CodeGroup panels but hides them;
 `html:not([data-theme-preference])` (Mintlify's head script sets that attribute;
 without JS it never appears). Patterns:
 
-| Need                                  | Use                                                                                                                                                                                                                                                                                              | Never                                                                                         |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
-| Hide-without-JS-only content          | `className="nojs-only"` (`div` or `span`)                                                                                                                                                                                                                                                        | raw `<noscript>` (stripped)                                                                   |
-| Collapsible                           | `<Accordion>` / `<Expandable>` (native `<details>`)                                                                                                                                                                                                                                              | raw `<details>`, `<abbr>` (stripped)                                                          |
-| Tooltip text                          | `<Tooltip tip="T">x</Tooltip><span className="nojs-only"> (T)</span>` (sibling, not child)                                                                                                                                                                                                       | text only in `tip`                                                                            |
-| Mermaid                               | keep the fence; convert adds `<div className="sol-mermaid" data-fallback="mermaid">` with the pre-rendered light/dark SVG (run `tsx scripts/render-mermaid.ts` then `python3 scripts/embed-diagram-fonts.py`); caption `.sol-caption`                                                            | hand-written fallback divs                                                                    |
-| iframe / YouTube                      | `<Frame><iframe/></Frame>` plus a plain link right after (no iframe is in the server HTML; nojs.css hides the empty box)                                                                                                                                                                         | iframe alone                                                                                  |
-| Video chapters / video cards          | written by the `video-guides` transform: chapter links in `<div className="sol-chapters" data-video="<id>">` seek the embedded player in place, cards in `<div className="sol-video-modal">` open a dialog (`video-chapters.js`, `styles/video.css`); both are plain `youtu.be` links without JS | links that only work with JS                                                                  |
+| Need                                  | Use                                                                                                                                                                                                                                                                                                                                                                      | Never                                                                                         |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
+| Hide-without-JS-only content          | `className="nojs-only"` (`div` or `span`)                                                                                                                                                                                                                                                                                                                                | raw `<noscript>` (stripped)                                                                   |
+| Collapsible                           | `<Accordion>` / `<Expandable>` (native `<details>`)                                                                                                                                                                                                                                                                                                                      | raw `<details>`, `<abbr>` (stripped)                                                          |
+| Tooltip text                          | `<Tooltip tip="T">x</Tooltip><span className="nojs-only"> (T)</span>` (sibling, not child)                                                                                                                                                                                                                                                                               | text only in `tip`                                                                            |
+| Mermaid                               | keep the fence; convert adds `<div className="sol-mermaid" data-fallback="mermaid">` with the pre-rendered light/dark SVG (run `tsx scripts/render-mermaid.ts` then `python3 scripts/embed-diagram-fonts.py`); caption `.sol-caption`                                                                                                                                    | hand-written fallback divs                                                                    |
+| iframe / YouTube                      | `<Frame><iframe/></Frame>` plus a plain link right after (no iframe is in the server HTML; nojs.css hides the empty box)                                                                                                                                                                                                                                                 | iframe alone                                                                                  |
+| Video chapters / video cards          | written by the `video-guides` transform: chapter links in `<div className="sol-chapters" data-video="<id>">` seek the embedded player in place, cards in `<div className="sol-video-modal">` open a dialog (`video-chapters.js`, `styles/video.css`); both are plain `youtu.be` links without JS                                                                         | links that only work with JS                                                                  |
 | Embedded YouTube video                | write `<Frame><iframe src="https://www.youtube-nocookie.com/embed/<id>" title="…" /></Frame>` and run `convert`: the `video-poster` transform turns it into a server-rendered `a.sol-yt` poster (thumbnail and play button) that `video-chapters.js` swaps for the autoplaying player in place; without JS it links to YouTube. Playlists need a `PLAYLIST_THUMBS` entry | a separate "Watch on YouTube" link (the poster is the link)                                   |
-| Snippets that must render server-side | default-imported MDX snippet with string props, or page-local `export const`                                                                                                                                                                                                                     | `/snippets/*.jsx` components or JSX expression children `{"…"}` inside snippets (client-only) |
-| Code in several languages             | `<CodeGroup>` (titles = tab labels; without JS panels are numbered `1 · …` to match the tab row)                                                                                                                                                                                                 |                                                                                               |
+| Snippets that must render server-side | default-imported MDX snippet with string props, or page-local `export const`                                                                                                                                                                                                                                                                                             | `/snippets/*.jsx` components or JSX expression children `{"…"}` inside snippets (client-only) |
+| Code in several languages             | `<CodeGroup>` (titles = tab labels; without JS panels are numbered `1 · …` to match the tab row)                                                                                                                                                                                                                                                                         |                                                                                               |
 
 `expandable` code blocks: Mintlify server-renders every line but collapses the
 block to 190px behind a "See all N lines" button that needs JS. `nojs.css`
@@ -548,12 +547,11 @@ solana.com) before cutover. `mint dev` cannot answer them:
   folder. Keep a new tutorial's examples in such a folder, named after its key
   in `paths.en.json` (gen:paths warns when it finds no folder). The wording is
   shared by every tutorial, in `_ui` (`playground`, `playgroundOff`,
-  `playgroundNote`); there are no per-tutorial overrides. A single-page
-  tutorial writes the same markup by hand at the top of the page (see
-  `programs/build-first-program.mdx`).
-  The button is generated disabled (no href, greyed, tooltip). `playground.js`
-  (styles `styles/playground.css`) turns it into
-  `<origin>/github.com/<source>/<data-pg-open>` when its `data-pg-kind`
+  `playgroundNote`); there are no per-tutorial overrides. A single-page tutorial
+  writes the same markup by hand at the top of the page (see
+  `programs/build-first-program.mdx`). The button is generated disabled (no
+  href, greyed, tooltip). `playground.js` (styles `styles/playground.css`) turns
+  it into `<origin>/github.com/<source>/<data-pg-open>` when its `data-pg-kind`
   (`src/examples/playground.ts`) is in `CONFIG.enabledKinds`. `source` is the
   one owner/repo/ref value in `playground.js`
   (`catmcgee/solana-com/tree/mintlify-migration`, which becomes
@@ -563,9 +561,9 @@ solana.com) before cutover. `mint dev` cannot answer them:
   identify framework" on TS/JS/Rust-client/Python, checked 2026-10-16), so
   `CONFIG.enabledKinds` is `anchor`, `native`: the job tutorials (TypeScript)
   stay greyed with their tooltip, and "Build your first program" (Anchor) is
-  live. Add a kind there when the playground can import it. Linked folders
-  must exist at that ref on GitHub. Each import costs one unauthenticated
-  GitHub API call per folder (60/hour per reader IP).
+  live. Add a kind there when the playground can import it. Linked folders must
+  exist at that ref on GitHub. Each import costs one unauthenticated GitHub API
+  call per folder (60/hour per reader IP).
 - **Terminal panels (job paths).** A recorded output with a `<stem>.run.json`
   next to its `<stem>.output.txt` renders as a terminal panel
   (`src/lib/terminal.ts`, styles `apps/docs/styles/demo.css`, behaviour
@@ -583,18 +581,17 @@ solana.com) before cutover. `mint dev` cannot answer them:
   the reader's browser or on a live network.
 - **Collections (WP7).** Bootcamp lessons carry `{/* bootcamp:video */}`; delete
   that block to re-inject after a curriculum video change. Learn order is
-  `LEARN_ORDER` in `transforms/learn.ts`. `docs/tools/ai` ("Build onchain AI agents",
-  Resources > Build apps, and the "Onchain AI agents" card on
+  `LEARN_ORDER` in `transforms/learn.ts`. `docs/tools/ai` ("Build onchain AI
+  agents", Resources > Build apps, and the "Onchain AI agents" card on
   `docs/tools/index`) is a live page: its content (SendAI Agent Kit, Eliza,
   GOAT, LangChain, onchain agent programs) is about agents that transact, not
   coding assistants (`intro/coding-with-agents`, "Build with AI agents"); the
-  two pages link to each other. The bootcamp lessons live in a hidden
-  "Bootcamp" tab (own sidebar at `/developers/bootcamp/**`); the Video
-  tutorials tab lists only the `video-guides` pages, which link to the matching
-  lesson course. oxfmt runs on
-  staged EN content at commit, so generator output must be oxfmt-stable (it
-  de-indents JSX children after a blank line and re-wraps attributes longer than
-  80 characters).
+  two pages link to each other. The bootcamp lessons live in a hidden "Bootcamp"
+  tab (own sidebar at `/developers/bootcamp/**`); the Video tutorials tab lists
+  only the `video-guides` pages, which link to the matching lesson course. oxfmt
+  runs on staged EN content at commit, so generator output must be oxfmt-stable
+  (it de-indents JSX children after a blank line and re-wraps attributes longer
+  than 80 characters).
 - **Cross-tab cards (2026-10-16, `cross-tab-cards.ts`).** A `<Card>` on a
   Payments, Assets or Markets page whose href is filed under another tab in
   `navigation/en.json` gets Mintlify's `arrow` prop (a small ↗, server-rendered,
@@ -605,13 +602,13 @@ solana.com) before cutover. `mint dev` cannot answer them:
   `programs/build-first-program`, the "Build your first program" page). The
   page's hand-written `.sol-pg-tut` button opens the program crate and is live
   once the files are on the `playground.js` source ref.
-- **Navigation (WP6).** Edit `navigation/en.json` by hand, then `nav:build`.
-  A tab can list `pages` directly instead of `groups` (Start here does): its
-  pages render as plain sidebar entries with no group header, and a nested
-  group (the Quickstart box) renders as a collapsible entry.
-  Locale label keys are slugs of the English label path (`labels.ts`), not
-  stable ids: renaming or moving an English group silently drops its
-  translations back to English (listed in `generated/untranslated.json`).
+- **Navigation (WP6).** Edit `navigation/en.json` by hand, then `nav:build`. A
+  tab can list `pages` directly instead of `groups` (Start here does): its pages
+  render as plain sidebar entries with no group header, and a nested group (the
+  Quickstart box) renders as a collapsible entry. Locale label keys are slugs of
+  the English label path (`labels.ts`), not stable ids: renaming or moving an
+  English group silently drops its translations back to English (listed in
+  `generated/untranslated.json`).
 
 ## Path and concept components (WP8b)
 
@@ -882,22 +879,26 @@ segment, after a vertical one), never knocked out on it. Don't repeat the Frame
 caption inside the figure. On phones (<640px) the core figures switch to a
 portrait drawing (`<name>-sm-light.svg` / `<name>-sm.svg`, same Frame, listed
 after the desktop pair; `draw-concepts.mjs` draws it, `styles/diagrams.css`
-picks it); other diagram images keep a 560px minimum width and scroll sideways
-with a fading edge. Left-to-right mermaid flowcharts get a top-to-bottom phone
-drawing the same way (`<hash>-sm*.svg`, written by the mermaid transform and
-`render-mermaid.ts`). In sequence diagrams, `%% focal: <message>` marks the one
-message drawn in the accent; flowcharts use `class X focal`. The core-concept
-and token figures are hand-laid-out in `scripts/draw-concepts.mjs` (root
-`data-sol-drawn="hand"`, skipped by the passes below). Pipeline, in order:
-`draw-concepts.mjs` / `draw-diagrams.mjs`, `sync-diagram-themes.mjs` (generated
-core/hub diagrams and their dark pairs), `brand-diagrams.mjs` (folds every other
-colour into the system; `--check`), then `embed-diagram-fonts.py` (`--check`).
-Labels must be SVG `<text>` in Diatype so they render in Diatype inside `<img>`.
-The script passes never spread the accent: `brand-diagrams.mjs` keeps it on one
-shape per file (`FOCAL`, default the first) and turns filled triangle heads into
-open chevrons. Mermaid uses the same system (`render-mermaid.ts`; see above).
-Linear flows on hub and path pages are HTML, not images:
-`<ol className="sol-flow not-prose">` with
+picks it). The older static figures (frontend, finance/privacy, Kora, Actions)
+have portrait drawings there too; a diagram image without one keeps a 560px
+minimum width and scrolls sideways with a fading edge. Every mermaid flowchart
+and sequence diagram gets a 336px phone drawing the same way (`<hash>-sm*.svg`,
+linked by the mermaid transform, drawn by `scripts/mermaid-phone.ts` from
+`render-mermaid.ts`): sequences as numbered steps with sender and receiver
+badges, flowcharts as an indented top-to-bottom tree, where an edge the tree
+cannot draw is a dashed chip naming its target. In sequence diagrams,
+`%% focal: <message>` marks the one message drawn in the accent; flowcharts use
+`class X focal`. The core-concept and token figures are hand-laid-out in
+`scripts/draw-concepts.mjs` (root `data-sol-drawn="hand"`, skipped by the passes
+below). Pipeline, in order: `draw-concepts.mjs` / `draw-diagrams.mjs`,
+`sync-diagram-themes.mjs` (generated core/hub diagrams and their dark pairs),
+`brand-diagrams.mjs` (folds every other colour into the system; `--check`), then
+`embed-diagram-fonts.py` (`--check`). Labels must be SVG `<text>` in Diatype so
+they render in Diatype inside `<img>`. The script passes never spread the
+accent: `brand-diagrams.mjs` keeps it on one shape per file (`FOCAL`, default
+the first) and turns filled triangle heads into open chevrons. Mermaid uses the
+same system (`render-mermaid.ts`; see above). Linear flows on hub and path pages
+are HTML, not images: `<ol className="sol-flow not-prose">` with
 `<li><b>Step</b><span>caption</span></li>` draws a numbered step rail
 (horizontal from 640px, vertical below). The last step's badge carries the
 accent; put `data-accent` on one `<li>` to move it.

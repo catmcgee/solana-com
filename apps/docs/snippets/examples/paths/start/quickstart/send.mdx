@@ -2,69 +2,37 @@
 
 ```ts send-dollars.ts
 import { generateKeyPairSigner } from "@solana/kit";
-import {
-  findAssociatedTokenPda,
-  getCreateAssociatedTokenIdempotentInstruction,
-  getTransferCheckedInstruction,
-  TOKEN_PROGRAM_ADDRESS,
-} from "@solana-program/token";
-import { loadWallet, rpc, send, USDC_DECIMALS, USDC_MINT } from "./config";
+import { client, tokenBalance, USDC_MINT } from "./client";
 
-const wallet = await loadWallet();
-// A brand-new address to pay. Any Solana address works here.
-const { address: recipient } = await generateKeyPairSigner();
-
-// Each wallet holds USDC in its own token account for the USDC mint.
-const tokenAccount = async (owner: typeof recipient) =>
-  (
-    await findAssociatedTokenPda({
-      mint: USDC_MINT,
-      owner,
-      tokenProgram: TOKEN_PROGRAM_ADDRESS,
-    })
-  )[0];
-const source = await tokenAccount(wallet.address);
-const destination = await tokenAccount(recipient);
-
-const amount = 1_000_000n; // 1 USDC: amounts are in base units (6 decimals)
-const balance = await rpc
-  .getTokenAccountBalance(source)
-  .send()
-  .then(({ value }) => BigInt(value.amount))
-  .catch(() => 0n);
-if (balance < amount) {
+const wallet = client.identity;
+if (Number(await tokenBalance(wallet.address)) < 1) {
   console.log(
     `No devnet USDC yet. Get some for ${wallet.address} at https://faucet.circle.com (pick Solana Devnet), then run this again.`,
   );
   process.exit(0);
 }
 
-// Two instructions in one transaction: open the recipient's token account
-// (if it doesn't exist yet), then move 1 USDC into it.
-const openAccount = getCreateAssociatedTokenIdempotentInstruction({
-  payer: wallet,
-  ata: destination,
-  owner: recipient,
-  mint: USDC_MINT,
-});
-const transfer = getTransferCheckedInstruction({
-  source,
-  mint: USDC_MINT,
-  destination,
-  authority: wallet,
-  amount,
-  decimals: USDC_DECIMALS,
-});
+// A brand-new address to pay. Any Solana address works here.
+const { address: recipient } = await generateKeyPairSigner();
 
-const signature = await send(wallet, [openAccount, transfer]);
+// Opens the recipient's USDC token account if needed, then moves 1 USDC
+// (1,000,000 base units: USDC has 6 decimals) with TransferChecked.
+const { context } = await client.token.instructions
+  .transferToATA({
+    mint: USDC_MINT,
+    authority: wallet,
+    recipient,
+    amount: 1_000_000n,
+    decimals: 6,
+  })
+  .sendTransaction();
+
 console.log("Sent 1 USDC to", recipient);
-console.log("Signature:", signature);
+console.log("Signature:", context.signature);
 console.log(
-  `Explorer: https://explorer.solana.com/tx/${signature}?cluster=devnet`,
+  `Explorer: https://explorer.solana.com/tx/${context.signature}?cluster=devnet`,
 );
-
-const { value } = await rpc.getTokenAccountBalance(destination).send();
-console.log("Recipient balance:", value.uiAmountString, "USDC");
+console.log("Recipient balance:", await tokenBalance(recipient), "USDC");
 ```
 
 <div className="sol-term not-prose" data-term="paths/start/quickstart/send" data-tab="send-dollars.ts" data-kind="block" data-steps="1" data-l-run="Run" data-l-run-step="Run step" data-l-next="Next step" data-l-all="Run all" data-l-again="Run again" data-l-running="Running…" data-l-tx="Sending transaction…" data-l-http="Requesting…" data-l-call="Running…" data-l-confirming="Confirming…" data-l-done="Done" data-l-copied="Copied" data-l-step="Step">
@@ -72,9 +40,9 @@ console.log("Recipient balance:", value.uiAmountString, "USDC");
 <div className="sol-term-screen" role="region" tabIndex="0" aria-label="Output of npx tsx send-dollars.ts: Output">
 <div className="sol-term-step" data-step="1" data-pending="tx">
 <div className="sol-term-row sol-term-cmd"><span className="sol-term-ps" aria-hidden="true">\$</span> npx tsx send-dollars.ts</div>
-<div className="sol-term-row sol-term-ln">Sent 1 USDC to <span className="sol-h" title="DQreTwgG7VhVDtdgRA991X439HBV9XxZuRRNsZUyh3FE"><span className="sol-h-f">DQreTwgG7VhVDtdgRA991X439HBV9XxZuRRNsZUyh3FE</span><span className="sol-h-s" aria-hidden="true">DQre…h3FE</span></span></div>
-<div className="sol-term-row sol-term-ln"><span className="sol-term-k">Signature\:</span> <span className="sol-h" title="fRMQoirpERWfXMeZQ7Ydxr36aa3ZKypXQvdBjfpN2AC8g8ng2uxy3szSVtMTkwoZ1Dqnb58onGsD4Y67WwqJBun"><span className="sol-h-f">fRMQoirpERWfXMeZQ7Ydxr36aa3ZKypXQvdBjfpN2AC8g8ng2uxy3szSVtMTkwoZ1Dqnb58onGsD4Y67WwqJBun</span><span className="sol-h-s" aria-hidden="true">fRMQ…JBun</span></span></div>
-<div className="sol-term-row sol-term-ln"><span className="sol-term-k">Explorer\:</span> https\://explorer.solana.com/tx/<span className="sol-h" title="fRMQoirpERWfXMeZQ7Ydxr36aa3ZKypXQvdBjfpN2AC8g8ng2uxy3szSVtMTkwoZ1Dqnb58onGsD4Y67WwqJBun"><span className="sol-h-f">fRMQoirpERWfXMeZQ7Ydxr36aa3ZKypXQvdBjfpN2AC8g8ng2uxy3szSVtMTkwoZ1Dqnb58onGsD4Y67WwqJBun</span><span className="sol-h-s" aria-hidden="true">fRMQ…JBun</span></span>?cluster=devnet</div>
+<div className="sol-term-row sol-term-ln">Sent 1 USDC to <span className="sol-h" title="7uayuZtw7YLxuGqU9cQ47wGqPsoZBhivDHDfLqP6Xckz"><span className="sol-h-f">7uayuZtw7YLxuGqU9cQ47wGqPsoZBhivDHDfLqP6Xckz</span><span className="sol-h-s" aria-hidden="true">7uay…Xckz</span></span></div>
+<div className="sol-term-row sol-term-ln"><span className="sol-term-k">Signature\:</span> <span className="sol-h" title="66vHKDBp1xddS9Sc4SA5ymX56HNjsRoPaFwZud4dTEsFQeWmQ4LEDq1AGd4T69tQZHE8VwiHx9mozFG8p4qVxeQE"><span className="sol-h-f">66vHKDBp1xddS9Sc4SA5ymX56HNjsRoPaFwZud4dTEsFQeWmQ4LEDq1AGd4T69tQZHE8VwiHx9mozFG8p4qVxeQE</span><span className="sol-h-s" aria-hidden="true">66vH…xeQE</span></span></div>
+<div className="sol-term-row sol-term-ln"><span className="sol-term-k">Explorer\:</span> `https://explorer.solana.com/tx/66vHKDBp1xddS9Sc4SA5ymX56HNjsRoPaFwZud4dTEsFQeWmQ4LEDq1AGd4T69tQZHE8VwiHx9mozFG8p4qVxeQE?cluster=devnet`</div>
 <div className="sol-term-row sol-term-ln">Recipient <span className="sol-term-k">balance\:</span> 1 USDC</div>
 <div className="sol-term-result"><span className="sol-term-badge" data-tone="ok">Confirmed</span></div>
 </div>

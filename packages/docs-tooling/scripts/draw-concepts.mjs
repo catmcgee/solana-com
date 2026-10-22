@@ -520,6 +520,98 @@ function ed25519(p, { x0, y0, x1, y1 }) {
   };
 }
 
+/* One transaction, step by step (diagrams/transaction-flow): lanes left to
+ * right, then the messages in order. `yours` marks the lanes that hold the
+ * reader's code. Checked against core/transactions, fees, pda, and cpi:
+ * signatures are verified and the fee is charged before any instruction
+ * runs, and the fee stays charged if execution fails (so it sits outside
+ * the atomic box); a PDA signs only through its own program's
+ * invoke_signed. */
+const LANES = [
+  { title: "Your app", desc: ["Your code,", "offchain"], yours: true },
+  { title: "Wallet", desc: ["Signs and", "pays fees"] },
+  { title: "Network", desc: ["Validators", "verify and run"] },
+  { title: "Your program", desc: ["Your code,", "onchain"], yours: true },
+  { title: "Token Program", desc: ["An existing", "program"] },
+  { title: "Accounts", desc: ["Onchain", "state"] },
+];
+const SEQ = [
+  {
+    from: 0,
+    self: true,
+    label: "build transaction",
+    sub: "instructions, recent blockhash",
+    step: ["Build the transaction: instructions", "and a recent blockhash."],
+  },
+  { from: 0, to: 1, label: "ask to sign", step: ["Ask the wallet to sign."] },
+  {
+    from: 1,
+    to: 0,
+    ret: true,
+    label: "signature",
+    step: ["Sign and return the signature."],
+  },
+  {
+    from: 0,
+    to: 2,
+    label: "send transaction through RPC",
+    step: ["Send the transaction through RPC."],
+  },
+  {
+    from: 2,
+    self: true,
+    label: "verify signatures",
+    step: ["Verify every signature."],
+  },
+  {
+    from: 2,
+    to: 1,
+    label: "charge fee",
+    note: "Charged even if the transaction fails",
+    step: [
+      "Charge the fee to the fee payer. It is",
+      "charged even if the transaction fails.",
+    ],
+  },
+  { atomic: "start" },
+  {
+    from: 2,
+    to: 3,
+    label: "run instruction",
+    step: ["Run your program’s instruction."],
+  },
+  { from: 3, self: true, label: "derive PDA", step: ["Derive a PDA."] },
+  { from: 3, to: 5, label: "read state", step: ["Read state."] },
+  {
+    from: 3,
+    to: 4,
+    label: "transfer (CPI)",
+    label2: "PDA signs",
+    step: ["Transfer tokens through a CPI.", "The PDA signs."],
+  },
+  {
+    from: 4,
+    to: 5,
+    label: "write balances",
+    step: ["Write the new balances."],
+  },
+  { from: 4, to: 3, ret: true, label: "OK", step: ["Return OK."] },
+  { from: 3, to: 5, label: "write state", step: ["Write state."] },
+  { from: 3, to: 2, ret: true, label: "OK", step: ["Return OK."] },
+  { atomic: "end" },
+  {
+    from: 2,
+    to: 0,
+    ret: true,
+    label: "confirmation (signature status)",
+    step: ["Report the confirmation (signature status)."],
+  },
+];
+const FLOW_LABEL =
+  "One transaction, step by step. Your app builds a transaction, the wallet signs it, and your app sends it to the network through RPC. The network verifies the signatures and charges the fee, then runs your program's instruction all or nothing: your program derives a PDA, reads state, calls the Token Program through a CPI that the PDA signs, and writes state. Your app then gets the confirmation.";
+const LAYERS_LABEL =
+  "Layers, top to bottom. The Solana network: validators that each keep the same accounts, where some accounts hold programs (your program, the Token Program) and others hold state (token balances, your program's data). Below it, apps (payments, games, markets) send transactions and read accounts through RPC. Below the apps, wallets hold keys and sign. At the bottom, users.";
+
 const FIGURES = {
   /* ------------------------------------------------------ accounts */
 
@@ -1734,6 +1826,272 @@ const FIGURES = {
     // The links sit inside the network card: lift them above its fill.
     for (let i = 0; i < 5; i++) p.front.push(p.back.pop());
     return [W, net.bottom + 24, label];
+  },
+
+  "diagrams/solana-layers": (p) => {
+    // Layers, top to bottom: the network (validators, and the accounts
+    // they all keep: programs and state), then apps, wallets, and users.
+    // Apps reach the network through RPC: transactions call programs
+    // (solid), reads look at accounts (dashed).
+    const c = p.c;
+    const label = LAYERS_LABEL;
+    const x = 24,
+      w = W - 48,
+      ix = x + 16,
+      iw = w - 32;
+    const vw = 104,
+      vgap = (iw - 5 * vw) / 4,
+      vh = 40;
+    const vy = 24 + HEAD_DESC;
+    const ay = vy + vh + 24; // "Accounts" heading
+    const cy = ay + 48; // program and state cards
+    const cw = (iw - 16) / 2;
+    const tmp = { rows: [["Your program"], ["Token Program"]] };
+    const cardH = HEAD + tmp.rows.length * ROW;
+    const net = p.card({
+      x,
+      y: 24,
+      w,
+      title: "Solana network",
+      tag: "onchain",
+      desc: "Validators: computers that each keep the same copy of every account",
+      accent: true,
+      minH: cy + cardH + 16 - 24,
+    });
+    const nodes = [];
+    for (let i = 0; i < 5; i++) {
+      const nx = ix + i * (vw + vgap);
+      p.rect(nx, vy, vw, vh);
+      p.text(nx + 16, vy + vh / 2, "Validator", { fill: c.ink2 });
+      nodes.push(nx);
+    }
+    for (let i = 0; i < 4; i++)
+      p.edge(
+        [
+          [nodes[i] + vw, vy + vh / 2],
+          [nodes[i + 1], vy + vh / 2],
+        ],
+        { head: false },
+      );
+    for (let i = 0; i < 4; i++) p.front.push(p.back.pop());
+    p.hline(x + 1.25, x + w - 1.25, ay - 12);
+    p.text(ix, ay + 8, "Accounts", { size: 13, weight: 500 });
+    p.text(ix, ay + 26, "Store data, like files on a computer", {
+      fill: c.ink2,
+    });
+    const prog = p.card({
+      x: ix,
+      y: cy,
+      w: cw,
+      title: "Programs",
+      tag: "executable code",
+      rows: [["Your program"], ["Token Program"]],
+    });
+    const state = p.card({
+      x: ix + cw + 16,
+      y: cy,
+      w: cw,
+      title: "State",
+      tag: "data",
+      rows: [["Token balances"], ["Your program’s data"]],
+    });
+    const apy = net.bottom + 72;
+    const bw = (iw - 32) / 3;
+    const apps = p.card({
+      x,
+      y: apy,
+      w,
+      title: "Apps",
+      tag: "offchain",
+      desc: "Your code: websites, mobile apps, and servers",
+      minH: HEAD_DESC + 40 + 16,
+    });
+    ["Payments", "Games", "Markets"].forEach((t, i) => {
+      const bx = ix + i * (bw + 16);
+      p.rect(bx, apy + HEAD_DESC, bw, 40);
+      p.text(bx + 16, apy + HEAD_DESC + 20, t, { fill: c.ink2 });
+    });
+    const tx = prog.x + 40,
+      rx = state.x + 40;
+    p.edge(
+      [
+        [tx, apps.y],
+        [tx, prog.bottom],
+      ],
+      { label: "send transactions through RPC" },
+    );
+    p.edge(
+      [
+        [rx, apps.y],
+        [rx, state.bottom],
+      ],
+      { dashed: true, label: "read accounts through RPC" },
+    );
+    // Both cross the network card's bottom edge: lift them above its fill.
+    p.front.push(p.back.pop(), p.back.pop());
+    const wal = p.card({
+      x,
+      y: apps.bottom + 56,
+      w,
+      title: "Wallets",
+      tag: "offchain",
+      desc: "Hold users’ keys: sign in and approve transactions",
+    });
+    const usr = p.card({
+      x,
+      y: wal.bottom + 56,
+      w,
+      title: "Users",
+      desc: "People using your app",
+    });
+    p.edge(
+      [
+        [tx, wal.y],
+        [tx, apps.bottom],
+      ],
+      { label: "sign" },
+    );
+    p.edge(
+      [
+        [tx, usr.y],
+        [tx, wal.bottom],
+      ],
+      { label: "approve" },
+    );
+    return [W, usr.bottom + 24, label];
+  },
+
+  "diagrams/transaction-flow": (p) => {
+    // A sequence diagram of one transaction: six lanes, the two that hold
+    // your code drawn in the accent.
+    const c = p.c;
+    const pitch = 112,
+      x0 = (W - 6 * pitch) / 2,
+      hw = pitch - 8;
+    const cx = (i) => x0 + pitch * i + pitch / 2;
+    const top = 24,
+      hh = 76;
+    LANES.forEach((l, i) => {
+      const hx = cx(i) - hw / 2;
+      p.rect(hx, top, hw, hh, {
+        stroke: l.yours ? c.accent : c.line,
+        sw: l.yours ? 1.25 : 1,
+      });
+      p.text(cx(i), top + 23, l.title, {
+        size: 13,
+        weight: 500,
+        anchor: "middle",
+      });
+      l.desc.forEach((d, k) =>
+        p.text(cx(i), top + 41 + k * 18, d, {
+          anchor: "middle",
+          fill: l.yours && k === 0 ? c.accent : c.ink2,
+        }),
+      );
+    });
+    // Lifelines are cut where a label crosses them (6px clear above and
+    // below), instead of running under a tight backing that still read as
+    // a line through the text.
+    const holes = [];
+    const back = (x, y, s, anchor) => {
+      const tw = s.length * 6.2 + 8;
+      const lx = anchor === "middle" ? x - tw / 2 : x - 4;
+      holes.push({ x0: lx, x1: lx + tw, y0: y - 8 - 6, y1: y + 8 + 6 });
+    };
+    const label = (x, y, s, o = {}) => {
+      back(x, y, s, o.anchor);
+      p.text(x, y, s, { fill: c.ink2, ...o });
+    };
+    // Rows: a message row puts its label 14px above the line and the line
+    // 24px (42px with a second label line) below the row top; a self row
+    // draws a 16px loop with its label beside it.
+    let y = top + hh + 16;
+    let atomicTop = 0;
+    for (const s of SEQ) {
+      if (s.atomic === "start") {
+        atomicTop = y;
+        const t = "Atomic: all or nothing";
+        const bx = x0 + pitch * 2 + 2;
+        back(bx + 12, y + 20, t + "  ");
+        p.text(bx + 12, y + 20, t, { weight: 500 });
+        y += 40;
+        continue;
+      }
+      if (s.atomic === "end") {
+        const bx = x0 + pitch * 2 + 2,
+          bw = W - x0 - 2 - bx;
+        p.rect(bx, atomicTop, bw, y + 4 - atomicTop, {
+          fill: "none",
+          stroke: c.line,
+          dash: "3 3",
+          layer: p.back,
+        });
+        y += 20;
+        continue;
+      }
+      if (s.self) {
+        const lx = cx(s.from),
+          ly = y + 8;
+        p.edge(
+          [
+            [lx, ly],
+            [lx + 24, ly],
+            [lx + 24, ly + 16],
+            [lx, ly + 16],
+          ],
+          { r: 4 },
+        );
+        label(lx + 32, ly + 8, s.label, { anchor: "start" });
+        if (s.sub)
+          label(lx + 32, ly + 26, s.sub, { anchor: "start", fill: c.ink3 });
+        y += s.sub ? 56 : 36;
+        continue;
+      }
+      const ly = y + (s.label2 ? 42 : 24);
+      const a = cx(s.from),
+        b = cx(s.to);
+      p.edge(
+        [
+          [a, ly],
+          [b, ly],
+        ],
+        { dashed: s.ret },
+      );
+      const mid = (a + b) / 2;
+      label(mid, ly - GAP - 6, s.label2 ?? s.label, { anchor: "middle" });
+      if (s.label2) label(mid, ly - GAP - 24, s.label, { anchor: "middle" });
+      if (s.note)
+        label(Math.max(a, b) + 12, ly, s.note, {
+          anchor: "start",
+          fill: c.ink3,
+        });
+      y = ly + 12;
+    }
+    y += 16;
+    // Lifelines, under everything.
+    const end = y - 8;
+    LANES.forEach((l, i) => {
+      const x = cx(i);
+      const cuts = holes
+        .filter((h) => x > h.x0 && x < h.x1)
+        .sort((a, b) => a.y0 - b.y0)
+        .reduce((acc, h) => {
+          const last = acc[acc.length - 1];
+          if (last && h.y0 - last.y1 < 24) last.y1 = Math.max(last.y1, h.y1);
+          else acc.push({ y0: h.y0, y1: h.y1 });
+          return acc;
+        }, []);
+      let d = "";
+      let from = top + hh;
+      for (const k of [...cuts, { y0: end, y1: end }]) {
+        if (k.y0 > from) d += `M${n(x + 0.5)} ${n(from)}V${n(k.y0)}`;
+        from = Math.max(from, k.y1);
+      }
+      p.back.unshift(
+        `<path d="${d}" stroke="${l.yours ? c.accent : c.line}" stroke-width="${l.yours ? 1.25 : 1}" stroke-dasharray="2 4"/>`,
+      );
+    });
+    return [W, end + 24, FLOW_LABEL];
   },
 
   "core/fees/fees": (p) => {
@@ -3287,6 +3645,207 @@ const SM = {
     return [SW, net.bottom + 24, label];
   },
 
+  "diagrams/solana-layers@sm": (p) => {
+    // The same layers, restacked: three validators, program and state
+    // cards side by side (8px inner margin so the longest row fits).
+    const c = p.c;
+    const ix = SX + 8,
+      iw = SC - 16;
+    const vw = 88,
+      vgap = (iw - 3 * vw) / 2,
+      vh = 40;
+    const ndesc = [
+      "Validators: computers that each keep",
+      "the same copy of every account",
+    ];
+    const nhead = HEAD_DESC + 18;
+    const vy = 24 + nhead;
+    const ay = vy + vh + 24;
+    const cy = ay + 48;
+    const cw = (iw - 8) / 2;
+    const cardH = HEAD_DESC + 2 * ROW;
+    const net = p.card({
+      x: SX,
+      y: 24,
+      w: SC,
+      title: "Solana network",
+      tag: "onchain",
+      desc: ndesc,
+      accent: true,
+      minH: cy + cardH + 8 - 24,
+    });
+    const nodes = [];
+    for (let i = 0; i < 3; i++) {
+      const nx = ix + i * (vw + vgap);
+      p.rect(nx, vy, vw, vh);
+      p.text(nx + 16, vy + vh / 2, "Validator", { fill: c.ink2 });
+      nodes.push(nx);
+    }
+    for (let i = 0; i < 2; i++)
+      p.edge(
+        [
+          [nodes[i] + vw, vy + vh / 2],
+          [nodes[i + 1], vy + vh / 2],
+        ],
+        { head: false },
+      );
+    for (let i = 0; i < 2; i++) p.front.push(p.back.pop());
+    p.hline(SX + 1.25, SX + SC - 1.25, ay - 12);
+    p.text(ix + 8, ay + 8, "Accounts", { size: 13, weight: 500 });
+    p.text(ix + 8, ay + 26, "Store data, like files on a computer", {
+      fill: c.ink2,
+    });
+    const prog = p.card({
+      x: ix,
+      y: cy,
+      w: cw,
+      title: "Programs",
+      desc: "Executable code",
+      rows: [["Your program"], ["Token Program"]],
+    });
+    const state = p.card({
+      x: ix + cw + 8,
+      y: cy,
+      w: cw,
+      title: "State",
+      desc: "Data",
+      rows: [["Token balances"], ["Your program’s data"]],
+    });
+    const apy = net.bottom + 80;
+    const bw = (iw - 16) / 3;
+    const adesc = ["Your code: websites, mobile apps,", "and servers"];
+    const ahead = HEAD_DESC + 18;
+    const apps = p.card({
+      x: SX,
+      y: apy,
+      w: SC,
+      title: "Apps",
+      tag: "offchain",
+      desc: adesc,
+      minH: ahead + 40 + 8,
+    });
+    ["Payments", "Games", "Markets"].forEach((t, i) => {
+      const bx = ix + i * (bw + 8);
+      p.rect(bx, apy + ahead, bw, 40);
+      p.text(bx + 12, apy + ahead + 20, t, { fill: c.ink2 });
+    });
+    const tx = prog.x + 24,
+      rx = state.x + 24;
+    p.edge([
+      [tx, apps.y],
+      [tx, prog.bottom],
+    ]);
+    p.edge(
+      [
+        [rx, apps.y],
+        [rx, state.bottom],
+      ],
+      { dashed: true },
+    );
+    p.front.push(p.back.pop(), p.back.pop());
+    const ly = net.bottom + 24;
+    p.text(tx + GAP, ly, "send transactions", { fill: c.ink2 });
+    p.text(tx + GAP, ly + 18, "through RPC", { fill: c.ink2 });
+    p.text(rx + GAP, ly, "read accounts", { fill: c.ink2 });
+    p.text(rx + GAP, ly + 18, "through RPC", { fill: c.ink2 });
+    const wal = p.card({
+      x: SX,
+      y: apps.bottom + 56,
+      w: SC,
+      title: "Wallets",
+      tag: "offchain",
+      desc: ["Hold users’ keys: sign in and", "approve transactions"],
+    });
+    const usr = p.card({
+      x: SX,
+      y: wal.bottom + 56,
+      w: SC,
+      title: "Users",
+      desc: "People using your app",
+    });
+    p.edge(
+      [
+        [tx, wal.y],
+        [tx, apps.bottom],
+      ],
+      { label: "sign" },
+    );
+    p.edge(
+      [
+        [tx, usr.y],
+        [tx, wal.bottom],
+      ],
+      { label: "approve" },
+    );
+    return [SW, usr.bottom + 24, LAYERS_LABEL];
+  },
+
+  "diagrams/transaction-flow@sm": (p) => {
+    // The sequence, top to bottom: a lane key, then numbered steps, each
+    // with its lane badges (from, to) and one plain sentence.
+    const c = p.c;
+    const badge = (x, y, i) => {
+      const l = LANES[i];
+      const w = l.title.length * 5.9 + 16;
+      p.rect(x, y, w, 24, {
+        stroke: l.yours ? c.accent : c.line,
+        sw: l.yours ? 1.25 : 1,
+      });
+      p.text(x + 8, y + 12, l.title, { fill: l.yours ? c.accent : c.ink });
+      return x + w;
+    };
+    let y = 24;
+    LANES.forEach((l, i) => {
+      badge(SX, y, i);
+      p.text(SX + 120, y + 12, l.desc.join(" "), { fill: c.ink2 });
+      y += 32;
+    });
+    y += 8;
+    p.hline(SX, SW - SX, y);
+    y += 24;
+    let k = 0,
+      atomicTop = 0;
+    for (const s of SEQ) {
+      if (s.atomic === "start") {
+        atomicTop = y;
+        p.text(SX + 34, y + 20, "Atomic: all or nothing", {
+          size: 13,
+          weight: 500,
+        });
+        y += 44;
+        continue;
+      }
+      if (s.atomic === "end") {
+        p.rect(SX + 24, atomicTop, SW - 8 - SX - 24, y - 4 - atomicTop, {
+          fill: "none",
+          stroke: c.line,
+          dash: "3 3",
+          layer: p.back,
+        });
+        y += 20;
+        continue;
+      }
+      k++;
+      p.text(SX, y + 12, String(k), { mono: true, fill: c.ink3 });
+      let bx = badge(SX + 34, y, s.from);
+      if (!s.self) {
+        p.edge(
+          [
+            [bx + 4, y + 12],
+            [bx + 24, y + 12],
+          ],
+          { dashed: s.ret },
+        );
+        badge(bx + 28, y, s.to);
+      }
+      s.step.forEach((t, i) =>
+        p.text(SX + 34, y + 24 + 18 + i * 18, t, { size: 13 }),
+      );
+      y += 24 + 18 * s.step.length + 26;
+    }
+    return [SW, y, FLOW_LABEL];
+  },
+
   "core/fees/fees@sm": (p) => {
     const c = p.c;
     const col = (y, card, note) => {
@@ -3599,6 +4158,795 @@ const SM = {
     ];
   },
 };
+
+/* ----------------------------------------------- phones: older figures
+ * Portrait drawings for the figures that predate this script (static SVGs
+ * re-themed by brand-diagrams.mjs): the same content restacked for 336px.
+ */
+
+/**
+ * A box: 13/500 title (optional tag on the right), then 12px lines, each
+ * `{ t, mono, dim }` or a string (code when isCode). Returns its geometry.
+ */
+function boxSm(
+  p,
+  { x = SX, y, w = SC, title, tag, tagMono, lines = [], accent, dash, pill },
+) {
+  const c = p.c;
+  const ls = lines.map((l) => (typeof l === "string" ? { t: l } : l));
+  const h = ls.length ? HEAD_DESC + (ls.length - 1) * 18 : HEAD;
+  p.rect(x, y, w, h, {
+    stroke: accent ? c.accent : c.line,
+    sw: accent ? 1.25 : 1,
+    dash,
+    r: pill ? Math.min(20, h / 2) : R,
+  });
+  const ty = ls.length ? y + 23 : y + h / 2;
+  p.text(x + 16, ty, title, { size: 13, weight: 500 });
+  if (tag)
+    p.text(x + w - 16, ty, tag, {
+      anchor: "end",
+      mono: tagMono ?? isCode(tag),
+      fill: c.ink3,
+    });
+  ls.forEach((l, i) =>
+    p.text(x + 16, y + 41 + i * 18, l.t, {
+      mono: l.mono ?? isCode(l.t),
+      fill: l.dim ? c.ink3 : c.ink2,
+    }),
+  );
+  return { x, y, w, h, bottom: y + h, cx: x + w / 2, cy: y + h / 2, ty };
+}
+
+/** Children hung off a spine 12px inside the parent's left edge. */
+function hangSm(p, parent, kids, o = {}) {
+  // kids: [{ label, dashed, draw: (x, y, w) => box }]
+  const sx = parent.x + 12;
+  const x = parent.x + 24,
+    w = parent.w - 24;
+  let y = parent.bottom + 16;
+  let last = null;
+  for (const k of kids) {
+    if (k.label) {
+      p.text(x, y + 6, k.label, { fill: p.c.ink2 });
+      y += 20;
+    }
+    const b = k.draw(x, y, w);
+    p.edge(
+      [
+        [sx, parent.bottom],
+        [sx, b.ty],
+        [x, b.ty],
+      ],
+      { dashed: k.dashed, head: o.head },
+    );
+    last = b;
+    y = b.bottom + 16;
+  }
+  return last ? last.bottom : parent.bottom;
+}
+
+/** A vertical arrow between two stacked boxes, label after it. */
+function dropSm(p, a, b, o = {}) {
+  const x = o.x ?? a.x + 40;
+  p.edge(
+    [
+      [x, a.bottom],
+      [x, b.y],
+    ],
+    { label: o.label, dashed: o.dashed, both: o.both, accent: o.accent },
+  );
+}
+
+/** A figure heading: 13/500 title and a muted line, left-aligned. */
+function headSm(p, y, title, sub) {
+  p.text(SX, y + 8, title, { size: 13, weight: 500 });
+  if (sub) p.text(SX, y + 28, sub, { fill: p.c.ink2 });
+  return y + (sub ? 52 : 32);
+}
+
+/**
+ * A sequence as numbered steps (transaction-flow@sm): sender and receiver
+ * badges, a dashed arrow for a reply, then the message as a sentence.
+ */
+function stepsSm(p, lanes, seq, label) {
+  const c = p.c;
+  const badge = (x, y, i) => {
+    const l = lanes[i];
+    const w = l.title.length * 5.9 + 16;
+    p.rect(x, y, w, 24, {
+      stroke: l.accent ? c.accent : c.line,
+      sw: l.accent ? 1.25 : 1,
+    });
+    p.text(x + 8, y + 12, l.title, { fill: l.accent ? c.accent : c.ink });
+    return x + w;
+  };
+  let y = 24;
+  seq.forEach((s, k) => {
+    p.text(SX, y + 12, String(k + 1), { mono: true, fill: c.ink3 });
+    const bx = badge(SX + 34, y, s.from);
+    if (s.to != null) {
+      p.edge(
+        [
+          [bx + 4, y + 12],
+          [bx + 24, y + 12],
+        ],
+        { dashed: s.ret },
+      );
+      badge(bx + 28, y, s.to);
+    }
+    s.step.forEach((t, i) =>
+      p.text(SX + 34, y + 24 + 18 + i * 18, t, { size: 13 }),
+    );
+    y += 24 + 18 * s.step.length + 26;
+  });
+  return [SW, y, label];
+}
+
+Object.assign(SM, {
+  "tools/kora/kora@sm": (p) =>
+    stepsSm(
+      p,
+      [
+        { title: "User" },
+        { title: "App" },
+        { title: "Kora", accent: true },
+        { title: "Solana" },
+      ],
+      [
+        { from: 0, to: 1, step: ["Initiate the transaction."] },
+        {
+          from: 1,
+          to: 0,
+          step: [
+            "Generate the transaction, including",
+            "the fee token transfer instruction.",
+          ],
+        },
+        { from: 0, to: 1, step: ["Sign the transaction."] },
+        { from: 1, to: 2, step: ["Send the partially signed transaction."] },
+        { from: 2, step: ["Validate it against kora.toml."] },
+        {
+          from: 2,
+          to: 1,
+          ret: true,
+          step: [
+            "The Kora paymaster signs and returns",
+            "the fully signed transaction.",
+          ],
+        },
+        { from: 1, to: 3, step: ["Send the transaction."] },
+        { from: 3, to: 1, ret: true, step: ["Transaction confirmed."] },
+        { from: 1, to: 0, ret: true, step: ["Success notification."] },
+        { from: 0, to: 2, ret: true, step: ["SPL token fee transfer."] },
+        { from: 2, to: 3, ret: true, step: ["SOL network fee payment."] },
+      ],
+      "Kora transaction flow, step by step",
+    ),
+
+  "action-execution-and-lifecycle@sm": (p) =>
+    stepsSm(
+      p,
+      [
+        { title: "User" },
+        { title: "Action client", accent: true },
+        { title: "Action provider" },
+        { title: "Solana" },
+      ],
+      [
+        {
+          from: 0,
+          to: 1,
+          step: ["Scans a QR code, clicks a link", "or a button."],
+        },
+        { from: 1, to: 2, step: ["GET request for metadata."] },
+        {
+          from: 2,
+          to: 1,
+          ret: true,
+          step: ["Metadata and available Actions."],
+        },
+        { from: 1, to: 0, ret: true, step: ["Shows the Action UI."] },
+        { from: 0, to: 1, step: ["Chooses an Action."] },
+        {
+          from: 1,
+          to: 2,
+          step: ["POST request with the wallet’s", "public key."],
+        },
+        { from: 2, to: 1, ret: true, step: ["Serialized transaction."] },
+        { from: 1, to: 0, ret: true, step: ["Shows transaction details."] },
+        { from: 0, to: 1, step: ["Approves the transaction."] },
+        { from: 1, to: 3, step: ["Signs and sends the transaction."] },
+      ],
+      "Solana Actions: execution and lifecycle, step by step",
+    ),
+
+  "frontend/sign-in-decision@sm": (p) => {
+    const top = boxSm(p, {
+      y: 24,
+      title: "Wallet connected",
+      lines: ["Read the account's features"],
+      accent: true,
+    });
+    const q = boxSm(p, {
+      y: top.bottom + 32,
+      title: "Supports signOffchainMessage v1?",
+      lines: [{ t: "solana:signOffchainMessage", mono: true }],
+      dash: "4 4",
+    });
+    dropSm(p, top, q);
+    let raw;
+    const end = hangSm(p, q, [
+      {
+        label: "Yes",
+        draw: (x, y, w) =>
+          boxSm(p, {
+            x,
+            y,
+            w,
+            title: "Sign an offchain message",
+            lines: [
+              "Readable text on every device,",
+              "hardware wallets included",
+            ],
+          }),
+      },
+      {
+        label: "No",
+        draw: (x, y, w) =>
+          (raw = boxSm(p, {
+            x,
+            y,
+            w,
+            title: "Sign a raw message",
+            lines: [
+              { t: "solana:signMessage", mono: true },
+              "for software wallets; same challenge, raw bytes",
+            ],
+          })),
+      },
+    ]);
+    const tx = boxSm(p, {
+      x: raw.x,
+      y: end + 48,
+      w: raw.w,
+      title: "Sign a sign-in transaction",
+      lines: [
+        "No message support on the device",
+        "Costs a fee and RPC round trips",
+      ],
+      dash: "4 4",
+    });
+    dropSm(p, raw, tx, { label: "User opts in: hardware wallet" });
+    return [
+      SW,
+      tx.bottom + 24,
+      "Choosing a sign-in method: an offchain message where the wallet supports it, otherwise a raw message, or a sign-in transaction for hardware wallets",
+    ];
+  },
+
+  "frontend/sign-in-comparison@sm": (p) => {
+    const c = p.c;
+    const a = p.card({
+      x: SX,
+      y: 24,
+      w: SC,
+      title: "Sign-in transaction",
+      rows: [
+        ["Build", "getLatestBlockhash", { index: 1, sub: "Fetch a blockhash" }],
+        ["Sign", null, { index: 2, sub: "Opaque bytes" }],
+        ["Simulate", "simulateTransaction", { index: 3, sub: "RPC call" }],
+        ["Send", "sendTransaction", { index: 4, sub: "RPC call" }],
+        [
+          "Confirm",
+          "getSignatureStatuses",
+          { index: 5, sub: "Poll until landed" },
+        ],
+        ["Verify", null, { index: 6, sub: "Server checks" }],
+      ],
+    });
+    p.text(SX, a.bottom + 18, "Network fee, RPC round trips, waits for", {
+      fill: c.ink2,
+    });
+    p.text(SX, a.bottom + 36, "confirmation, no readable message", {
+      fill: c.ink2,
+    });
+    const b = p.card({
+      x: SX,
+      y: a.bottom + 72,
+      w: SC,
+      title: "Offchain message",
+      accent: true,
+      rows: [
+        [
+          "Challenge",
+          null,
+          { index: 1, sub: "Server issues a message with a nonce" },
+        ],
+        ["Sign", null, { index: 2, sub: "Wallet shows the text, user signs" }],
+        [
+          "Verify",
+          null,
+          { index: 3, sub: "Server checks the Ed25519 signature" },
+        ],
+      ],
+    });
+    p.text(SX, b.bottom + 18, "No fee, no RPC calls, one wallet prompt,", {
+      fill: c.ink2,
+    });
+    p.text(SX, b.bottom + 36, "readable on the device", { fill: c.ink2 });
+    return [
+      SW,
+      b.bottom + 60,
+      "A sign-in transaction takes six steps, a network fee, and RPC round trips; an offchain message takes three steps, no fee, and no RPC calls",
+    ];
+  },
+
+  "frontend/offchain-message-layout@sm": (p) => {
+    const c = p.c;
+    // Field list: offset (mono, muted), name, size on the right, an
+    // optional second line under the name.
+    const fields = (y, title, tag, rows, accentRow) => {
+      const x = SX,
+        w = SC;
+      const rh = (r) => (r.sub ? SUBROW : ROW);
+      const h = HEAD + rows.reduce((s, r) => s + rh(r), 0);
+      p.rect(x, y, w, h);
+      p.text(x + 16, y + HEAD / 2, title, { size: 13, weight: 500 });
+      p.text(x + w - 16, y + HEAD / 2, tag, { anchor: "end", fill: c.ink3 });
+      let ry = y + HEAD;
+      rows.forEach((r, i) => {
+        const hh = rh(r);
+        p.hline(x + 1, x + w - 1, ry);
+        const ly = r.sub ? ry + 16 : ry + hh / 2;
+        if (r.off) p.text(x + 16, ly, r.off, { mono: true, fill: c.ink3 });
+        p.text(x + 64, ly, r.name, { fill: c.ink });
+        p.text(x + w - 16, ly, r.size, { anchor: "end", fill: c.ink2 });
+        if (r.sub)
+          p.text(x + 64, ry + 34, r.sub, { mono: r.subMono, fill: c.ink3 });
+        if (i === accentRow)
+          p.front.push(
+            `<rect x="${x + 0.625}" y="${ry + 0.625}" width="${w - 1.25}" height="${hh - 1.25}" rx="0" fill="none" stroke="${c.accent}" stroke-width="1.25"/>`,
+          );
+        ry += hh;
+      });
+      return { y, bottom: y + h };
+    };
+    const m = fields(
+      24,
+      "Message",
+      "what the wallet signs",
+      [
+        {
+          off: "0x00",
+          name: "Signing domain",
+          size: "16 bytes",
+          sub: "\\xffsolana offchain",
+          subMono: true,
+        },
+        {
+          off: "0x10",
+          name: "Version",
+          size: "1 byte",
+          sub: "1",
+          subMono: true,
+        },
+        {
+          off: "0x11",
+          name: "Signer count",
+          size: "1 byte",
+          sub: "n",
+          subMono: true,
+        },
+        {
+          off: "0x12",
+          name: "Signers",
+          size: "n × 32 bytes",
+          sub: "sorted, unique",
+        },
+        { name: "Content", size: "remainder", sub: "UTF-8 text" },
+      ],
+      0,
+    );
+    const e = fields(m.bottom + 32, "Envelope", "what you store or send", [
+      { name: "Signature count", size: "1 byte" },
+      { name: "Signatures", size: "n × 64 bytes", sub: "in signer order" },
+      { name: "Message", size: "the bytes above" },
+    ]);
+    return [
+      SW,
+      e.bottom + 24,
+      "A version 1 offchain message: signing domain, version, signer count, signers, and content; the envelope adds a signature count and the signatures",
+    ];
+  },
+
+  "finance/privacy/confidential-balances@sm": (p) => {
+    let y = headSm(
+      p,
+      24,
+      "Confidential Balances",
+      "Public accounts, encrypted balances and amounts",
+    );
+    const s = boxSm(p, {
+      y,
+      title: "Sender account",
+      lines: ["address · public", { t: "balance · encrypted", mono: true }],
+    });
+    const t = boxSm(p, {
+      y: s.bottom + 40,
+      title: "Confidential transfer",
+      lines: [{ t: "amount · encrypted", mono: true }],
+      accent: true,
+    });
+    dropSm(p, s, t, { accent: true });
+    const end = hangSm(p, t, [
+      {
+        draw: (x, y, w) =>
+          boxSm(p, {
+            x,
+            y,
+            w,
+            title: "Recipient account",
+            lines: [
+              "address · public",
+              { t: "balance · encrypted", mono: true },
+            ],
+          }),
+      },
+      {
+        dashed: true,
+        label: "verified by",
+        draw: (x, y, w) =>
+          boxSm(p, {
+            x,
+            y,
+            w,
+            title: "ZK proof verified on Solana",
+            lines: ["Encrypted state updates without", "revealing the amount"],
+          }),
+      },
+      {
+        dashed: true,
+        label: "optional",
+        draw: (x, y, w) =>
+          boxSm(p, {
+            x,
+            y,
+            w,
+            title: "Auditor key",
+            lines: ["Decrypts transfer amounts"],
+            dash: "4 4",
+          }),
+      },
+    ]);
+    return [
+      SW,
+      end + 24,
+      "Confidential Balances: public sender and recipient accounts, an encrypted amount, a zero-knowledge proof verified on Solana, and an optional auditor key",
+    ];
+  },
+
+  "finance/privacy/private-channels@sm": (p) => {
+    const c = p.c;
+    let y = headSm(
+      p,
+      24,
+      "Private Channels",
+      "Private execution, institution-defined controls,",
+    );
+    p.text(SX, y - 6, "Solana settlement", { fill: c.ink2 });
+    y += 16;
+    // The institution perimeter: a dashed accent frame.
+    const fx = SX,
+      fw = SC,
+      top = y;
+    p.text(fx + 16, top + 22, "Institution perimeter", { fill: c.ink3 });
+    const ch = boxSm(p, {
+      x: fx + 16,
+      y: top + 44,
+      w: fw - 32,
+      title: "Private channel",
+      lines: ["Private, instant, no set transaction fee"],
+      accent: true,
+    });
+    const acts = ["View", "Approve", "Freeze", "Move"];
+    const gap = 8,
+      aw = (fw - 32 - gap * 3) / 4,
+      ay = ch.bottom + 32;
+    acts.forEach((a, i) => {
+      const ax = fx + 16 + i * (aw + gap);
+      p.rect(ax, ay, aw, 32);
+      p.text(ax + aw / 2, ay + 16, a, { anchor: "middle", fill: c.ink });
+      p.edge(
+        [
+          [ax + aw / 2, ch.bottom],
+          [ax + aw / 2, ay],
+        ],
+        { head: false },
+      );
+    });
+    p.text(fx + 16, ay + 52, "Permissions defined by the operating", {
+      fill: c.ink2,
+    });
+    p.text(fx + 16, ay + 70, "institution", { fill: c.ink2 });
+    const fh = ay + 88 - top;
+    p.rect(fx, top, fw, fh, {
+      fill: "none",
+      stroke: c.accent,
+      dash: "4 4",
+      layer: p.back,
+    });
+    const main = boxSm(p, { y: top + fh + 48, title: "Solana mainnet" });
+    p.edge(
+      [
+        [fx + 40, top + fh],
+        [fx + 40, main.y],
+      ],
+      { both: true, accent: true, label: "value moves to and from mainnet" },
+    );
+    y = main.bottom + 32;
+    p.text(SX, y, "Outside the perimeter", { fill: c.ink3 });
+    const ob = boxSm(p, {
+      y: y + 16,
+      title: "External observers",
+      lines: ["Cannot inspect channel activity"],
+      dash: "4 4",
+    });
+    const au = boxSm(p, {
+      y: ob.bottom + 16,
+      title: "Auditor view",
+      lines: ["Granted by the institution"],
+      dash: "4 4",
+    });
+    return [
+      SW,
+      au.bottom + 24,
+      "Private Channels: a private channel inside an institution's perimeter, with its permissions, settling to and from Solana mainnet; outside observers cannot inspect it, an auditor view is granted by the institution",
+    ];
+  },
+
+  "finance/privacy/solana-privacy-protocol@sm": (p) => {
+    const c = p.c;
+    let y = headSm(
+      p,
+      24,
+      "Solana Privacy Rings",
+      "Encrypted balances, configurable visibility,",
+    );
+    p.text(SX, y - 6, "native settlement", { fill: c.ink2 });
+    y += 16;
+    const w = SC - 24;
+    const ring = (yy, title, line, accent) =>
+      boxSm(p, { y: yy, w, title, lines: [line], accent, pill: true });
+    const d = ring(y, "Default Ring", "Permissionless, confidential");
+    const cr = ring(
+      d.bottom + 48,
+      "Custom Ring",
+      "Policy controlled, confidential or anonymous",
+      true,
+    );
+    const o = ring(cr.bottom + 48, "Other Custom Ring", "Interoperable");
+    dropSm(p, d, cr, {
+      dashed: true,
+      both: true,
+      accent: true,
+      label: "private cross ring",
+    });
+    dropSm(p, cr, o, {
+      dashed: true,
+      both: true,
+      accent: true,
+      label: "private cross ring",
+    });
+    const au = boxSm(p, {
+      y: o.bottom + 32,
+      w,
+      title: "Optional auditor access",
+      lines: ["Visibility defined by Custom Ring policy"],
+      dash: "4 4",
+    });
+    // Auditor access attaches to the Custom Ring, along the right gutter.
+    const gx = SX + w + 12;
+    p.edge(
+      [
+        [SX + w, cr.cy],
+        [gx, cr.cy],
+        [gx, au.cy],
+        [SX + w, au.cy],
+      ],
+      { dashed: true, head: false },
+    );
+    const f = boxSm(p, {
+      y: au.bottom + 32,
+      title: "One Solana transaction, native settlement",
+      pill: true,
+    });
+    return [
+      SW,
+      f.bottom + 24,
+      "Solana Privacy Rings: a permissionless Default Ring, a policy-controlled Custom Ring, and other custom rings, joined by private cross-ring transfers, with optional auditor access",
+    ];
+  },
+
+  "diagrams/finance-overview@sm": (p) => {
+    const a = boxSm(p, {
+      y: 24,
+      title: "Assets",
+      lines: ["Tokens and ownership"],
+      accent: true,
+    });
+    const end = hangSm(p, a, [
+      {
+        draw: (x, y, w) =>
+          boxSm(p, { x, y, w, title: "Payments", lines: ["Move value"] }),
+      },
+      {
+        draw: (x, y, w) =>
+          boxSm(p, {
+            x,
+            y,
+            w,
+            title: "Markets & trading",
+            lines: ["Price value"],
+          }),
+      },
+    ]);
+    return [SW, end + 24, "Assets power payments and onchain markets"];
+  },
+
+  "tools/kora/request-lifecycle@sm": (p) => {
+    const c = p.c;
+    // The request path down the left; under each stage, indented, the
+    // config section that governs it, pointing up at the stage.
+    const stage = (y, title, lines, o = {}) =>
+      boxSm(p, { y, title, lines, ...o });
+    const conf = (st, label, def) => {
+      const b = boxSm(p, { x: SX + 48, y: st.bottom + 40, w: SC - 48, ...def });
+      p.edge(
+        [
+          [b.x + 24, b.y],
+          [b.x + 24, st.bottom],
+        ],
+        { label },
+      );
+      return b;
+    };
+    const next = (from, to) =>
+      p.edge(
+        [
+          [SX + 20, from.bottom],
+          [SX + 20, to.y],
+        ],
+        {},
+      );
+    const m = (t) => ({ t, mono: true });
+    const client = stage(
+      24,
+      "Client app",
+      ["Builds the transaction and the", "payment instruction"],
+      { accent: true },
+    );
+    const gw = stage(client.bottom + 32, "Gateway", [
+      "Rate limit, CORS, method allowlist,",
+      "API key, HMAC, reCAPTCHA (beta)",
+      "The liveness route bypasses all of these",
+    ]);
+    next(client, gw);
+    const net = conf(gw, "gates access", {
+      title: "Network & access",
+      tag: "[kora]",
+      tagMono: true,
+      lines: [
+        m("rate_limit"),
+        m("cors_allow_origins"),
+        m("enabled_methods"),
+        m("auth: api keys, HMAC"),
+        m("payment_address · cache"),
+        { t: "Beta in v2.2:", dim: true },
+        m("recaptcha · usage_limit"),
+        m("bundle · lighthouse"),
+      ],
+    });
+    const val = stage(net.bottom + 32, "Validation", [
+      "Program and token allowlists, blocked",
+      "accounts, lamport and signature",
+      "ceilings, oracle pricing. Anything",
+      "kora.toml does not permit is rejected",
+    ]);
+    next(gw, val);
+    const rules = conf(val, "accepts or rejects", {
+      title: "Validation rules",
+      tag: "[validation]",
+      tagMono: true,
+      lines: [
+        m("allowed_programs"),
+        m("allowed_tokens"),
+        m("allowed_spl_paid_tokens"),
+        m("disallowed_accounts"),
+        m("max_allowed_lamports"),
+        m("max_signatures"),
+        m("price / price_source"),
+      ],
+    });
+    const fee = boxSm(p, {
+      x: rules.x,
+      y: rules.bottom + 16,
+      w: rules.w,
+      title: "Fee payer policy",
+      dash: "4 4",
+      lines: [
+        m("[validation.fee_payer_policy]"),
+        m("system · spl_token"),
+        m("token_2022 · alt"),
+        m("bpf_loader_upgradeable"),
+        m("loader_v4"),
+        "Every flag defaults to false:",
+        "opt in explicitly",
+      ],
+    });
+    const plug = stage(
+      fee.bottom + 32,
+      "Plugins",
+      ["Optional extra checks you opt into", "per transaction"],
+      { tag: "beta" },
+    );
+    next(val, plug);
+    const plugConf = conf(plug, "extra checks", {
+      title: "Plugins",
+      tag: "[kora.plugins]",
+      tagMono: true,
+      lines: [m('enabled = ["gas_swap",'), m('  "deploy_authority"]')],
+    });
+    const sign = stage(plugConf.bottom + 32, "Sign as fee payer", [
+      "Your signer signs and pays the SOL",
+      "network fee",
+    ]);
+    next(plug, sign);
+    const signers = conf(sign, "signing key", {
+      title: "Signers",
+      tag: "signers.toml",
+      tagMono: true,
+      lines: [m("memory · Turnkey · Privy"), m("Vault · pools")],
+    });
+    // The two ways out, off a spine down the left from the signer.
+    const ox = SX + 40,
+      ow = SC - 40;
+    const ret = boxSm(p, {
+      x: ox,
+      y: signers.bottom + 32,
+      w: ow,
+      title: "Return to client",
+      lines: [m("signTransaction"), m("signBundle")],
+    });
+    const bc = boxSm(p, {
+      x: ox,
+      y: ret.bottom + 16,
+      w: ow,
+      title: "Kora broadcasts",
+      lines: [m("signAndSendTransaction"), m("signAndSendBundle")],
+    });
+    for (const b of [ret, bc])
+      p.edge(
+        [
+          [SX + 20, sign.bottom],
+          [SX + 20, b.ty],
+          [ox, b.ty],
+        ],
+        {},
+      );
+    p.text(
+      SX,
+      Math.max(ret.bottom, bc.bottom) + 18,
+      "Bundle methods are in beta.",
+      { fill: c.ink3 },
+    );
+    return [
+      SW,
+      Math.max(ret.bottom, bc.bottom) + 44,
+      "A transaction travels from the client app through the gateway, validation, plugins, and signing, before Kora either returns it or broadcasts it. Each stage is governed by a matching section of kora.toml or signers.toml.",
+    ];
+  },
+});
 
 const only = (() => {
   const i = process.argv.indexOf("--only");
