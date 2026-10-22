@@ -17,6 +17,10 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { VFile } from "vfile";
+import {
+  embedSource,
+  replaceSource,
+} from "fumadocs-core/mdx-plugins/stringifier";
 import { findDocsRoot } from "./docs-root.mjs";
 import { smartQuotes } from "./smart-quotes.mjs";
 
@@ -96,6 +100,14 @@ function unravel(node) {
   }
 }
 
+/** A JSX comment expression: renders nothing, and is left out of the Markdown. */
+function isComment(node) {
+  return (
+    node.type === "mdxFlowExpression" &&
+    /^\s*\/\*[\s\S]*\*\/\s*$/.test(node.value ?? "")
+  );
+}
+
 function isSnippetElement(node, names) {
   return (
     (node.type === "mdxJsxFlowElement" || node.type === "mdxJsxTextElement") &&
@@ -107,7 +119,7 @@ function isSnippetElement(node, names) {
  * Replace every <Name /> whose Name is a snippet import with the snippet
  * tree. `seen` guards against import cycles.
  */
-function inlineSnippets(processor, tree, file, seen = new Set()) {
+function inlineSnippets(processor, tree, file, seen = new Set(), root = file) {
   const imports = new Map();
   const emptyEsm = new Set();
   for (const node of tree.children) {
@@ -115,6 +127,10 @@ function inlineSnippets(processor, tree, file, seen = new Set()) {
     const found = snippetImports(node);
     if (!found.length) continue;
     for (const item of found) imports.set(item.name, item.source);
+    // The Markdown output (remarkLLMs) is built from the authored source:
+    // drop the snippet imports there too.
+    if (found.length === (node.data?.estree?.body ?? []).length)
+      replaceSource(root, node, "");
     if (
       removeStatements(
         node,
@@ -131,7 +147,10 @@ function inlineSnippets(processor, tree, file, seen = new Set()) {
   const cache = new Map();
   const load = (name) => {
     const source = imports.get(name);
-    if (cache.has(source)) return structuredClone(cache.get(source));
+    if (cache.has(source)) {
+      const hit = cache.get(source);
+      return { parsed: structuredClone(hit.parsed), value: hit.value };
+    }
     const abs = path.join(snippetsDir(), source.slice(SNIPPET_PREFIX.length));
     if (seen.has(abs)) throw new Error(`snippet import cycle at ${abs}`);
     const value = readFileSync(abs, "utf8");
@@ -139,9 +158,9 @@ function inlineSnippets(processor, tree, file, seen = new Set()) {
     const child = new VFile({ path: abs, value, data: file.data });
     const parsed = processor.parse(child);
     unravel(parsed);
-    inlineSnippets(processor, parsed, child, new Set([...seen, abs]));
-    cache.set(source, parsed);
-    return structuredClone(parsed);
+    inlineSnippets(processor, parsed, child, new Set([...seen, abs]), root);
+    cache.set(source, { parsed, value });
+    return { parsed: structuredClone(parsed), value };
   };
 
   const visit = (parent) => {
@@ -149,10 +168,12 @@ function inlineSnippets(processor, tree, file, seen = new Set()) {
     for (let i = 0; i < parent.children.length; i++) {
       const node = parent.children[i];
       if (isSnippetElement(node, names)) {
-        const snippet = load(node.name);
+        const { parsed: snippet, value } = load(node.name);
         // ESM (imports/exports a snippet declares) moves to the page root.
         const esm = snippet.children.filter((n) => n.type === "mdxjsEsm");
-        const content = snippet.children.filter((n) => n.type !== "mdxjsEsm");
+        const content = snippet.children.filter(
+          (n) => n.type !== "mdxjsEsm" && !isComment(n),
+        );
         if (esm.length) tree.children.unshift(...esm);
         let replacement = content;
         if (node.type === "mdxJsxTextElement") {
@@ -162,6 +183,8 @@ function inlineSnippets(processor, tree, file, seen = new Set()) {
               ? content[0].children
               : content;
         }
+        // The Markdown output shows the snippet's own text in its place.
+        embedSource(root, node, value, replacement);
         parent.children.splice(i, 1, ...replacement);
         i += replacement.length - 1;
         continue;
@@ -184,6 +207,7 @@ function hasApiExamples(node) {
 export function remarkDocsCompat() {
   const processor = this;
   return (tree, file) => {
+    for (const node of tree.children) if (isComment(node)) replaceSource(file, node, "");
     inlineSnippets(processor, tree, file);
     // RPC method pages: the page shows its examples in a column of their own.
     if (hasApiExamples(tree)) {

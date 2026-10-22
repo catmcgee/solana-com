@@ -52,7 +52,7 @@ export const docs = defineCollections({
   files: ["developers/{docs,cookbook}/**/*.mdx", "learn/**/*.mdx"],
   schema,
   async: true,
-  postprocess: { includeProcessedMarkdown: true },
+  postprocess: { includeProcessedMarkdown: { headingIds: false } },
 });
 
 export const docsI18n = defineCollections({
@@ -61,7 +61,7 @@ export const docsI18n = defineCollections({
   files: [`${locales}/developers/docs/**/*.mdx`, `${locales}/learn/**/*.mdx`],
   schema,
   dynamic: true,
-  postprocess: { includeProcessedMarkdown: true },
+  postprocess: { includeProcessedMarkdown: { headingIds: false } },
 });
 
 export default defineConfig({
