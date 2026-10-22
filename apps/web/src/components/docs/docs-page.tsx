@@ -136,6 +136,20 @@ export async function DocsPageView({
   return (
     <>
       <DocsThemePrepaint />
+      {/* For agents reading the HTML: where the Markdown index is. */}
+      <blockquote className="sr-only" data-agent-docs-index="true" aria-hidden="true">
+        <h2>Documentation Index</h2>
+        <p>
+          Fetch the complete documentation index at:{" "}
+          <a href="/llms.txt" tabIndex={-1}>
+            /llms.txt
+          </a>
+        </p>
+        <p>
+          Use this file to discover all available pages before exploring
+          further.
+        </p>
+      </blockquote>
       <div data-docs="" data-dev-landing="docs" data-mode={wide ? "wide" : undefined} lang={contentLocale === locale ? undefined : contentLocale}>
         <DocsHeader
           locale={contentLocale}

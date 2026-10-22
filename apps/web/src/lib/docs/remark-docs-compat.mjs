@@ -18,6 +18,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { VFile } from "vfile";
 import { findDocsRoot } from "./docs-root.mjs";
+import { smartQuotes } from "./smart-quotes.mjs";
 
 const SNIPPET_PREFIX = "/snippets/";
 
@@ -203,7 +204,8 @@ export function remarkDocsCompat() {
 const KEEP = /[\p{L}\p{N}\-_’/&+”“→？#@：\s.]/u;
 
 export function docsSlugBase(text) {
-  let s = text.toLowerCase().trim();
+  // Slugs are made from the rendered (typographic) heading text.
+  let s = smartQuotes(text).toLowerCase().trim();
   s = [...s].filter((c) => KEEP.test(c)).join("");
   return s.replace(/[\s.]+/g, "-").replace(/-+/g, "-");
 }

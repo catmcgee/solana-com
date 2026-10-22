@@ -14,6 +14,7 @@
  *   as its title.
  */
 import { docsSlugBase } from "./remark-docs-compat.mjs";
+import { smartQuotes } from "./smart-quotes.mjs";
 function isWhitespace(node) {
   return node.type === "text" && !node.value.trim();
 }
@@ -107,9 +108,40 @@ function stepTitles(tree) {
   });
 }
 
+const NO_QUOTES = new Set(["code", "pre", "kbd", "samp", "script", "style"]);
+
+/** Typographic quotes in text, outside code (smart-quotes.mjs). */
+function quotes(node, state = { prev: "" }) {
+  if (node.type === "text") {
+    node.value = smartQuotes(node.value, state.prev);
+    state.prev = node.value.slice(-1) || state.prev;
+    return;
+  }
+  if (node.type === "element" && NO_QUOTES.has(node.tagName)) {
+    state.prev = "x";
+    return;
+  }
+  if (
+    (node.type === "mdxJsxFlowElement" || node.type === "mdxJsxTextElement") &&
+    /^[A-Z]/.test(node.name ?? "") === false &&
+    NO_QUOTES.has(node.name)
+  )
+    return;
+  if (node.type === "mdxFlowExpression" || node.type === "mdxTextExpression")
+    return;
+  // Block boundaries reset the context.
+  const block =
+    node.type === "root" ||
+    (node.type === "element" && /^(p|h[1-6]|li|td|th|div|blockquote)$/.test(node.tagName)) ||
+    node.type === "mdxJsxFlowElement";
+  const inner = block ? { prev: "" } : state;
+  for (const child of node.children ?? []) quotes(child, inner);
+}
+
 export function rehypeDocsCompat() {
   return (tree) => {
     strip(tree);
     stepTitles(tree);
+    quotes(tree);
   };
 }
