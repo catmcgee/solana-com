@@ -141,18 +141,13 @@ function ApiVisual() {
       className="flex w-[84%] flex-col gap-1.5 font-[family-name:var(--dl-mono)] text-[12.5px] leading-normal text-[var(--dl-muted)]"
     >
       <div className={line}>
-        <b className="font-semibold text-[var(--dl-code-fn)]">GET</b>{" "}
-        /api/forecast
+        <b className="font-semibold text-[var(--dl-code-fn)]">GET</b> /forecast
       </div>
-      <div className={`${line} ![animation-delay:1.2s]`}>
-        <span className="text-[var(--dl-code-num)]">402</span> price: $0.001
+      <div className={`${line} ![animation-delay:1.6s]`}>
+        <span className="text-[var(--dl-code-num)]">402</span> pay $0.001
       </div>
-      <div className={`${line} ![animation-delay:2.4s]`}>
-        <span className="text-[var(--dl-good)]">paid</span> 0.001 USDC
-      </div>
-      <div className={`${line} ![animation-delay:3.6s]`}>
-        <span className="text-[var(--dl-good)]">200</span>{" "}
-        {'{ "sky": "clear" }'}
+      <div className={`${line} ![animation-delay:3.2s]`}>
+        <span className="text-[var(--dl-good)]">200</span> OK
       </div>
     </div>
   );
@@ -248,9 +243,6 @@ function AssetVisual({ t }: { t: (key: string) => string }) {
           <b className="shrink-0 text-[var(--dl-danger)]">✕</b>
         </div>
       </div>
-      <span className="col-span-2 justify-self-center font-[family-name:var(--dl-mono)] text-xs text-[var(--dl-accent-text)]">
-        {t("picker.visuals.assetTag")}
-      </span>
     </div>
   );
 }
@@ -403,14 +395,13 @@ export async function DevelopersHub({
                     className={`group flex w-full flex-col overflow-hidden ${cardLink}`}
                   >
                     {/* Headline first, so a reader knows what the
-                        animation shows before they see it. The title box
-                        holds two lines (three in the four-column row), so the visuals line
-                        up across cards. */}
-                    <div className="flex items-start gap-3 px-5 pt-5">
+                        animation shows before they see it. A fixed-height
+                        row keeps the visuals lined up across cards. */}
+                    <div className="flex h-[5.25rem] items-center gap-3 px-5 pt-5">
                       <span className={`${iconTile} shrink-0`}>
                         <Icon aria-hidden className="!size-[18px]" />
                       </span>
-                      <h3 className="m-0 min-h-[2.5em] font-brand xl:min-h-[3.75em] text-lg font-medium leading-[1.25] tracking-[-0.015em] text-[var(--dl-text)] [text-wrap:pretty]">
+                      <h3 className="m-0 font-brand text-lg font-medium leading-[1.25] tracking-[-0.015em] text-[var(--dl-text)] [text-wrap:pretty]">
                         {t(`picker.cards.${job.id}.title`)}
                       </h3>
                     </div>
