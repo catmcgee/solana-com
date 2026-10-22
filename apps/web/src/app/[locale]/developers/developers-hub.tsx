@@ -228,22 +228,32 @@ function PaymentSnippet({ t, href }: { t: Translate; href: string }) {
 
 function AssetVisual({ t }: { t: (key: string) => string }) {
   const row =
-    "rounded-[10px] border border-[var(--dl-line)] bg-[var(--dl-raised)] px-3 py-[7px] text-[13px] text-[var(--dl-text)] motion-safe:animate-[dl-row_4s_infinite]";
+    "rounded-[10px] border border-[var(--dl-line)] bg-[var(--dl-raised)] whitespace-nowrap px-2.5 py-[7px] text-[13px] text-[var(--dl-text)] motion-safe:animate-[dl-row_4s_infinite]";
   return (
-    <div className="flex items-center gap-3">
-      <div className="grid size-14 shrink-0 place-items-center rounded-2xl border border-[var(--dl-gold-line)] bg-[var(--dl-gold-soft)] font-[family-name:var(--dl-mono)] text-sm font-bold text-[var(--dl-gold)] motion-safe:animate-[dl-bob_4s_ease-in-out_infinite]">
-        LSF
-      </div>
-      <div className="flex flex-col gap-2">
-        <div className={row}>
-          → {t("picker.visuals.assetApproved")}{" "}
-          <b className="ms-2 text-[var(--dl-good)]">✓</b>
+    <div className="flex flex-col items-center gap-2.5">
+      <div className="flex items-center gap-3">
+        <div className="flex shrink-0 flex-col items-center justify-center rounded-2xl border border-[var(--dl-gold-line)] bg-[var(--dl-gold-soft)] px-2.5 py-2 text-center text-[var(--dl-gold)] motion-safe:animate-[dl-bob_4s_ease-in-out_infinite]">
+          <span className="text-[13px] font-semibold leading-tight">
+            {t("picker.visuals.assetToken")}
+          </span>
+          <span className="font-[family-name:var(--dl-mono)] text-[11px] leading-tight opacity-80">
+            {t("picker.visuals.assetKind")}
+          </span>
         </div>
-        <div className={`${row} [animation-delay:2s]`}>
-          → {t("picker.visuals.assetUnknown")}{" "}
-          <b className="ms-2 text-[var(--dl-danger)]">✕</b>
+        <div className="flex flex-col gap-2">
+          <div className={row}>
+            → {t("picker.visuals.assetApproved")}{" "}
+            <b className="ms-2 text-[var(--dl-good)]">✓</b>
+          </div>
+          <div className={`${row} [animation-delay:2s]`}>
+            → {t("picker.visuals.assetUnknown")}{" "}
+            <b className="ms-2 text-[var(--dl-danger)]">✕</b>
+          </div>
         </div>
       </div>
+      <span className="font-[family-name:var(--dl-mono)] text-xs text-[var(--dl-accent-text)]">
+        {t("picker.visuals.assetTag")}
+      </span>
     </div>
   );
 }
