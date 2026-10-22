@@ -567,8 +567,8 @@ function Field({
                   data-component-part="field-info-pill"
                   className="field-pill"
                 >
+                  <span className="field-pill-label">default:</span>
                   <span>
-                    default:
                     {typeof defaultValue === "string"
                       ? JSON.stringify(defaultValue)
                       : String(defaultValue)}
