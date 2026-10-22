@@ -71,7 +71,7 @@ export const NEW_PAGES: readonly NewPage[] = [
   ]),
   {
     page: "developers/docs/payments/paywall-api",
-    title: "Charge a few cents per API call",
+    title: "Charge a fraction of a cent per API call",
     sidebarTitle: "Paywall an endpoint",
     description: "TODO(WP8a)",
     kind: "path-intro",

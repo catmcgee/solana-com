@@ -118,6 +118,29 @@ export const INSTALL_SETUP = {
 } as const;
 
 /**
+ * The payment snippet beside the cost calculator. `lines` (other than the
+ * leading `// …` line) are a contiguous run of the Quickstart's tested
+ * example, `source`; landing-render.test.tsx fails if they drift from it.
+ */
+export const PAYMENT_SNIPPET = {
+  source: "packages/docs-examples/paths/start/quickstart/send-dollars.ts",
+  file: "send-dollars.ts",
+  href: "/developers/docs/quickstart/send-dollars",
+  lines: [
+    "// … set up source, destination, and openAccount",
+    "const transfer = getTransferCheckedInstruction({",
+    "  source,",
+    "  mint: USDC_MINT,",
+    "  destination,",
+    "  authority: wallet,",
+    "  amount,",
+    "  decimals: USDC_DECIMALS,",
+    "});",
+    "const signature = await send(wallet, [openAccount, transfer]);",
+  ],
+} as const;
+
+/**
  * "Other ways to learn" cards. A route without an `href` is shown greyed
  * out as "Coming soon" (the new Solana Playground, until it launches).
  */
