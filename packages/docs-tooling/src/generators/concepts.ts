@@ -460,6 +460,10 @@ export function buildConceptOutputs(
 // --sync: inline concept chips
 // ---------------------------------------------------------------------------
 
+/** Punctuation that must stay on the chip's line (and a possessive 's). */
+const TRAILING_PUNCT_START = /^(?:[,.;:!?)\]}…”’»]+|['’]s\b)+/;
+const TRAILING_PUNCT = new RegExp(`${TRAILING_PUNCT_START.source}$`);
+
 /** Expand/refresh every `data-concept` chip in a tree. Returns true if changed. */
 export function syncChips(
   tree: AstNode,
@@ -538,7 +542,36 @@ export function syncChips(
         ["className", "sol-chip"],
         ["data-concept", key],
       ]) || changed;
-    changed = setChildren(wrapper, [tooltipNode, nojs]) || changed;
+    // Punctuation right after the chip ("RPC endpoint, and") moves inside
+    // it, after the no-JS text, so styles/concepts.css can keep the two on
+    // one line (a chip is an inline-flex box: browsers break after it).
+    const nojsAt = kids.findIndex((k) => isJsx(k) && hasClass(k, "nojs-only"));
+    const tail =
+      nojsAt >= 0
+        ? kids
+            .slice(nojsAt + 1)
+            .filter(
+              (k) =>
+                k.type === "text" && TRAILING_PUNCT.test(String(k.value ?? "")),
+            )
+        : [];
+    let punct = tail.map((k) => String(k.value)).join("");
+    const next = parent?.children?.[index + 1];
+    if (next?.type === "text") {
+      const m = TRAILING_PUNCT_START.exec(String(next.value ?? ""));
+      if (m) {
+        punct += m[0];
+        next.value = String(next.value).slice(m[0].length);
+        if (!next.value) parent!.children!.splice(index + 1, 1);
+        changed = true;
+      }
+    }
+    changed =
+      setChildren(wrapper, [
+        tooltipNode,
+        nojs,
+        ...(punct ? [text(punct)] : []),
+      ]) || changed;
     return "skip";
   });
   return changed;
