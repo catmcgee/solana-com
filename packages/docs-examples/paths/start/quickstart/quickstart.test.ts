@@ -1,6 +1,11 @@
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { address } from "@solana/kit";
+import {
+  findAssociatedTokenPda,
+  TOKEN_2022_PROGRAM_ADDRESS,
+} from "@solana-program/token-2022";
 import { describe, expect, it } from "vitest";
 import { setTokenBalance } from "../../../test/fixtures/fund";
 import { runExample } from "../../../test/record";
@@ -20,20 +25,21 @@ describe("paths/start/quickstart", () => {
       output: out("balance"),
     });
     expect(r.text).toMatch(
-      /^Wallet: \w+\nBalance: 0 SOL\nAirdrop: \w+\nBalance: 1 SOL\nUSDC: 0\nGet free devnet USDC for \w+ at https:\/\/faucet\.circle\.com \(pick Solana Devnet\)\.$/,
+      /^Wallet: \w+\nAirdrop: \w+\nBalance: 1 SOL\nUSDC: 0\nGet free devnet USDC for \w+ at https:\/\/faucet\.circle\.com \(pick Solana Devnet\)\.$/,
     );
   });
 
   it("2: sends 1 USDC to a new address", async () => {
     // Stands in for Circle's devnet faucet: 10 USDC in the reader's wallet.
-    const { loadWallet } = await import("./config");
-    const wallet = await loadWallet();
-    await setTokenBalance(wallet.address, 10_000_000n);
+    const { client } = await import("./client");
+    await setTokenBalance(client.identity.address, 10_000_000n);
 
     const r = await runExample(() => import("./send-dollars"), {
       output: out("send-dollars"),
     });
     expect(r.text).toContain("Recipient balance: 1 USDC");
+    const { usdcBalance } = await import("./client");
+    expect(await usdcBalance(client.identity.address)).toBe("9");
     expect(r.text).toMatch(
       /^Explorer: https:\/\/explorer\.solana\.com\/tx\/\w+\?cluster=devnet$/m,
     );
@@ -44,7 +50,19 @@ describe("paths/start/quickstart", () => {
       output: out("create-asset"),
     });
     expect(r.text).toContain("Name: Example Fund (EXF)");
-    expect(r.text).toContain("Balance: 1000 EXF");
+    expect(r.text).toContain("Supply: 1000 EXF");
+    // All 1,000 went to the reader's own token account.
+    const { client } = await import("./client");
+    const mint = address(r.text.match(/^Asset \(mint\): (\w+)$/m)![1]!);
+    const [tokenAccount] = await findAssociatedTokenPda({
+      mint,
+      owner: client.identity.address,
+      tokenProgram: TOKEN_2022_PROGRAM_ADDRESS,
+    });
+    const { value } = await client.rpc
+      .getTokenAccountBalance(tokenAccount)
+      .send();
+    expect(value.uiAmountString).toBe("1000");
     expect(r.text).toMatch(
       /^Explorer: https:\/\/explorer\.solana\.com\/address\/\w+\?cluster=devnet$/m,
     );

@@ -28,11 +28,30 @@ describe("terminal panel (src/lib/terminal.ts)", () => {
     expect(termInline('err: {"InstructionError":[0,{"Custom":17}]}')).toContain(
       '`{"InstructionError":[0,{"Custom":17}]}`',
     );
-    const html = termInline("<x> *a* _b_ $1 & http://h");
+    const html = termInline("<x> *a* _b_ $1 & see: x@y");
     expect(html).toContain("\\<x\\>");
     expect(html).toContain("\\*a\\*");
     expect(html).toContain("\\$1");
-    expect(html).toContain("http\\://h");
+    expect(html).toContain("see\\: x\\@y");
+  });
+
+  it("keeps URLs whole, as plain text that is never a link", () => {
+    // The signature inside stays part of the URL (no base58 highlight), and
+    // inline code keeps the docs from autolinking a Surfpool-only link.
+    expect(
+      termInline(
+        `Explorer: https://explorer.solana.com/tx/${SIG}?cluster=devnet`,
+      ),
+    ).toBe(
+      `<span className="sol-term-k">Explorer\\:</span> \`https://explorer.solana.com/tx/${SIG}?cluster=devnet\``,
+    );
+    // Trailing punctuation stays outside the URL.
+    expect(
+      termInline("Get SOL at https://faucet.solana.com, then run this again."),
+    ).toBe("Get SOL at `https://faucet.solana.com`, then run this again.");
+    expect(termInline("(see http://127.0.0.1:8899)")).toBe(
+      "(see `http://127.0.0.1:8899`)",
+    );
   });
 
   it("keeps a line with quotes in one code span, not one per token", () => {
