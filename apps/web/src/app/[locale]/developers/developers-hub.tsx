@@ -402,19 +402,25 @@ export async function DevelopersHub({
                     data-testid={`job-card-${job.id}`}
                     className={`group flex w-full flex-col overflow-hidden ${cardLink}`}
                   >
+                    {/* Headline first, so a reader knows what the
+                        animation shows before they see it. The title box
+                        holds two lines (three in the four-column row), so the visuals line
+                        up across cards. */}
+                    <div className="flex items-start gap-3 px-5 pt-5">
+                      <span className={`${iconTile} shrink-0`}>
+                        <Icon aria-hidden className="!size-[18px]" />
+                      </span>
+                      <h3 className="m-0 min-h-[2.5em] font-brand xl:min-h-[3.75em] text-lg font-medium leading-[1.25] tracking-[-0.015em] text-[var(--dl-text)] [text-wrap:pretty]">
+                        {t(`picker.cards.${job.id}.title`)}
+                      </h3>
+                    </div>
                     <div
                       aria-hidden
-                      className="relative m-2 grid h-[160px] place-items-center overflow-hidden rounded-xl border border-[var(--dl-line)] [background:var(--dl-vis)]"
+                      className="relative mx-2 mt-4 grid h-[160px] place-items-center overflow-hidden rounded-xl border border-[var(--dl-line)] [background:var(--dl-vis)]"
                     >
                       {visuals[job.id]}
                     </div>
                     <div className="px-5 pt-4">
-                      <span className={iconTile}>
-                        <Icon aria-hidden className="!size-[18px]" />
-                      </span>
-                      <h3 className="mb-2 mt-4 font-brand text-lg font-medium leading-[1.25] tracking-[-0.015em] text-[var(--dl-text)] [text-wrap:pretty]">
-                        {t(`picker.cards.${job.id}.title`)}
-                      </h3>
                       <p className="m-0 text-sm leading-[1.5] text-[var(--dl-muted)]">
                         {t(`picker.cards.${job.id}.body`)}
                       </p>
