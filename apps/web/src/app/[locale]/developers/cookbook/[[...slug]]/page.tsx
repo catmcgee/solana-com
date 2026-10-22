@@ -11,7 +11,11 @@ const PREFIX = ["developers", "cookbook"];
 
 type Props = { params: Promise<{ locale: string; slug?: string[] }> };
 
+// Static: English at build time, translations on first request, then
+// cached (the site's locale routing otherwise renders every request).
+export const dynamic = "force-static";
 export const dynamicParams = true;
+export const revalidate = false;
 
 export default async function Page({ params }: Props) {
   const { locale, slug = [] } = await params;
