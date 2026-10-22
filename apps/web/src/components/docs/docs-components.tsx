@@ -1048,7 +1048,7 @@ function Table(props: ComponentProps<"table">) {
     <div className="table-wrap" data-table-wrapper="true">
       <div className="table-scroll" role="region">
         <div className="flex">
-          <div>
+          <div className="table-grow">
             <table {...props} />
           </div>
         </div>
