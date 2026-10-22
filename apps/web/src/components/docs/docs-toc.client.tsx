@@ -11,8 +11,8 @@ import {
 } from "fumadocs-core/toc";
 
 /**
- * "On this page", in the right column from 1280px: h2 entries with their
- * h3 entries nested, the heading in view highlighted (Fumadocs' anchor
+ * "On this page", in the right column from 1280px: h1/h2 entries with their
+ * h3 and h4 entries nested, the heading in view highlighted (Fumadocs' anchor
  * observer, one active item), as the docs have shown it. Markup keeps the
  * #table-of-contents ids the docs CSS targets.
  */
@@ -21,17 +21,20 @@ interface Node {
   children: Node[];
 }
 
+/** Level in the list: h1 and h2 at the top, then h3, then h4. */
+const level = (item: TOCItemType) => Math.max(item.depth, 2) - 2;
+
 function nest(items: TOCItemType[]): Node[] {
   const roots: Node[] = [];
-  const top = items.length ? Math.min(...items.map((i) => i.depth)) : 2;
-  let parent: Node | undefined;
+  const stack: { level: number; node: Node }[] = [];
   for (const item of items) {
-    const node = { item, children: [] };
-    if (item.depth > top && parent) parent.children.push(node);
-    else {
-      roots.push(node);
-      parent = node;
-    }
+    const node: Node = { item, children: [] };
+    const l = level(item);
+    while (stack.length && stack[stack.length - 1].level >= l) stack.pop();
+    const parent = stack[stack.length - 1];
+    if (parent) parent.node.children.push(node);
+    else roots.push(node);
+    stack.push({ level: l, node });
   }
   return roots;
 }
@@ -80,7 +83,7 @@ export function DocsToc({
   icon: ReactNode;
 }) {
   const scroll = useRef<HTMLDivElement>(null);
-  const items = toc.filter((i) => i.depth >= 2 && i.depth <= 3);
+  const items = toc.filter((i) => i.depth <= 4);
   if (!items.length) return null;
   return (
     <AnchorProvider toc={items} single>

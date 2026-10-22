@@ -14,7 +14,7 @@
  *   as its title.
  */
 import { docsSlugBase } from "./remark-docs-compat.mjs";
-import { smartQuotes } from "./smart-quotes.mjs";
+import { smartPunctuation, smartQuotes } from "./smart-quotes.mjs";
 function isWhitespace(node) {
   return node.type === "text" && !node.value.trim();
 }
@@ -110,10 +110,13 @@ function stepTitles(tree) {
 
 const NO_QUOTES = new Set(["code", "pre", "kbd", "samp", "script", "style"]);
 
-/** Typographic quotes in text, outside code (smart-quotes.mjs). */
+/** Typographic quotes, dashes and ellipses in text, outside code (smart-quotes.mjs). */
 function quotes(node, state = { prev: "" }) {
   if (node.type === "text") {
-    node.value = smartQuotes(node.value, state.prev);
+    node.value = smartQuotes(
+      smartPunctuation(node.value, state.prev),
+      state.prev,
+    );
     state.prev = node.value.slice(-1) || state.prev;
     return;
   }

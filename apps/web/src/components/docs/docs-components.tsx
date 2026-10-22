@@ -514,6 +514,7 @@ function Field({
   required,
   deprecated,
   defaultValue,
+  post,
   children,
 }: P & {
   name?: string;
@@ -522,6 +523,8 @@ function Field({
   required?: boolean;
   deprecated?: boolean;
   defaultValue?: unknown;
+  /** Labels after the type (e.g. which response shape this is). */
+  post?: string[];
 }) {
   const id = name
     ? `${kind === "param" ? "param" : "response"}-${name.replace(/[^\w.-]+/g, "-").toLowerCase()}`
@@ -548,12 +551,26 @@ function Field({
                   <span>{type}</span>
                 </div>
               ) : null}
+              {post?.map((label) => (
+                <div
+                  key={label}
+                  data-component-part="field-info-pill"
+                  className="field-pill"
+                >
+                  <span>{label}</span>
+                </div>
+              ))}
               {defaultValue !== undefined ? (
                 <div
                   data-component-part="field-info-pill"
                   className="field-pill"
                 >
-                  <span>default:{String(defaultValue)}</span>
+                  <span>
+                    default:
+                    {typeof defaultValue === "string"
+                      ? JSON.stringify(defaultValue)
+                      : String(defaultValue)}
+                  </span>
                 </div>
               ) : null}
               {required ? (
@@ -621,6 +638,7 @@ export function ResponseField(
     required?: boolean;
     deprecated?: boolean;
     default?: unknown;
+    post?: string[];
   },
 ) {
   return (
@@ -631,6 +649,7 @@ export function ResponseField(
       required={props.required}
       deprecated={props.deprecated}
       defaultValue={props.default}
+      post={props.post}
     >
       {props.children}
     </Field>

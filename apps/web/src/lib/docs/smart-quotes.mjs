@@ -20,3 +20,19 @@ export function smartQuotes(text, before = "") {
   }
   return out;
 }
+
+/**
+ * The rest of the docs' typography, applied with the quotes in prose:
+ * `...` becomes … and `--` an em dash, except where it starts a word after
+ * a space (a CLI flag such as --rpc-url). `before` as for smartQuotes.
+ */
+export function smartPunctuation(text, before = "") {
+  return text
+    .replace(/\.\.\./g, "…")
+    .replace(/--/g, (match, offset, all) => {
+      const prev = offset ? all[offset - 1] : before;
+      const next = all[offset + 2] ?? "";
+      const flag = (!prev || /\s/.test(prev)) && /[\p{L}\p{N}]/u.test(next);
+      return flag ? match : "—";
+    });
+}
