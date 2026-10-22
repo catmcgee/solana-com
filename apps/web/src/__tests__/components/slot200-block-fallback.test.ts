@@ -52,4 +52,24 @@ describe("sampled block fallback", () => {
     expect(recovered.status).toBe(200);
     expect(rpc.getBlockFull).toHaveBeenCalledTimes(3);
   });
+
+  it("keeps the full signature and fee of each tape transaction", async () => {
+    const sig = "5".repeat(88);
+    rpc.getBlockFull.mockResolvedValue({
+      blockTime: 1_780_704_000,
+      transactions: [
+        {
+          meta: { fee: 7500, computeUnitsConsumed: 1000 },
+          transaction: { signatures: [sig], message: { accountKeys: [] } },
+        },
+      ],
+    });
+    const programs = await import("@/lib/slot200/programs");
+    vi.mocked(programs.classifyTx).mockReturnValue("Transfers");
+    const { GET } = await import("@/app/api/slot-time/block/route");
+    const sample = await (await GET()).json();
+    expect(sample.tape).toEqual([
+      { sig: sig.slice(0, 8), p: "Transfers", id: sig, fee: 7500 },
+    ]);
+  });
 });
