@@ -83,7 +83,7 @@ their source files during the build:
 
 - `@workspace/i18n` - i18n configuration and utilities
 - `@workspace/ui` - Shared UI components (Button, Dialog, Accordion, etc.)
-- `@solana-com/ui-chrome` - Header, Footer, ThemeProvider, InkeepChatButton
+- `@solana-com/ui-chrome` - Header, Footer, ThemeProvider, SearchBar
 - `@workspace/ecosystem-data` - Canonical company metadata, wallet records, and
   logos
 - `@workspace/sentry` - Shared Sentry configuration helpers
@@ -114,7 +114,6 @@ Key environment variables (defined in `turbo.json`):
 - `SENTRY_AUTH_TOKEN` - Error tracking
 - `SIMPLECAST_API_KEY` / `SIMPLECAST_PODCAST_ID` - Podcast integration
 - `YOUTUBE_API_KEY` / `YOUTUBE_CHANNEL_ID` - YouTube integration
-- `INKEEP_API_KEY` - AI chat assistant
 
 ## Git Hooks (Husky)
 

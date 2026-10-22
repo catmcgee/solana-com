@@ -13,7 +13,7 @@ Most apps are not standalone product islands. They share:
 - `@workspace/i18n` for locale config and routing helpers
 - `@workspace/ui` for reusable UI primitives
 - `@solana-com/ui-chrome` for shared header, footer, cross-app links, alerts,
-  and Inkeep integrations
+  and the header search
 - Turborepo tasks defined in the root `package.json` and `turbo.json`
 
 ## Fast Routing Map

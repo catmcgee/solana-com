@@ -5,7 +5,7 @@ import { breadcrumbs, resolveDocsPage } from "./page-data";
 import { DOCS_LOCALES } from "./locales.mjs";
 
 /**
- * Docs search (placeholder until Inkeep search returns): Fumadocs' built-in
+ * Docs search: Fumadocs' built-in
  * search over every page's title, description and section, per locale.
  * Bodies are not indexed, so answering a query loads no page module. Used by
  * /api/docs-search (the search dialog) and the MCP `search` tool.

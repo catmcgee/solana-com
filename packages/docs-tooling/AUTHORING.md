@@ -921,8 +921,7 @@ accent; put `data-accent` on one `<li>` to move it.
 #### API Routes
 
 The `src/app/api/markdown/[...slug]` route serves Markdown representations of
-documentation pages. Inkeep feedback uses a server action under
-`src/app/components/inkeep/`.
+documentation pages.
 
 #### Build Configuration
 

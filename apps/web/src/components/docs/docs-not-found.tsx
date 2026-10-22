@@ -87,10 +87,7 @@ export async function DocsNotFound() {
             </div>
           </div>
         </main>
-        <DocsSearch
-          locale={defaultLocale}
-          inkeep={Boolean(process.env.INKEEP_API_KEY)}
-        />
+        <DocsSearch locale={defaultLocale} />
         <DocsScripts />
       </div>
     </>

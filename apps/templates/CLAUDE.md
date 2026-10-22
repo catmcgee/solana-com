@@ -93,7 +93,6 @@ Templates sourced from `solana-foundation/templates` GitHub repository:
 - `shiki` - Code syntax highlighting
 - `marked` - Markdown parsing
 - `framer-motion` - Animations
-- `@inkeep/cxkit-react` - AI chat assistant
 - `@workspace/ui` - Shared UI components
 
 ## Routing
