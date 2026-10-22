@@ -18,6 +18,9 @@ export function findDocsRoot() {
     /* turbopackIgnore: true */ process.cwd(),
     "apps/docs",
   );
-  cached = existsSync(path.join(fromWeb, "docs.json")) ? fromWeb : fromRoot;
+  // Test the repo-root layout: the server functions ship only the traced
+  // docs sources (no docs.json), so probing ../docs/docs.json sent
+  // translated pages that inline snippets to apps/web/apps/docs (ENOENT).
+  cached = existsSync(path.join(fromRoot, "docs.json")) ? fromRoot : fromWeb;
   return cached;
 }
