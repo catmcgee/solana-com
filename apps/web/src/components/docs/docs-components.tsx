@@ -33,6 +33,7 @@ import {
 import { DocsLink } from "./docs-link";
 import { isDocsHref } from "@/lib/docs/docs-href";
 import { TxWalkthrough } from "@/components/tx-walkthrough";
+import { LiveFeed } from "./docs-live-feed.client";
 
 type P = { children?: ReactNode };
 
@@ -1123,6 +1124,8 @@ export const docsComponents = {
   Icon,
   Tree,
   TxWalkthrough,
+  // apps/web only; Mintlify uses the /snippets/live-feed.jsx stand-in.
+  LiveFeed,
 };
 
 export { text as textContent };
