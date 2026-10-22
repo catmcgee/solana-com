@@ -230,30 +230,30 @@ function PaymentSnippet({ t, href }: { t: Translate; href: string }) {
 
 function AssetVisual({ t }: { t: (key: string) => string }) {
   const row =
-    "rounded-[10px] border border-[var(--dl-line)] bg-[var(--dl-raised)] whitespace-nowrap px-2.5 py-[7px] text-[13px] text-[var(--dl-text)] motion-safe:animate-[dl-row_4s_infinite]";
+    "flex min-w-0 items-center justify-between gap-1.5 rounded-[10px] border border-[var(--dl-line)] bg-[var(--dl-raised)] px-2 py-[7px] text-[12.5px] leading-tight text-[var(--dl-text)] motion-safe:animate-[dl-row_4s_infinite]";
   return (
-    <div className="flex flex-col items-center gap-2.5">
-      <div className="flex items-center gap-3">
-        <div className="flex shrink-0 flex-col items-center justify-center rounded-2xl border border-[var(--dl-gold-line)] bg-[var(--dl-gold-soft)] px-2.5 py-2 text-center text-[var(--dl-gold)] motion-safe:animate-[dl-bob_4s_ease-in-out_infinite]">
-          <span className="text-[13px] font-semibold leading-tight">
-            {t("picker.visuals.assetToken")}
+    <div className="grid w-full max-w-[20rem] grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2 gap-y-3 px-3">
+      <div className="flex max-w-[4.75rem] flex-col items-center rounded-2xl border border-[var(--dl-gold-line)] bg-[var(--dl-gold-soft)] px-2 py-2 text-center text-[var(--dl-gold)] motion-safe:animate-[dl-bob_4s_ease-in-out_infinite]">
+        <span className="text-[12.5px] font-semibold leading-tight">
+          {t("picker.visuals.assetToken")}
+        </span>
+        <span className="font-[family-name:var(--dl-mono)] text-[11px] leading-tight opacity-80">
+          {t("picker.visuals.assetKind")}
+        </span>
+      </div>
+      <div className="flex min-w-0 flex-col gap-2">
+        <div className={row}>
+          <span className="truncate">
+            → {t("picker.visuals.assetApproved")}
           </span>
-          <span className="font-[family-name:var(--dl-mono)] text-[11px] leading-tight opacity-80">
-            {t("picker.visuals.assetKind")}
-          </span>
+          <b className="shrink-0 text-[var(--dl-good)]">✓</b>
         </div>
-        <div className="flex flex-col gap-2">
-          <div className={row}>
-            → {t("picker.visuals.assetApproved")}{" "}
-            <b className="ms-2 text-[var(--dl-good)]">✓</b>
-          </div>
-          <div className={`${row} [animation-delay:2s]`}>
-            → {t("picker.visuals.assetUnknown")}{" "}
-            <b className="ms-2 text-[var(--dl-danger)]">✕</b>
-          </div>
+        <div className={`${row} [animation-delay:2s]`}>
+          <span className="truncate">→ {t("picker.visuals.assetUnknown")}</span>
+          <b className="shrink-0 text-[var(--dl-danger)]">✕</b>
         </div>
       </div>
-      <span className="font-[family-name:var(--dl-mono)] text-xs text-[var(--dl-accent-text)]">
+      <span className="col-span-2 justify-self-center font-[family-name:var(--dl-mono)] text-xs text-[var(--dl-accent-text)]">
         {t("picker.visuals.assetTag")}
       </span>
     </div>
