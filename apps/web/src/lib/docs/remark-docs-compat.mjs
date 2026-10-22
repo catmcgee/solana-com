@@ -10,6 +10,10 @@
  *   from snippets reach the TOC, and the processed Markdown (`.md` twins,
  *   llms-full.txt) contains the snippet text, as it did before.
  *   Snippets may import other snippets; those are inlined the same way.
+ * - Component stand-ins: `import { X } from "/snippets/x.jsx"` is a
+ *   Mintlify-only fallback for a component that apps/web provides in the
+ *   docs MDX components (components/docs/docs-components.tsx). The import is
+ *   dropped, so `<X>` resolves to the real component here.
  * - Heading ids follow the slugs the docs have always published (kept by
  *   `docsSlug`, used through remarkHeading's `slug` option in
  *   source.config.ts), so existing #anchors keep working.
@@ -195,6 +199,30 @@ function inlineSnippets(processor, tree, file, seen = new Set(), root = file) {
   visit(tree);
 }
 
+/** Drop `/snippets/*.jsx` imports (Mintlify stand-ins, see above). */
+function dropStandInImports(tree) {
+  const isStandIn = (statement) =>
+    statement.type === "ImportDeclaration" &&
+    String(statement.source?.value ?? "").startsWith(SNIPPET_PREFIX) &&
+    String(statement.source?.value ?? "").endsWith(".jsx");
+  tree.children = tree.children.filter((node) => {
+    if (node.type !== "mdxjsEsm" || !node.data?.estree) return true;
+    const body = node.data.estree.body;
+    if (!body.some(isStandIn)) return true;
+    node.data.estree.body = body.filter((s) => !isStandIn(s));
+    node.value = node.value
+      .split("\n")
+      .filter(
+        (line) =>
+          !/^\s*import\s.*from\s+["']\/snippets\/[^"']+\.jsx["'];?\s*$/.test(
+            line,
+          ),
+      )
+      .join("\n");
+    return node.data.estree.body.length > 0;
+  });
+}
+
 function hasApiExamples(node) {
   if (
     (node.type === "mdxJsxFlowElement" || node.type === "mdxJsxTextElement") &&
@@ -209,6 +237,8 @@ export function remarkDocsCompat() {
   return (tree, file) => {
     for (const node of tree.children) if (isComment(node)) replaceSource(file, node, "");
     inlineSnippets(processor, tree, file);
+    // After inlining, so stand-ins imported by snippets go too.
+    dropStandInImports(tree);
     // RPC method pages: the page shows its examples in a column of their own.
     if (hasApiExamples(tree)) {
       file.data["mdx-export"] ??= [];

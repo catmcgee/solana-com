@@ -25,6 +25,7 @@ import {
 import { CalloutIcon, ChevronIcon } from "./docs-ui-icons";
 import { DocsLink } from "./docs-link";
 import { isDocsHref } from "@/lib/docs/docs-href";
+import { TxWalkthrough } from "@/components/tx-walkthrough";
 
 type P = { children?: ReactNode };
 
@@ -1098,6 +1099,8 @@ export const docsComponents = {
   Badge,
   Icon,
   Tree,
+  // apps/web only; Mintlify uses the /snippets/tx-walkthrough.jsx stand-in.
+  TxWalkthrough,
 };
 
 export { text as textContent };
