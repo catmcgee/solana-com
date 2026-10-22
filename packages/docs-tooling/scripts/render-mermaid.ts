@@ -33,6 +33,7 @@ import {
   mermaidHash,
 } from "../src/convert/transforms/mermaid.ts";
 import { listContentPages } from "../src/generators/_lib.ts";
+import { drawPhone } from "./mermaid-phone.ts";
 import { repoRoot } from "../src/lib/paths.ts";
 import type { AstNode } from "../src/types.ts";
 
@@ -62,6 +63,8 @@ function findMermaid(): string {
 }
 const mermaidJs = findMermaid();
 
+/** Width of the phone drawings: the figure on a 390px phone. */
+const PHONE_WIDTH = 336;
 const FONT = "Diatype, Inter, ui-sans-serif, system-ui, sans-serif";
 const common = {
   fontFamily: FONT,
@@ -236,18 +239,12 @@ export function flowDirection(source: string): "TD" | "LR" | undefined {
 /**
  * Source tweaks applied at render time only (the hash is of the authored
  * source): the `focal` classDef, a marker after the first `<br/>` of each
- * node label so postProcess can set the title line apart, and, for the
- * phone drawing of a left-to-right flowchart, top-to-bottom layout.
+ * node label so postProcess can set the title line apart. (Phone drawings
+ * are not mermaid layouts: see mermaid-phone.ts.)
  */
-export function prepare(
-  source: string,
-  mode: keyof typeof SYS,
-  phone = false,
-): string {
+export function prepare(source: string, mode: keyof typeof SYS): string {
   const c = SYS[mode];
   let src = source;
-  if (phone)
-    src = src.replace(/^(\s*(?:flowchart|graph)\s+)(?:LR|RL)\b/m, "$1TD");
   if (/^\s*(flowchart|graph)\b/.test(src)) {
     src = src
       .split("\n")
@@ -975,6 +972,28 @@ async function main() {
       for (const v of variants(h))
         for (const mode of ["light", "dark"] as const) {
           const phone = v === "-sm";
+          const name = mode === "light" ? `${h}${v}-light.svg` : `${h}${v}.svg`;
+          if (phone) {
+            // The phone drawing is our own top-to-bottom layout.
+            const svg: string = await page.evaluate(
+              ({ fn, src, c, o }) =>
+                // eslint-disable-next-line no-new-func
+                new Function(`return (${fn})`)()(src, c, o),
+              {
+                fn: drawPhone.toString(),
+                src: source,
+                c: SYS[mode],
+                o: {
+                  sans: FONT,
+                  mono: MONO,
+                  focal: focalMessage(source),
+                  width: PHONE_WIDTH,
+                },
+              },
+            );
+            writeFileSync(path.join(outDir, name), svg);
+            continue;
+          }
           let res: { svg?: string; error?: string } = await page.evaluate(
             async ({ id, src, cfg }) => {
               const m = (
@@ -997,7 +1016,7 @@ async function main() {
             },
             {
               id: `m${h}`,
-              src: prepare(source, mode, phone),
+              src: prepare(source, mode),
               cfg: config(mode),
             },
           );
@@ -1027,7 +1046,7 @@ async function main() {
               },
               {
                 id: `m${h}`,
-                src: prepare(source, mode, phone),
+                src: prepare(source, mode),
                 cfg: { ...cfg, sequence: { ...cfg.sequence, wrap: false } },
               },
             );
@@ -1051,7 +1070,7 @@ async function main() {
               o: {
                 mono: MONO,
                 focal: focalMessage(source),
-                flow: phone ? ("TD" as const) : flowDirection(source),
+                flow: flowDirection(source),
               },
             },
           );
@@ -1088,10 +1107,9 @@ async function main() {
               host.remove();
               return out;
             },
-            [styled, phone ? "TD" : (flowDirection(source) ?? "")] as const,
+            [styled, flowDirection(source) ?? ""] as const,
           );
           res = { svg: cropped };
-          const name = mode === "light" ? `${h}${v}-light.svg` : `${h}${v}.svg`;
           writeFileSync(
             path.join(outDir, name),
             `${sizeSvg(res.svg!.replace(/<br>/g, "<br/>"))}\n`,
@@ -1111,4 +1129,5 @@ async function main() {
   }
 }
 
-if (existsSync(docsRoot)) await main();
+if (existsSync(docsRoot) && process.argv[1]?.endsWith("render-mermaid.ts"))
+  await main();

@@ -154,7 +154,7 @@ describe("WP3 goldens", () => {
               mermaidHash(String(c.value)),
             );
             const imgs = (next?.children ?? []).filter((k) => k.name === "img");
-            // Left-to-right flowcharts also carry their phone drawing.
+            // Flowcharts and sequence diagrams also carry their phone drawing.
             expect(imgs).toHaveLength(hasPhoneVariant(String(c.value)) ? 4 : 2);
           });
         });

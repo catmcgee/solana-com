@@ -50,12 +50,13 @@ export function mermaidHash(source: string): string {
 }
 
 /**
- * Flowcharts drawn left to right also get a phone drawing, the same graph
- * top to bottom (`<hash>-sm-light.svg` / `<hash>-sm.svg`), which
- * styles/diagrams.css shows below 640px instead of a sideways scroll.
+ * Flowcharts and sequence diagrams also get a phone drawing
+ * (`<hash>-sm-light.svg` / `<hash>-sm.svg`, drawn top to bottom by
+ * scripts/mermaid-phone.ts), which styles/diagrams.css shows below 640px
+ * instead of a sideways scroll.
  */
 export function hasPhoneVariant(source: string): boolean {
-  return /^\s*(?:flowchart|graph)\s+(?:LR|RL)\b/m.test(source);
+  return /^\s*(?:(?:flowchart|graph)\b|sequenceDiagram\b)/m.test(source);
 }
 
 function fallbackFor(source: string, alt: string): AstNode {
