@@ -10,7 +10,7 @@ solana-com/
 ├── apps/
 │   ├── accelerate/   # Solana Accelerate conference - port 3004
 │   ├── web/          # Main website (solana.com) - port 3000
-│   ├── docs/         # Developer documentation - port 3003
+│   ├── docs/         # Developer docs content (rendered by apps/web)
 │   ├── media/        # Blog & news (Keystatic) - port 3002
 │   ├── templates/    # Code templates showcase - port 3001
 │   └── breakpoint/   # Breakpoint event microsite - port 3005
@@ -54,7 +54,7 @@ pnpm dev
 
 # Development (specific app)
 pnpm dev --filter solana-com              # Main website
-pnpm dev:docs                             # Documentation (mint dev in apps/docs)
+pnpm dev:docs                             # Documentation (apps/web, port 3000)
 pnpm dev --filter solana-com-media        # Blog/Media
 pnpm dev --filter solana-templates        # Templates
 pnpm dev --filter solana-com-accelerate   # Accelerate conference
@@ -157,8 +157,8 @@ Each app has its own CLAUDE.md with app-specific details:
 
 - `apps/accelerate/CLAUDE.md` - Accelerate conference site
 - `apps/web/CLAUDE.md` - Main website
-- `packages/docs-tooling/AUTHORING.md` - Documentation site (Mintlify; apps/docs
-  must not contain CLAUDE.md/AGENTS.md because Mintlify publishes every .md)
+- `packages/docs-tooling/AUTHORING.md` - Documentation site (apps/docs content,
+  rendered by apps/web with Fumadocs)
 - `apps/media/CLAUDE.md` - Blog/Media site
 - `apps/templates/CLAUDE.md` - Templates showcase
 - `apps/breakpoint/CLAUDE.md` - Breakpoint event site

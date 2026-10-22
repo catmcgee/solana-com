@@ -60,7 +60,7 @@ entries point at the English page until `nav:swap` runs after a Lingo run.
 The developer docs content lives in this folder (`apps/docs`). `apps/web`
 renders it with Fumadocs and serves it at solana.com/developers/docs:
 
-- `docs/**`, `developers/cookbook/**`, `developers/bootcamp/**`, `learn/*.mdx`
+- `developers/docs/**`, `developers/cookbook/**`, `learn/*.mdx`
   are the English pages; `<locale>/…` holds the translations. Folder paths are
   public URLs, so moving a file needs a redirect in
   `apps/web/rewrites-redirects.ts`.

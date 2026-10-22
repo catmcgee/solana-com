@@ -13,21 +13,20 @@ be checked on a deployment is listed under "Release gates" below.
 
 ## Where things live
 
-| Path                                                             | What                                                                                                                                                                                                                  |
-| ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/docs/`                                                     | Docs content root, read by apps/web (`source.config.ts`). No `package.json`.                                                                                                                                          |
-| `apps/docs/docs.json`                                            | Site config read by apps/web and docs-tooling: name, description, footer, `navigation` (`$ref` to `navigation/<lang>.json`), `search.prompt`, `seo.metatags`, `markdown.instructions`, `errors.404`.                  |
-| `apps/docs/developers/docs/**`                                   | English docs, served at `/developers/docs/**` (`index.mdx` = folder URL). Moved from `apps/docs/docs/**` (`/docs/**`) on 2026-10-16; see "The /developers/docs move".                                                 |
-| `apps/docs/developers/cookbook/**`                               | Cookbook (English only), `/developers/cookbook/**`.                                                                                                                                                                   |
-| `apps/docs/developers/bootcamp/**`                               | English bootcamp, `/developers/bootcamp/**`.                                                                                                                                                                          |
-| `apps/docs/learn/*.mdx`                                          | English learn articles, `/learn/<slug>`. The `/learn` landing is a React page moving to apps/web (WP10).                                                                                                              |
-| `apps/docs/<loc>/{developers/docs,developers/bootcamp,learn}/**` | Translations for ar de es fi fr id it ja ko nl pl pt ru tr uk vi zh. Greek (`el`) was removed.                                                                                                                        |
-| `apps/docs/docs-assets/**`                                       | Images/video served at `/docs-assets/<original public path>`.                                                                                                                                                         |
-| `apps/docs/**/meta.json`                                         | Removed at integration (WP12): the legacy Fumadocs nav is compiled into `navigation/en.json`; `nav compile-legacy` reads the originals from git (`LEGACY_REF`).                                                       |
-| `packages/docs-tooling/`                                         | All build/migration tooling (this package).                                                                                                                                                                           |
-| `packages/docs-tooling/data/`                                    | Data moved out of the Next app: Surfpool JSON schemas, bootcamp curriculum, learn order, legacy `resources.json`.                                                                                                     |
-| `packages/docs-tooling/legacy/`                                  | Legacy TypeScript kept for reference by later work packages (not compiled).                                                                                                                                           |
-| `migration/` (repo root)                                         | Review artifacts: `legacy-urls.{txt,tsv}`, `move-map.csv`, `assets-diff.txt`, `asset-refs.csv`, `docs-app-redirects.json`, `pending-web-work.json` (WP9/WP10 handoff), `verify-urls.tsv`, `missing-translations.txt`. |
+| Path                                         | What                                                                                                                                                                                                                  |
+| -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/docs/`                                 | Docs content root, read by apps/web (`source.config.ts`). No `package.json`.                                                                                                                                          |
+| `apps/docs/docs.json`                        | Site config read by apps/web and docs-tooling: name, description, footer, `navigation` (`$ref` to `navigation/<lang>.json`), `search.prompt`, `seo.metatags`, `markdown.instructions`, `errors.404`.                  |
+| `apps/docs/developers/docs/**`               | English docs, served at `/developers/docs/**` (`index.mdx` = folder URL). Moved from `apps/docs/docs/**` (`/docs/**`) on 2026-10-16; see "The /developers/docs move".                                                 |
+| `apps/docs/developers/cookbook/**`           | Cookbook (English only), `/developers/cookbook/**`.                                                                                                                                                                   |
+| `apps/docs/learn/*.mdx`                      | English learn articles, `/learn/<slug>`. The `/learn` landing is a React page moving to apps/web (WP10).                                                                                                              |
+| `apps/docs/<loc>/{developers/docs,learn}/**` | Translations for ar de es fi fr id it ja ko nl pl pt ru tr uk vi zh. Greek (`el`) was removed.                                                                                                                        |
+| `apps/docs/docs-assets/**`                   | Images/video served at `/docs-assets/<original public path>`.                                                                                                                                                         |
+| `apps/docs/**/meta.json`                     | Removed at integration (WP12): the legacy Fumadocs nav is compiled into `navigation/en.json`; `nav compile-legacy` reads the originals from git (`LEGACY_REF`).                                                       |
+| `packages/docs-tooling/`                     | All build/migration tooling (this package).                                                                                                                                                                           |
+| `packages/docs-tooling/data/`                | Data moved out of the Next app: Surfpool JSON schemas, bootcamp curriculum, learn order, legacy `resources.json`.                                                                                                     |
+| `packages/docs-tooling/legacy/`              | Legacy TypeScript kept for reference by later work packages (not compiled).                                                                                                                                           |
+| `migration/` (repo root)                     | Review artifacts: `legacy-urls.{txt,tsv}`, `move-map.csv`, `assets-diff.txt`, `asset-refs.csv`, `docs-app-redirects.json`, `pending-web-work.json` (WP9/WP10 handoff), `verify-urls.tsv`, `missing-translations.txt`. |
 
 Rules for `apps/docs`:
 
@@ -352,7 +351,7 @@ deployment) and checks HTTP 200 plus the page title in the HTML.
 - `site-links` (650): root-relative links to pages apps/web serves (`/skills`,
   `/discord`, `/developers/templates`, …) become `https://solana.com/…`; the
   docs routes are only `/developers/docs/**`, `/learn/<article>`,
-  `/developers/cookbook/**`, `/developers/bootcamp/**`, `/docs-assets/**`
+  `/developers/cookbook/**`, `/docs-assets/**`
   (optionally locale-prefixed; old `/docs/**` links are left alone because they
   redirect). Bare relative links are resolved the way the legacy browser did.
   GFM autolinks that swallowed CJK/Arabic punctuation are cut.
@@ -506,9 +505,8 @@ Release gate: check this before the docs leave the fork.
   `docs/tools/index`) is a live page: its content (SendAI Agent Kit, Eliza,
   GOAT, LangChain, onchain agent programs) is about agents that transact, not
   coding assistants (`intro/coding-with-agents`, "Build with AI agents"); the
-  two pages link to each other. The bootcamp lessons live in a hidden "Bootcamp"
-  tab (own sidebar at `/developers/bootcamp/**`); the Video tutorials tab lists
-  only the `video-guides` pages, which link to the matching lesson course. oxfmt
+  two pages link to each other. The Video tutorials tab lists
+  the `video-guides` pages; old `/developers/bootcamp/**` URLs redirect there. oxfmt
   runs on staged EN content at commit, so generator output must be oxfmt-stable
   (it de-indents JSX children after a blank line and re-wraps attributes longer
   than 80 characters).
@@ -732,8 +730,8 @@ Content is organized using Fumadocs conventions:
 
 3. **Learn** (`/learn/*`) - General Solana learning resources
 
-4. **Developer bootcamp** (`/developers/bootcamp/*`) - Structured learning
-   tracks and companion material
+4. **Video tutorials** (`/developers/docs/video-guides/*`) - Video courses,
+   including the 2026 Developer Bootcamp
 
 ##### Localization
 
@@ -889,9 +887,8 @@ and docs-specific UI.
 
 - Workspace: `apps/docs`
 - Package: `solana-docs`
-- Default dev port: `3003`
-- Public route ownership: `/docs`, `/learn`, `/developers`,
-  `/developers/cookbook`, `/developers/bootcamp`
+- Served by apps/web (dev port `3000`, `pnpm dev:docs`)
+- Public route ownership: `/developers/docs`, `/learn`, `/developers/cookbook`
 
 #### First Files To Open
 

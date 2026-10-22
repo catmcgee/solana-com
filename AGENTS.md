@@ -23,7 +23,7 @@ Pick the app first. That usually cuts exploration time in half.
 | Area                  | Workspace                                   | Local Port | Key Route Prefixes                                                          |
 | --------------------- | ------------------------------------------- | ---------- | --------------------------------------------------------------------------- |
 | Main marketing site   | `apps/web` / `solana-com`                   | `3000`     | `/`, `/solutions`, `/ecosystem`, `/events`, selected `/developers/*` routes |
-| Developer docs        | `apps/docs` (Mintlify, no package)          | `3003`     | `/docs`, `/learn/*`, `/developers/cookbook`, `/developers/bootcamp`         |
+| Developer docs        | `apps/docs` content, rendered by `apps/web` | `3000`     | `/developers/docs`, `/learn/*`, `/developers/cookbook`                      |
 | Media/blog            | `apps/media` / `solana-com-media`           | `3002`     | `/news`, `/changelog`, `/reports`, `/upgrades`, `/podcasts`, `/keystatic`   |
 | Templates showcase    | `apps/templates` / `solana-templates`       | `3001`     | `/developers/templates` via rewrites                                        |
 | Accelerate event site | `apps/accelerate` / `solana-com-accelerate` | `3004`     | `/accelerate` via rewrites                                                  |
@@ -35,9 +35,9 @@ Pick the app first. That usually cuts exploration time in half.
 
 - `apps/web`: main `solana.com` app, large surface area, mix of marketing,
   ecosystem, events, news aggregation, and developer entry points
-- `apps/docs`: Mintlify project (migration in progress on `mintlify-migration`).
-  Folders mirror public URLs (`docs/`, `<locale>/docs/`, `developers/cookbook/`,
-  `developers/bootcamp/`, `learn/`). Tooling and authoring rules live in
+- `apps/docs`: docs content (MDX), rendered by `apps/web` with Fumadocs.
+  Folders mirror public URLs (`developers/docs/`, `<locale>/developers/docs/`,
+  `developers/cookbook/`, `learn/`). Tooling and authoring rules live in
   `packages/docs-tooling` (see `packages/docs-tooling/AUTHORING.md`)
 - `apps/media`: Keystatic-backed news and podcast site with content in
   `content/`
@@ -71,7 +71,7 @@ pnpm dev:web
 pnpm dev:media
 pnpm dev:acc
 pnpm dev:bp
-pnpm dev:docs   # mint dev in apps/docs (port 3003)
+pnpm dev:docs   # apps/web with the docs (port 3000)
 pnpm --filter solana-templates dev
 pnpm --filter solana-com-breakpoint dev
 pnpm lint
@@ -90,7 +90,7 @@ node skills/refresh-agent-context/scripts/workspace_inventory.mjs
 Useful filters:
 
 - `solana-com`
-- `@workspace/docs-tooling` (Mintlify docs tooling; apps/docs has no package)
+- `@workspace/docs-tooling` (docs generators and checks; apps/docs has no package)
 - `solana-com-media`
 - `solana-templates`
 - `solana-com-accelerate`
