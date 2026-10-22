@@ -195,7 +195,7 @@ describe("/developers landing", () => {
   it("shows the payment snippet beside the calculator, copied from the tested Quickstart example", async () => {
     renderWithIntl(await DevelopersHub({ locale: "en", updates: [] }));
     const snippet = screen.getByTestId("pay-snippet");
-    expect(snippet).toHaveTextContent("Sending a payment is one instruction.");
+    expect(snippet).toHaveTextContent("Sending a payment is one call.");
     expect(
       within(snippet).getByRole("link", { name: "See the full example" }),
     ).toHaveAttribute("href", "/developers/docs/quickstart/send-dollars");
@@ -219,7 +219,7 @@ describe("/developers landing", () => {
       source.slice(start, start + code.length + 1).filter(Boolean),
     ).toEqual(code);
     expect(source.join("\n")).toContain(
-      'getTransferCheckedInstruction,\n  TOKEN_PROGRAM_ADDRESS,\n} from "@solana-program/token";',
+      'import { client, tokenBalance, USDC_MINT } from "./client";',
     );
   });
 

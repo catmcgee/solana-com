@@ -42,6 +42,8 @@ import { NewsletterForm } from "./newsletter-form.client";
  * off-site links (hackathons, MCP setup) open a new tab, with the arrow.
  */
 export const HACKATHONS_URL = "https://hackathons.solana.com";
+/** Live payments on Solana. It refuses framing, so it is a link, not an embed. */
+export const PAYMENTS_ORG_URL = "https://payments.org";
 
 type IconComponent = ComponentType<{
   className?: string;
@@ -628,6 +630,19 @@ export async function DevelopersHub({
             </div>
             <PaymentSnippet t={t} href={href(PAYMENT_SNIPPET.href)} />
           </div>
+          <p className="m-0 mt-3.5 text-sm text-[var(--dl-muted)]">
+            {t("calc.liveBody")}{" "}
+            <a
+              href={PAYMENTS_ORG_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              data-testid="calc-live"
+              className={inlineLink}
+            >
+              {t("calc.liveLink")}
+              <NewTabHint text={newTabText} />
+            </a>
+          </p>
         </div>
       </section>
 
