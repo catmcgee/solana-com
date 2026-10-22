@@ -5,7 +5,7 @@
  * own stylesheets) always load fresh.
  */
 const DOCS_PATH =
-  /^\/(?:[a-z]{2}\/)?(?:developers\/(?:docs|cookbook|bootcamp)(?:[/?#]|$)|learn\/[^?#])/;
+  /^\/(?:[a-z]{2}\/)?(?:developers\/(?:docs|cookbook)(?:[/?#]|$)|learn\/[^?#])/;
 
 export function isDocsHref(href: string | undefined): href is string {
   return !!href && DOCS_PATH.test(href) && !/\.(?:md|txt)(?:[?#]|$)/.test(href);

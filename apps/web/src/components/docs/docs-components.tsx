@@ -9,13 +9,14 @@
  */
 import {
   Children,
+  Fragment,
   isValidElement,
   type CSSProperties,
   type ComponentProps,
   type ReactElement,
   type ReactNode,
 } from "react";
-import { icons as lucideIcons } from "lucide-react";
+import { icons as lucideIcons } from "lucide";
 import {
   CodeGroupClient,
   CopyCodeButton,
@@ -27,10 +28,16 @@ import { isDocsHref } from "@/lib/docs/docs-href";
 
 type P = { children?: ReactNode };
 
+/** Element children, with fragments flattened. */
 function elements(children: ReactNode): ReactElement<Record<string, unknown>>[] {
-  return Children.toArray(children).filter(isValidElement) as ReactElement<
-    Record<string, unknown>
-  >[];
+  const out: ReactElement<Record<string, unknown>>[] = [];
+  for (const child of Children.toArray(children)) {
+    if (!isValidElement(child)) continue;
+    if (child.type === Fragment)
+      out.push(...elements((child.props as { children?: ReactNode }).children));
+    else out.push(child as ReactElement<Record<string, unknown>>);
+  }
+  return out;
 }
 
 function text(node: ReactNode): string {
@@ -47,7 +54,38 @@ function text(node: ReactNode): string {
 const toPascal = (s: string) =>
   s.replace(/(^|[-_ ])([a-z0-9])/g, (_, __, c: string) => c.toUpperCase());
 
-/** Lucide icon by name ("credit-card"), as the docs' `icon` props name them. */
+type IconNode = [string, Record<string, string | number>][];
+const maskCache = new Map<string, string | null>();
+
+/** Data URI of a Lucide icon's SVG, for CSS masks. */
+function lucideMask(name: string): string | null {
+  if (maskCache.has(name)) return maskCache.get(name)!;
+  const node = (lucideIcons as unknown as Record<string, IconNode>)[
+    toPascal(name)
+  ];
+  let uri: string | null = null;
+  if (node) {
+    const body = node
+      .map(
+        ([tag, attrs]) =>
+          `<${tag} ${Object.entries(attrs)
+            .map(([k, v]) => `${k}="${v}"`)
+            .join(" ")}/>`,
+      )
+      .join("");
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
+    uri = `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+  }
+  maskCache.set(name, uri);
+  return uri;
+}
+
+/**
+ * Lucide icon by name ("credit-card"), as the docs' `icon` props name them.
+ * Drawn as a mask filled with the background colour (the primary colour by
+ * default, `color` when given), as the docs have always drawn them, so the
+ * stylesheets that recolour icons keep working.
+ */
 export function Icon({
   icon,
   size = 16,
@@ -59,16 +97,27 @@ export function Icon({
   color?: string;
   className?: string;
 }) {
-  const Lucide = (lucideIcons as Record<string, typeof lucideIcons.Info>)[
-    toPascal(icon)
-  ];
-  if (!Lucide) return null;
+  const mask = lucideMask(icon);
+  if (!mask) return null;
   return (
-    <Lucide
-      size={size}
-      className={className ?? "docs-icon"}
-      style={color ? { color } : undefined}
+    <svg
+      className={className ?? "icon inline"}
       aria-hidden="true"
+      focusable="false"
+      style={{
+        WebkitMaskImage: mask,
+        WebkitMaskRepeat: "no-repeat",
+        WebkitMaskPosition: "center",
+        maskImage: mask,
+        maskRepeat: "no-repeat",
+        maskPosition: "center",
+        maskSize: "100%",
+        width: size,
+        height: size,
+        display: "inline-block",
+        verticalAlign: "middle",
+        ...(color ? { backgroundColor: color } : {}),
+      }}
     />
   );
 }
@@ -188,7 +237,7 @@ export function Card({
           ) : null}
           {children ? (
             <div
-              className={title ? "prose card-content card-content-spaced" : "prose card-content"}
+              className={title && !horizontal ? "prose card-content card-content-spaced" : "prose card-content"}
               data-component-part="card-content"
             >
               {children}
@@ -655,7 +704,17 @@ function ApiResponseExample({ children }: P) {
  * the examples column.
  */
 export function ApiExamplesWrapper({ children }: P) {
-  const found = elements(children).filter(
+  // MDX passes one element (its content component); render it to its
+  // top-level elements (a plain function, no hooks) and keep the examples.
+  let content: ReactNode = children;
+  const only = elements(children)[0];
+  if (only && typeof only.type === "function") {
+    const tree = (only.type as (p: unknown) => ReactNode)(only.props);
+    content = isValidElement(tree)
+      ? ((tree.props as { children?: ReactNode }).children ?? tree)
+      : tree;
+  }
+  const found = elements(content).filter(
     (el) => el.type === RequestExample || el.type === ResponseExample,
   );
   if (!found.length) return null;

@@ -39,7 +39,8 @@ import "./docs-styles";
 interface LoadedBody {
   body: (props: { components?: Record<string, unknown> }) => ReactNode;
   toc: TOCItemType[];
-  apiExamples?: boolean;
+  /** Every export of the page module (remark-docs-compat adds apiExamples). */
+  _exports?: { apiExamples?: boolean };
 }
 
 function headerTabs(resolved: ResolvedDocsPage): {
@@ -124,7 +125,7 @@ export async function DocsPageView({
     ? {}
     : neighbours(resolved);
   const wide = fm.mode === "wide";
-  const api = !!loaded.apiExamples;
+  const api = !!loaded._exports?.apiExamples;
   const { tabs, active } = headerTabs(resolved);
   const tab = resolved.tab;
   const current = page.url;

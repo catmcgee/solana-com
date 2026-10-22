@@ -13,7 +13,7 @@ import { DOCS_LOCALES } from "./locales.mjs";
  * docs app on origin/main did; the default locale is hidden in URLs.
  *
  * Page URLs equal the public paths: /developers/docs/..., /learn/...,
- * /developers/cookbook/..., /developers/bootcamp/..., each optionally under
+ * /developers/cookbook/..., each optionally under
  * /<locale>. `index` files are their folder's URL.
  */
 const english = toFumadocsSource(docs, []);

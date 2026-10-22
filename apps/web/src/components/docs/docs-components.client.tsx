@@ -51,6 +51,16 @@ function slug(label: string) {
     .replace(/^-|-$/g, "");
 }
 
+/** The reader's operating system, as the OS tab labels name them. */
+function detectOs(): string | null {
+  const nav = navigator as Navigator & { userAgentData?: { platform?: string } };
+  const p = nav.userAgentData?.platform || nav.platform || nav.userAgent || "";
+  if (/win/i.test(p)) return "Windows";
+  if (/mac|iphone|ipad|ipod/i.test(p)) return "macOS";
+  if (/linux|x11|cros|android/i.test(p)) return "Linux";
+  return null;
+}
+
 export function TabsClient({
   labels,
   panels,
@@ -60,8 +70,22 @@ export function TabsClient({
 }) {
   const [active, choose] = useSyncedTab(labels);
   const base = useId();
+  const root = useRef<HTMLDivElement>(null);
+  // OS tabs (<div className="sol-os-tabs"> around macOS / Linux / Windows
+  // tabs): the reader's OS moves first and is selected. Without JavaScript,
+  // or on another OS, the content order stays (was apps/docs/os-tabs.js).
+  const [osFirst, setOsFirst] = useState(-1);
+  useEffect(() => {
+    if (!root.current?.closest(".sol-os-tabs")) return;
+    const os = detectOs();
+    const index = os ? labels.findIndex((l) => l.trim().startsWith(os)) : -1;
+    if (index < 0) return;
+    setOsFirst(index);
+    choose(index);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   return (
-    <div className="tabs tab-container">
+    <div className="tabs tab-container" ref={root}>
       <ul className="not-prose tabs-list" role="tablist" data-component-part="tabs-list">
         {labels.map((label, i) => (
           <li
@@ -71,6 +95,7 @@ export function TabsClient({
             aria-selected={i === active}
             aria-controls={`${base}-panel-${i}`}
             className="tabs-tab"
+            style={i === osFirst ? { order: -1 } : undefined}
             tabIndex={i === active ? 0 : -1}
             onClick={() => choose(i)}
             onKeyDown={(event) => {

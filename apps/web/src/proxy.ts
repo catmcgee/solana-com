@@ -32,7 +32,7 @@ export function isProxiedPath(normalizedPathname: string) {
 }
 
 /**
- * Docs paths (/developers/{docs,cookbook,bootcamp}, /learn/<article>, their
+ * Docs paths (/developers/{docs,cookbook}, /learn/<article>, their
  * locale copies and `.md` twins), rendered by this app (Fumadocs). Before
  * the locale routing below:
  * 1. one 308 to the canonical path (lowercase, one locale, no `/en`);

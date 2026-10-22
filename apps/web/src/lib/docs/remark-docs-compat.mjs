@@ -58,6 +58,43 @@ function removeStatements(node, statements) {
   return body.length === 0;
 }
 
+/**
+ * MDX's own "unravel" step (paragraphs that hold only JSX and whitespace
+ * become the JSX itself) runs before this plugin, so inlined snippet trees
+ * get it here (same rule as @mdx-js/mdx and Fumadocs' include).
+ */
+function unravel(node) {
+  if (!node.children) return;
+  for (let i = 0; i < node.children.length; i++) {
+    const child = node.children[i];
+    if (child.type === "paragraph") {
+      let jsx = false;
+      let only = true;
+      for (const c of child.children) {
+        if (c.type === "mdxJsxTextElement" || c.type === "mdxTextExpression")
+          jsx = true;
+        else if (!(c.type === "text" && !c.value.trim())) {
+          only = false;
+          break;
+        }
+      }
+      if (only && jsx) {
+        const kids = child.children
+          .filter((c) => !(c.type === "text" && /^[\t\r\n ]+$/.test(c.value)))
+          .map((c) => {
+            if (c.type === "mdxJsxTextElement") c.type = "mdxJsxFlowElement";
+            if (c.type === "mdxTextExpression") c.type = "mdxFlowExpression";
+            return c;
+          });
+        node.children.splice(i, 1, ...kids);
+        i -= 1; // visit the unwrapped elements next
+        continue;
+      }
+    }
+    unravel(child);
+  }
+}
+
 function isSnippetElement(node, names) {
   return (
     (node.type === "mdxJsxFlowElement" || node.type === "mdxJsxTextElement") &&
@@ -100,6 +137,7 @@ function inlineSnippets(processor, tree, file, seen = new Set()) {
     file.data?._compiler?.addDependency?.(abs);
     const child = new VFile({ path: abs, value, data: file.data });
     const parsed = processor.parse(child);
+    unravel(parsed);
     inlineSnippets(processor, parsed, child, new Set([...seen, abs]));
     cache.set(source, parsed);
     return structuredClone(parsed);

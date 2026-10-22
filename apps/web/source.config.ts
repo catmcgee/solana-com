@@ -3,11 +3,10 @@
  * app since phase 2a; Mintlify is no longer used).
  *
  * The content stays where it is, in apps/docs:
- * - `docs`: every English page under apps/docs/developers/{docs,cookbook,
- *   bootcamp} and apps/docs/learn;
- * - `docsI18n`: the translated copies under apps/docs/<locale>/developers/
- *   {docs,bootcamp} and apps/docs/<locale>/learn (the cookbook is English
- *   only).
+ * - `docs`: every English page under apps/docs/developers/{docs,cookbook}
+ *   and apps/docs/learn;
+ * - `docsI18n`: the translated copies under apps/docs/<locale>/developers/docs
+ *   and apps/docs/<locale>/learn (the cookbook is English only).
  * Snippets (apps/docs/snippets) are not a collection: remark-docs-compat
  * inlines every `import X from "/snippets/..."` into the page that uses it,
  * so they compile with the page and appear in its Markdown.
@@ -48,7 +47,7 @@ const locales = `{${DOCS_LOCALES.join(",")}}`;
 export const docs = defineCollections({
   type: "doc",
   dir: docsDir,
-  files: ["developers/{docs,cookbook,bootcamp}/**/*.mdx", "learn/**/*.mdx"],
+  files: ["developers/{docs,cookbook}/**/*.mdx", "learn/**/*.mdx"],
   schema,
   async: true,
   postprocess: { includeProcessedMarkdown: true },
@@ -58,7 +57,7 @@ export const docsI18n = defineCollections({
   type: "doc",
   dir: docsDir,
   files: [
-    `${locales}/developers/{docs,bootcamp}/**/*.mdx`,
+    `${locales}/developers/docs/**/*.mdx`,
     `${locales}/learn/**/*.mdx`,
   ],
   schema,

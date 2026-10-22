@@ -47,8 +47,7 @@ export function shouldShowDocsSidebarToggle(
 /**
  * Pages that wear the docs chrome instead of the solana.com Header and
  * Footer: the /developers landing (exact path, any locale) and the developer
- * docs (/developers/docs, /developers/cookbook, /developers/bootcamp,
- * /learn/<article>; the /learn landing keeps the site chrome). They use the
+ * docs (/developers/docs, /developers/cookbook, /learn/<article>; the /learn landing keeps the site chrome). They use the
  * docs' light/dark theme, stored in localStorage "isDarkMode", so one choice
  * applies to all of them. ThemeProvider leaves <html> alone there; apps/web's
  * docs header owns the theme.
@@ -64,7 +63,6 @@ export function isDocsPageRoute(pathname: string | null | undefined) {
   return (
     matchesRouteSegment(path, "/developers/docs") ||
     matchesRouteSegment(path, "/developers/cookbook") ||
-    matchesRouteSegment(path, "/developers/bootcamp") ||
     /^\/learn\/[^/]/.test(path)
   );
 }

@@ -19,10 +19,10 @@ const DOCS_AGENT_HEADERS = [
   { key: "x-llms-txt", value: "/llms.txt" },
 ];
 const DOCS_HEADER_SOURCES = [
-  "/developers/:section(docs|cookbook|bootcamp)",
-  "/developers/:section(docs|cookbook|bootcamp)/:path*",
-  "/:locale/developers/:section(docs|cookbook|bootcamp)",
-  "/:locale/developers/:section(docs|cookbook|bootcamp)/:path*",
+  "/developers/:section(docs|cookbook)",
+  "/developers/:section(docs|cookbook)/:path*",
+  "/:locale/developers/:section(docs|cookbook)",
+  "/:locale/developers/:section(docs|cookbook)/:path*",
   "/learn/:path+",
   "/:locale/learn/:path+",
 ];
