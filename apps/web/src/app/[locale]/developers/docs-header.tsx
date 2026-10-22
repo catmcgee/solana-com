@@ -12,6 +12,7 @@ import { localizedHref } from "@/data/developers/hub";
 import {
   DocsSearchField,
   HeaderMenus,
+  ThemeChoice,
   ThemeToggle,
 } from "./docs-header.client";
 import {
@@ -193,24 +194,97 @@ export async function DocsHeader({
             label={t("language")}
             paths={languagePaths}
           />
-          <details className="dh-mobile">
-            <summary aria-label={t("menu")}>
-              <MenuIcon />
-            </summary>
-            <div className="dh-mobile-panel">
-              <Tabs tabs={tabs} label={t("sections")} activeTab={activeTab} />
-              {menu ? <div className="dh-mobile-nav">{menu}</div> : null}
-              <div className="dh-mobile-tools">
-                <LanguageMenu
-                  locale={locale}
-                  label={t("language")}
-                  className="dh-lang dh-lang-mobile"
-                  paths={languagePaths}
-                />
-                <ThemeToggle {...toggle} className="dh-theme dh-theme-mobile" />
+          {menu ? (
+            <details className="dh-mobile dh-mobile-drawer">
+              <summary aria-label={t("menu")}>
+                <MenuIcon />
+              </summary>
+              <div className="dh-drawer">
+                <div className="dh-drawer-backdrop" data-dh-close="" />
+                <div
+                  className="dh-drawer-panel"
+                  role="dialog"
+                  aria-label={t("menu")}
+                >
+                  <button
+                    type="button"
+                    className="dh-drawer-close"
+                    aria-label="Close navigation"
+                    data-dh-close=""
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="18"
+                      height="18"
+                      viewBox="0 0 18 18"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M14 4L4 14" />
+                      <path d="M4 4L14 14" />
+                    </svg>
+                  </button>
+                  <div className="dh-drawer-scroll">
+                    <div className="dh-drawer-head">
+                      <a
+                        href={localizedHref(locale, "/developers")}
+                        className="dh-drawer-logo"
+                        aria-label={t("home")}
+                      >
+                        <SolanaLogo gradientId="dh-drawer-logo-g" developers />
+                      </a>
+                      <ThemeChoice />
+                    </div>
+                    <div className="dh-drawer-selects">
+                      <LanguageMenu
+                        locale={locale}
+                        label={t("language")}
+                        className="dh-lang dh-drawer-select dh-drawer-lang"
+                        paths={languagePaths}
+                      />
+                      <details className="dh-drawer-select dh-drawer-tabs">
+                        <summary>
+                          <span>
+                            {tabs.find((tab) => tab.key === activeTab)?.label ??
+                              tabs[0]?.label}
+                          </span>
+                          <ChevronDownIcon />
+                        </summary>
+                        <Tabs
+                          tabs={tabs}
+                          label={t("sections")}
+                          activeTab={activeTab}
+                        />
+                      </details>
+                    </div>
+                    <div className="dh-mobile-nav">{menu}</div>
+                  </div>
+                </div>
               </div>
-            </div>
-          </details>
+            </details>
+          ) : (
+            <details className="dh-mobile">
+              <summary aria-label={t("menu")}>
+                <MenuIcon />
+              </summary>
+              <div className="dh-mobile-panel">
+                <Tabs tabs={tabs} label={t("sections")} activeTab={activeTab} />
+                <div className="dh-mobile-tools">
+                  <LanguageMenu
+                    locale={locale}
+                    label={t("language")}
+                    className="dh-lang dh-lang-mobile"
+                    paths={languagePaths}
+                  />
+                  <ThemeToggle {...toggle} className="dh-theme dh-theme-mobile" />
+                </div>
+              </div>
+            </details>
+          )}
         </div>
       </div>
       <HeaderMenus rootId={HEADER_ID} />
