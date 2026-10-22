@@ -108,7 +108,7 @@ index 0000000..5495676
 +          echo "::error::Recorded example output changed. Download the recorded-output artifact, review it and commit it (git apply recorded-output.patch)."
 +          exit 1
 diff --git a/.github/workflows/docs-examples.yml b/.github/workflows/docs-examples.yml
-index c7c2b60..78db58f 100644
+index c7c2b60..882107e 100644
 --- a/.github/workflows/docs-examples.yml
 +++ b/.github/workflows/docs-examples.yml
 @@ -2,16 +2,30 @@ name: Docs examples
@@ -116,7 +116,7 @@ index c7c2b60..78db58f 100644
  on:
    push:
 -    branches: [main]
-+    branches: [main, mintlify-migration]
++    branches: [main, docs-redesign]
      paths:
        - "packages/docs-examples/**"
 -      - "apps/docs/content/cookbook/**"
@@ -125,13 +125,13 @@ index c7c2b60..78db58f 100644
 +      - "apps/docs/snippets/examples/**"
 +      - "apps/docs/run-examples.js"
 +      - "apps/docs/styles/run.css"
-+      - "apps/docs/docs/**"
-+      - "apps/docs/*/docs/**"
++      - "apps/docs/developers/docs/**"
++      - "apps/docs/*/developers/docs/**"
 +      - "apps/docs/developers/cookbook/**"
        - ".github/workflows/docs-examples.yml"
    pull_request:
 -    branches: [main]
-+    branches: [main, mintlify-migration]
++    branches: [main, docs-redesign]
      paths:
        - "packages/docs-examples/**"
 -      - "apps/docs/content/cookbook/**"
@@ -140,8 +140,8 @@ index c7c2b60..78db58f 100644
 +      - "apps/docs/snippets/examples/**"
 +      - "apps/docs/run-examples.js"
 +      - "apps/docs/styles/run.css"
-+      - "apps/docs/docs/**"
-+      - "apps/docs/*/docs/**"
++      - "apps/docs/developers/docs/**"
++      - "apps/docs/*/developers/docs/**"
 +      - "apps/docs/developers/cookbook/**"
        - ".github/workflows/docs-examples.yml"
  
@@ -221,38 +221,48 @@ index c7c2b60..78db58f 100644
    examples-rust:
      name: Rust examples
      runs-on: ubuntu-latest
-diff --git a/.github/workflows/docs-mintlify.yml b/.github/workflows/docs-mintlify.yml
+diff --git a/.github/workflows/docs.yml b/.github/workflows/docs.yml
 new file mode 100644
-index 0000000..2253843
+index 0000000..36a6165
 --- /dev/null
-+++ b/.github/workflows/docs-mintlify.yml
++++ b/.github/workflows/docs.yml
 @@ -0,0 +1,93 @@
-+name: Docs (Mintlify)
++name: Docs
 +
-+# Spec §4.4 (WP12 integration). `docs-tooling verify` runs every repo-side
-+# check (residual syntax, nav coverage, legacy URL parity, frontmatter,
-+# assets, generator freshness, convert --check); the Mintlify CLI checks
-+# follow. Report-only: no pull requests are opened (decisions.md).
++# Repo-side checks for the developer docs content in apps/docs, which apps/web
++# renders with Fumadocs. `docs-tooling verify` runs every content check
++# (residual syntax, nav coverage, legacy URL parity, frontmatter, assets,
++# generator freshness, convert --check); the apps/web docs tests follow.
++# Report-only: no pull requests are opened.
 +
 +on:
 +  pull_request:
-+    branches: [main, mintlify-migration]
++    branches: [main, docs-redesign]
 +    paths:
 +      - "apps/docs/**"
 +      - "packages/docs-tooling/**"
++      - "apps/web/source.config.ts"
 +      - "apps/web/rewrites-redirects.ts"
++      - "apps/web/scripts/copy-docs-static.mjs"
++      - "apps/web/src/app/**/developers/docs/**"
++      - "apps/web/src/components/docs/**"
++      - "apps/web/src/lib/docs/**"
 +      - "apps/web/src/lib/docs-edge/**"
 +      - "packages/sitemap/**"
 +      - "migration/move-map.csv"
-+      - ".github/workflows/docs-mintlify.yml"
++      - ".github/workflows/docs.yml"
 +  push:
-+    branches: [main, mintlify-migration]
++    branches: [main, docs-redesign]
 +    paths:
 +      - "apps/docs/**"
 +      - "packages/docs-tooling/**"
++      - "apps/web/source.config.ts"
 +      - "apps/web/rewrites-redirects.ts"
++      - "apps/web/src/app/**/developers/docs/**"
++      - "apps/web/src/components/docs/**"
++      - "apps/web/src/lib/docs/**"
 +      - "apps/web/src/lib/docs-edge/**"
-+      - ".github/workflows/docs-mintlify.yml"
++      - ".github/workflows/docs.yml"
 +
 +permissions:
 +  contents: read
@@ -284,47 +294,103 @@ index 0000000..2253843
 +          npm install --global @aikidosec/safe-chain
 +          safe-chain setup-ci
 +
++      # Also runs apps/web's postinstall (fumadocs-mdx), which generates the
++      # Fumadocs collections from apps/docs.
 +      - name: Install dependencies
 +        run: pnpm install --frozen-lockfile
 +
 +      - name: Type check
 +        run: pnpm --filter @workspace/docs-tooling check-types
 +
-+      # Includes test/rpc.test.ts, the WP4 acceptance gate (param counts,
-+      # leftover RPC syntax, Surfpool method coverage).
++      # Includes test/rpc.test.ts (param counts, leftover RPC syntax,
++      # Surfpool method coverage).
 +      - name: Unit and fixture tests
 +        run: pnpm --filter @workspace/docs-tooling test
 +
 +      # residual syntax = 0, nav:verify exact coverage, verify-urls 100%,
-+      # frontmatter, assets, every generator --check (examples, surfpool,
-+      # paths, concepts, addresses, nav:build, tags, manifest/llms/redirects)
-+      # and convert --check (converted + idempotent).
-+      - name: docs-tooling verify (spec §4.4)
++      # frontmatter, assets, every generator --check (generate:check:
++      # examples, surfpool, paths, concepts, addresses, nav:build, tags,
++      # manifest/llms/redirects) and convert --check.
++      - name: docs-tooling verify
 +        run: pnpm --filter @workspace/docs-tooling verify
 +
-+      - name: apps/web docs routing (rewrites, redirects, middleware, llms, sitemap)
++      - name:
++          apps/web docs routing (rewrites, redirects, middleware, llms, sitemap)
 +        run: pnpm --filter solana-com exec vitest run src/__tests__/routes
 +
-+      - name: Mintlify validate
-+        working-directory: apps/docs
-+        run: npx -y mint@latest validate
-+
-+      - name: Mintlify broken links (pages, snippets, redirects)
-+        working-directory: apps/docs
-+        run: npx -y mint@latest broken-links --check-snippets --check-redirects
-+
-+      # Anchors are reported, not blocking: 466 in-content fragments were
-+      # already dead on the legacy site (translated headings in stale locale
-+      # forks, removed sections); the `anchors` transform warns about each.
-+      - name: Mintlify broken anchors (report)
-+        working-directory: apps/docs
-+        continue-on-error: true
-+        run: npx -y mint@latest broken-links --check-anchors
++      - name: apps/web docs chrome
++        run: pnpm --filter solana-com exec vitest run src/__tests__/developers
+diff --git a/.github/workflows/guides-ci.yml b/.github/workflows/guides-ci.yml
+index 3d94f18..1b38e8d 100644
+--- a/.github/workflows/guides-ci.yml
++++ b/.github/workflows/guides-ci.yml
+@@ -1,8 +1,10 @@
+ name: Guides CI
+ 
+ # Walks through developer guides with an agent that follows the guide exactly
+-# as a reader would, and fails if the guide is broken. On PRs it tests the
+-# guides the PR touches. Once a week it sweeps every guide, and failures
++# as a reader would, and fails if the guide is broken. A guide is an English
++# developer docs page (apps/docs/developers/docs/**/*.mdx) whose frontmatter
++# has `type: tutorial` or `type: guide`. On PRs it tests the guides the PR
++# touches. Once a week it sweeps every guide, and failures
+ # produce an auto-fix PR (opened by the solana-docs-checker GitHub App).
+ #
+ # Required secrets:
+@@ -19,8 +21,8 @@ on:
+     inputs:
+       guides:
+         description: >-
+-          Comma-separated guide paths to test (apps/docs/content/guides/...), or
+-          "all"
++          Comma-separated guide paths to test (apps/docs/developers/docs/...),
++          or "all"
+         required: true
+         default: all
+       open_fix_prs:
+@@ -54,7 +56,7 @@ jobs:
+           INPUT_GUIDES: ${{ inputs.guides }}
+         run: |
+           set -euo pipefail
+-          pathspec=':(glob)apps/docs/content/guides/**/*.mdx'
++          pathspec=':(glob)apps/docs/developers/docs/**/*.mdx'
+ 
+           if [ "$EVENT" = "schedule" ] || { [ "$EVENT" = "workflow_dispatch" ] && [ "$INPUT_GUIDES" = "all" ]; }; then
+             files=$(git ls-files "$pathspec")
+@@ -65,10 +67,17 @@ jobs:
+             files=$(git diff --name-only --diff-filter=d "$base" HEAD -- "$pathspec")
+           fi
+ 
+-          # Keep only files that exist (guards manual dispatch typos)
++          # Keep only files that exist (guards manual dispatch typos) and, for
++          # the sweep and PR modes, only tutorial/guide pages (frontmatter
++          # `type: tutorial` or `type: guide`); reference and conceptual
++          # pages have no steps to follow.
+           existing=""
+           while IFS= read -r f; do
+-            [ -n "$f" ] && [ -f "$f" ] && existing="$existing$f"$'\n'
++            [ -n "$f" ] && [ -f "$f" ] || continue
++            if [ "$EVENT" != "workflow_dispatch" ] || [ "$INPUT_GUIDES" = "all" ]; then
++              awk 'NR==1 && $0!="---"{exit 1} NR>1 && $0=="---"{exit 1} /^type:[[:space:]]*"?(tutorial|guide)"?[[:space:]]*$/{found=1; exit 0} END{exit !found}' "$f" || continue
++            fi
++            existing="$existing$f"$'\n'
+           done <<< "$files"
+ 
+           guides=$(printf '%s' "$existing" | jq -R -s -c 'split("\n") | map(select(length > 0))')
+@@ -224,7 +233,7 @@ jobs:
+           token: ${{ steps.app-token.outputs.token }}
+           branch: guides-autofix/${{ github.run_id }}
+           base: main
+-          add-paths: apps/docs/content/guides/**
++          add-paths: apps/docs/developers/docs/**
+           commit-message: ${{ steps.pr.outputs.title }}
+           title: ${{ steps.pr.outputs.title }}
+           body-path: ${{ runner.temp }}/pr-body.md
 diff --git a/.github/workflows/i18n.yml b/.github/workflows/i18n.yml
-index 011d43a..2b7f6f5 100644
+index 011d43a..097f5fa 100644
 --- a/.github/workflows/i18n.yml
 +++ b/.github/workflows/i18n.yml
-@@ -7,15 +7,19 @@ on:
+@@ -7,15 +7,18 @@ on:
      paths:
        - ".github/workflows/i18n.yml"
        - ".lingo/config.json"
@@ -338,20 +404,19 @@ index 011d43a..2b7f6f5 100644
 -      - "apps/docs/content/learn/en/**/meta.json"
 -      - "apps/docs/content/developers-learn/en/**/*.mdx"
 -      - "apps/docs/content/developers-learn/en/**/meta.json"
-+      # Docs Lingo project (apps/docs/.lingo): English sources in the
-+      # Mintlify layout. Locale copies live in apps/docs/<locale>/.
-+      - "apps/docs/docs/**/*.mdx"
-+      - "!apps/docs/docs/rpc/**"
-+      - "!apps/docs/docs/tools/surfpool/rpc/**"
++      # Docs Lingo project (apps/docs/.lingo): English sources. Locale
++      # copies live in apps/docs/<locale>/{developers/docs,learn}.
++      - "apps/docs/developers/docs/**/*.mdx"
++      - "!apps/docs/developers/docs/rpc/**"
++      - "!apps/docs/developers/docs/tools/surfpool/rpc/**"
 +      - "apps/docs/learn/**/*.mdx"
-+      - "apps/docs/developers/bootcamp/**/*.mdx"
 +      - "apps/docs/navigation/labels/en.json"
 +      - "apps/docs/concepts/concepts.en.json"
 +      - "apps/docs/paths/paths.en.json"
    workflow_dispatch:
  
  concurrency:
-@@ -54,6 +58,19 @@ jobs:
+@@ -54,6 +57,20 @@ jobs:
          run: |
            timeout --verbose --signal=TERM --kill-after=30s \
              300m node scripts/i18n/run.mjs all
@@ -363,7 +428,8 @@ index 011d43a..2b7f6f5 100644
 +        with:
 +          run_install: false
 +      - name: Install docs tooling
-+        run: pnpm install --frozen-lockfile --filter "@workspace/docs-tooling..."
++        run:
++          pnpm install --frozen-lockfile --filter "@workspace/docs-tooling..."
 +      - name: Swap translated pages into the locale navigations
 +        run: |
 +          pnpm --filter @workspace/docs-tooling nav:swap
@@ -404,7 +470,7 @@ index 011d43a..2b7f6f5 100644
            steps.create-pr.outputs.pull-request-operation != 'none' &&
 diff --git a/.github/workflows/surfpool-schema-drift.yml b/.github/workflows/surfpool-schema-drift.yml
 new file mode 100644
-index 0000000..6d8f449
+index 0000000..93dfcd4
 --- /dev/null
 +++ b/.github/workflows/surfpool-schema-drift.yml
 @@ -0,0 +1,110 @@
@@ -412,7 +478,7 @@ index 0000000..6d8f449
 +
 +# Weekly check that the Surfpool RPC reference
 +# (apps/docs/snippets/rpc/surfpool/*.mdx, imported by
-+# docs/tools/surfpool/rpc/* in every locale) still matches upstream.
++# developers/docs/tools/surfpool/rpc/* in every locale) still matches upstream.
 +#
 +# Upstream: solana-foundation/surfpool-web-ui, apps/docs/src/data/*.json.
 +# The local copies in packages/docs-tooling/data/surfpool carry solana.com
