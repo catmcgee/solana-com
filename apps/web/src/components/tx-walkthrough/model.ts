@@ -196,7 +196,8 @@ function displayLabel(label: string) {
 
 function symbolFor(label: string) {
   if (label.startsWith("USDC")) return "USDC";
-  if (label.startsWith("LSF")) return ASSET_NAME;
+  if (label.startsWith("LSF") || label.startsWith("Fund share"))
+    return ASSET_NAME;
   return label;
 }
 
