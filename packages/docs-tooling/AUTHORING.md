@@ -879,25 +879,26 @@ segment, after a vertical one), never knocked out on it. Don't repeat the Frame
 caption inside the figure. On phones (<640px) the core figures switch to a
 portrait drawing (`<name>-sm-light.svg` / `<name>-sm.svg`, same Frame, listed
 after the desktop pair; `draw-concepts.mjs` draws it, `styles/diagrams.css`
-picks it); other diagram images keep a 560px minimum width and scroll sideways
-with a fading edge. Every mermaid flowchart and sequence diagram gets a 336px
-phone drawing the same way (`<hash>-sm*.svg`, linked by the mermaid transform,
-drawn by `scripts/mermaid-phone.ts` from `render-mermaid.ts`): sequences as
-numbered steps with sender and receiver badges, flowcharts as an indented
-top-to-bottom tree, where an edge the tree cannot draw is a dashed chip naming
-its target. In sequence diagrams, `%% focal: <message>` marks the one message
-drawn in the accent; flowcharts use `class X focal`. The core-concept and token
-figures are hand-laid-out in `scripts/draw-concepts.mjs` (root
-`data-sol-drawn="hand"`, skipped by the passes below). Pipeline, in order:
-`draw-concepts.mjs` / `draw-diagrams.mjs`, `sync-diagram-themes.mjs` (generated
-core/hub diagrams and their dark pairs), `brand-diagrams.mjs` (folds every other
-colour into the system; `--check`), then `embed-diagram-fonts.py` (`--check`).
-Labels must be SVG `<text>` in Diatype so they render in Diatype inside `<img>`.
-The script passes never spread the accent: `brand-diagrams.mjs` keeps it on one
-shape per file (`FOCAL`, default the first) and turns filled triangle heads into
-open chevrons. Mermaid uses the same system (`render-mermaid.ts`; see above).
-Linear flows on hub and path pages are HTML, not images:
-`<ol className="sol-flow not-prose">` with
+picks it). The older static figures (frontend, finance/privacy, Kora, Actions)
+have portrait drawings there too; a diagram image without one keeps a 560px
+minimum width and scrolls sideways with a fading edge. Every mermaid flowchart
+and sequence diagram gets a 336px phone drawing the same way (`<hash>-sm*.svg`,
+linked by the mermaid transform, drawn by `scripts/mermaid-phone.ts` from
+`render-mermaid.ts`): sequences as numbered steps with sender and receiver
+badges, flowcharts as an indented top-to-bottom tree, where an edge the tree
+cannot draw is a dashed chip naming its target. In sequence diagrams,
+`%% focal: <message>` marks the one message drawn in the accent; flowcharts use
+`class X focal`. The core-concept and token figures are hand-laid-out in
+`scripts/draw-concepts.mjs` (root `data-sol-drawn="hand"`, skipped by the passes
+below). Pipeline, in order: `draw-concepts.mjs` / `draw-diagrams.mjs`,
+`sync-diagram-themes.mjs` (generated core/hub diagrams and their dark pairs),
+`brand-diagrams.mjs` (folds every other colour into the system; `--check`), then
+`embed-diagram-fonts.py` (`--check`). Labels must be SVG `<text>` in Diatype so
+they render in Diatype inside `<img>`. The script passes never spread the
+accent: `brand-diagrams.mjs` keeps it on one shape per file (`FOCAL`, default
+the first) and turns filled triangle heads into open chevrons. Mermaid uses the
+same system (`render-mermaid.ts`; see above). Linear flows on hub and path pages
+are HTML, not images: `<ol className="sol-flow not-prose">` with
 `<li><b>Step</b><span>caption</span></li>` draws a numbered step rail
 (horizontal from 640px, vertical below). The last step's badge carries the
 accent; put `data-accent` on one `<li>` to move it.
