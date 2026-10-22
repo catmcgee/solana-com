@@ -256,7 +256,7 @@ export async function DocsPageView({
             </div>
           </main>
         </div>
-        <DocsFooter locale={contentLocale} />
+        <DocsFooter locale={contentLocale} developers />
         <DocsSearch locale={contentLocale} />
         <DocsScripts />
       </div>

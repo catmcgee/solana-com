@@ -87,7 +87,7 @@ export async function DocsNotFound() {
             </div>
           </div>
         </main>
-        <DocsFooter locale={defaultLocale} />
+        <DocsFooter locale={defaultLocale} developers />
         <DocsSearch locale={defaultLocale} />
         <DocsScripts />
       </div>

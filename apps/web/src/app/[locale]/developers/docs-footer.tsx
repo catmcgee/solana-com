@@ -13,7 +13,14 @@ import { SOCIAL_ICONS, SocialIcon, SolanaLogo } from "./docs-icons";
  * hairline and the legal links. Styles in docs-chrome.css ("Docs footer").
  */
 
-export async function DocsFooter({ locale }: { locale: string }) {
+export async function DocsFooter({
+  locale,
+  developers = false,
+}: {
+  locale: string;
+  /** The "Solana Developers" logo, as on the docs pages. */
+  developers?: boolean;
+}) {
   const t = await getTranslations({
     locale,
     namespace: "developers.landing.footer",
@@ -30,7 +37,7 @@ export async function DocsFooter({ locale }: { locale: string }) {
               className="df-logo"
               aria-label="Solana"
             >
-              <SolanaLogo gradientId="df-logo-g" />
+              <SolanaLogo gradientId="df-logo-g" developers={developers} />
             </a>
             <ul className="df-socials" aria-label={t("socials")}>
               {DOCS_FOOTER_SOCIALS.map(({ id, href }) => {
