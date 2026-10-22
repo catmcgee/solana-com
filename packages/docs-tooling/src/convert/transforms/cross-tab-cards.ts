@@ -1,12 +1,12 @@
 /**
  * cross-tab-cards (2026-10-16): a `<Card>` on a job tab (Payments, Assets,
- * Markets) that links to a page filed under another tab gets Mintlify's
+ * Markets) that links to a page filed under another tab gets the docs
  * `arrow` prop, a small diagonal ↗ in the card's top-right corner, so readers
  * know the card leaves the tab they are in. Example: the Payments overview
  * links to Kora and Commerce Kit, which live under Resources › Tools.
  *
  * The tab of a page comes from `navigation/en.json` (a page, or a group
- * `root`); locale pages use the tab of their English page. Mintlify renders
+ * `root`); locale pages use the tab of their English page. The docs render
  * the arrow on the server as an inline SVG in the card's text colour, so it
  * shows in light and dark mode and without JavaScript.
  *

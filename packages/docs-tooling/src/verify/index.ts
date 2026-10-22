@@ -1,13 +1,11 @@
 /**
  * `docs-tooling verify` (spec §4.4, WP12): every repo-side check in one
  * command. CI runs it on every change to apps/docs/** or
- * packages/docs-tooling/**, followed by the Mintlify CLI checks (§4.4.7:
- * `mint validate`, `mint broken-links`), which need the network and live in
- * the workflow rather than here.
+ * packages/docs-tooling/**; the apps/web build then compiles every page.
  *
  *  1. counts        pages per collection and locale (report)
  *  2. residual      0 Fumadocs/Code Hike constructs (src/verify/residual.ts)
- *     + math        0 prose blocks Mintlify would render as KaTeX (two or
+ *     + math        0 prose blocks a math renderer would turn into KaTeX (two or
  *                   more `$` with one unescaped in text; see
  *                   transforms/dollar-escape.ts). Pages and snippets.
  *  3. navigation    exact nav coverage (src/nav/verify-nav.ts) + legacy URL
@@ -52,10 +50,7 @@ export const GENERATOR_CHECKS: [string, string[]][] = [
   ["gen:addresses --check", ["src/generators/addresses.ts", "--check"]],
   ["nav:build --check", ["src/cli.ts", "nav", "build", "--check"]],
   ["gen:tags --check", ["src/generators/tags.ts", "--check"]],
-  [
-    "gen:manifest/llms/redirects --check",
-    ["src/manifest/cli.ts", "all", "--check"],
-  ],
+  ["gen:manifest/llms --check", ["src/manifest/cli.ts", "all", "--check"]],
 ];
 
 interface Check {
@@ -142,8 +137,8 @@ export function shadowedIndexPages(
 }
 
 /**
- * Blocks where Mintlify's remark-math would turn prose dollar amounts into
- * KaTeX. No page intends math; a page that does can opt out with
+ * Blocks where remark-math (single-dollar inline math) would turn prose
+ * dollar amounts into KaTeX. No page intends math; a page that does can opt out with
  * `math: true` in its frontmatter.
  */
 export function scanMathRisks(files: string[]): string[] {

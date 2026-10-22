@@ -10,17 +10,13 @@ import {
   type ManifestPage,
 } from "../src/manifest/pages.ts";
 import {
-  buildMintlifyRedirects,
-  toMintlifyRedirect,
-} from "../src/manifest/redirects.ts";
-import {
   docsSections,
   renderLlmsTxt,
   renderSectionLlmsTxt,
 } from "../src/llms/generate.ts";
 
 describe("gen:manifest", () => {
-  it("maps Mintlify files to public URLs", () => {
+  it("maps docs files to public URLs", () => {
     expect(fileToUrl("apps/docs/developers/docs/index.mdx")).toEqual({
       url: "/developers/docs",
       lang: "en",
@@ -108,7 +104,7 @@ describe("gen:manifest", () => {
       group: "Accounts",
     });
     expect(nav.get("en")?.has("box")).toBe(false);
-    // Mintlify code jp maps back to the ja folder.
+    // Navigation code jp maps back to the ja folder.
     expect(nav.get("ja")?.get("ja/developers/docs/core")).toEqual({
       tab: "仕組み",
       group: "G",
@@ -210,145 +206,5 @@ describe("gen:llms", () => {
     );
     expect(body).not.toContain("Paiements");
     expect(renderSectionLlmsTxt(pages, "nope")).toBeNull();
-  });
-});
-
-describe("gen:redirects", () => {
-  it("converts Next.js docs redirects to Mintlify syntax", () => {
-    expect(
-      toMintlifyRedirect({
-        source: "/:locale(en|ar|fr)/docs/clients/go",
-        destination: "/:locale/developers/docs/clients/community/go",
-      }),
-    ).toEqual({
-      source: "/:locale/docs/clients/go",
-      destination: "/:locale/developers/docs/clients/community/go",
-      permanent: true,
-    });
-    expect(
-      toMintlifyRedirect({
-        source: "/developers/docs/tags/:tag+",
-        destination: "/developers/docs/tags",
-        permanent: false,
-      }),
-    ).toEqual({
-      source: "/developers/docs/tags/:tag*",
-      destination: "/developers/docs/tags",
-      permanent: false,
-    });
-  });
-
-  it("makes non-docs destinations absolute and skips what Mintlify cannot express", () => {
-    expect(
-      toMintlifyRedirect({
-        source: "/developers/docs/intro/economics",
-        destination: "/staking",
-      }),
-    ).toMatchObject({ destination: "https://solana.com/staking" });
-    // not a docs path
-    expect(
-      toMintlifyRedirect({ source: "/brand", destination: "/branding" }),
-    ).toBeNull();
-    // .md twin
-    expect(
-      toMintlifyRedirect({
-        source: "/developers/docs/a.md",
-        destination: "/developers/docs/b.md",
-      }),
-    ).toBeNull();
-    // external
-    expect(
-      toMintlifyRedirect({
-        source: "/developers/docs/x",
-        destination: "https://x.dev",
-      }),
-    ).toBeNull();
-    // conditional
-    expect(
-      toMintlifyRedirect({
-        source: "/developers/docs/x",
-        destination: "/developers/docs/y",
-        has: [{ type: "query", key: "a" }],
-      }),
-    ).toBeNull();
-  });
-
-  it("keeps Greek catch-alls but drops per-page Greek shortcuts", () => {
-    const out = buildMintlifyRedirects([
-      {
-        source: "/el/docs/clients/go",
-        destination: "/developers/docs/clients/community/go",
-      },
-      { source: "/el/docs", destination: "/developers/docs" },
-      { source: "/el/docs/:path*", destination: "/developers/docs/:path*" },
-      { source: "/developers/docs/a", destination: "/developers/docs/b" },
-      { source: "/developers/docs/a", destination: "/developers/docs/c" },
-    ]);
-    expect(out.map((r) => r.source)).toEqual([
-      "/el/docs",
-      "/el/docs/:path*",
-      "/developers/docs/a",
-    ]);
-  });
-
-  it("adds Greek twins for moved /docs pages before the Greek catch-all", () => {
-    const greek = {
-      source:
-        "/el/:path((?:docs|learn|developers/(?:docs|cookbook|bootcamp|guides|learn))(?:\\.md|/.+)?|developers(?:\\.md)?)",
-      destination: "/:path",
-      permanent: true,
-    };
-    const out = buildMintlifyRedirects([
-      greek,
-      // Moved: gets a Greek twin.
-      {
-        source: "/docs/clients/go",
-        destination: "/developers/docs/clients/community/go",
-      },
-      // Prefix-only move: the catch-all covers it, no twin.
-      {
-        source: "/docs/core/accounts",
-        destination: "/developers/docs/core/accounts",
-      },
-    ]);
-    const sources = out.map((r) => r.source);
-    expect(out).toContainEqual({
-      source: "/el/docs/clients/go",
-      destination: "/developers/docs/clients/community/go",
-      permanent: true,
-    });
-    expect(sources).not.toContain("/el/docs/core/accounts");
-    expect(sources.indexOf("/el/docs/clients/go")).toBeLessThan(
-      sources.indexOf("/el/docs/:path*"),
-    );
-  });
-
-  it("expands apps/web's Greek regex rule into plain catch-alls", () => {
-    const out = buildMintlifyRedirects([
-      {
-        source:
-          "/el/:path((?:docs|learn|developers/(?:docs|cookbook|bootcamp|guides|learn))(?:\\.md|/.+)?|developers(?:\\.md)?)",
-        destination: "/:path",
-        permanent: true,
-      },
-    ]);
-    // Straight to the current prefix (one hop).
-    expect(out).toContainEqual({
-      source: "/el/docs/:path*",
-      destination: "/developers/docs/:path*",
-      permanent: true,
-    });
-    expect(out).toContainEqual({
-      source: "/el/developers/docs/:path*",
-      destination: "/developers/docs/:path*",
-      permanent: true,
-    });
-    expect(out).toContainEqual({
-      source: "/el/learn/:path*",
-      destination: "/learn/:path*",
-      permanent: true,
-    });
-    expect(out.map((r) => r.source)).toContain("/el/developers/bootcamp");
-    expect(out.every((r) => !/[()]/.test(r.source))).toBe(true);
   });
 });

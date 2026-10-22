@@ -1,8 +1,8 @@
 /**
- * Page inventory of the Mintlify project (apps/docs), by language.
+ * Page inventory of the docs content (apps/docs), by language.
  *
  * A "page" is an .mdx/.md file outside snippets/, written as its path relative
- * to apps/docs without the extension (Mintlify's navigation format).
+ * to apps/docs without the extension (the navigation format).
  */
 import { existsSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";

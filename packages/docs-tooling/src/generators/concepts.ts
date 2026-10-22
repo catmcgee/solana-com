@@ -41,8 +41,8 @@
  *   tip="…" cta="Learn more" href="/docs/core/accounts">accounts</Tooltip><span
  *   className="nojs-only"> ([Accounts](/docs/core/accounts): …)</span></span>
  *
- * The marker lives on the wrapper `<span>` because Mintlify drops unknown
- * Tooltip props from the DOM, and the `nojs-only` span carries the tooltip
+ * The marker lives on the wrapper `<span>` because Tooltip does not pass
+ * unknown props to the DOM, and the `nojs-only` span carries the tooltip
  * text plus a real link for readers without JavaScript (the Tooltip trigger
  * is a `<button>` and its tip/href only exist in the client payload). Only
  * elements with `data-concept` are touched; the trigger text is kept. Sync

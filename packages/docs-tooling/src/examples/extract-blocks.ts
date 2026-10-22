@@ -46,7 +46,7 @@ export interface ExtractResult {
 }
 
 const SKIP_DIRS = new Set(["node_modules", "snippets", ".git"]);
-/** Repo docs at the Mintlify root that are not pages (they quote the syntax). */
+/** Repo docs at the docs content root that are not pages (they quote the syntax). */
 const SKIP_FILES = new Set(["CONTRIBUTING.md", "README.md"]);
 
 export function listContentPages(root = docsRoot): string[] {

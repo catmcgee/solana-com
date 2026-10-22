@@ -1,5 +1,5 @@
 /**
- * Fumadocs `<Tabs items groupId>` / `<Tab value>` -> Mintlify `<Tabs>` /
+ * Fumadocs `<Tabs items groupId>` / `<Tab value>` -> docs `<Tabs>` /
  * `<Tab title>` (spec §3.1).
  *
  *   <Tabs items={['pnpm', 'npm']} groupId="package-manager">
@@ -16,14 +16,14 @@
  *
  * - `value` becomes `title`. A `<Tab>` without `value` takes the matching
  *   `items` entry by position (Fumadocs' fallback).
- * - `items`, `groupId`, `persist` and `updateAnchor` are dropped. Mintlify
- *   syncs tabs with the same title on a page by default, which replaces
+ * - `items`, `groupId`, `persist` and `updateAnchor` are dropped. The docs
+ *   sync tabs with the same title on a page by default, which replaces
  *   `groupId`; cross-page persistence is lost (accepted in decisions.md).
  * - `defaultIndex={n}` becomes `defaultTabIndex={n}`.
  * - Only `<Tab>` elements whose parent is a `<Tabs>` with Fumadocs
- *   attributes or `value` props are rewritten, so Mintlify output is a no-op.
+ *   attributes or `value` props are rewritten, so docs-format output is a no-op.
  *
- * No-JS: Mintlify server-renders every panel (inactive ones get the
+ * No-JS: the renderer at conversion time server-rendered every panel (inactive ones get the
  * `hidden` class); migration/setup-nojs-fallback.css (to be shipped in
  * apps/docs/styles by WP11) un-hides them when JavaScript is off.
  */

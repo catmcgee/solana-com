@@ -1,11 +1,10 @@
 /**
  * gen:llms (WP9, spec §5.4). From generated/pages.json it writes:
- * - apps/docs/llms.txt: Mintlify's override for /llms.txt (the agent header
- *   in ./header.md plus the English index, every link as `.md`);
+ * - apps/docs/llms.txt: the body of /llms.txt (apps/web app/llms.txt; the
+ *   agent header in ./header.md plus the English index, every link as `.md`);
  * - packages/docs-tooling/generated/llms-sections/<section>.txt: the scoped
- *   indexes that apps/web serves at /docs/<section>/llms.txt (the /docs
- *   rewrite excludes that path, so Mintlify never sees it).
- * /llms-full.txt stays Mintlify's built-in. The per-locale
+ *   indexes that apps/web serves at /developers/docs/<section>/llms.txt.
+ * /llms-full.txt is built by apps/web from the pages. The per-locale
  * apps/web/public/llms-<locale>.txt files are curated and translated by
  * Lingo (llmtxt-generator.py), so they are left alone.
  */

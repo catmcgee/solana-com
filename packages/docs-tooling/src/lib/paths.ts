@@ -6,7 +6,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 /** Monorepo root (packages/docs-tooling/src/lib -> ../../../..). */
 export const repoRoot = path.resolve(here, "..", "..", "..", "..");
 
-/** The Mintlify project root. */
+/** The docs content root. */
 export const docsRoot = path.join(repoRoot, "apps", "docs");
 
 /** Legacy Fumadocs content root, relative to the repo root. */

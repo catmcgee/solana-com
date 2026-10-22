@@ -6,7 +6,7 @@ export const LEGACY_LOCALES: readonly string[] = allLocales;
 export const DEFAULT_LOCALE = "en";
 
 /**
- * Locales dropped by the migration (decisions.md: Mintlify has no `el`).
+ * Locales dropped by the migration (decisions.md: no `el`).
  * Their content is removed and their URLs redirect to the English page.
  */
 export const DROPPED_LOCALES: readonly string[] = ["el"];
@@ -17,10 +17,10 @@ export const TARGET_LOCALES: readonly string[] = LEGACY_LOCALES.filter(
 );
 
 /**
- * Folder/URL locale -> Mintlify `navigation.languages[].language` code.
+ * Folder/URL locale -> docs.json `navigation.languages[].language` code.
  * Folder names and public URLs keep the left-hand value (decisions.md).
  */
-export const MINTLIFY_LANGUAGE_CODE: Readonly<Record<string, string>> = {
+export const NAV_LANGUAGE_CODE: Readonly<Record<string, string>> = {
   en: "en",
   ar: "ar",
   de: "de",

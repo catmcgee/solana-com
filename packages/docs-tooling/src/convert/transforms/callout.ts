@@ -1,5 +1,5 @@
 /**
- * Fumadocs `<Callout type title>` -> Mintlify callouts (spec §3.1).
+ * Legacy `<Callout type title>` -> docs callouts (spec §3.1).
  *
  *   <Callout type="warn" title="Heads up">Body</Callout>
  *
@@ -15,15 +15,15 @@
  *   Danger, tip/idea -> Tip, success/check -> Check, none -> Note. Unknown
  *   types become Note with a warning.
  * - `title` (string or string-literal expression `title={"T"}`) becomes a
- *   bold first paragraph; Mintlify callouts have no title prop. A non-literal
+ *   bold first paragraph; docs callouts have no title prop. A non-literal
  *   expression is kept as `**{expr}**`.
  * - An inline callout that is the only content of its paragraph
  *   (`<Callout>text</Callout>` on one line) is lifted to a block callout.
  * - A `<Callout>` with any attribute other than type/title (for example the
  *   generated concept cards' `<Callout icon color className>`) is already a
- *   Mintlify callout and is left alone, so the transform is idempotent.
+ *   docs callout and is left alone, so the transform is idempotent.
  *
- * All Mintlify callouts are server-rendered and visible without JavaScript.
+ * All docs callouts are server-rendered and visible without JavaScript.
  */
 import type { AstNode, Transform } from "../../types.ts";
 import {

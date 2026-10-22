@@ -1,12 +1,12 @@
 /**
- * Render one example block as a Mintlify MDX snippet (pure).
+ * Render one example block as a docs MDX snippet (pure).
  *
  * Output patterns (chosen from the SSR probe, see the WP5 report):
  * - Code panels use built-in `<Tabs>`/`<CodeGroup>`; every panel is in the
  *   server HTML and the no-JS fallback CSS un-hides inactive panels.
  * - Recorded output is a plain `<div className="sol-run">` holding a
- *   `text Output` fence. Raw `<details>`/`<noscript>` are dropped by
- *   Mintlify, so the output is simply VISIBLE in the server HTML. With JS,
+ *   `text Output` fence (no raw `<details>`/`<noscript>`), so the output is
+ *   simply VISIBLE in the server HTML. With JS,
  *   run-examples.js marks `<html data-sol-run>`; styles/run.css then hides the
  *   output until the reader presses Run (the button is in the markup but
  *   only shown once the script is live).
@@ -27,7 +27,7 @@ export interface RenderTab {
   title: string;
   lang: string;
   code: string;
-  /** Mintlify line-highlight ranges, e.g. "24-30". */
+  /** Fence line-highlight ranges, e.g. "24-30". */
   highlight?: string;
   /** Recorded output (already trimmed), or undefined. */
   output?: string;

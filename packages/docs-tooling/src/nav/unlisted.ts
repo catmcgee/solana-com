@@ -1,6 +1,6 @@
 /**
- * Pages deliberately left out of every navigation, with the reason. Mintlify
- * still builds them (it publishes every .mdx file), so this list must stay
+ * Pages deliberately left out of every navigation, with the reason. The docs
+ * still build them (every .mdx file is published), so this list must stay
  * short and each entry needs an owner to remove the file.
  *
  * Hidden-but-navigable pages (the Learn articles, docs/tags)

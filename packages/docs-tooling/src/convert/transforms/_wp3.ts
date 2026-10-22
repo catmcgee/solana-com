@@ -10,7 +10,7 @@
  * the raw `!tooltip[/re/] name` comment lines, which `fences.ts` (WP2)
  * deletes. The other WP3 transforms are order-independent with respect to
  * `fences.ts`: they read fence titles in both the Code Hike form
- * (`lang !! title="X"`) and the converted Mintlify form (`lang X` /
+ * (`lang !! title="X"`) and the converted docs form (`lang X` /
  * `lang title="X Y"`), and they never rewrite annotation lines other than
  * the ones whose semantics they own (`!tooltip`, `!mention`).
  */
@@ -209,12 +209,12 @@ export function contentLines(value: string): string[] {
 // Fence meta
 // ---------------------------------------------------------------------------
 
-/** Mintlify fence meta flags that are never a title. */
+/** Docs fence meta flags that are never a title. */
 const META_FLAGS = new Set(["wrap", "expandable", "lines", "-w", "!!", "!"]);
 
 /**
  * Fence title in any of the forms the corpus can be in while converting:
- * Code Hike `!! title="X"` / `title="X"` / `!name` (slot), or Mintlify
+ * Code Hike `!! title="X"` / `title="X"` / `!name` (slot), or docs
  * `Title words {1-3} focus={2}`.
  */
 export function fenceTitle(

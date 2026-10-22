@@ -3,8 +3,8 @@
  *
  * packages/docs-examples/**\/blocks.json + the sliced source files + the
  * recorded `.output.txt` files -> apps/docs/snippets/examples/<id>.mdx and
- * apps/docs/snippets/examples/index.json. Mintlify runs none of our code, so
- * the output is committed; `--check` regenerates in memory and fails when the
+ * apps/docs/snippets/examples/index.json. The output is committed (the docs
+ * build reads the snippets as content); `--check` regenerates in memory and fails when the
  * committed files differ (or a stale snippet is left behind).
  *
  * Output lookup per tab (same rules as the legacy remark-example-output):

@@ -62,7 +62,7 @@ const WP2 = [
 ];
 
 describe("fence meta", () => {
-  it("parses Code Hike meta into Mintlify meta", () => {
+  it("parses Code Hike meta into docs meta", () => {
     expect(formatMeta(parseMeta('!! title="Kit"'))).toBe("Kit");
     expect(formatMeta(parseMeta('title="My file.ts" -w'))).toBe(
       'title="My file.ts" wrap',

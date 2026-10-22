@@ -1,9 +1,9 @@
 /**
- * WP7: convert the video-guide components to Mintlify built-ins (spec §3.1).
+ * WP7: convert the video-guide components to docs built-ins (spec §3.1).
  * No custom component survives, and everything except the embedded player
  * is in the server HTML, so the pages read fully without JavaScript.
  *
- * | Legacy                         | Mintlify                                   |
+ * | Legacy                         | docs                                       |
  * | ------------------------------ | ------------------------------------------ |
  * | SectionHeading                 | `## title` (+ description / link line)     |
  * | CourseHero                     | `<Card cta arrow>` with subtext + facts    |
@@ -87,7 +87,7 @@ function need<T>(v: unknown, what: string): T {
   return v as T;
 }
 
-/** Mintlify's heading slug (github-slugger style) for the id check. */
+/** The docs heading slug (github-slugger style) for the id check. */
 export const slug = (s: string) =>
   s
     .toLowerCase()
@@ -201,7 +201,7 @@ export function convertComponent(
       const id = str(getAttr(node, "id"));
       if (id && id !== slug(title))
         ctx.warn(
-          `SectionHeading id "${id}" differs from the Mintlify anchor "${slug(title)}"`,
+          `SectionHeading id "${id}" differs from the docs anchor "${slug(title)}"`,
         );
       const out = [heading(2, title)];
       const description = str(getAttr(node, "description"));

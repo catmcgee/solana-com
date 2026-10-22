@@ -35,8 +35,8 @@
  * Output, per language with a source file, under snippets/paths/<lang>/<key>/:
  * - `stepper-<n>.mdx`, n = 0 (intro page, nothing current) … N (step N
  *   current). A `<div role="navigation">` with an `<ol>`; the current step's
- *   link carries `aria-current="step"`. Raw `<nav>` is dropped by Mintlify.
- * (No per-step "Next" cards: Mintlify's own previous/next links at the bottom
+ *   link carries `aria-current="step"` (a div, not a raw `<nav>`).
+ * (No per-step "Next" cards: the docs' own previous/next links at the bottom
  *   of each page are the only page-to-page navigation.)
  * - `card.mdx`: the path card for job pickers and hubs.
  * - `start.mdx`: the same card for the path intro, pointing at step 1
@@ -723,7 +723,6 @@ ${tutorialButton(ui, pg)}
 </div>
 `;
 }
-
 
 /**
  * Path card (job pickers, hubs). Mirrors the mockup's `.pcard`: kicker, title,

@@ -22,7 +22,7 @@ Commands:
   convert [--files p1,p2] [--exclude p1,p2] [--locale l] [--check|--dry-run]
                               Run the auto-discovered transforms (src/convert/transforms/*.ts).
                               --exclude: comma-separated path prefixes (relative to apps/docs) to skip
-  verify [--skip-generators] [--skip-convert]   All spec §4.4 checks except the Mintlify CLI (src/verify/index.ts)
+  verify [--skip-generators] [--skip-convert]   All spec §4.4 checks (src/verify/index.ts)
   residual                    Residual Fumadocs/Code Hike syntax scan (spec §4.4.2)
   nav [compile-legacy|stubs|build|swap|verify] [--check] [--force]   Navigation (WP6, src/nav/index.ts)
   examples [--check]          Build runnable example snippets (WP5)

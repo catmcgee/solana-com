@@ -11,14 +11,14 @@
  * - `pages` lists children in order: a file name, a folder name, or a nested
  *   path ("typescript/getting-started");
  * - `---Label---` starts a separator section, `---` / `--- ---` ends it;
- * - `[Text](url)` is a link entry. Mintlify pages cannot be links, so these
+ * - `[Text](url)` is a link entry. Navigation pages cannot be links, so these
  *   are dropped and reported;
- * - `index` is the folder's own page (the group root in Mintlify);
+ * - `index` is the folder's own page (the group `root` in the navigation);
  * - files and folders not listed are not shown by Fumadocs. They are
  *   appended at the end of their folder here and reported as orphans, so no
  *   page is lost (inventory: kora json-rpc-api/authentication, cookbook
  *   offline-transactions);
- * - `defaultOpen: true` becomes Mintlify `expanded: true`.
+ * - `defaultOpen: true` becomes `expanded: true`.
  */
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
@@ -124,7 +124,7 @@ export type LabelProvenance =
   | { kind: "folder-title"; folder: string };
 
 export interface ExpandReport {
-  /** `[Text](url)` entries that could not become Mintlify pages. */
+  /** `[Text](url)` entries that could not become navigation pages. */
   droppedLinks: { folder: string; entry: string }[];
   /** Pages/folders on disk but not in meta.json, appended at the end. */
   orphans: { folder: string; page: string }[];

@@ -2,7 +2,7 @@
  * Code Hike inline-language code `` _rs`pub mod constants`_ `` -> plain
  * `` `pub mod constants` `` (spec §3.2 "Inline syntax").
  *
- * Code Hike rendered `_<lang>`code`_` as highlighted inline code. Mintlify
+ * Code Hike rendered `_<lang>`code`_` as highlighted inline code. The docs
  * would show it as italic text "rs" followed by code, so the language prefix
  * and the markers are removed. The markdown parse of this syntax takes
  * several shapes, all handled:

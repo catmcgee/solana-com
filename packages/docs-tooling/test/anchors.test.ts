@@ -9,17 +9,17 @@ import { TransformRegistry } from "../src/convert/registry.ts";
 import { convertSource } from "../src/convert/run.ts";
 import { transform as anchors } from "../src/convert/transforms/anchors.ts";
 import {
-  mintlifyServes,
+  docsServes,
   trimAutolink,
   pageUrl,
 } from "../src/convert/transforms/site-links.ts";
-import { legacySlugger, mintlifySlugger } from "../src/lib/slugs.ts";
+import { legacySlugger, docsSlugger } from "../src/lib/slugs.ts";
 import { repoRoot } from "../src/lib/paths.ts";
 
 describe("slugs", () => {
-  it("ports Mintlify ids as rendered by mint dev", () => {
-    const m = mintlifySlugger();
-    // Expected values read from `mint dev` HTML (docs/tools/actions, ar game-sdks).
+  it("ports docs heading ids as rendered", () => {
+    const m = docsSlugger();
+    // Expected values read from rendered docs HTML (docs/tools/actions, ar game-sdks).
     expect(m("actions.json")).toBe("actions-json");
     expect(m("Rules - pathPattern")).toBe("rules-pathpattern");
     expect(m("Dialect's Actions Registry")).toBe("dialect’s-actions-registry");
@@ -30,7 +30,7 @@ describe("slugs", () => {
     );
     expect(m("Get Started")).toBe("get-started");
     expect(m("Get Started")).toBe("get-started-2");
-    // cleanHeadingId: ASCII punctuation is dropped at render time (mint dev,
+    // cleanHeadingId: ASCII punctuation is dropped at render time (rendered HTML,
     // docs/research "Appendix A: the brief, in full").
     expect(m("Appendix A: the brief, in full")).toBe(
       "appendix-a-the-brief-in-full",
@@ -46,7 +46,7 @@ describe("slugs", () => {
 });
 
 describe("site-links helpers", () => {
-  it("knows what Mintlify serves", () => {
+  it("knows what the docs serve", () => {
     for (const p of [
       "/developers/docs",
       "/developers/docs/core#x",
@@ -56,7 +56,7 @@ describe("site-links helpers", () => {
       "/zh/developers/bootcamp",
       "/docs-assets/a.png",
     ])
-      expect(mintlifyServes(p), p).toBe(true);
+      expect(docsServes(p), p).toBe(true);
     for (const p of [
       "/",
       "/learn",
@@ -66,7 +66,7 @@ describe("site-links helpers", () => {
       "/skills",
       "/docsx",
     ])
-      expect(mintlifyServes(p), p).toBe(false);
+      expect(docsServes(p), p).toBe(false);
   });
   it("cuts autolink junk and computes page URLs", () => {
     expect(trimAutolink("http://localhost:3000，连接")).toBe(

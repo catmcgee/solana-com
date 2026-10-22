@@ -139,8 +139,8 @@ describe("terminal panel (src/lib/terminal.ts)", () => {
     expect(mdx).toContain('data-tone="ok">Confirmed</span>');
     expect(mdx).toContain('data-at="2" data-tone="error" data-final=""');
     expect(mdx).toContain('data-act="all"');
-    // No JSX expression children (Mintlify SSR drops them) and no raw
-    // elements Mintlify strips.
+    // No JSX expression children (dropped by SSR at conversion time) and no
+    // raw elements that renderer stripped.
     expect(mdx).not.toMatch(/>\{|<details|<noscript/);
     expect(() => mdxCodec.parse(mdx)).not.toThrow();
   });

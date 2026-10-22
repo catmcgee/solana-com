@@ -2,9 +2,9 @@
  * WP13 (integration review): drop a first body paragraph that repeats the
  * frontmatter `description`.
  *
- * Mintlify always renders `description` as the page lede under the H1. Many
+ * The docs always render `description` as the page lede under the H1. Many
  * pages (the RPC method pages above all) also open their body with the same
- * sentence, which the Fumadocs layout tolerated, so on Mintlify readers saw
+ * sentence, which the Fumadocs layout tolerated, so in the docs readers saw
  * it twice. Only an exact repeat is removed: the first content block must be
  * a paragraph whose plain text equals the description once inline Markdown
  * markers and whitespace are ignored. Anything else is left alone.

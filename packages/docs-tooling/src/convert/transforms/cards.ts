@@ -1,5 +1,5 @@
 /**
- * Fumadocs `<Cards>` / `<Card>` -> Mintlify `<Columns cols={2}>` / `<Card>`
+ * Legacy `<Cards>` / `<Card>` -> docs `<Columns cols={2}>` / `<Card>`
  * (spec §3.1).
  *
  *   <Cards>
@@ -17,7 +17,7 @@
  * - `Cards` -> `Columns cols={2}` (the Fumadocs grid is two columns from
  *   the `sm` breakpoint up, one column on phones; Columns does the same).
  * - `description="…"` becomes the card body (before any existing children).
- * - `icon={<Name />}` (Fumadocs/boxicons React element) becomes the Mintlify
+ * - `icon={<Name />}` (Fumadocs/boxicons React element) becomes the docs
  *   icon name, `icon="name"` (lucide, docs.json `icons.library`). Known
  *   boxicons get an explicit mapping; others are kebab-cased. A non-element
  *   expression is dropped with a warning.

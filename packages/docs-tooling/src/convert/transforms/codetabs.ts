@@ -1,6 +1,6 @@
 /**
  * codetabs (WP12, spec §3.1): Code Hike `<CodeTabs>` that are not example
- * blocks -> Mintlify `<CodeGroup>`.
+ * blocks -> docs `<CodeGroup>`.
  *
  *   <CodeTabs storage="x" flags="r">            <CodeGroup>
  *   ```ts !! title="Kit"                         ```ts !! title="Kit"
@@ -15,7 +15,7 @@
  * - Only fences inside (blank text ignored): rename to `<CodeGroup>`. Every
  *   fence, with its language and meta, is kept untouched; `fences.ts`
  *   (order 900) later turns the Code Hike meta (`!! title="Kit"`) into the
- *   Mintlify title, which CodeGroup uses as the tab label.
+ *   docs title, which CodeGroup uses as the tab label.
  * - A single fence: the wrapper is removed and the fence stands alone. Its
  *   title becomes the code block's header, which is what a one-tab
  *   CodeTabs showed.
@@ -32,9 +32,9 @@
  *   should have replaced the whole block (WP5 handoff), and renaming it
  *   would publish an empty code block.
  *
- * No-JS: Mintlify server-renders every CodeGroup panel (inactive ones with
- * `[hidden]`) and every Tab panel (inactive ones with `.hidden`);
- * styles/nojs.css un-hides and stacks them when JavaScript is off.
+ * No-JS: the renderer at conversion time server-rendered every CodeGroup
+ * panel (inactive ones with `[hidden]`) and every Tab panel (inactive ones
+ * with `.hidden`); styles/nojs.css un-hides and stacks them when JavaScript is off.
  *
  * Order 300 (components band): after terminal.ts (88), which keeps a
  * terminal fence inside tabs as one block, and before fences.ts (900),

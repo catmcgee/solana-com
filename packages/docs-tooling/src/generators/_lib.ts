@@ -15,9 +15,9 @@
  * - `--sync` edits content pages through the source-preserving `mdxCodec`, and
  *   only touches elements that carry the generator's `data-*` marker.
  *
- * Output patterns are chosen from the Mintlify SSR probe (setup task): raw
- * `<nav>`, `<details>`, `<noscript>` and `<abbr>` are dropped by Mintlify, and
- * Tooltip `tip`/`headline`/`cta`/`href` only reach the RSC payload. So:
+ * Output patterns were chosen from the SSR probe (setup task): raw
+ * `<nav>`, `<details>`, `<noscript>` and `<abbr>` were dropped, and
+ * Tooltip `tip`/`headline`/`cta`/`href` only reached the client payload. So:
  * `role="navigation"` on a `<div>`, `<Accordion>`/visible fences instead of
  * `<details>`, and a `nojs-only` sibling span next to every Tooltip.
  */
@@ -45,7 +45,7 @@ export const GENERATED_MARK =
 
 /** Common options for every generator. */
 export interface GeneratorOptions {
-  /** Mintlify root (defaults to apps/docs). Tests point this at a temp dir. */
+  /** Docs content root (defaults to apps/docs). Tests point this at a temp dir. */
   docsRoot?: string;
   /** Compute in memory and report; never write. */
   check?: boolean;
@@ -99,8 +99,8 @@ export function header(generator: string, sources: string[], script: string) {
 // ---------------------------------------------------------------------------
 
 /**
- * A plain-text JSX attribute (`name="..."`). Mintlify's SSR drops `{…}`
- * expressions in snippet content (probe: `{"text"}` children vanish from the
+ * A plain-text JSX attribute (`name="..."`). The SSR probe dropped `{…}`
+ * expressions in snippet content (`{"text"}` children vanished from the
  * server HTML), so generated snippets never use expressions: attributes are
  * string literals and text is escaped markdown (`mdText`).
  */
@@ -113,8 +113,8 @@ export function attr(name: string, s: string) {
 
 /**
  * A plain-text value as a JSX attribute expression (`name={"..."}`).
- * Attribute expressions survive Mintlify SSR (a `<Card title={"…"}>` in a
- * snippet renders server-side); prefer `attr` anyway. Kept for other
+ * Attribute expressions render server-side (a `<Card title={"…"}>` in a
+ * snippet); prefer `attr` anyway. Kept for other
  * generators that import it.
  */
 export function jsAttr(name: string, s: string) {
@@ -123,8 +123,8 @@ export function jsAttr(name: string, s: string) {
 
 /**
  * A plain-text value as a JSX expression child (`{"..."}`).
- * WARNING: Mintlify's SSR drops expression children inside imported MDX
- * snippets (probe 2026-10-13: the text is only in the client payload), so
+ * WARNING: the SSR probe dropped expression children inside imported MDX
+ * snippets (2026-10-13: the text was only in the client payload), so
  * never use this for content that must read without JavaScript. Use
  * `mdText` instead.
  */
@@ -306,7 +306,7 @@ export function applyOutputs(
 
 const SKIP_DIRS = new Set(["snippets", "node_modules", "docs-assets"]);
 
-/** Every `.mdx` content page under the Mintlify root (snippets excluded). */
+/** Every `.mdx` content page under the docs root (snippets excluded). */
 export function listContentPages(docsRoot: string): string[] {
   const out: string[] = [];
   const rec = (dir: string) => {

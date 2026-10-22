@@ -1,5 +1,5 @@
 /**
- * Pure path rules for the Fumadocs -> Mintlify move (spec §1.3, R1-R9, as
+ * Pure path rules for the legacy -> apps/docs layout move (spec §1.3, R1-R9, as
  * adjusted by decisions.md: Greek is removed, not moved).
  *
  * Everything here is a function of legacy repo-relative paths only, so it can
@@ -113,7 +113,7 @@ export function legacyUrl(entry: LegacyEntry): string {
 
 /**
  * New repo-relative path under apps/docs (R1-R7, R9). Folder layout mirrors
- * the public URL so Mintlify (root-hosted, no base path) serves the same URL.
+ * the public URL (no base path), so each file serves its own URL.
  * Docs files are under developers/docs (LAYOUT_BASE), so their URL changed:
  * apps/web redirects the legacy /docs URL.
  */
@@ -252,7 +252,7 @@ export function classify(files: readonly string[]): ClassifyResult {
 
 /**
  * The files in the NEW layout that would serve a URL, if the URL is in a
- * Mintlify-served namespace (folder layout = URL). Returns both candidates
+ * docs namespace (folder layout = URL). Returns both candidates
  * (`x.mdx`, `x/index.mdx`); callers check which exist.
  */
 export function candidateFilesForUrl(url: string): string[] {

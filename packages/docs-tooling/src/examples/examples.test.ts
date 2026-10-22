@@ -170,7 +170,7 @@ describe("render", () => {
     expect(mdx.match(/className="sol-run"/g)).toHaveLength(1);
     expect(mdx).toContain("```text Output\nSignature: abc {x} <y>\n```");
     expect(mdx).toContain("```rust highlight={1}\nb()\n```");
-    // Never raw <details>/<noscript>: Mintlify drops them.
+    // Never raw <details>/<noscript>: the renderer at conversion time dropped them.
     expect(mdx).not.toMatch(/<details|<noscript/);
   });
 

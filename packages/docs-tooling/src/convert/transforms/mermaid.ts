@@ -20,7 +20,7 @@
  *   `scripts/embed-diagram-fonts.py`. Transforms stay pure: this only
  *   computes the hash.
  * - The figure renders on the server, so it reads without JavaScript, and
- *   styles/diagrams.css hides Mintlify's client-side render of the fence when
+ *   styles/diagrams.css hides the client-side render of the fence when
  *   the figure follows it, so readers see one drawing in every mode.
  * - The figure is re-synced from the fence on every run (editing the diagram
  *   changes the hash), and the older source-text fallback

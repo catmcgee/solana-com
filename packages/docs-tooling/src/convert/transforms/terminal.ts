@@ -1,5 +1,5 @@
 /**
- * ```` ```terminal ```` fences -> plain Mintlify code blocks (spec §3.2,
+ * ```` ```terminal ```` fences -> plain docs code blocks (spec §3.2,
  * "terminal fences").
  *
  * Code Hike's Terminal treated `$ ` lines as commands (the only copied

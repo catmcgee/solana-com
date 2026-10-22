@@ -3,7 +3,7 @@
  * the old docs (`YoutubeIFrame`, `VideoWithChapters`) and solana.com show
  * videos: a thumbnail with a play button that becomes the player in place.
  *
- * Mintlify renders `<iframe>` client-side only, so the server HTML had an
+ * The renderer at conversion time drew `<iframe>` client-side only, so the server HTML had an
  * empty box plus a "Watch on YouTube" link. Every YouTube iframe (bare or as
  * the only child of a `<Frame>`) becomes:
  *
@@ -91,7 +91,12 @@ export function poster(v: Video, title: string): AstNode {
         "aria-label": title,
       },
       [
-        jsx("img", { src: posterThumb(v.id), alt: "", noZoom: true }, [], false),
+        jsx(
+          "img",
+          { src: posterThumb(v.id), alt: "", noZoom: true },
+          [],
+          false,
+        ),
         jsx("span", { className: "sol-yt-play" }, [], false),
       ],
       false,
@@ -185,7 +190,11 @@ export const transform: Transform = {
         if (!id || !played.has(id)) continue;
         // The previous non-whitespace sibling must hold that video's poster.
         let j = i - 1;
-        while (j >= 0 && kids[j]!.type === "text" && !String(kids[j]!.value).trim())
+        while (
+          j >= 0 &&
+          kids[j]!.type === "text" &&
+          !String(kids[j]!.value).trim()
+        )
           j--;
         if (j >= 0 && containsPoster(kids[j]!, id)) kids.splice(i, 1);
       }

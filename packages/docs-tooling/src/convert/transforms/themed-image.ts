@@ -4,7 +4,7 @@
  * The legacy app swapped every `<DocsDiagram src alt>` and every markdown
  * image of `/assets/docs/core/**.svg` or `/assets/docs/tools/kora/kora.svg`
  * for a pair of images: `X-light.svg` in light mode, `X.svg` in dark mode
- * (`ThemedDiagram` in the old mdx-components.tsx). Mintlify has no such
+ * (`ThemedDiagram` in the old mdx-components.tsx). The docs have no such
  * component, so the pair is written out:
  *
  *   ![Accounts](/assets/docs/core/accounts/accounts.svg)
@@ -22,7 +22,7 @@
  * - URLs are rewritten to `/docs-assets/...` (spec §1.4).
  * - A missing `-light.svg` sibling (or dark original) under
  *   apps/docs/docs-assets is an error, which leaves the file unconverted.
- * - Without JavaScript Mintlify always renders dark mode (setup probe), so
+ * - Without JavaScript the renderer at conversion time always rendered dark mode (setup probe), so
  *   no-JS readers get the dark image; both images and alts are in the HTML.
  *
  * Runs before images.ts, which then leaves these Frames alone.

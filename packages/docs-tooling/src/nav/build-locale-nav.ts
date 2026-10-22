@@ -7,8 +7,8 @@
  *   points at the English page `P` and is recorded in
  *   generated/untranslated.json (reason `missing-translation`, or
  *   `english-only` for the cookbook, which has no translations by design).
- *   Mintlify accepts the same page in several language navs (checked with
- *   `mint validate` + `mint dev`: the link goes to the English page).
+ *   The same page may appear in several language navs (the link goes to
+ *   the English page).
  * - Tab/group labels come from navigation/labels/<loc>.json by key
  *   (labels.ts); a missing key falls back to English and is recorded.
  * - Internal tab `href`s are localized the same way.
@@ -20,7 +20,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import {
   DEFAULT_LOCALE,
-  MINTLIFY_LANGUAGE_CODE,
+  NAV_LANGUAGE_CODE,
   TARGET_LOCALES,
 } from "../lib/locales.ts";
 import { docsRoot as defaultDocsRoot } from "../lib/paths.ts";
@@ -77,7 +77,7 @@ export function navPaths(docsRoot: string = defaultDocsRoot): NavPaths {
   };
 }
 
-/** Origins whose paths are served by this Mintlify project. */
+/** Origins whose paths are served by the docs. */
 export const SITE_ORIGINS = ["https://solana.com"];
 
 /** Path part of an href served by this project, or undefined. */
@@ -194,7 +194,7 @@ export function docsJsonNavigation(
     languages: [
       { language: "en", default: true, $ref: "./navigation/en.json" },
       ...locales.map((loc) => ({
-        language: MINTLIFY_LANGUAGE_CODE[loc]!,
+        language: NAV_LANGUAGE_CODE[loc]!,
         $ref: `./navigation/${loc}.json`,
       })),
     ],

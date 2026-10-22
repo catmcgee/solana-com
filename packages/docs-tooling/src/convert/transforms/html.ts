@@ -2,7 +2,7 @@
  * Raw HTML/JSX in content (spec §3.1 `html.ts`).
  *
  * The legacy pages style a few boxes with Fumadocs Tailwind tokens
- * (`bg-fd-muted`, `dark:bg-gray-950/20`, …) that Mintlify does not ship, and
+ * (`bg-fd-muted`, `dark:bg-gray-950/20`, …) that the docs do not ship, and
  * one box (`learn/what-is-solana`) is dark-only (`bg-zinc-900 text-white`),
  * which breaks light mode. They become built-in components or Markdown that
  * work in both modes:
@@ -26,7 +26,7 @@
  * is already there. YouTube embeds link to the watch/playlist page.
  *
  * `<video>`/`<img>` `src` rewrites are images.ts. Plain inline HTML (`<br>`,
- * `<sup>`, `<small>`, `<b>`) is valid in Mintlify and left alone.
+ * `<sup>`, `<small>`, `<b>`) is valid in the docs and left alone.
  */
 import type { AstNode, Transform } from "../../types.ts";
 import {

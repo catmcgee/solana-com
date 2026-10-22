@@ -1,7 +1,7 @@
 /**
  * gen:manifest (WP9, spec §5.4/§5.11): writes
  * packages/docs-tooling/generated/pages.json, the index of every published
- * Mintlify page. packages/sitemap, gen:llms and the apps/web per-section
+ * docs page. packages/sitemap, gen:llms and the apps/web per-section
  * llms route read it instead of walking apps/docs themselves.
  *
  * Read-only over the content tree: it parses frontmatter, never rewrites it.
@@ -13,7 +13,7 @@ import { parse as parseYaml } from "yaml";
 import type { PageManifestEntry, PagesManifest } from "../types.ts";
 import {
   DEFAULT_LOCALE,
-  MINTLIFY_LANGUAGE_CODE,
+  NAV_LANGUAGE_CODE,
   TARGET_LOCALES,
 } from "../lib/locales.ts";
 import {
@@ -35,9 +35,9 @@ export const CONTENT_ROOTS = ["developers", "learn"] as const;
  * consumers need (sitemap and llms skip `noindex` pages).
  */
 export interface ManifestPage extends PageManifestEntry {
-  /** Mintlify `noindex: true`: published but kept out of search engines. */
+  /** Frontmatter `noindex: true`: published but kept out of search engines. */
   noindex?: boolean;
-  /** Mintlify `hidden: true`, or not referenced by the language's nav. */
+  /** Frontmatter `hidden: true`, or not referenced by the language's nav. */
   hidden?: boolean;
 }
 
@@ -87,7 +87,7 @@ export function fileToUrl(repoRelFile: string): { url: string; lang: string } {
   return { url: `/${withoutIndex}`, lang };
 }
 
-/** Mintlify navigation page id (`fr/developers/docs/core/index`) for a file. */
+/** Navigation page id (`fr/developers/docs/core/index`) for a file. */
 export function fileToNavPage(repoRelFile: string) {
   return repoRelFile.replace(/^apps\/docs\//, "").replace(/\.mdx?$/, "");
 }
@@ -205,10 +205,7 @@ export function loadNavPlacements(
   ) as { navigation?: Record<string, Json> };
   const nav = config.navigation ?? {};
   const byCode = new Map(
-    Object.entries(MINTLIFY_LANGUAGE_CODE).map(([folder, code]) => [
-      code,
-      folder,
-    ]),
+    Object.entries(NAV_LANGUAGE_CODE).map(([folder, code]) => [code, folder]),
   );
   const languages = Array.isArray(nav.languages)
     ? (nav.languages as Record<string, Json>[])

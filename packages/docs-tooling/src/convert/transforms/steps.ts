@@ -1,5 +1,5 @@
 /**
- * Fumadocs `<Steps>` -> Mintlify `<Steps>` / `<Step title>` (spec §3.1).
+ * Legacy `<Steps>` -> docs `<Steps>` / `<Step title>` (spec §3.1).
  *
  *   <Steps>
  *   <Step>
@@ -19,7 +19,7 @@
  * Rules:
  * - A `<Step>` without `title` whose first block is a heading gets that
  *   heading lifted into `title` (inline code/bold/italic kept as Markdown,
- *   which Mintlify renders in step titles; links keep their text). Steps
+ *   which the docs render in step titles; links keep their text). Steps
  *   whose titles all come from H3s get `titleSize="h3"` on `<Steps>` so they
  *   keep the H3 look and their table-of-contents entries.
  * - A first paragraph that is only `**bold**` is lifted the same way, with
@@ -28,7 +28,7 @@
  *   `<Step>` children). Those are split into one `<Step>` per heading of the
  *   shallowest depth; content before the first heading stays before
  *   `<Steps>`.
- * - Steps that already have a `title` (Mintlify, or scrolly.ts output) are
+ * - Steps that already have a `title` (docs format, or scrolly.ts output) are
  *   left alone.
  *
  * Steps render fully on the server; nothing needs JavaScript.
@@ -45,7 +45,7 @@ import {
   textOf,
 } from "./_wp2.ts";
 
-/** Markdown-ish inline text for a Mintlify title attribute. */
+/** Markdown-ish inline text for a docs title attribute. */
 export function inlineTitle(nodes: readonly AstNode[]): string {
   const esc = (s: string) => s.replace(/([\\`*_[\]<>{}])/g, "\\$1");
   const out = (n: AstNode): string => {

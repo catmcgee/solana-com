@@ -1,12 +1,12 @@
 /**
  * site-links (WP12): links that only worked because Fumadocs and apps/web
- * shared one origin, rewritten so they also resolve on Mintlify
- * (`mint broken-links`, direct *.mintlify.site traffic, Mintlify's client
- * router).
+ * shared one origin, rewritten so they also resolve when the docs are
+ * served on their own (broken-link checks, direct traffic to the docs
+ * deployment, and client-side routing).
  *
  * 1. Root-relative links to pages apps/web serves (`/skills`, `/discord`,
  *    `/solutions/…`, `/developers/templates`, `/data`, `/rpc`, …) become
- *    absolute `https://solana.com/…` links. Mintlify serves only the docs
+ *    absolute `https://solana.com/…` links. The docs serve only the content
  *    collections: `/developers/docs/**`, `/learn/<article>`, `/developers/cookbook/**`,
  *    `/developers/bootcamp/**` and `/docs-assets/**` (each optionally
  *    locale-prefixed); the exact `/learn` and `/developers` landings belong
@@ -14,7 +14,7 @@
  * 2. Bare relative page links (`[x](quickstart)`) are resolved the way the
  *    browser resolved them on the legacy URL (no trailing slash), e.g. on
  *    /docs/tools/attestations/overview -> /docs/tools/attestations/quickstart.
- *    Mintlify resolves relative links against its own routes, so they are
+ *    The docs resolve relative links against their own routes, so they are
  *    made root-relative.
  * 3. GFM autolink literals that swallowed trailing CJK/Arabic punctuation
  *    (`http://localhost:3000，连接…` is one autolink in GFM, because those
@@ -22,7 +22,7 @@
  *    the rest stays as text. Same as the legacy rendering, minus the junk
  *    in the href.
  *
- * Idempotent: absolute URLs, Mintlify-served paths and clean autolinks are
+ * Idempotent: absolute URLs, docs-served paths and clean autolinks are
  * left alone.
  */
 import path from "node:path";
@@ -35,8 +35,8 @@ const LOCALE_RE = new RegExp(`^/(?:${LOCALES.join("|")})(?=/|$)`);
 
 export const SITE_ORIGIN = "https://solana.com";
 
-/** Is this root-relative path served by the Mintlify project? */
-export function mintlifyServes(p: string): boolean {
+/** Is this root-relative path served by the docs? */
+export function docsServes(p: string): boolean {
   const bare = p.split(/[?#]/)[0]!.replace(LOCALE_RE, "") || "/";
   return (
     /^\/(?:docs|docs-assets|developers\/docs|developers\/cookbook|developers\/bootcamp)(?:\/|$)/.test(
@@ -76,7 +76,7 @@ export function trimAutolink(url: string): string {
 
 function rewriteUrl(url: string, file: ConvertFile): string | undefined {
   if (url.startsWith("/") && !url.startsWith("//")) {
-    return mintlifyServes(url) ? undefined : `${SITE_ORIGIN}${url}`;
+    return docsServes(url) ? undefined : `${SITE_ORIGIN}${url}`;
   }
   // Bare relative page link (no scheme, not an anchor, not ./asset.ext).
   if (
@@ -86,7 +86,7 @@ function rewriteUrl(url: string, file: ConvertFile): string | undefined {
   ) {
     const base = path.posix.dirname(pageUrl(file.path));
     const resolved = path.posix.normalize(`${base}/${url}`);
-    return mintlifyServes(resolved) ? resolved : `${SITE_ORIGIN}${resolved}`;
+    return docsServes(resolved) ? resolved : `${SITE_ORIGIN}${resolved}`;
   }
   return undefined;
 }

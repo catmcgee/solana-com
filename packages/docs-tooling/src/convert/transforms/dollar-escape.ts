@@ -1,7 +1,7 @@
 /**
  * Escape prose dollar signs: `$0.88 or $20` -> `\$0.88 or \$20`.
  *
- * Mintlify always runs remark-math with single-dollar inline math, so two
+ * The renderer at conversion time always ran remark-math with single-dollar inline math, so two
  * `$` in one paragraph, heading or table row turn everything between them
  * into KaTeX ("$5 or $50" renders as math italic "5or"). Fumadocs had no
  * math, so legacy prose never escaped `$`. No page in this site intends
@@ -139,7 +139,7 @@ export interface MathRisk {
   text: string;
 }
 
-/** Blocks that Mintlify would render (partly) as KaTeX. */
+/** Blocks that single-dollar math would render (partly) as KaTeX. */
 export function findMathRisks(tree: AstNode, source: string): MathRisk[] {
   const risks: MathRisk[] = [];
   visitBlocks(tree, (block) => {

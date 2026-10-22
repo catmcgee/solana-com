@@ -1,13 +1,12 @@
 /**
- * Heading slugs, legacy (Fumadocs) and Mintlify (WP12).
+ * Heading slugs, legacy and current (WP12).
  *
- * - Fumadocs gave headings github-slugger ids (`actions.json` ->
+ * - The legacy docs app gave headings github-slugger ids (`actions.json` ->
  *   `actionsjson`, `Rules - pathPattern` -> `rules---pathpattern`).
- * - Mintlify uses @sindresorhus/slugify with a counter, on
- *   `encodeURIComponent(lowercase, spaces -> "-")`, and renders the id
+ * - The docs ids (published since WP12, kept by apps/web) use
+ *   @sindresorhus/slugify with a counter, on
+ *   `encodeURIComponent(lowercase, spaces -> "-")`, and render the id
  *   decoded (`actions-json`, `rules-pathpattern`, Arabic stays Arabic).
- *   Port of @mintlify/common dist/slugify.js (`slugify`,
- *   `cachedSlugifyWithCounter`), checked against `mint dev` output.
  */
 import GithubSlugger from "github-slugger";
 import librarySlugify from "@sindresorhus/slugify";
@@ -18,22 +17,21 @@ export function legacySlugger() {
 }
 
 /**
- * Mintlify's per-page heading id function: `slugify(title)` (a fresh
- * counter per call, so no counting there) followed by the TOC extractor's
- * `deduplicateSlug` (`x`, `x-2`, `x-3`, …), as in
- * @mintlify/common remarkExtractTableOfContents.
+ * The docs' per-page heading id function: `slugify(title)` (a fresh
+ * counter per call, so no counting there) followed by deduplication
+ * (`x`, `x-2`, `x-3`, …), as the table of contents does it.
  */
-export function mintlifySlugger() {
-  const pair = mintlifySluggerWithRaw();
+export function docsSlugger() {
+  const pair = docsSluggerWithRaw();
   return (title: string) => pair(title).id;
 }
 
 /**
- * Like `mintlifySlugger`, but also returns `raw`: the deduplicated id before
+ * Like `docsSlugger`, but also returns `raw`: the deduplicated id before
  * `cleanHeadingId` (decoded). Earlier tooling (and authors copying ids from
- * older Mintlify builds) wrote those, e.g. `#need-help?`.
+ * older builds) wrote those, e.g. `#need-help?`.
  */
-export function mintlifySluggerWithRaw() {
+export function docsSluggerWithRaw() {
   const seen = new Map<string, number>();
   const dedupe = (slug: string) => {
     const count = seen.get(slug) ?? 0;
@@ -58,8 +56,8 @@ export function mintlifySluggerWithRaw() {
 }
 
 /**
- * Mintlify's render-time id cleanup (@mintlify/common `cleanHeadingId`,
- * applied by Heading, Step and Update): decode, then drop ASCII
+ * Render-time id cleanup (applied to headings, Steps and Updates): decode,
+ * then drop ASCII
  * punctuation `?,;:!'"()[]{}` and emoji. `Appendix A: the brief, in full`
  * renders as `appendix-a-the-brief-in-full`. The TOC deduplicates the slug
  * before this cleanup.
@@ -80,7 +78,7 @@ export function cleanHeadingId(id: string): string {
 }
 
 /**
- * Mintlify runs smart punctuation before it extracts headings (`Dialect's`
+ * The docs run smart punctuation before extracting headings (`Dialect's`
  * renders as `Dialect’s`, and the id keeps the ’). Quotes only; that is
  * all that changes a slug.
  */
@@ -92,7 +90,7 @@ export function smartQuotes(s: string): string {
     .replace(/"/g, "”");
 }
 
-/** Mintlify `slugify(title)`, still percent-encoded (what the TOC dedupes). */
+/** `slugify(title)`, still percent-encoded (what the TOC dedupes). */
 function encodedSlug(title: string): string {
   const encoded = encodeURIComponent(
     smartQuotes(title).toLowerCase().trim().replace(/\s+/g, "-"),
@@ -106,7 +104,7 @@ function encodedSlug(title: string): string {
     : librarySlugify(encoded, { decamelize: false, preserveCharacters: ["_"] });
 }
 
-/** Mintlify heading id without deduplication, as rendered. */
-export function mintlifySlug(title: string): string {
+/** Docs heading id without deduplication, as rendered. */
+export function docsHeadingSlug(title: string): string {
   return cleanHeadingId(encodedSlug(title));
 }

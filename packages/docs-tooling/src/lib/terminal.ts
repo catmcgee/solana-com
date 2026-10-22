@@ -137,7 +137,7 @@ export function termText(s: string) {
 }
 
 /**
- * Literal text that Mintlify's typography pass would rewrite (smart quotes
+ * Literal text that the docs' typography pass would rewrite (smart quotes
  * for `"` and `'`, dashes for `--`, an ellipsis for `...`) goes into an
  * inline code span, which it leaves alone (styles/demo.css resets the code
  * styling inside the panel). Leading and trailing spaces stay outside the
@@ -207,7 +207,9 @@ export function shortB58(v: string) {
 /** Whole-line tone of a recorded output line. */
 export function lineTone(line: string): Tone | undefined {
   if (
-    /\b(failed|rejected|refused|blocked|error|mismatch|already used)\b/i.test(line) ||
+    /\b(failed|rejected|refused|blocked|error|mismatch|already used)\b/i.test(
+      line,
+    ) ||
     /^\s*err:/.test(line) ||
     /"paid":false|\bpaid: [Ff]alse\b/.test(line)
   )

@@ -1,22 +1,22 @@
 /**
  * anchors (WP12): in-content `#fragment` links rewritten to the heading ids
- * Mintlify generates.
+ * the docs generate.
  *
- * Fumadocs gave headings github-slugger ids; Mintlify uses
+ * Fumadocs gave headings github-slugger ids; the docs use
  * @sindresorhus/slugify (src/lib/slugs.ts). Authors (and Lingo, which
  * translates headings but not link fragments) wrote anchors against the old
  * ids. For every link (`[x](#a)`, `[x](/docs/p#a)`, `<Card href="…#a">`,
- * definitions) whose page Mintlify serves:
+ * definitions) whose page the docs serve:
  *
- * 1. The fragment already is a Mintlify id of the target page: kept.
+ * 1. The fragment already is a docs id of the target page: kept.
  * 2. It is the legacy (github-slugger) id of a heading on the target page,
- *    or its Mintlify id before render-time cleanup (`#need-help?`, written
+ *    or its docs id before render-time cleanup (`#need-help?`, written
  *    by earlier runs of this transform; see `cleanHeadingId`):
- *    replaced by that heading's Mintlify id. This keeps every link that
+ *    replaced by that heading's docs id. This keeps every link that
  *    worked on the legacy site working (e.g. `#actionsjson` ->
  *    `#actions-json`, `#rules---pathpattern` -> `#rules-pathpattern`).
  * 3. The target is a locale page and the fragment is a (legacy or
- *    Mintlify) id of the ENGLISH twin's heading n, and the locale page has
+ *    docs) id of the ENGLISH twin's heading n, and the locale page has
  *    the same heading outline (count and levels): replaced by the locale
  *    heading n's id. These links were already broken on the legacy site
  *    (translated heading, English fragment); the outline check keeps the
@@ -24,7 +24,7 @@
  * 4. Anything else is left as is and reported as a warning (a dead anchor
  *    that was dead before the migration too).
  *
- * Headings: markdown headings, `<Step title>` (Mintlify gives Steps ids;
+ * Headings: markdown headings, `<Step title>` (the docs give Steps ids;
  * steps lifted from an H3 by steps.ts carry `titleSize="h3"` and were legacy
  * headings, scrolly steps were not). Other pages are read from the working
  * tree (cached; unconverted pages are understood too: `## !!steps T` counts
@@ -41,17 +41,17 @@ import { mdxCodec } from "../codec.ts";
 import { LEGACY_LOCALES } from "../../lib/locales.ts";
 import {
   legacySlugger,
-  mintlifySlugger,
-  mintlifySluggerWithRaw,
+  docsSlugger,
+  docsSluggerWithRaw,
 } from "../../lib/slugs.ts";
 import { isJsx, strAttr, walk } from "./_wp2.ts";
-import { mintlifyServes, pageUrl } from "./site-links.ts";
+import { docsServes, pageUrl } from "./site-links.ts";
 
 interface Entry {
   depth: number;
   legacy?: string;
-  mint: string;
-  /** Mintlify id before render-time punctuation cleanup (`need-help?`). */
+  docs: string;
+  /** Docs id before render-time punctuation cleanup (`need-help?`). */
   raw?: string;
 }
 
@@ -70,14 +70,14 @@ function plainTitle(s: string): string {
 
 export function headingEntries(tree: AstNode): Entry[] {
   const legacy = legacySlugger();
-  const mintPair = mintlifySluggerWithRaw();
+  const mintPair = docsSluggerWithRaw();
   const ids = (t: string) => {
     const { id, raw } = mintPair(t);
-    return raw === id ? { mint: id } : { mint: id, raw };
+    return raw === id ? { docs: id } : { docs: id, raw };
   };
   // Accordion/Tab/View ids (remarkComponentIds): own counter, not part of
   // the heading outline (depth 0 entries are skipped by sameOutline).
-  const component = mintlifySlugger();
+  const component = docsSlugger();
   const out: Entry[] = [];
   walk(tree, (n) => {
     if (n.type === "code" || n.type === "yaml") return "skip";
@@ -96,7 +96,7 @@ export function headingEntries(tree: AstNode): Entry[] {
       const id = strAttr(n, "id");
       const title = strAttr(n, "title");
       if (id || title)
-        out.push({ depth: 0, mint: id ?? component(plainTitle(title!)) });
+        out.push({ depth: 0, docs: id ?? component(plainTitle(title!)) });
     }
     if (isJsx(n, "Step")) {
       const title = strAttr(n, "title");
@@ -176,7 +176,7 @@ export const transform: Transform = {
       const m = /^([^#]*)#(.+)$/.exec(href);
       if (!m) return undefined;
       const [, base, rawFrag] = m as unknown as [string, string, string];
-      if (base && (!base.startsWith("/") || !mintlifyServes(base)))
+      if (base && (!base.startsWith("/") || !docsServes(base)))
         return undefined;
       const url = base || self;
       const frag = decode(rawFrag);
@@ -188,9 +188,9 @@ export const transform: Transform = {
               return abs ? entriesOf(abs) : undefined;
             })();
       if (!entries) return undefined; // missing page: broken-links reports it
-      if (entries.some((e) => e.mint === frag)) return undefined;
+      if (entries.some((e) => e.docs === frag)) return undefined;
       const legacy = entries.find((e) => e.legacy === frag || e.raw === frag);
-      if (legacy) return `${base}#${legacy.mint}`;
+      if (legacy) return `${base}#${legacy.docs}`;
       const loc = localeOf(url);
       if (loc) {
         const enAbs = fileForUrl(ctx.repoRoot, url.slice(loc.length + 1));
@@ -199,9 +199,9 @@ export const transform: Transform = {
         const locH = outline(entries);
         if (enH && sameOutline(enH, locH)) {
           const i = enH.findIndex(
-            (e) => e.legacy === frag || e.mint === frag || e.raw === frag,
+            (e) => e.legacy === frag || e.docs === frag || e.raw === frag,
           );
-          if (i >= 0) return `${base}#${locH[i]!.mint}`;
+          if (i >= 0) return `${base}#${locH[i]!.docs}`;
         }
       }
       ctx.warn(

@@ -1,17 +1,17 @@
 /**
- * Code fences: Code Hike meta and annotations -> Mintlify code block syntax
+ * Code fences: Code Hike meta and annotations -> docs code block syntax
  * (spec §3.2).
  *
  * Fence meta
  * - `lang !! title="X"` -> `lang X`; a title with spaces or special
  *   characters is written `title="X Y"`. `filename=x` / `name="x"` are
- *   titles too. A fence with meta but no language gets `text` (Mintlify
- *   needs a language before any option).
- * - `-w` -> `wrap`. Mintlify flags (`wrap`, `expandable`, `lines`,
+ *   titles too. A fence with meta but no language gets `text` (the docs
+ *   need a language before any option).
+ * - `-w` -> `wrap`. Docs flags (`wrap`, `expandable`, `lines`,
  *   `twoslash`, `nocopy`) and options (`icon=`, `theme=`, `highlight=`,
  *   `focus=`) are kept; unknown `key=value` options (e.g. WP5's `file=`)
  *   are kept verbatim.
- * - Legacy brace meta `{5}` is stripped: Code Hike ignored it, Mintlify
+ * - Legacy brace meta `{5}` is stripped: Code Hike ignored it, the docs
  *   would highlight it (spec: keep today's rendering). Highlights this
  *   transform emits are written `highlight={…}`, which is kept on re-runs,
  *   so the transform is idempotent.
@@ -29,7 +29,7 @@
  * - `!focus`, `!focus(a:b)` -> `focus={lines}`.
  * - `!collapse(a:b) [collapsed]` -> `expandable`.
  * - `!diff +` / `!diff -` -> `[!code ++]` / `[!code --]` comment at the end
- *   of the target line (Mintlify/Shiki diff notation).
+ *   of the target line (Shiki diff notation).
  * - `!hover`, `!tooltip`, `!mention`, `!callout`, `!fold`, `!ww`, `!border`,
  *   `!bg`, `!link`, `!className`, `!label` -> removed.
  * - Any other `!name` comment line is left in place and reported as an
@@ -109,7 +109,7 @@ const STRIPPED_ANNOTATIONS = new Set([
 ]);
 const HANDLED_ANNOTATIONS = new Set(["mark", "focus", "collapse", "diff"]);
 
-const MINTLIFY_FLAGS = new Set([
+const DOCS_FENCE_FLAGS = new Set([
   "wrap",
   "expandable",
   "lines",
@@ -227,7 +227,7 @@ export function parseMeta(meta: string | null | undefined): FenceMeta {
       m.flags.add("wrap");
       continue;
     }
-    if (MINTLIFY_FLAGS.has(tok)) {
+    if (DOCS_FENCE_FLAGS.has(tok)) {
       m.flags.add(tok);
       continue;
     }
@@ -262,7 +262,7 @@ export function parseMeta(meta: string | null | undefined): FenceMeta {
 function titleToken(title: string): string {
   const bare =
     /^[^\s"'{}=]+$/.test(title) &&
-    !MINTLIFY_FLAGS.has(title) &&
+    !DOCS_FENCE_FLAGS.has(title) &&
     !title.startsWith("!") &&
     !title.startsWith("/") &&
     !title.startsWith("-");

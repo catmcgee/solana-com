@@ -29,7 +29,7 @@
  *    - Frontmatter: `hideTableOfContents` / `mode: wide` are removed. A page
  *      with `<RequestExample>` shows the examples in the right column where
  *      the TOC would be (the old two-panel layout); `mode: wide` would instead
- *      stack them above the page title (verified with `mint dev`).
+ *      stack them above the page title.
  *
  * 2. Surfpool pages (`tools/surfpool/rpc/*`, 7 pages x 19 locales):
  *    `<AccountsRpc />` -> `import SurfpoolAccounts from

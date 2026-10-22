@@ -46,7 +46,7 @@ describe("codetabs", () => {
     expect(r.output).toContain("<CodeGroup>");
   });
 
-  it("full registry: CodeGroup with Mintlify titles, no Code Hike left, idempotent", async () => {
+  it("full registry: CodeGroup with docs titles, no Code Hike left, idempotent", async () => {
     const registry = await defaultTransforms();
     const src = [
       "---",

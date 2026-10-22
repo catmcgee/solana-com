@@ -438,7 +438,7 @@ export function runVerifyUrls(
     (r) => r.cls === "redirect-pending",
   );
   // Files still in the layout at a URL that a (pending) redirect claims:
-  // Mintlify would serve them until the redirect lands in apps/web.
+  // the docs would serve them until the redirect lands in apps/web.
   const shadowedFiles = redirectPending
     .flatMap((r) => candidateFilesForUrl(r.url).filter((f) => pages.has(f)))
     .sort();

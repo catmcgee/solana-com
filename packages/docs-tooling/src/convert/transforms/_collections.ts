@@ -260,8 +260,8 @@ export const YOUTUBE_ALLOW =
   "accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";
 
 /**
- * `<Frame><iframe/></Frame>` for a YouTube video. Mintlify renders iframes
- * client-side only (server HTML has an empty placeholder), so callers must
+ * `<Frame><iframe/></Frame>` for a YouTube video. The renderer at conversion time drew iframes
+ * client-side only (server HTML had an empty placeholder), so callers must
  * also emit a plain watch link for readers without JavaScript.
  */
 export function youtubeFrame(id: string, title: string, start = 0): AstNode {

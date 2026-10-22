@@ -1,13 +1,13 @@
 /**
- * Fumadocs `<Accordions>` / `<Accordion title>` -> Mintlify
+ * Legacy `<Accordions>` / `<Accordion title>` -> docs
  * `<AccordionGroup>` / `<Accordion title>` (spec §3.1). Rename only.
  *
  * - `Accordions` attributes (`type="single"`, `defaultValue`, …) have no
- *   Mintlify equivalent and are dropped with a warning.
+ *   docs equivalent and are dropped with a warning.
  * - `Accordion` keeps `title`; `value` is dropped. A string-literal
  *   expression title (`title={"T"}`) becomes a plain string.
  *
- * No-JS: Mintlify renders Accordion as native `<details>/<summary>`, so the
+ * No-JS: the docs render Accordion as native `<details>/<summary>`, so the
  * body is in the server HTML and opens without JavaScript.
  */
 import type { Transform } from "../../types.ts";

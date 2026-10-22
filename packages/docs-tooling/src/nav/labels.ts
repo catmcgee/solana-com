@@ -1,7 +1,7 @@
 /**
  * Tab and group labels for the locale navigations (spec §2.3 item 3).
  *
- * en.json holds the English strings (Mintlify reads it directly, so it cannot
+ * en.json holds the English strings (the docs read it directly, so it cannot
  * hold placeholder ids). Each tab/group gets a stable key derived from its
  * position in the label hierarchy: slug(tab) "." slug(group) "." ...,
  * with "~2", "~3" for siblings that share a slug. `labels/en.json` maps

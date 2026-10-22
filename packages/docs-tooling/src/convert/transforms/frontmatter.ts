@@ -1,7 +1,7 @@
 /**
- * Fumadocs frontmatter -> Mintlify frontmatter (spec §3.3, decisions.md).
+ * Legacy frontmatter -> docs frontmatter (spec §3.3, decisions.md).
  *
- * | legacy                    | Mintlify                                       |
+ * | legacy                    | docs                                           |
  * | ------------------------- | ---------------------------------------------- |
  * | `title` + `h1`            | `title: <h1>` (visible H1, browser title),     |
  * |                           | `sidebarTitle: <title>` (nav label)            |
@@ -13,15 +13,15 @@
  * |                           | before, and decisions.md keeps that behaviour  |
  * |                           | (payments/accept-payments/solana-pay)          |
  * | `url`                     | dropped when it equals the file's URL; kept    |
- * |                           | (Mintlify external link) and reported if not   |
+ * |                           | (docs external link) and reported if not       |
  * | `index`                   | dropped (WP6 maps it to nav `directory`)       |
  * | `type`                    | normalized to conceptual/reference/tutorial/   |
  * |                           | guide (translated values mapped)               |
  * | everything else           | kept (`description`, `keywords`, `related`,    |
  * |                           | `prerequisites`, `date`, `tags`, …)            |
  *
- * Known loss: the legacy `<title>` was `seoTitle || h1 || title`. Mintlify
- * builds `<title>` from `title` only ("Title - Site"), so pages with a
+ * Known loss: the legacy `<title>` was `seoTitle || h1 || title`. The docs
+ * build `<title>` from `title` only ("Title - Site"), so pages with a
  * `seoTitle` keep it for `og:title`/`twitter:title` but their browser/search
  * title becomes the H1. See the report for the list.
  *
@@ -130,11 +130,11 @@ export const transform: Transform = {
       if (ok) {
         delete fm.url;
       } else {
-        // Kept: in Mintlify `url` makes the nav entry an external link,
+        // Kept: in the docs `url` makes the nav entry an external link,
         // which is what a deliberate mismatch (e.g. the tools/microscope
         // stub -> /microscope) means. Legacy pages have no mismatches.
         ctx.warn(
-          `frontmatter url "${declared}" differs from the file URL "${stripLocale(actual, file.locale)}"; kept as a Mintlify external link`,
+          `frontmatter url "${declared}" differs from the file URL "${stripLocale(actual, file.locale)}"; kept as a docs external link`,
         );
       }
     }

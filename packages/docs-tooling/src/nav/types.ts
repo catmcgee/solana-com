@@ -1,9 +1,7 @@
 /**
- * Mintlify navigation shapes (the subset we emit) plus the IA template
- * shapes used once by compile-legacy-nav.
- *
- * Mintlify schema reference: https://mintlify.com/docs.json
- * (tabSchema / groupsSchema / pageOrGroupSchema).
+ * Docs navigation shapes (navigation/<lang>.json, read by apps/web
+ * src/lib/docs/navigation.ts) plus the IA template shapes used once by
+ * compile-legacy-nav.
  */
 
 /** A page entry: a path relative to apps/docs, without extension. */
@@ -23,7 +21,7 @@ export interface NavGroup {
   pages: NavEntry[];
 }
 
-/** An external sidebar link (Mintlify `navigationLinkSchema`). */
+/** An external sidebar link. */
 export interface NavLink {
   type: "link";
   title: string;
@@ -44,7 +42,7 @@ export interface NavTab {
   groups?: NavGroup[];
   /**
    * Pages (and groups) listed straight in the tab, with no group header
-   * above them (the Start here tab). Mintlify renders a page here as a plain
+   * above them (the Start here tab). The docs render a page here as a plain
    * sidebar entry and a group as a collapsible entry.
    */
   pages?: NavEntry[];

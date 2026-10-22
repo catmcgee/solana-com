@@ -3,7 +3,7 @@
  *
  * The legacy learn route rendered the frontmatter title as the page H1 *and*
  * every article also starts with its own `# Title` heading; that route hid
- * the duplication with its own layout. Mintlify always renders `title` as
+ * the duplication with its own layout. The docs always render `title` as
  * the page H1, so the leading body H1 is removed:
  *
  * - same text as `title` -> removed;
@@ -12,8 +12,8 @@
  *   one is already set.
  *
  * Chapter order and prev/next come from navigation (see
- * `LEARN_ORDER`, handed to WP6 for `navigation/en.json`), which Mintlify
- * renders as server-side pagination links, also in a hidden tab.
+ * `LEARN_ORDER`, handed to WP6 for `navigation/en.json`), which the docs
+ * render as server-side pagination links, also in a hidden tab.
  */
 import type { Transform } from "../../types.ts";
 import { tutorialOrder } from "../../../data/learn/learn-tutorials.ts";

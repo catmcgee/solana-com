@@ -25,7 +25,7 @@
  *
  * Checks (read-only, against the repo):
  * - error if the generated snippet does not exist (the import would break
- *   the Mint build): run `examples extract` + `examples:build` first;
+ *   the docs build): run `examples extract` + `examples:build` first;
  * - warn if the page's block differs from its blocks.json entry, and in
  *   particular if an inline tab's code differs (a locale copy with
  *   translated comments): the shared snippet replaces it.

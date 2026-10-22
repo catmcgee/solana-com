@@ -1,9 +1,9 @@
 /**
- * Files / Folder / File -> Mintlify `<Tree>` / `<Tree.Folder>` /
+ * Files / Folder / File -> docs `<Tree>` / `<Tree.Folder>` /
  * `<Tree.File>` (spec §3.1 `files.ts`).
  *
- * Every folder is emitted with `defaultOpen`: Mintlify only server-renders
- * the contents of open folders (SSR probe), so a closed folder would hide
+ * Every folder is emitted with `defaultOpen`: the renderer at conversion time
+ * only server-rendered the contents of open folders (SSR probe), so a closed folder would hide
  * its files from readers without JavaScript. The corpus only has open
  * folders today, so this changes nothing for JS readers.
  */

@@ -2,12 +2,12 @@
  * WP7: inject each bootcamp lesson's video and resources (spec §3.1).
  *
  * The Fumadocs lesson route rendered a YouTube iframe and "See the code"
- * links from the TypeScript curriculum, not from MDX. Mintlify renders MDX
+ * links from the TypeScript curriculum, not from MDX. The docs render MDX
  * only, so the curriculum data is written into every lesson file, in every
  * locale:
  *
  *   {/* bootcamp:video *\/}            <- idempotency marker
- *   <Frame><iframe …/></Frame>         <- client-rendered by Mintlify
+ *   <Frame><iframe …/></Frame>         <- client-rendered at conversion time
  *   [Watch on YouTube](https://youtu.be/ID)   <- server HTML, works without JS
  *   … lesson body …
  *   ## Resources                       <- only when the lesson has links

@@ -377,7 +377,7 @@ export interface CleanedCode {
 /**
  * Remove Code Hike annotation comment lines (`// !hover x`, `# !mark`, ...).
  * Only own-line annotations exist in the RPC pages; `!collapse … collapsed`
- * becomes Mintlify's `expandable` (spec §3.2).
+ * becomes the docs `expandable` flag (spec §3.2).
  */
 export function stripAnnotations(value: string, lang: string): CleanedCode {
   const re = annotationRe(lang);
@@ -401,7 +401,7 @@ export function hikeCodeTitle(title: string): string {
   return title.trim();
 }
 
-/** Mintlify fence meta: `Title` or `title="Two words"`, then flags. */
+/** Docs fence meta: `Title` or `title="Two words"`, then flags. */
 export function fenceMeta(title: string, flags: string[] = []): string | null {
   const parts: string[] = [];
   if (title) parts.push(/\s/.test(title) ? `title="${title}"` : title);
@@ -428,7 +428,7 @@ export function jsonLang(lang: string, value: string): string {
   }
 }
 
-/** A hike fence turned into a plain Mintlify fence. */
+/** A hike fence turned into a plain docs fence. */
 export function plainFence(
   code: HikeCode,
   opts: { title?: string; ctx: ConvertContext; where: string },

@@ -1,6 +1,6 @@
 /**
  * WP8b generators: concepts, paths, addresses (spec §3.4, §4.3).
- * Every test runs against a throwaway Mintlify root in the OS temp dir.
+ * Every test runs against a throwaway docs root in the OS temp dir.
  */
 import {
   mkdirSync,
@@ -306,7 +306,7 @@ describe("Open tutorial in Playground", () => {
 });
 
 describe("generated snippets", () => {
-  it("never use JSX expression children (Mintlify SSR drops them)", () => {
+  it("never use JSX expression children (SSR dropped them at conversion time)", () => {
     const r = all();
     expect(errors(r.paths.problems)).toEqual([]);
     expect(errors(r.concepts.problems)).toEqual([]);

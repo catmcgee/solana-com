@@ -37,7 +37,7 @@
  * - Fences that no placeholder claims stay where they are, which is the end
  *   of the step in practice (Code Hike's sticky column).
  * - Slot fences with more than 40 code lines (annotation comments not
- *   counted) get the Mintlify `expandable` flag.
+ *   counted) get the docs `expandable` flag.
  * - Fence meta and annotations (`!!`, `!focus`, `!mark`, …) are untouched:
  *   fences.ts converts them (`!focus(a:b)` -> `focus={a-b}` etc.), before
  *   or after this transform.
