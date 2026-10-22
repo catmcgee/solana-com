@@ -357,6 +357,9 @@ export function strayAssetsInDocsRoot(
     "apps/docs/agent-banner.js",
     // Puts the reader's OS first in .sol-os-tabs groups (Quickstart install).
     "apps/docs/os-tabs.js",
+    // Imported by MDX pages, not injected globally. tx-walkthrough.jsx is the
+    // static stand-in for the walkthrough that apps/web renders in React.
+    "apps/docs/snippets/",
     "apps/docs/styles/",
   ],
 ) {
