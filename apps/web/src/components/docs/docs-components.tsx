@@ -1035,10 +1035,10 @@ function Anchor({
   className,
   ...rest
 }: ComponentProps<"a">) {
-  rest = { ...rest, className: className ? `link ${className}` : "link" };
+  const cls = className ? `link ${className}` : "link";
   if (isDocsHref(href))
     return (
-      <DocsLink href={href} {...rest}>
+      <DocsLink href={href} {...rest} className={cls}>
         {children}
       </DocsLink>
     );
@@ -1047,6 +1047,7 @@ function Anchor({
     <a
       href={href}
       {...rest}
+      className={cls}
       {...(external && !rest.target
         ? { target: "_blank", rel: "noreferrer" }
         : {})}

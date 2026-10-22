@@ -261,7 +261,10 @@ export async function DocsPageView({
           </main>
         </div>
         <DocsFooter locale={contentLocale} developers />
-        <DocsSearch locale={contentLocale} />
+        <DocsSearch
+          locale={contentLocale}
+          inkeep={Boolean(process.env.INKEEP_API_KEY)}
+        />
         <DocsScripts />
       </div>
     </>
