@@ -1,7 +1,6 @@
 import { defaultLocale } from "@workspace/i18n/config";
 import docsConfig from "../../../../docs/docs.json";
 import { DocsHeader } from "@/app/[locale]/developers/docs-header";
-import { DocsFooter } from "@/app/[locale]/developers/docs-footer";
 import { DocsThemePrepaint } from "@/app/[locale]/developers/theme-prepaint";
 import type { DocsTab, DocsTabIcon } from "@/data/developers/docs-nav";
 import { getDocsNavigation } from "@/lib/docs/navigation";
@@ -55,7 +54,6 @@ export async function DocsNotFound() {
         <DocsHeader
           locale={defaultLocale}
           tabs={tabs}
-          activeTab={tabs[0]?.key}
           inPageSearch
         />
         <main id="content-container" className="not-found-main">
@@ -87,7 +85,6 @@ export async function DocsNotFound() {
             </div>
           </div>
         </main>
-        <DocsFooter locale={defaultLocale} developers />
         <DocsSearch locale={defaultLocale} />
         <DocsScripts />
       </div>

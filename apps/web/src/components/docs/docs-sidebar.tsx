@@ -1,6 +1,6 @@
 import type { NavGroup, NavNode, NavTab } from "@/lib/docs/navigation";
 import { SidebarGroup, SidebarScrollToCurrent } from "./docs-sidebar.client";
-import { ChevronIcon } from "./docs-ui-icons";
+import { ChevronIcon, ExternalArrowIcon } from "./docs-ui-icons";
 import { DocsLink } from "./docs-link";
 
 /**
@@ -36,7 +36,8 @@ function Item({
   depth: number;
   current: string;
 }) {
-  if (node.kind === "link") {
+  // Links out of the docs (nav links, pages with a `url`) open in a new tab.
+  if (node.kind === "link" || (node.kind === "page" && /^https?:/.test(node.url))) {
     return (
       <li className="sidebar-item" data-title={node.title}>
         <a
@@ -49,6 +50,9 @@ function Item({
           <div className="sidebar-link-inner">
             <div className="sidebar-link-text">
               <span>{node.title}</span>
+            </div>
+            <div className="sidebar-ext">
+              <ExternalArrowIcon className="sidebar-ext-icon" />
             </div>
           </div>
         </a>

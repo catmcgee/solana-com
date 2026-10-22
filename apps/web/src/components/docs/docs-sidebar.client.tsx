@@ -117,7 +117,7 @@ export function SidebarScrollToCurrent({ current }: { current: string }) {
     if (visible) return;
     scroller.scrollTop = Math.max(
       0,
-      top - (scroller.clientHeight - item.offsetHeight) / 2,
+      Math.floor(top - (scroller.clientHeight - item.offsetHeight) / 2),
     );
   }, [current]);
   return null;

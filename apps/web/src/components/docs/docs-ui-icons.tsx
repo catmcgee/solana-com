@@ -65,6 +65,16 @@ export function Lucide({
   );
 }
 
+/** Opens elsewhere (external nav links). */
+export function ExternalArrowIcon({ className }: { className?: string }) {
+  return (
+    <Icon18 className={className}>
+      <path d="M14.25 3.75L3.75525 14.2446" />
+      <path d="M4.71301 3.75H14.2499V13.2869" />
+    </Icon18>
+  );
+}
+
 /** Points right; rotated by CSS when open. */
 export function ChevronIcon({ className }: { className?: string }) {
   return (
