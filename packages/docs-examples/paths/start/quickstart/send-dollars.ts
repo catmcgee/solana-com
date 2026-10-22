@@ -1,9 +1,9 @@
 // #region send
 import { generateKeyPairSigner } from "@solana/kit";
-import { client, USDC_MINT, usdcBalance } from "./client";
+import { client, tokenBalance, USDC_MINT } from "./client";
 
 const wallet = client.identity;
-if (Number(await usdcBalance(wallet.address)) < 1) {
+if (Number(await tokenBalance(wallet.address)) < 1) {
   console.log(
     `No devnet USDC yet. Get some for ${wallet.address} at https://faucet.circle.com (pick Solana Devnet), then run this again.`,
   );
@@ -30,5 +30,5 @@ console.log("Signature:", context.signature);
 console.log(
   `Explorer: https://explorer.solana.com/tx/${context.signature}?cluster=devnet`,
 );
-console.log("Recipient balance:", await usdcBalance(recipient), "USDC");
+console.log("Recipient balance:", await tokenBalance(recipient), "USDC");
 // #endregion send

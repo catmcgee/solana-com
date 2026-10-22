@@ -207,7 +207,7 @@ export function shortB58(v: string) {
 /** Whole-line tone of a recorded output line. */
 export function lineTone(line: string): Tone | undefined {
   if (
-    /\b(failed|rejected|refused|error|mismatch|already used)\b/i.test(line) ||
+    /\b(failed|rejected|refused|blocked|error|mismatch|already used)\b/i.test(line) ||
     /^\s*err:/.test(line) ||
     /"paid":false|\bpaid: [Ff]alse\b/.test(line)
   )

@@ -1,4 +1,5 @@
 // #region asset
+import { writeFileSync } from "node:fs";
 import { generateKeyPairSigner, unwrapOption } from "@solana/kit";
 import { extension } from "@solana-program/token-2022";
 import { client } from "./client";
@@ -15,6 +16,7 @@ const { context } = await client.sendTransaction([
     newMint: mint,
     decimals: 2,
     mintAuthority: wallet,
+    freezeAuthority: wallet.address, // lets you freeze holders (step 5)
     extensions: [
       extension("MetadataPointer", {
         authority: wallet.address,
@@ -38,6 +40,9 @@ const { context } = await client.sendTransaction([
     decimals: 2,
   }),
 ]);
+
+// Save the asset's address for the next steps.
+writeFileSync("asset.json", JSON.stringify({ mint: mint.address }));
 
 // Read the asset back from the network.
 const asset = await client.token2022.accounts.mint.fetch(mint.address);

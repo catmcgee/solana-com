@@ -9,23 +9,18 @@ import {
 } from "@solana/kit";
 import { solanaDevnetRpc } from "@solana/kit-plugin-rpc";
 import { signerFromFile } from "@solana/kit-plugin-signer";
-import {
-  findAssociatedTokenPda,
-  TOKEN_PROGRAM_ADDRESS,
-  tokenProgram,
-} from "@solana-program/token";
+import { findAssociatedTokenPda, tokenProgram } from "@solana-program/token";
 import { token2022Program } from "@solana-program/token-2022";
 
 // Your wallet lives in wallet.json. The first run creates it.
-const WALLET_FILE = process.env.WALLET_FILE ?? "wallet.json";
-if (!existsSync(WALLET_FILE)) {
-  await writeKeyPairSigner(await generateKeyPairSigner(true), WALLET_FILE);
+if (!existsSync("wallet.json")) {
+  await writeKeyPairSigner(await generateKeyPairSigner(true), "wallet.json");
 }
 
 // Connects to devnet (or RPC_URL, if set), signs and pays fees with your
 // wallet, and knows the Token Program and Token-2022.
 export const client = await createClient()
-  .use(signerFromFile(WALLET_FILE))
+  .use(signerFromFile("wallet.json"))
   .use(solanaDevnetRpc({ rpcUrl: process.env.RPC_URL }))
   .use(tokenProgram())
   .use(token2022Program());
@@ -35,12 +30,15 @@ export const USDC_MINT = address(
   "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
 );
 
-/** The USDC an address holds, in its token account for the USDC mint. */
-export async function usdcBalance(owner: Address): Promise<string> {
+/** How much of a token (USDC unless you pass another mint) an address holds. */
+export async function tokenBalance(owner: Address, mint: Address = USDC_MINT) {
+  // The holder's token account address comes from the owner, the mint, and
+  // the token program that owns the mint (Token Program or Token-2022).
+  const { value } = await client.rpc.getAccountInfo(mint).send();
   const [account] = await findAssociatedTokenPda({
-    mint: USDC_MINT,
     owner,
-    tokenProgram: TOKEN_PROGRAM_ADDRESS,
+    mint,
+    tokenProgram: value!.owner,
   });
   return client.rpc
     .getTokenAccountBalance(account)

@@ -1,6 +1,6 @@
 // #region balance
 import { lamports } from "@solana/kit";
-import { client, usdcBalance } from "./client";
+import { client, tokenBalance } from "./client";
 
 const wallet = client.identity.address;
 console.log("Wallet:", wallet);
@@ -24,7 +24,7 @@ if (before < 100_000_000n) {
 const { value: balance } = await client.rpc.getBalance(wallet).send();
 console.log("Balance:", Number(balance) / 1e9, "SOL");
 
-const usdc = await usdcBalance(wallet);
+const usdc = await tokenBalance(wallet);
 console.log("USDC:", usdc);
 if (usdc === "0") {
   console.log(

@@ -87,6 +87,7 @@ describe("terminal panel (src/lib/terminal.ts)", () => {
     expect(lineTone("Transfer 100 LSF to approved holder: confirmed")).toBe(
       "ok",
     );
+    expect(lineTone("Transfer blocked: account is frozen")).toBe("error");
     expect(lineTone("Fee: 5000 lamports")).toBeUndefined();
     // What Node prints for verifyPayment()'s result.
     expect(lineTone("{ paid: true }")).toBe("ok");
