@@ -16,7 +16,9 @@ export async function GET(
   { params }: { params: Promise<{ slug: string[] }> },
 ) {
   const { slug } = await params;
-  const locale = DOCS_LOCALES.includes(slug[0] ?? "") ? slug[0]! : defaultLocale;
+  const locale = DOCS_LOCALES.includes(slug[0] ?? "")
+    ? slug[0]!
+    : defaultLocale;
   const rest = locale === defaultLocale ? slug : slug.slice(1);
   const resolved = resolveDocsPage(locale, rest);
   if (!resolved) {
@@ -28,7 +30,8 @@ export async function GET(
   return new Response(await pageMarkdown(resolved.page), {
     headers: {
       "Content-Type": "text/markdown; charset=utf-8",
-      "Cache-Control": "public, max-age=0, s-maxage=3600, stale-while-revalidate=86400",
+      "Cache-Control":
+        "public, max-age=0, s-maxage=3600, stale-while-revalidate=86400",
       Vary: "Accept",
     },
   });

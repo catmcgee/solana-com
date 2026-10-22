@@ -132,7 +132,8 @@ function quotes(node, state = { prev: "" }) {
   // Block boundaries reset the context.
   const block =
     node.type === "root" ||
-    (node.type === "element" && /^(p|h[1-6]|li|td|th|div|blockquote)$/.test(node.tagName)) ||
+    (node.type === "element" &&
+      /^(p|h[1-6]|li|td|th|div|blockquote)$/.test(node.tagName)) ||
     node.type === "mdxJsxFlowElement";
   const inner = block ? { prev: "" } : state;
   for (const child of node.children ?? []) quotes(child, inner);

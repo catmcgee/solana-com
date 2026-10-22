@@ -70,7 +70,9 @@ describe("Cross-app rewrites", () => {
 
   it("rewrites none of the developer docs (this app renders them)", () => {
     for (const rewrite of beforeFiles) {
-      expect(rewrite.source).not.toMatch(/^\/(:locale[^/]*\/)?developers\/(:page|docs|cookbook)/);
+      expect(rewrite.source).not.toMatch(
+        /^\/(:locale[^/]*\/)?developers\/(:page|docs|cookbook)/,
+      );
     }
   });
 

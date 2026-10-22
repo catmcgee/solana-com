@@ -60,7 +60,11 @@ export async function DocsNotFound() {
         />
         <main id="content-container" className="not-found-main">
           <div id="content-area">
-            <div id="content" className="mdx-content" data-page-title="Page Not Found">
+            <div
+              id="content"
+              className="mdx-content"
+              data-page-title="Page Not Found"
+            >
               <div className="not-found-container">
                 <div className="not-found-head">
                   <span id="error-badge" className="not-found-status-code">
@@ -69,7 +73,10 @@ export async function DocsNotFound() {
                   <h1 id="error-title" className="not-found-title">
                     {ERROR.title}
                   </h1>
-                  <div id="error-description" className="prose not-found-description">
+                  <div
+                    id="error-description"
+                    className="prose not-found-description"
+                  >
                     <span data-as="p">
                       <Description />
                     </span>

@@ -29,7 +29,9 @@ import { isDocsHref } from "@/lib/docs/docs-href";
 type P = { children?: ReactNode };
 
 /** Element children, with fragments flattened. */
-function elements(children: ReactNode): ReactElement<Record<string, unknown>>[] {
+function elements(
+  children: ReactNode,
+): ReactElement<Record<string, unknown>>[] {
   const out: ReactElement<Record<string, unknown>>[] = [];
   for (const child of Children.toArray(children)) {
     if (!isValidElement(child)) continue;
@@ -144,7 +146,10 @@ function CalloutBox({
       <div data-component-part="callout-icon" className="callout-icon">
         {icon ?? <CalloutIcon type={type} />}
       </div>
-      <div data-component-part="callout-content" className="callout-content prose">
+      <div
+        data-component-part="callout-content"
+        className="callout-content prose"
+      >
         {children}
       </div>
     </div>
@@ -210,7 +215,12 @@ export function Card({
   const body = (
     <>
       {img ? (
-        <img src={img} alt="" className="card-img" data-component-part="card-image" />
+        <img
+          src={img}
+          alt=""
+          className="card-img"
+          data-component-part="card-image"
+        />
       ) : null}
       <div
         className={horizontal ? "card-body card-body-horizontal" : "card-body"}
@@ -229,7 +239,11 @@ export function Card({
         <div className="card-text">
           {title ? (
             <h2
-              className={icon && !horizontal ? "not-prose card-title card-title-spaced" : "not-prose card-title"}
+              className={
+                icon && !horizontal
+                  ? "not-prose card-title card-title-spaced"
+                  : "not-prose card-title"
+              }
               data-component-part="card-title"
             >
               {title}
@@ -237,7 +251,11 @@ export function Card({
           ) : null}
           {children ? (
             <div
-              className={title && !horizontal ? "prose card-content card-content-spaced" : "prose card-content"}
+              className={
+                title && !horizontal
+                  ? "prose card-content card-content-spaced"
+                  : "prose card-content"
+              }
               data-component-part="card-content"
             >
               {children}
@@ -273,7 +291,11 @@ export function Columns({
 }: P & { cols?: number | string }) {
   const n = Number(cols) || 2;
   return (
-    <div className="columns not-prose" data-cols={n} style={{ "--cols": n } as CSSProperties}>
+    <div
+      className="columns not-prose"
+      data-cols={n}
+      style={{ "--cols": n } as CSSProperties}
+    >
       {children}
     </div>
   );
@@ -358,15 +380,17 @@ function StepItem({
       />
       <div data-component-part="step-number" className="step-number">
         <div data-component-part="step-indicator" className="step-indicator">
-          {icon ? <Icon icon={icon} size={14} /> : <div>{stepNumber ?? index + 1}</div>}
+          {icon ? (
+            <Icon icon={icon} size={14} />
+          ) : (
+            <div>{stepNumber ?? index + 1}</div>
+          )}
         </div>
       </div>
       <div className="step-body">
         {title ? (
           <Title data-component-part="step-title" className="step-title">
-            {headingTitle
-              ? (headingTitle.props.children as ReactNode)
-              : title}
+            {headingTitle ? (headingTitle.props.children as ReactNode) : title}
           </Title>
         ) : null}
         <div data-component-part="step-content" className="prose step-content">
@@ -408,17 +432,33 @@ export function Accordion({
       .replace(/^-|-$/g, "");
   return (
     <details className="accordion" open={defaultOpen || undefined}>
-      <summary className="not-prose accordion-button" data-component-part="accordion-button">
+      <summary
+        className="not-prose accordion-button"
+        data-component-part="accordion-button"
+      >
         <div id={anchor} className="accordion-anchor" />
-        <div data-component-part="accordion-caret-right" className="accordion-caret">
-          {icon ? <Icon icon={icon} size={12} /> : <ChevronIcon className="accordion-chevron" />}
+        <div
+          data-component-part="accordion-caret-right"
+          className="accordion-caret"
+        >
+          {icon ? (
+            <Icon icon={icon} size={12} />
+          ) : (
+            <ChevronIcon className="accordion-chevron" />
+          )}
         </div>
-        <div data-component-part="accordion-title-container" className="accordion-title-container">
+        <div
+          data-component-part="accordion-title-container"
+          className="accordion-title-container"
+        >
           <p data-component-part="accordion-title" className="accordion-title">
             {title}
           </p>
           {description ? (
-            <p data-component-part="accordion-description" className="accordion-description">
+            <p
+              data-component-part="accordion-description"
+              className="accordion-description"
+            >
               {description}
             </p>
           ) : null}
@@ -443,7 +483,10 @@ export function Expandable({
   const label = title ?? "properties";
   return (
     <details className="expandable" open={defaultOpen || undefined}>
-      <summary className="not-prose expandable-button" data-component-part="expandable-button">
+      <summary
+        className="not-prose expandable-button"
+        data-component-part="expandable-button"
+      >
         <ChevronIcon className="expandable-chevron" />
         <div className="expandable-label">
           <p className="expandable-label-text">
@@ -452,7 +495,10 @@ export function Expandable({
           </p>
         </div>
       </summary>
-      <div className="expandable-content" data-component-part="expandable-content">
+      <div
+        className="expandable-content"
+        data-component-part="expandable-content"
+      >
         {children}
       </div>
     </details>
@@ -477,7 +523,9 @@ function Field({
   deprecated?: boolean;
   defaultValue?: unknown;
 }) {
-  const id = name ? `${kind === "param" ? "param" : "response"}-${name.replace(/[^\w.-]+/g, "-").toLowerCase()}` : undefined;
+  const id = name
+    ? `${kind === "param" ? "param" : "response"}-${name.replace(/[^\w.-]+/g, "-").toLowerCase()}`
+    : undefined;
   return (
     <div className="field">
       <div id={id} className="param-head">
@@ -493,22 +541,34 @@ function Field({
             </span>
             <div data-component-part="field-meta" className="field-meta">
               {type ? (
-                <div data-component-part="field-info-pill" className="field-pill">
+                <div
+                  data-component-part="field-info-pill"
+                  className="field-pill"
+                >
                   <span>{type}</span>
                 </div>
               ) : null}
               {defaultValue !== undefined ? (
-                <div data-component-part="field-info-pill" className="field-pill">
+                <div
+                  data-component-part="field-info-pill"
+                  className="field-pill"
+                >
                   <span>default:{String(defaultValue)}</span>
                 </div>
               ) : null}
               {required ? (
-                <div data-component-part="field-required-pill" className="field-pill field-pill-required">
+                <div
+                  data-component-part="field-required-pill"
+                  className="field-pill field-pill-required"
+                >
                   required
                 </div>
               ) : null}
               {deprecated ? (
-                <div data-component-part="field-deprecated-pill" className="field-pill field-pill-deprecated">
+                <div
+                  data-component-part="field-deprecated-pill"
+                  className="field-pill field-pill-deprecated"
+                >
                   deprecated
                 </div>
               ) : null}
@@ -517,7 +577,10 @@ function Field({
         </div>
       </div>
       {children ? (
-        <div data-component-part="field-content" className="field-content prose-sm">
+        <div
+          data-component-part="field-content"
+          className="field-content prose-sm"
+        >
           {children}
         </div>
       ) : null}
@@ -525,16 +588,18 @@ function Field({
   );
 }
 
-export function ParamField(props: P & {
-  body?: string;
-  query?: string;
-  path?: string;
-  header?: string;
-  type?: string;
-  required?: boolean;
-  deprecated?: boolean;
-  default?: unknown;
-}) {
+export function ParamField(
+  props: P & {
+    body?: string;
+    query?: string;
+    path?: string;
+    header?: string;
+    type?: string;
+    required?: boolean;
+    deprecated?: boolean;
+    default?: unknown;
+  },
+) {
   return (
     <Field
       kind="param"
@@ -549,13 +614,15 @@ export function ParamField(props: P & {
   );
 }
 
-export function ResponseField(props: P & {
-  name: string;
-  type?: string;
-  required?: boolean;
-  deprecated?: boolean;
-  default?: unknown;
-}) {
+export function ResponseField(
+  props: P & {
+    name: string;
+    type?: string;
+    required?: boolean;
+    deprecated?: boolean;
+    default?: unknown;
+  },
+) {
   return (
     <Field
       kind="response"
@@ -604,17 +671,25 @@ function CodeBody({ pre, rounded }: { pre: PreProps; rounded?: boolean }) {
     <div
       role="presentation"
       data-component-part="code-block-root"
-      className={rounded ? "code-block-root code-block-root-rounded" : "code-block-root"}
+      className={
+        rounded ? "code-block-root code-block-root-rounded" : "code-block-root"
+      }
       data-expandable={collapse ? "" : undefined}
       data-wrap={wrap ? "" : undefined}
       data-lines={lines ? "" : undefined}
       style={collapse ? { height: "190px" } : undefined}
     >
-      <div data-component-part="scroll-area-viewport" className="code-block-viewport">
+      <div
+        data-component-part="scroll-area-viewport"
+        className="code-block-viewport"
+      >
         <pre {...rest}>{children}</pre>
       </div>
       {collapse ? (
-        <div data-component-part="code-block-footer" className="code-block-footer">
+        <div
+          data-component-part="code-block-footer"
+          className="code-block-footer"
+        >
           <button
             type="button"
             data-component-part="code-block-footer-button"
@@ -640,8 +715,14 @@ export function CodeBlock(pre: PreProps) {
       data-code-copy-scope=""
     >
       {title ? (
-        <div data-component-part="code-block-header" className="code-block-header">
-          <div data-component-part="code-block-header-filename" className="code-block-filename">
+        <div
+          data-component-part="code-block-header"
+          className="code-block-header"
+        >
+          <div
+            data-component-part="code-block-header-filename"
+            className="code-block-filename"
+          >
             <span>{title}</span>
           </div>
           <div className="code-block-actions">
@@ -660,7 +741,9 @@ export function CodeBlock(pre: PreProps) {
 
 function codeGroupFrom(children: ReactNode, variant?: "api") {
   const blocks = elements(children).filter(
-    (el) => typeof (el.props as PreProps)["data-language"] === "string" || el.type === CodeBlock,
+    (el) =>
+      typeof (el.props as PreProps)["data-language"] === "string" ||
+      el.type === CodeBlock,
   );
   const labels = blocks.map((el, i) => {
     const props = el.props as PreProps;
@@ -722,9 +805,13 @@ export function ApiExamplesWrapper({ children }: P) {
     <div className="api-examples">
       {found.map((el, i) =>
         el.type === RequestExample ? (
-          <ApiRequestExample key={i}>{el.props.children as ReactNode}</ApiRequestExample>
+          <ApiRequestExample key={i}>
+            {el.props.children as ReactNode}
+          </ApiRequestExample>
         ) : (
-          <ApiResponseExample key={i}>{el.props.children as ReactNode}</ApiResponseExample>
+          <ApiResponseExample key={i}>
+            {el.props.children as ReactNode}
+          </ApiResponseExample>
         ),
       )}
     </div>
@@ -744,7 +831,10 @@ export function Frame({
       {hint ? <div className="frame-hint">{hint}</div> : null}
       <div className="frame-inner relative">{children}</div>
       {caption ? (
-        <figcaption className="frame-caption" data-component-part="frame-caption">
+        <figcaption
+          className="frame-caption"
+          data-component-part="frame-caption"
+        >
           {caption}
         </figcaption>
       ) : null}
@@ -794,19 +884,31 @@ function TreeFolder({
   depth = 0,
 }: P & { name: string; defaultOpen?: boolean; depth?: number }) {
   return (
-    <details className="tree-folder" open={defaultOpen || undefined} role="none">
+    <details
+      className="tree-folder"
+      open={defaultOpen || undefined}
+      role="none"
+    >
       <summary
         role="treeitem"
         className="tree-row"
         style={{ paddingInlineStart: `${6 + depth * 22}px` }}
       >
-        <Icon icon="folder-open" size={16} className="tree-icon tree-icon-open" />
+        <Icon
+          icon="folder-open"
+          size={16}
+          className="tree-icon tree-icon-open"
+        />
         <Icon icon="folder" size={16} className="tree-icon tree-icon-closed" />
         <span data-component-part="tree-folder-title" className="tree-title">
           {name}
         </span>
       </summary>
-      <div role="group" className="tree-group" data-component-part="tree-folder-children-wrapper">
+      <div
+        role="group"
+        className="tree-group"
+        data-component-part="tree-folder-children-wrapper"
+      >
         <div
           className="tree-line"
           data-component-part="tree-folder-children-line"
@@ -822,7 +924,11 @@ function TreeFolder({
 
 function TreeFile({ name, depth = 0 }: { name: string; depth?: number }) {
   return (
-    <div role="treeitem" className="tree-row" style={{ paddingInlineStart: `${6 + depth * 22}px` }}>
+    <div
+      role="treeitem"
+      className="tree-row"
+      style={{ paddingInlineStart: `${6 + depth * 22}px` }}
+    >
       <Icon icon="file" size={16} className="tree-icon" />
       <span data-component-part="tree-file-title" className="tree-title">
         {name}
@@ -831,7 +937,13 @@ function TreeFile({ name, depth = 0 }: { name: string; depth?: number }) {
   );
 }
 
-function TreeChild({ el, depth }: { el: ReactElement<Record<string, unknown>>; depth: number }) {
+function TreeChild({
+  el,
+  depth,
+}: {
+  el: ReactElement<Record<string, unknown>>;
+  depth: number;
+}) {
   if (el.type === TreeFolderShim)
     return <TreeFolder {...(el.props as { name: string })} depth={depth} />;
   if (el.type === TreeFileShim)
@@ -871,15 +983,18 @@ function Heading({
   ...rest
 }: ComponentProps<"h2"> & { as: "h1" | "h2" | "h3" | "h4" | "h5" | "h6" }) {
   if ("data-step-title" in rest) return <>{children}</>;
-  if (!id)
-    return (
-      <Tag {...rest}>
-        {children}
-      </Tag>
-    );
+  if (!id) return <Tag {...rest}>{children}</Tag>;
   return (
-    <Tag id={id} {...rest} className={["heading", rest.className].filter(Boolean).join(" ")}>
-      <a href={`#${id}`} className="heading-anchor" aria-label="Navigate to header">
+    <Tag
+      id={id}
+      {...rest}
+      className={["heading", rest.className].filter(Boolean).join(" ")}
+    >
+      <a
+        href={`#${id}`}
+        className="heading-anchor"
+        aria-label="Navigate to header"
+      >
         ​
       </a>
       <span className="heading-text">{children}</span>
@@ -899,7 +1014,9 @@ function Anchor({ href = "", children, ...rest }: ComponentProps<"a">) {
     <a
       href={href}
       {...rest}
-      {...(external && !rest.target ? { target: "_blank", rel: "noreferrer" } : {})}
+      {...(external && !rest.target
+        ? { target: "_blank", rel: "noreferrer" }
+        : {})}
     >
       {children}
     </a>

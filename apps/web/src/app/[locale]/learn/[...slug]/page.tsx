@@ -35,5 +35,6 @@ export async function generateStaticParams({
   const { locale } = await params;
   if (locale !== defaultLocale) return [];
   return englishPages(PREFIX)
-    .filter((slug) => slug.length > 0).map((slug) => ({ slug }));
+    .filter((slug) => slug.length > 0)
+    .map((slug) => ({ slug }));
 }

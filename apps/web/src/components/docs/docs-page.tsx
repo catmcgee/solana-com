@@ -64,11 +64,9 @@ function headerTabs(resolved: ResolvedDocsPage): {
 }
 
 function Pagination({
-  resolved,
   previous,
   next,
 }: {
-  resolved: ResolvedDocsPage;
   previous?: { name: ReactNode; url: string };
   next?: { name: ReactNode; url: string };
 }) {
@@ -83,7 +81,10 @@ function Pagination({
           data-component-part="pagination-prev"
           className="pagination-link"
         >
-          <div data-component-part="pagination-title" className="pagination-title">
+          <div
+            data-component-part="pagination-title"
+            className="pagination-title"
+          >
             {previous.name}
           </div>
         </DocsLink>
@@ -95,7 +96,10 @@ function Pagination({
           data-component-part="pagination-next"
           className="pagination-link"
         >
-          <div data-component-part="pagination-title" className="pagination-title">
+          <div
+            data-component-part="pagination-title"
+            className="pagination-title"
+          >
             {next.name}
           </div>
         </DocsLink>
@@ -137,10 +141,15 @@ export async function DocsPageView({
     <>
       <DocsThemePrepaint />
       {/* For agents reading the HTML: where the Markdown index is. */}
-      <blockquote className="sr-only" data-agent-docs-index="true" aria-hidden="true">
+      <blockquote
+        className="sr-only"
+        data-agent-docs-index="true"
+        aria-hidden="true"
+      >
         <h2>Documentation Index</h2>
         <p>
           Fetch the complete documentation index at:{" "}
+          {/* eslint-disable-next-line next/no-html-link-for-pages -- a file */}
           <a href="/llms.txt" tabIndex={-1}>
             /llms.txt
           </a>
@@ -150,7 +159,12 @@ export async function DocsPageView({
           further.
         </p>
       </blockquote>
-      <div data-docs="" data-dev-landing="docs" data-mode={wide ? "wide" : undefined} lang={contentLocale === locale ? undefined : contentLocale}>
+      <div
+        data-docs=""
+        data-dev-landing="docs"
+        data-mode={wide ? "wide" : undefined}
+        lang={contentLocale === locale ? undefined : contentLocale}
+      >
         <DocsHeader
           locale={contentLocale}
           tabs={tabs}
@@ -233,11 +247,7 @@ export async function DocsPageView({
                 >
                   <MDX components={docsComponents} />
                 </div>
-                <Pagination
-                  resolved={resolved}
-                  previous={previous}
-                  next={next}
-                />
+                <Pagination previous={previous} next={next} />
               </div>
             </div>
           </main>

@@ -9,7 +9,13 @@
  *   components/docs/docs-scripts.tsx until they are React components).
  * The copies are build outputs (.gitignore). Unchanged files are skipped.
  */
-import { copyFileSync, existsSync, mkdirSync, readdirSync, statSync } from "node:fs";
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  statSync,
+} from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -48,6 +54,8 @@ function copyDir(from, to) {
 
 copyDir(path.join(docs, "docs-assets"), path.join(pub, "docs-assets"));
 for (const f of readdirSync(path.join(docs, "fonts")))
-  if (f.endsWith(".woff2")) copy(path.join(docs, "fonts", f), path.join(pub, "fonts", f));
-for (const f of SCRIPTS) copy(path.join(docs, f), path.join(pub, "docs-scripts", f));
+  if (f.endsWith(".woff2"))
+    copy(path.join(docs, "fonts", f), path.join(pub, "fonts", f));
+for (const f of SCRIPTS)
+  copy(path.join(docs, f), path.join(pub, "docs-scripts", f));
 console.log(`[docs-static] ${copied} file(s) copied`);

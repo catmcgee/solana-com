@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  useEffect,
-  useId,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { CheckIcon, CopyIcon } from "./docs-ui-icons";
 
 /**
@@ -53,7 +47,9 @@ function slug(label: string) {
 
 /** The reader's operating system, as the OS tab labels name them. */
 function detectOs(): string | null {
-  const nav = navigator as Navigator & { userAgentData?: { platform?: string } };
+  const nav = navigator as Navigator & {
+    userAgentData?: { platform?: string };
+  };
   const p = nav.userAgentData?.platform || nav.platform || nav.userAgent || "";
   if (/win/i.test(p)) return "Windows";
   if (/mac|iphone|ipad|ipod/i.test(p)) return "macOS";
@@ -86,7 +82,11 @@ export function TabsClient({
   }, []);
   return (
     <div className="tabs tab-container" ref={root}>
-      <ul className="not-prose tabs-list" role="tablist" data-component-part="tabs-list">
+      <ul
+        className="not-prose tabs-list"
+        role="tablist"
+        data-component-part="tabs-list"
+      >
         {labels.map((label, i) => (
           <li
             key={i}
@@ -121,7 +121,9 @@ export function TabsClient({
             id={`${base}-panel-${i}`}
             role="tabpanel"
             data-component-part="tab-content"
-            className={i === active ? "prose tab-panel" : "prose tab-panel hidden"}
+            className={
+              i === active ? "prose tab-panel" : "prose tab-panel hidden"
+            }
           >
             {panel}
           </div>
@@ -187,12 +189,11 @@ export function CodeGroupClient({
   const [active, choose] = useSyncedTab(labels);
   const base = useId();
   return (
-    <div
-      className="code-group"
-      data-variant={variant}
-      data-code-copy-scope=""
-    >
-      <div className="code-group-tab-bar" data-component-part="code-group-tab-bar">
+    <div className="code-group" data-variant={variant} data-code-copy-scope="">
+      <div
+        className="code-group-tab-bar"
+        data-component-part="code-group-tab-bar"
+      >
         <div className="code-group-tabs" role="tablist">
           {labels.map((label, i) => (
             <button

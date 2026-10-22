@@ -63,9 +63,9 @@ export function docsPageMetadata(resolved: ResolvedDocsPage): Metadata {
       images: [{ url: image, width: 1200, height: 630 }],
     },
     twitter: {
-      card: (get("twitter:card") ?? META["twitter:card"] ?? "summary_large_image") as
-        | "summary_large_image"
-        | "summary",
+      card: (get("twitter:card") ??
+        META["twitter:card"] ??
+        "summary_large_image") as "summary_large_image" | "summary",
       site: META["twitter:site"],
       title: get("twitter:title") ?? get("og:title") ?? title,
       description: get("twitter:description") ?? description,

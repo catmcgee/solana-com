@@ -58,10 +58,7 @@ export const docs = defineCollections({
 export const docsI18n = defineCollections({
   type: "doc",
   dir: docsDir,
-  files: [
-    `${locales}/developers/docs/**/*.mdx`,
-    `${locales}/learn/**/*.mdx`,
-  ],
+  files: [`${locales}/developers/docs/**/*.mdx`, `${locales}/learn/**/*.mdx`],
   schema,
   dynamic: true,
   postprocess: { includeProcessedMarkdown: true },

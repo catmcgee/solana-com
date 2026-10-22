@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useId, useState, type CSSProperties, type ReactNode } from "react";
+import {
+  useEffect,
+  useId,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 import { useRouter } from "next/navigation";
 
 /**
@@ -55,7 +61,11 @@ export function SidebarGroup({
     >
       <button
         type="button"
-        className={rootActive ? "sidebar-link sidebar-group-button is-active" : "sidebar-link sidebar-group-button"}
+        className={
+          rootActive
+            ? "sidebar-link sidebar-group-button is-active"
+            : "sidebar-link sidebar-group-button"
+        }
         style={style}
         data-nav-href={rootActive ? undefined : href}
         data-active-nav-item={rootActive ? "true" : undefined}

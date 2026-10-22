@@ -10,7 +10,9 @@ export function NotFoundSuggestions() {
   useEffect(() => {
     const words = (pathname ?? "")
       .split("/")
-      .filter((s) => s && !["developers", "docs", "cookbook", "learn"].includes(s))
+      .filter(
+        (s) => s && !["developers", "docs", "cookbook", "learn"].includes(s),
+      )
       .join(" ")
       .replace(/[-_]+/g, " ")
       .trim();
@@ -34,7 +36,11 @@ export function NotFoundSuggestions() {
     <div className="not-found-recommended">
       <div className="not-found-recommended-pages-list">
         {pages.map((p) => (
-          <a key={p.url} href={p.url} className="not-found-recommended-page-link">
+          <a
+            key={p.url}
+            href={p.url}
+            className="not-found-recommended-page-link"
+          >
             <span>{p.title}</span>
           </a>
         ))}

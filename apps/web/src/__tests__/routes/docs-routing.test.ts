@@ -21,12 +21,16 @@ const docsRoot = path.join(repoRoot, "apps/docs");
  * English-only cookbook) in English. `.md` twins and `/index` paths too.
  */
 function docsPageExists(pathname: string): boolean {
-  let p = pathname.split(/[?#]/)[0].replace(/\.md$/, "").replace(/\/index$/, "");
+  let p = pathname
+    .split(/[?#]/)[0]
+    .replace(/\.md$/, "")
+    .replace(/\/index$/, "");
   const segments = p.split("/").filter(Boolean);
   const locale = DOCS_LOCALES.includes(segments[0] ?? "") ? segments[0] : null;
   const rest = locale ? segments.slice(1) : segments;
   const isDocs =
-    (rest[0] === "developers" && ["docs", "cookbook"].includes(rest[1] ?? "")) ||
+    (rest[0] === "developers" &&
+      ["docs", "cookbook"].includes(rest[1] ?? "")) ||
     (rest[0] === "learn" && rest.length > 1);
   if (!isDocs) return false;
   p = rest.join("/");
@@ -44,7 +48,8 @@ function isDocsPath(pathname: string): boolean {
     ? segments.slice(1)
     : segments;
   return (
-    (rest[0] === "developers" && ["docs", "cookbook"].includes(rest[1] ?? "")) ||
+    (rest[0] === "developers" &&
+      ["docs", "cookbook"].includes(rest[1] ?? "")) ||
     rest[0] === "learn"
   );
 }
@@ -557,7 +562,8 @@ describe("Legacy URL parity", () => {
           }
           if (r.kind !== "none") continue;
           if (!isDocsPath(target)) continue;
-          if (!docsPageExists(target)) missing.push(`${candidate} -> ${target}`);
+          if (!docsPageExists(target))
+            missing.push(`${candidate} -> ${target}`);
         }
       }
       expect(missing).toEqual([]);

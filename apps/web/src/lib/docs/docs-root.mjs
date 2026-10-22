@@ -10,8 +10,14 @@ let cached;
 
 export function findDocsRoot() {
   if (cached) return cached;
-  const fromWeb = path.join(/* turbopackIgnore: true */ process.cwd(), "../docs");
-  const fromRoot = path.join(/* turbopackIgnore: true */ process.cwd(), "apps/docs");
+  const fromWeb = path.join(
+    /* turbopackIgnore: true */ process.cwd(),
+    "../docs",
+  );
+  const fromRoot = path.join(
+    /* turbopackIgnore: true */ process.cwd(),
+    "apps/docs",
+  );
   cached = existsSync(path.join(fromWeb, "docs.json")) ? fromWeb : fromRoot;
   return cached;
 }
