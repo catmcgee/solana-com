@@ -445,11 +445,12 @@ const movedDocsRedirects: RedirectInput[] = withMdVariants([
   },
   // The Playground quick start and its two walkthroughs were merged into the
   // Quickstart tutorial (2026-10-16): reading -> Check a balance, writing ->
-  // Send SOL. The pages and their locale copies were deleted.
+  // Send dollars (Send SOL until 2026-10-21). The pages and their locale
+  // copies were deleted.
   ...[
     ["", "/developers/docs/quickstart"],
     ["/reading-from-network", "/developers/docs/quickstart/check-balance"],
-    ["/writing-to-network", "/developers/docs/quickstart/send-sol"],
+    ["/writing-to-network", "/developers/docs/quickstart/send-dollars"],
   ].flatMap(([page, destination]) => [
     { source: `/docs/intro/quick-start${page}`, destination: destination! },
     {
@@ -494,6 +495,17 @@ const anchoredMdTwinRedirects: RedirectInput[] = [
  * tab (2026-10-21). Temporary while the docs are in preview.
  */
 const installRedirects: RedirectInput[] = withMdVariants([
+  // The Quickstart now sends dollars and creates an asset (2026-10-21).
+  {
+    source: "/developers/docs/quickstart/send-sol",
+    destination: "/developers/docs/quickstart/send-dollars",
+    permanent: false,
+  },
+  {
+    source: "/developers/docs/quickstart/create-token",
+    destination: "/developers/docs/quickstart/create-asset",
+    permanent: false,
+  },
   {
     source: "/developers/docs/intro/installation",
     destination: "/developers/docs/quickstart",
@@ -503,7 +515,8 @@ const installRedirects: RedirectInput[] = withMdVariants([
     source: "/developers/docs/intro/installation/index",
     destination: "/developers/docs/quickstart",
     permanent: false,
-  },  {
+  },
+  {
     source: "/docs/intro/installation",
     destination: "/developers/docs/quickstart",
     permanent: false,
