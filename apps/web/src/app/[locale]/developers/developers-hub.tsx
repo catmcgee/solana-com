@@ -254,7 +254,7 @@ function TradeVisual({ t }: { t: (key: string) => string }) {
   return (
     <div className="flex flex-col items-center gap-2.5">
       <div dir="ltr" className="flex items-center gap-2.5">
-        <span className={leg}>4 LSF →</span>
+        <span className={leg}>2 NVDAx →</span>
         <span className={`${leg} [animation-delay:2s]`}>← USDC</span>
       </div>
       <span className="font-[family-name:var(--dl-mono)] text-xs text-[var(--dl-accent-text)]">
