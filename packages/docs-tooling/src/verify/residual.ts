@@ -180,6 +180,7 @@ export const DOCS_COMPONENTS = new Set([
   "Icon",
   "Info",
   "Latex",
+  "LiveFeed",
   "Note",
   "Panel",
   "ParamField",

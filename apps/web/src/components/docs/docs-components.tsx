@@ -1124,7 +1124,6 @@ export const docsComponents = {
   Icon,
   Tree,
   TxWalkthrough,
-  // apps/web only; Mintlify uses the /snippets/live-feed.jsx stand-in.
   LiveFeed,
 };
 
