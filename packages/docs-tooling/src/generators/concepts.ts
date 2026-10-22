@@ -12,15 +12,17 @@
  *     "name": "Accounts", "cat": "The basics",
  *     "short": "Everything on Solana … lives in *accounts* …",  // inline markdown
  *     "href": "/docs/core/accounts",
- *     "label": "New concept"                                   // optional card label
+ *     "label": "New concept"                                   // optional, unused
  *   }
  * }
  * ```
  *
  * Output, per language with a source file, under snippets/concepts/<lang>/:
- * - `<key>.mdx`: the concept card, a `<Callout className="sol-concept">`
+ * - `<key>.mdx`: the concept row, a quiet glossary line (name, the first
+ *   sentence of `short`, a link to `href`) in `<div className="sol-concept">`
  *   (SSR, readable without JS). `import Accounts from
- *   "/snippets/concepts/en/account.mdx"` then `<Accounts />`.
+ *   "/snippets/concepts/en/account.mdx"` then `<Accounts />`; a step's
+ *   imports in a row render as one list.
  * - `<key>.short.mdx`: the `short` sentence only, for `## In short` on the
  *   concept's canonical page.
  * - `<key>.used-in.mdx`: "You've used this in: …" backlinks to every path page
@@ -313,20 +315,27 @@ const hdr = (lang: string, extra: string[] = []) =>
     "gen:concepts",
   );
 
+/** The first sentence of a concept's `short`, as plain text (row definitions). */
+export function firstSentence(short: string) {
+  const text = plainText(short);
+  return text.split(/(?<=[.!?])\s+(?=\S)|(?<=[。！？])/u)[0]!.trim();
+}
+
+/**
+ * One quiet glossary row (name and a one-sentence definition, linking to the
+ * concept page). A step imports its concepts one after another; consecutive
+ * rows form one list in styles/concepts.css.
+ */
 export function renderCard(
   docsRoot: string,
   src: ConceptsSource,
   c: ConceptDef,
 ) {
-  const { ui, lang } = src;
+  const { lang } = src;
   return `${hdr(lang)}
-<Callout icon="gem" color="#9945FF" className="sol-concept">
-<span className="sol-concept-head">**${mdText(c.name)}** <span className="sol-concept-label">${mdText(c.label ?? ui.newConcept)}</span></span>
-
-${mdInline(c.short)}
-
-<span className="sol-concept-more">[${mdText(`${ui.learnMore} →`)}](${localizeHref(docsRoot, c.href, lang)})</span>
-</Callout>
+<div className="sol-concept not-prose">
+[<span className="sol-concept-name">${mdText(c.name)}</span> <span className="sol-concept-def">${mdText(firstSentence(c.short))}</span>](${localizeHref(docsRoot, c.href, lang)})
+</div>
 `;
 }
 

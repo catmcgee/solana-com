@@ -328,16 +328,15 @@ describe("generated snippets", () => {
   it("concept card, short text, backlinks and coverage", () => {
     all();
     const card = read("snippets/concepts/en/account.mdx");
+    // A quiet glossary row: name and first sentence, the whole row a link.
+    expect(card).toContain('<div className="sol-concept not-prose">');
     expect(card).toContain(
-      '<Callout icon="gem" color="#9945FF" className="sol-concept">',
+      '[<span className="sol-concept-name">Accounts</span> <span className="sol-concept-def">',
     );
-    expect(card).toContain(
-      '**Accounts** <span className="sol-concept-label">New concept</span>',
-    );
-    expect(card).toContain("[Learn more →](/developers/docs/core/accounts)");
-    // The card ends at "Learn more": no analogy line or divider.
-    expect(card).not.toContain("sol-concept-like");
-    expect(card).not.toContain("Like:");
+    expect(card).toContain("](/developers/docs/core/accounts)");
+    expect(card).not.toContain("Callout");
+    expect(card).not.toContain("New concept");
+    expect(card).not.toContain("Learn more");
     expect(read("snippets/concepts/en/mint.short.mdx")).toMatch(
       /\(\*mint authority\*\)/,
     );
