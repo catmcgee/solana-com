@@ -57,8 +57,8 @@ entries point at the English page until `nav:swap` runs after a Lingo run.
 
 ## Documentation
 
-The developer docs are a [Mintlify](https://mintlify.com/docs) project in this
-folder (`apps/docs`, the Mintlify root):
+The developer docs content lives in this folder (`apps/docs`). `apps/web`
+renders it with Fumadocs and serves it at solana.com/developers/docs:
 
 - `docs/**`, `developers/cookbook/**`, `developers/bootcamp/**`, `learn/*.mdx`
   are the English pages; `<locale>/…` holds the translations. Folder paths are
@@ -67,31 +67,19 @@ folder (`apps/docs`, the Mintlify root):
 - `navigation/en.json` is the English navigation. Edit it by hand, then run
   `pnpm --filter @workspace/docs-tooling nav:build` to regenerate the 17 locale
   navigations.
-- Use Mintlify components (`<Note>`, `<Steps>`, `<CodeGroup>`, `<Tabs>`,
-  `<Card>`, …). Pages must read completely without JavaScript: see "Reading
+- Use the docs components (`<Note>`, `<Steps>`, `<CodeGroup>`, `<Tabs>`,
+  `<Card>`, …; `apps/web/src/components/docs/docs-components.tsx`). Pages must read completely without JavaScript: see "Reading
   without JavaScript" in `packages/docs-tooling/AUTHORING.md` for the allowed
   patterns.
-- Preview locally with `pnpm dev:docs` (`mint dev`). Before pushing run
-  `pnpm --filter @workspace/docs-tooling verify` and, in this folder,
-  `npx mint@latest validate` and `npx mint@latest broken-links`.
+- Preview locally with `pnpm dev:web` (docs at
+  http://localhost:3000/developers/docs). Before pushing run
+  `pnpm --filter @workspace/docs-tooling verify` and
+  `pnpm --filter @workspace/docs-tooling generate:check`; a content change
+  that touches components or MDX syntax should also pass
+  `pnpm --filter solana-com build`.
 
 All tooling (converters, generators, checks) lives in `packages/docs-tooling`;
 `packages/docs-tooling/AUTHORING.md` is the full guide.
-
-### Hosting and the Mintlify plan
-
-The docs are hosted by Mintlify (Hobby plan) and served on solana.com by
-`apps/web`, which rewrites `/developers/docs`, `/learn/*`, `/developers/cookbook` and
-`/developers/bootcamp` to the `*.mintlify.site` root
-(`apps/web/rewrites-redirects.ts`, MINTLIFY block).
-
-**Recommendation: upgrade to Mintlify Enterprise.** Enterprise includes the
-static export, which would let us self-host the docs on Vercel next to
-`apps/web` instead of proxying to Mintlify. `mint export` worked locally
-without logging in, but Mintlify's documentation describes self-hosting as
-Enterprise-only, so we do not rely on it. Features that need Pro or
-Enterprise (page feedback, the AI assistant, preview deployments, static
-export) are listed in `packages/docs-tooling/AUTHORING.md`.
 
 ## Cookbook code examples
 
@@ -111,8 +99,8 @@ A TypeScript example comes in up to three flavours, one file each:
 | `legacy.ts` | `@solana/web3.js` 1.x       | `Web3.js (legacy)` |
 
 Order tabs `Kit` → `Web3.js v3` → `Rust` → `Web3.js (legacy)`; the legacy tab
-always goes last. Use these titles verbatim: Mintlify syncs tabs with the same
-title on a page. Token pages use one section per language instead, in the
+always goes last. Use these titles verbatim: tab groups with the same titles
+stay in sync on a page. Token pages use one section per language instead, in the
 order `### Kit`, `### Web3.js v3`, `### Rust`, `### Python`,
 `### Web3.js (legacy)`; the TypeScript sections use the storage keys
 `token-ts-kit`, `token-ts-web3v3`, and `token-ts-legacy`.

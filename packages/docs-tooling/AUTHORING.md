@@ -1,22 +1,22 @@
-# Authoring and tooling guide: Solana developer docs (Mintlify)
+# Authoring and tooling guide: Solana developer docs
 
-This file replaces `apps/docs/CLAUDE.md` and `apps/docs/AGENTS.md`. They moved
-here because Mintlify publishes every `.md`/`.mdx` file under `apps/docs` as a
-page, so agent/contributor notes cannot live in the Mintlify root.
+This file replaces `apps/docs/CLAUDE.md` and `apps/docs/AGENTS.md`. The content
+in `apps/docs` is rendered by `apps/web` with Fumadocs
+(`apps/web/source.config.ts`, `apps/web/src/lib/docs/`,
+`apps/web/src/components/docs/`) and served at `/developers/docs`; keep
+agent/contributor notes out of the content folder.
 
-Status: the Fumadocs to Mintlify migration is integrated on the
-`mintlify-migration` branch (WP12, review fixes WP13). Every page is converted
-(`convert --check` is clean on all 8,870 files, including the pages the WP8a
-writers edited), navigation, generators and edge routing are wired, and
-`docs-tooling verify` runs every repo-side check. What can only be checked on a
-deployed `*.mintlify.site` is listed under "Release gates" below.
+Status: every page is converted (`convert --check` is clean on all 8,870 files,
+including the pages the WP8a writers edited), navigation, generators and routing
+are wired, and `docs-tooling verify` runs every repo-side check. What can only
+be checked on a deployment is listed under "Release gates" below.
 
 ## Where things live
 
 | Path                                                             | What                                                                                                                                                                                                                  |
 | ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/docs/`                                                     | Mintlify project root (dashboard: "docs.json is in a subdirectory" = `/apps/docs`). No `package.json`.                                                                                                                |
-| `apps/docs/docs.json`                                            | Mintlify config (WP11 keys; `navigation` = `$ref` to `navigation/<lang>.json`, `redirects` = `$ref` to `redirects.json`).                                                                                             |
+| `apps/docs/`                                                     | Docs content root, read by apps/web (`source.config.ts`). No `package.json`.                                                                                                                                          |
+| `apps/docs/docs.json`                                            | Site config read by apps/web and docs-tooling: name, description, footer, `navigation` (`$ref` to `navigation/<lang>.json`), `search.prompt`, `seo.metatags`, `markdown.instructions`, `errors.404`.                  |
 | `apps/docs/developers/docs/**`                                   | English docs, served at `/developers/docs/**` (`index.mdx` = folder URL). Moved from `apps/docs/docs/**` (`/docs/**`) on 2026-10-16; see "The /developers/docs move".                                                 |
 | `apps/docs/developers/cookbook/**`                               | Cookbook (English only), `/developers/cookbook/**`.                                                                                                                                                                   |
 | `apps/docs/developers/bootcamp/**`                               | English bootcamp, `/developers/bootcamp/**`.                                                                                                                                                                          |
@@ -33,11 +33,13 @@ Rules for `apps/docs`:
 
 - Never add `.js`, `.jsx` or `.css` files except the owned globals
   (`run-examples.js`, `ask-ai.js`, `playground.js`, `video-chapters.js`,
-  `styles/*.css`, and the others in the `strayAssetsInDocsRoot` allowlist):
-  Mintlify injects every one of them on every page. `verify-urls` fails on
-  strays.
-- Never add `.md` notes (README, CLAUDE.md, AGENTS.md): they become pages.
-  `.mintignore` is defence in depth only.
+  `styles/*.css`, and the others in the `strayAssetsInDocsRoot` allowlist).
+  apps/web copies the scripts to `/docs-scripts/`
+  (`scripts/copy-docs-static.mjs`) and imports the styles
+  (`components/docs/docs-styles.ts`); a new file needs an entry in both and in
+  the allowlist. `verify-urls` fails on strays.
+- Never add `.md` notes (README, CLAUDE.md, AGENTS.md) to `apps/docs`. Put them
+  in `packages/docs-tooling`.
 - Folder paths are public URLs. Moving a file changes its URL and needs an
   `apps/web/rewrites-redirects.ts` redirect (page and `.md` twin).
 - Merging a duplicate page into another: move its unique content first, delete
@@ -46,11 +48,10 @@ Rules for `apps/docs`:
   `#anchor` gets no `.md` twin, so add that to `anchoredMdTwinRedirects`),
   repoint any existing redirect that targeted the removed page (no chains),
   update `navigation/en.json` and inbound links, then run `generate` and
-  `verify` (`gen:redirects` mirrors the result into `apps/docs/redirects.json`).
-  The 2026-10-15 merges are listed in the comment above those redirects.
-  Redirect sources keep the URL readers had (`/docs/...` for pages that moved
-  before 2026-10-16); destinations are always the final `/developers/docs/...`
-  page.
+  `verify`. `apps/web/rewrites-redirects.ts` is the only redirect source. The
+  2026-10-15 merges are listed in the comment above those redirects. Redirect
+  sources keep the URL readers had (`/docs/...` for pages that moved before
+  2026-10-16); destinations are always the final `/developers/docs/...` page.
 
 ### The /developers/docs move (2026-10-16)
 
@@ -64,23 +65,22 @@ and `apps/docs/<loc>/docs` to `apps/docs/developers/docs` and
   opens the search). Page-level redirects run first and point straight at the
   final page, so a page that moved is still one hop. Greek goes
   `/el/docs/x -> /docs/x -> /developers/docs/x` (two hops).
-- `apps/docs/redirects.json` (gen:redirects) mirrors the same rules for direct
-  `*.mintlify.site` traffic.
 - `verify-urls` follows every legacy URL through the apps/web redirects and
   fails a chain longer than two hops (`redirect-chain`) or one that ends on
   nothing (`redirect-dead`). `migration/move-map.csv` points at the new files
   and URLs; `migration/legacy-urls.*` keep the legacy URLs.
 - Internal links in content, snippets, generator sources, apps/web, ui-chrome
   and the i18n messages use `/developers/docs/...` directly.
-- Locale folders keep our codes (`ja`, `zh`, `pt`); Mintlify's
+- Locale folders keep our codes (`ja`, `zh`, `pt`); docs.json
   `navigation.languages` uses `jp`, `cn`, `pt-BR` (see `src/lib/locales.ts`).
 - Translations come from Lingo, never from agents.
 
 ## Commands
 
 ```bash
-pnpm dev:docs                                         # mint dev on :3003
-pnpm --filter @workspace/docs-tooling mint:validate   # npx mint@latest validate
+pnpm dev:web                                          # apps/web on :3000, docs at /developers/docs
+pnpm --filter @workspace/docs-tooling verify          # every repo-side check
+pnpm --filter @workspace/docs-tooling generate:check  # every generator --check
 pnpm --filter @workspace/docs-tooling test            # vitest (rules + fixtures)
 pnpm --filter @workspace/docs-tooling check-types
 pnpm --filter @workspace/docs-tooling cli <command>   # see below
@@ -111,7 +111,7 @@ Package scripts (`pnpm --filter @workspace/docs-tooling <script>`):
 | `gen:surfpool [--check\|--sync --ref main]`                               | `src/generators/surfpool-rpc.ts`                                         |
 | `gen:paths`, `gen:concepts`, `gen:addresses` `[--sync] [--check]`         | `src/generators/{paths,concepts,addresses}.ts`                           |
 | `gen:tags [--check]`                                                      | `src/generators/tags.ts`                                                 |
-| `gen:manifest`, `gen:llms`, `gen:redirects` `[--check]`                   | `src/manifest/cli.ts`                                                    |
+| `gen:manifest`, `gen:llms` `[--check]`                                    | `src/manifest/cli.ts`                                                    |
 | `generate` / `generate:check`                                             | every generator, in dependency order                                     |
 | `theme-check --base <url>`                                                | `scripts/theme-check.mjs` (Playwright, WP11)                             |
 
@@ -149,18 +149,18 @@ Discovery fails loudly (naming the file) on a missing `transform` export, a
 `order` values are distinct (a test enforces it), so the run order never depends
 on a name tie-break. Bands as integrated (`ORDER_BANDS` in `registry.ts`):
 
-| Order   | Transforms                                                                                                                                                    | Why there                                                                                                                                                                                                                                                                                                                                               |
-| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 10      | frontmatter                                                                                                                                                   | everything else sees normalized keys                                                                                                                                                                                                                                                                                                                    |
-| 80-90   | notes 80, mentions 81, side-by-side 82, scrolly 83, files 84, codetabs-examples 85, mermaid 86, return-type 87, terminal 88, api-method 89, code-reference 90 | they read RAW Code Hike fence syntax (`!tooltip`, `!!request`, `!hover`, `file=`) that fences.ts rewrites                                                                                                                                                                                                                                               |
-| 150     | inline-code                                                                                                                                                   | `_lang`code`_`, plus the unclosed `_lang`code`` / `\_lang`code`` that some translations left (known code languages only); residual has a pattern for each                                                                                                                                                                                               |
-| 210-300 | callout, cards, tabs, steps, accordion, embed, html, themed-image, images, codetabs 300                                                                       | Mintlify components                                                                                                                                                                                                                                                                                                                                     |
-| 610-650 | bootcamp, video-guides, learn, site-links 650                                                                                                                 | collections, then link rewriting                                                                                                                                                                                                                                                                                                                        |
-| 900     | fences                                                                                                                                                        | deliberately last among rewrites: skips fences still inside an unconverted Code Hike container; writes highlights as `highlight={…}` so a re-run can tell them from legacy brace meta                                                                                                                                                                   |
-| 910     | web3js-specifier                                                                                                                                              | `@solana/web3.js-(v3\|legacy)` -> `@solana/web3.js`; `restoreWeb3jsSpecifier()` is used by examples                                                                                                                                                                                                                                                     |
-| 920     | anchors                                                                                                                                                       | needs final headings and Step titles                                                                                                                                                                                                                                                                                                                    |
-| 930     | dedupe-lede                                                                                                                                                   | drops a first body paragraph that repeats `description` (Mintlify renders `description` as the lede; 51 EN pages, mostly RPC, showed it twice)                                                                                                                                                                                                          |
-| 950     | dollar-escape                                                                                                                                                 | Mintlify always runs remark-math (single-dollar inline math): two `$` in one paragraph, heading or table row render as KaTeX. Every unescaped prose `$` in such a block becomes `\$`; code and JSX attributes are untouched. `verify` fails on any remaining block (pages and snippets); a page that really wants math sets `math: true` in frontmatter |
+| Order   | Transforms                                                                                                                                                    | Why there                                                                                                                                                                                                                                                                                                                    |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 10      | frontmatter                                                                                                                                                   | everything else sees normalized keys                                                                                                                                                                                                                                                                                         |
+| 80-90   | notes 80, mentions 81, side-by-side 82, scrolly 83, files 84, codetabs-examples 85, mermaid 86, return-type 87, terminal 88, api-method 89, code-reference 90 | they read RAW Code Hike fence syntax (`!tooltip`, `!!request`, `!hover`, `file=`) that fences.ts rewrites                                                                                                                                                                                                                    |
+| 150     | inline-code                                                                                                                                                   | `_lang`code`_`, plus the unclosed `_lang`code`` / `\_lang`code`` that some translations left (known code languages only); residual has a pattern for each                                                                                                                                                                    |
+| 210-300 | callout, cards, tabs, steps, accordion, embed, html, themed-image, images, codetabs 300                                                                       | docs components                                                                                                                                                                                                                                                                                                              |
+| 610-650 | bootcamp, video-guides, learn, site-links 650                                                                                                                 | collections, then link rewriting                                                                                                                                                                                                                                                                                             |
+| 900     | fences                                                                                                                                                        | deliberately last among rewrites: skips fences still inside an unconverted Code Hike container; writes highlights as `highlight={…}` so a re-run can tell them from legacy brace meta                                                                                                                                        |
+| 910     | web3js-specifier                                                                                                                                              | `@solana/web3.js-(v3\|legacy)` -> `@solana/web3.js`; `restoreWeb3jsSpecifier()` is used by examples                                                                                                                                                                                                                          |
+| 920     | anchors                                                                                                                                                       | needs final headings and Step titles                                                                                                                                                                                                                                                                                         |
+| 930     | dedupe-lede                                                                                                                                                   | drops a first body paragraph that repeats `description` (apps/web renders `description` as the lede; 51 EN pages, mostly RPC, showed it twice)                                                                                                                                                                               |
+| 950     | dollar-escape                                                                                                                                                 | a renderer with single-dollar inline math (remark-math) reads two `$` in one paragraph, heading or table row as KaTeX. Every unescaped prose `$` in such a block becomes `\$`; code and JSX attributes are untouched. `verify` fails on any remaining block (pages and snippets); `math: true` in frontmatter exempts a page |
 
 Ownership decisions made at integration: `terminal.ts`/`mermaid.ts` (WP3) own
 terminal fences and mermaid fallbacks; fences.ts still has equivalent branches,
@@ -185,7 +185,7 @@ Rules:
    byte for byte (folded `description: >-` and multi-line plain scalars keep
    their line breaks), changed entries are re-rendered in place (80 columns),
    deleted entries go, new keys are appended. Keys that are not plain
-   identifiers are quoted (`"og:title": …`), as Mintlify's docs write them.
+   identifiers are quoted (`"og:title": …`).
 4. **Escape hatch:** `{ type: "raw", value: "..." }` is emitted verbatim (flow
    or inline). Use it only for syntax mdast cannot express.
 5. **Errors:** a transform that throws is reported as an `error` diagnostic and
@@ -229,103 +229,68 @@ would change without writing them.
 
 ## Assets
 
-Assets live at `apps/docs/docs-assets/<original public path>` and Mintlify
-serves them at `/docs-assets/<same path>`. Convert rewrote every `/assets/...`,
-`/images/...` and `/img/...` reference (WP2 `images.ts`, `themed-image.ts`,
-`html.ts`); new content must use `/docs-assets/...` (`verify` checks every
-reference exists and every `-light` themed variant has its dark twin).
-`migration/asset-refs.csv` lists every reference, its file and its rewritten
-URL. All 130 referenced files came from `apps/docs/public`; none had to be
-copied from `apps/web/public`. `apps/web/public` keeps its own copies for
-existing hotlinks.
+Assets live at `apps/docs/docs-assets/<original public path>` and apps/web
+serves them at `/docs-assets/<same path>` (`scripts/copy-docs-static.mjs` copies
+them into `public/`). Convert rewrote every `/assets/...`, `/images/...` and
+`/img/...` reference (WP2 `images.ts`, `themed-image.ts`, `html.ts`); new
+content must use `/docs-assets/...` (`verify` checks every reference exists and
+every `-light` themed variant has its dark twin). `migration/asset-refs.csv`
+lists every reference, its file and its rewritten URL. All 130 referenced files
+came from `apps/docs/public`; none had to be copied from `apps/web/public`.
+`apps/web/public` keeps its own copies for existing hotlinks.
 
-## Site config, theme and Mintlify plan limits (WP11)
+## Site config and theme (WP11)
 
-`apps/docs/docs.json` top-level keys (everything except `navigation` and
-`redirects`) are the WP11 site config. `apps/docs/styles/theme.css` is the brand
-theme. Brand files are in `apps/docs/docs-assets/brand/`:
+`apps/docs/docs.json` holds the site config apps/web and docs-tooling read (keys
+listed under "Where things live"). `apps/docs/styles/theme.css` is the brand
+theme; apps/web imports it with the other `styles/*.css` files
+(`components/docs/docs-styles.ts`). Brand files are in
+`apps/docs/docs-assets/brand/`:
 
 - `solana-logo-on-light.svg` (black wordmark) and `solana-logo-on-dark.svg`
   (white wordmark). Both are copied from `packages/ui-chrome`
   `logotype.inline.svg`.
 - `favicon.svg` and `favicon.ico`.
-- Fonts are in `apps/docs/fonts/` (served at `/fonts/*`, proxied by apps/web):
-  ABC Diatype (300/400/500/700 plus italics), ABC Monument Extended (400/700)
-  and ABC Favorit Mono (variable). All are woff2 copies of `apps/web/src/fonts`.
-  docs.json `fonts.*.source` must start with `fonts/` (see theme.css section 1).
+- Fonts are in `apps/docs/fonts/` (copied to `/fonts/*` by apps/web
+  `scripts/copy-docs-static.mjs`): ABC Diatype (300/400/500/700 plus italics),
+  ABC Monument Extended (400/700) and ABC Favorit Mono (variable). All are woff2
+  copies of `apps/web/src/fonts`.
 
 Theme rules:
 
-- **Fonts.** `docs.json` `fonts` can load only one weight each for headings and
-  body (Diatype 500 and 400). `theme.css` declares the other faces with
-  `@font-face`. Code uses ABC Favorit Mono. Monument is opt-in through
-  `className="solana-display"` for hub and landing headings. CSS font URLs must
-  be absolute (`/docs-assets/...`), because Mintlify inlines CSS into the page.
+- **Fonts.** `theme.css` declares the faces with `@font-face`. Code uses ABC
+  Favorit Mono. Monument is opt-in through `className="solana-display"` for hub
+  and landing headings. CSS font and image URLs must be absolute (`/fonts/...`,
+  `/docs-assets/...`).
 - **Colors.** Light mode links use `#7A2FE0` (6.3:1 on white). Dark mode links
   use `#B78AFF` (8.1:1 on black). The dark page background is `#000`, like
   solana.com.
-- **Top bar.** The docs use Mintlify's own navbar (logo, search, language and
-  theme) with no solana.com links; the solana.com header appears only on
-  solana.com pages such as /developers. (An injected bundle of the ui-chrome
-  header was tried and removed on 2026-10-16; see git history for
-  `src/header-bundle`.) Links from solana.com pages into the docs open in a new
-  tab (`isDocsHref` in packages/ui-chrome/src/url-config.ts).
-- **Tab divider and external tab.** The divider after tab 4 (Markets) and
-  pushing any `http` tab to the far end are done in CSS. External tabs need an
-  absolute `href`. Mintlify renders a relative tab `href` as `/`.
-- **RTL (`ar`).** Mintlify never sets `dir="rtl"`. It sets `<html lang="ar">`
-  only after hydration. `theme.css` detects Arabic from `html[lang="ar"]` or,
-  without JS, from `/ar/` tab and sidebar links. It flips the text regions
-  (content, header, sidebar, TOC, pagination) to RTL and keeps code LTR. The
-  page frame (sidebar position) stays LTR.
-- **No JS.** Mintlify always ships `class="dark"` without JS, so no-JS readers
-  get dark mode. The theme is built for that case too.
-- **Verify** with `migration/wp11-theme-check.mjs --base <url>`. It is
+- **Top bar.** The docs header is apps/web
+  `src/app/[locale]/developers/docs-header.tsx` (logo, tabs, search, theme and
+  language), shared with the /developers landing and kept to one row at every
+  width. Tabs and labels come from the docs navigation
+  (`src/data/developers/docs-nav.ts`), including the divider after tab 4
+  (Markets, `DOCS_TAB_DIVIDER_AFTER`). Links from other solana.com pages into
+  the docs open in a new tab (`isDocsHref` in
+  packages/ui-chrome/src/url-config.ts).
+- **RTL (`ar`).** apps/web sets `<html lang="ar" dir="rtl">` (rtl-detect in
+  `src/app/[locale]/layout.tsx`). `theme.css` flips the text regions (content,
+  header, sidebar, TOC, pagination) to RTL and keeps code LTR.
+- **Theme without JS.** `DocsThemePrepaint` (apps/web
+  `src/app/[locale]/developers/theme-prepaint.tsx`) sets the theme class and
+  `html[data-theme-preference]` before paint. Without JS neither is set; the
+  theme must read in that case too.
+- **Verify** with
+  `pnpm --filter @workspace/docs-tooling theme-check --base <url>`
+  (`scripts/theme-check.mjs`, default base `http://localhost:3000`). It is
   Playwright-based and covers light and dark, JS on and off, desktop and mobile.
-  Run it after every Mintlify version bump, because the tab, footer and top-row
-  selectors are not a documented API.
+  Run it after theme or docs header changes.
 
-Consent and analytics:
-
-- GTM (`GTM-TNX63HZ`) and PostHog (the production `phc_` key, events sent to
-  `https://us.i.posthog.com` as today) are loaded by Mintlify only when
-  analytics consent is true. Mintlify's client renders the GTM script only when
-  consent is true, and the PostHog mediator is created the same way. Analytics
-  run on production deployments only, never on `mint dev`.
-- Consent comes from **Mintlify's built-in cookie banner**. It is enabled in the
-  dashboard (project settings, privacy / cookie consent), not in `docs.json`.
-  When the banner is on, it is the only consent source.
-- `integrations.cookies` (`cookie_consent` = `"true"`) is the fallback when the
-  banner is off. Mintlify compares the localStorage string exactly. solana.com
-  now stores `{"value":true,"timeToExpire":…}`, so only the legacy `"true"`
-  value matches. With the banner off, analytics therefore stay off for almost
-  everyone, which fails closed.
-- Consent given in the solana.com banner (apps/web) does not carry over to
-  Mintlify's banner, which uses its own c15t storage. The reverse is also true.
-  Readers may be asked twice.
-
-Plan limits. The project runs on Mintlify **Hobby (Starter, free)**:
-
-| Feature                                                                                                | Hobby                                            | Needs                                               |
-| ------------------------------------------------------------------------------------------------------ | ------------------------------------------------ | --------------------------------------------------- |
-| Custom CSS (`styles/*.css`), custom JS, fonts, logos, colors, navbar, footer, banner                   | yes                                              |                                                     |
-| Built-in search (`search.prompt`)                                                                      | yes; local `mint dev` search needs `mint login`  | search filters: Enterprise                          |
-| Contextual menu (`copy`, `view`, `chatgpt`, `claude`)                                                  | yes                                              | `assistant` option: Pro; `download-pdf`: Enterprise |
-| SEO (`seo.metatags` canonical, `indexing: all`, organization JSON-LD), sitemap, `llms.txt` (generated) | yes                                              |                                                     |
-| Markdown for agents (`.md`, `markdown.instructions`), search MCP server                                | yes                                              |                                                     |
-| Analytics integrations (GTM, PostHog) + `integrations.cookies`                                         | yes (configured in docs.json)                    |                                                     |
-| Built-in cookie consent banner                                                                         | dashboard toggle; confirm it is offered on Hobby |                                                     |
-| Page feedback (thumbs, suggest edits, raise issue)                                                     | **no**                                           | Pro                                                 |
-| AI Assistant, agent, automations, AI translations                                                      | **no**                                           | Pro                                                 |
-| Preview deployments                                                                                    | **no**; check branches with `mint dev`           | Pro                                                 |
-| Mintlify platform analytics dashboard                                                                  | **no** (use GTM and PostHog)                     | Pro                                                 |
-| Static files `.txt`, `.pdf`, `.xml`, `.csv`, `.zip`                                                    | **no**, they return 404                          | Enterprise                                          |
-| Static export or self-hosting, white labeling (removing "Powered by Mintlify")                         | **no**                                           | Enterprise                                          |
-| Editor seats                                                                                           | 5                                                | Pro: unlimited                                      |
-
-`feedback` has no `docs.json` key. Enabling it in the dashboard is a no-op on
-Hobby. Do not disable `integrations.telemetry`: that also turns off feedback
-once the plan has it.
+Consent and analytics: GTM and PostHog are configured in apps/web
+(`src/components/GTMTrackingSnippet.tsx`,
+`src/app/components/posthog/PostHogProvider.tsx`) and follow the solana.com
+cookie consent banner (`CookieConsent`), the same as every other solana.com
+page. GTM loads on production deployments only.
 
 ## Integration pipeline (WP12)
 
@@ -337,11 +302,10 @@ Order (each step is idempotent; re-run from the top after any change):
 3. `generate`: `examples:build`, `gen:surfpool`, `gen:paths`,
    `gen:concepts --sync`, `gen:addresses --sync` (concepts reads the path pages,
    so this order), `nav:build`, `gen:tags` (after any tab-root title or
-   description change, or a new hub), `gen:manifest`, `gen:llms`,
-   `gen:redirects` (manifest, then llms, then redirects).
-4. `verify` (below), then in `apps/docs`: `mint validate`,
-   `mint broken-links --check-snippets --check-redirects`, and
-   `mint broken-links --check-anchors` (reported).
+   description change, or a new hub), `gen:manifest`, `gen:llms` (manifest, then
+   llms).
+4. `verify` (below) and `generate:check`, then build apps/web
+   (`pnpm --filter solana-com build`), which compiles every English page.
 5. After convert rewrites locale files:
    `node scripts/i18n/rekey-lock.mjs --rehash`, so converted targets do not read
    as "diverged from Lingo lock".
@@ -379,36 +343,38 @@ wording changed on purpose, and every original link target is still linked:
 
 Locale copies of these hubs keep the old structure until the next Lingo run.
 
-`scripts/crawl-mint.py --base http://localhost:3333` fetches every page in
-`generated/pages.json` from a running `mint dev` (or preview) and checks HTTP
-200 plus the page title in the HTML.
+`scripts/crawl-docs.py --base http://localhost:3000` fetches every page in
+`generated/pages.json` from a running apps/web (`pnpm dev:web`, or a preview
+deployment) and checks HTTP 200 plus the page title in the HTML.
 
 ### Links and anchors
 
 - `site-links` (650): root-relative links to pages apps/web serves (`/skills`,
-  `/discord`, `/developers/templates`, …) become `https://solana.com/…`;
-  Mintlify serves only `/developers/docs/**`, `/learn/<article>`,
+  `/discord`, `/developers/templates`, …) become `https://solana.com/…`; the
+  docs routes are only `/developers/docs/**`, `/learn/<article>`,
   `/developers/cookbook/**`, `/developers/bootcamp/**`, `/docs-assets/**`
   (optionally locale-prefixed; old `/docs/**` links are left alone because they
   redirect). Bare relative links are resolved the way the legacy browser did.
   GFM autolinks that swallowed CJK/Arabic punctuation are cut.
-- `anchors` (920): Mintlify heading ids come from @sindresorhus/slugify
-  (`actions.json` -> `#actions-json`), not github-slugger (`#actionsjson`).
-  Fragments that pointed at a legacy id are rewritten to the Mintlify id of the
-  same heading; English fragments on translated pages are mapped by heading
-  position when the outlines match. Write new anchors in Mintlify form
-  (`src/lib/slugs.ts`). Fragments that match nothing are warnings: they were
-  already dead on the legacy site.
+- `anchors` (920): docs heading ids come from @sindresorhus/slugify
+  (`actions.json` -> `#actions-json`), not github-slugger (`#actionsjson`):
+  `docsSlugger` in `src/lib/slugs.ts`, and `docsSlug` in apps/web
+  (`remark-docs-compat.mjs`, `rehype-docs-compat.mjs`) produces the same ids.
+  Fragments that pointed at a legacy id are rewritten to the docs id of the same
+  heading; English fragments on translated pages are mapped by heading position
+  when the outlines match. Write new anchors in that form. Fragments that match
+  nothing are warnings: they were already dead on the legacy site.
 - Step titles get ids too. Set `id` on a `<Step>` if inbound anchor links matter
   more than the generated slug.
 
 ## Reading without JavaScript
 
-Every page must read completely with JavaScript off (decisions.md). Mintlify
-server-renders inactive Tabs/CodeGroup panels but hides them;
-`apps/docs/styles/nojs.css` un-hides and stacks them when
-`html:not([data-theme-preference])` (Mintlify's head script sets that attribute;
-without JS it never appears). Patterns:
+Every page must read completely with JavaScript off (decisions.md). apps/web
+server-renders inactive Tabs/CodeGroup panels but hides them
+(`components/docs/docs-components.client.tsx`); `apps/docs/styles/nojs.css`
+un-hides and stacks them when `html:not([data-theme-preference])` (apps/web's
+`DocsThemePrepaint` head script sets that attribute; without JS it never
+appears). Patterns:
 
 | Need                                  | Use                                                                                                                                                                                                                                                                                                                                                                      | Never                                                                                         |
 | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
@@ -422,83 +388,39 @@ without JS it never appears). Patterns:
 | Snippets that must render server-side | default-imported MDX snippet with string props, or page-local `export const`                                                                                                                                                                                                                                                                                             | `/snippets/*.jsx` components or JSX expression children `{"…"}` inside snippets (client-only) |
 | Code in several languages             | `<CodeGroup>` (titles = tab labels; without JS panels are numbered `1 · …` to match the tab row)                                                                                                                                                                                                                                                                         |                                                                                               |
 
-`expandable` code blocks: Mintlify server-renders every line but collapses the
-block to 190px behind a "See all N lines" button that needs JS. `nojs.css`
-un-collapses them without JS (in `@layer base`, because the viewport's
-`overflow-y-hidden!` is an important utility) and hides the inert button.
-`theme-check` fails if any code block is clipped or a "See all" button shows
-with JS off.
+`expandable` code blocks: apps/web server-renders every line but collapses a
+block longer than eight lines to 190px behind an expand button that needs JS
+(`CodeBody` in `components/docs/docs-components.tsx`). `nojs.css` un-collapses
+them without JS and hides the inert button. `theme-check` fails if any code
+block is clipped or the expand button shows with JS off.
 
-Known limits (accepted losses, see below): without JS Mintlify always serves
-`<html class="dark">`, so no-JS readers get dark mode (themed images still pair
-correctly). Stacked CodeGroup panels are labelled `n · <language>` (Mintlify
-puts the tab title only on the tab button, and the panel has no
-`aria-labelledby`), so match them to the numbered tab row (`2 · Kit`).
+Known limit: stacked CodeGroup panels without JS are labelled `n · <language>`,
+so match them to the numbered tab row (`2 · Kit`).
 
 ## Accepted losses and release gates
 
-Accepted losses (platform limits, nothing in content can fix them; raise with
-Mintlify if they matter):
+Accepted losses:
 
-- **No-JS light mode.** Without JS every page renders dark, on `mint dev` and
-  per Mintlify's client code also in production. With JS, light and dark both
-  work. This is a partial loss against "dark and light everywhere" for no-JS
-  readers only.
 - **No-JS CodeGroup labels** are numbered languages, not tab titles (above).
 - **Iframes** (Commerce Kit playground, YouTube, 2048) never server-render;
   every one has a plain link next to it.
-- **`<title>` from `seoTitle`** (392 pages) and the Code Hike hover links, as
-  listed under "Component and content notes".
+- **Code Hike hover links**, as listed under "Component and content notes".
 
-Release gates: check these on the deployed `*.mintlify.site` (and through
-solana.com) before cutover. `mint dev` cannot answer them:
+Release gate: check this before the docs leave the fork.
 
-1. **Canonical and `og:url`.** Mintlify builds them as
-   `seo.metatags.canonical + page.href`; a page's own `canonical` frontmatter
-   wins. On `mint dev` `href` carries the dev-only `src/_props/` prefix
-   (`https://solana.com/src/_props/docs/core/wallets`). Checked on `mint dev`: a
-   page-level `canonical: https://solana.com/ja/docs/core/accounts` renders
-   exactly. Locale pages that exist get a canonical; untranslated locale URLs
-   404 on Mintlify itself and are served the English page (with the English
-   canonical) by the apps/web fallback rewrite. If production also shows a wrong
-   path, stamp `canonical` frontmatter on every page with a transform.
-2. **`/developers/docs/tools`.** On `mint dev` it 307s to its first sub-page.
-   Mintlify's dev page lookup only tries `src/_props/<slug>.mdx`, never
-   `<slug>/index.mdx`, and falls back to the first nav page under the prefix.
-   For `/developers/docs/tools` that page (commerce-kit, in Payments) comes
-   before the index in nav order, so dev redirects. Production resolves pages
-   differently. The apps/web `MINTLIFY_INDEX_SHADOWED` rewrite to
-   `/<section>/index` keeps solana.com correct either way; remove it only if the
-   deployed site answers 200. (`/docs/tokenization` was the second case until
-   its index was merged into `/developers/docs/assets#tokenization`; it is now a
-   redirect.)
-3. **`.md` twins and `Accept: text/markdown`** are served by Mintlify (all 404
-   on `mint dev`).
-4. **Proxy headers.** Mintlify accepts the proxied Host/Origin, including the
-   analytics POST to `/_mintlify/api/v1/e`.
-5. **Consent.** The dashboard cookie banner is on, and GTM/PostHog load only
-   after Accept.
-6. **The origin serves pages publicly.** `MINTLIFY_ORIGIN`
-   (apps/web/apps-urls.ts, default `https://solana-f31f4a8d.mintlify.site`) must
-   answer a docs page with `200` and the page HTML. At WP12 review it answered
-   every request with a `302` to Mintlify's end-user auth
-   (`app.mintlify.com/api/end-user-auth/deployment?next=solana.mintlify.io`), so
-   the deployment was either auth-protected or not this project. Confirm the
-   subdomain is ours and public, then
-   `curl -sI "$MINTLIFY_ORIGIN/developers/docs/core/accounts"` returns 200.
-7. **Repository links.** Path pages tell readers to clone `catmcgee/solana-com`
-   on `mintlify-migration` (checkout and paywall `Run it on your machine`,
-   issue-asset `demo.ts`), because the examples exist only there. After the
-   merge into `solana-foundation/solana-com`, switch them back:
-   `grep -rn "catmcgee/solana-com" apps/docs/developers/docs`.
+1. **Repository links.** Path pages tell readers to clone the `docs-redesign`
+   branch of `catmcgee/solana-com` (checkout and paywall
+   `Run it on your machine`, issue-asset `demo.ts`), because the examples exist
+   only there. After the merge into `solana-foundation/solana-com`, switch them
+   back: `grep -rn "catmcgee/solana-com" apps/docs/developers/docs`.
 
 ## Component and content notes from the work packages
 
 - **Dollar signs (WP12 `dollar-escape.ts`).** Write prose amounts as `\$20`.
-  Mintlify parses `$…$` as KaTeX, so "\$5 or \$50" written without the
-  backslashes renders as math italic "5or" with the dollars gone. Convert
-  escapes them in converted pages and `verify` fails on any that remain
-  (hand-written pages and snippets included).
+  Renderers with single-dollar math parse `$…$` as KaTeX, so "\$5 or \$50"
+  written without the backslashes would render as math italic "5or" with the
+  dollars gone. Convert escapes them in converted pages and `verify` fails on
+  any that remain (hand-written pages and snippets included).
 - **CodeTabs (WP12 `codetabs.ts`).** Non-example `<CodeTabs>` became
   `<CodeGroup>` (one fence: a plain titled fence; prose between tabs: `<Tabs>`
   with one `<Tab>` per fence). `storage`/`flags`/`runner` are dropped; there is
@@ -507,9 +429,10 @@ solana.com) before cutover. `mint dev` cannot answer them:
   whole-line highlight; `!collapse(…) collapsed` became block-level
   `expandable`.
 - **Frontmatter (WP2).** `seoTitle` -> `"og:title"` + `"twitter:title"`;
-  Mintlify's `<title>` is built from `title` (the old `seoTitle || h1 || title`
-  is a known SEO loss, 392 pages). `docs/tools/microscope` keeps an external
-  `url` (sidebar link); no other page may have `url`.
+  apps/web builds `<title>` from `og:title` when set, else
+  `<title> - Solana Developer Docs` (`src/lib/docs/metadata.ts`).
+  `docs/tools/microscope` keeps an external `url` (sidebar link); no other page
+  may have `url`.
 - **RPC (WP4).** API method pages must not use `mode: wide` (RequestExample
   needs the default layout). Nested fields: the first level is `defaultOpen`.
   Surfpool snippets are generated (`gen:surfpool`) from `data/surfpool/*.json`;
@@ -522,12 +445,9 @@ solana.com) before cutover. `mint dev` cannot answer them:
   request is read from the first `<RequestExample>` fence (`bash cURL` with
   `-d '<json>'`, or `json WebSocket`), whose `"method"` must match the page
   slug. `verify` ("RPC Try it", `src/verify/rpc-try-it.ts`) fails on an English
-  page that breaks this. Mintlify's native API playground is not used: it sends
-  a named-field object built from `<ParamField body>`, not a positional `params`
-  array, has one fixed server per page, and proxies through Mintlify.
-  Mainnet-beta answers browsers only from allowlisted origins (solana.com): on
-  localhost or a `*.mintlify.app` preview it returns 403, which the dialog
-  explains.
+  page that breaks this. Mainnet-beta answers browsers only from allowlisted
+  origins (solana.com): on localhost or a Vercel preview it returns 403, which
+  the dialog explains.
 - **Runnable examples (WP5).** Write code with `#region` markers in
   `packages/docs-examples`, add the block to that folder's `blocks.json`, record
   with
@@ -553,8 +473,8 @@ solana.com) before cutover. `mint dev` cannot answer them:
   href, greyed, tooltip). `playground.js` (styles `styles/playground.css`) turns
   it into `<origin>/github.com/<source>/<data-pg-open>` when its `data-pg-kind`
   (`src/examples/playground.ts`) is in `CONFIG.enabledKinds`. `source` is the
-  one owner/repo/ref value in `playground.js`
-  (`catmcgee/solana-com/tree/mintlify-migration`, which becomes
+  one owner/repo/ref value in `playground.js` (`CONFIG.source`, currently
+  `catmcgee/solana-com/tree/docs-redesign`, which becomes
   `solana-foundation/solana-com/tree/main` after the merge). Never prefix
   `https://`, because the playground router then rejects the URL. The
   playground's GitHub import only accepts Anchor/Native programs ("Could not
@@ -594,9 +514,9 @@ solana.com) before cutover. `mint dev` cannot answer them:
   than 80 characters).
 - **Cross-tab cards (2026-10-16, `cross-tab-cards.ts`).** A `<Card>` on a
   Payments, Assets or Markets page whose href is filed under another tab in
-  `navigation/en.json` gets Mintlify's `arrow` prop (a small ↗, server-rendered,
-  light and dark). After moving pages between tabs run `convert`;
-  `convert --check` fails while a card is missing its arrow.
+  `navigation/en.json` gets the `arrow` prop (a small ↗, server-rendered, light
+  and dark). After moving pages between tabs run `convert`; `convert --check`
+  fails while a card is missing its arrow.
 - **Program examples in Playground.** `packages/docs-examples/programs/<name>/`
   holds Anchor workspaces whose files a page shows through `blocks.json` (e.g.
   `programs/build-first-program`, the "Build your first program" page). The
@@ -631,10 +551,9 @@ even when a locale has no concepts JSON yet: the chip text is English, but the
 link goes to the translated page.
 
 **Rule for anything that must read without JavaScript.** Never use `{…}`
-expression children in an MDX snippet. Mintlify's server render drops them, and
-the text then exists only in the client payload. Raw `<nav>`, `<details>`,
-`<noscript>` and `<abbr>` are dropped too. Tooltip `tip`/`headline`/`cta`/`href`
-are client-only.
+expression children in an MDX snippet, or raw `<nav>`, `<details>`, `<noscript>`
+and `<abbr>`: use the patterns below and under "Reading without JavaScript",
+which have no-JS styles.
 
 | Want                                     | Write                                                                                                                                                                                                                                                                                                      |
 | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -837,7 +756,7 @@ Advanced code blocks with:
 
 ##### Mermaid Diagrams
 
-Flowcharts and sequence diagrams rendered from markdown. In the Mintlify project
+Flowcharts and sequence diagrams rendered from markdown. In the current docs
 each fence is pre-rendered to a themed SVG pair (diagram system, both modes,
 readable without JS): after adding or editing a fence run
 `pnpm --filter @workspace/docs-tooling convert`, then

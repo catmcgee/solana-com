@@ -7,10 +7,9 @@ file under `cookbook/` is real, runnable, and exercised against a local
 so SDK renames or signature changes turn into red CI runs instead of rotted
 documentation.
 
-Docs pages never read these files directly (Mintlify runs none of our code).
-Instead, `blocks.json` files next to the code declare **blocks** (one or more
-flavour tabs, each a `#region` slice), and
-`pnpm --filter @workspace/docs-tooling examples:build` turns them, plus the
+Docs pages never read these files directly. Instead, `blocks.json` files next to
+the code declare **blocks** (one or more flavour tabs, each a `#region` slice),
+and `pnpm --filter @workspace/docs-tooling examples:build` turns them, plus the
 recorded `.output.txt` files, into committed snippets under
 `apps/docs/snippets/examples/<dir>/<block>.mdx`. Pages import them:
 
