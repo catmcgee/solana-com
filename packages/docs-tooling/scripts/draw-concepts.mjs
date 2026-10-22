@@ -520,6 +520,98 @@ function ed25519(p, { x0, y0, x1, y1 }) {
   };
 }
 
+/* One transaction, step by step (diagrams/transaction-flow): lanes left to
+ * right, then the messages in order. `yours` marks the lanes that hold the
+ * reader's code. Checked against core/transactions, fees, pda, and cpi:
+ * signatures are verified and the fee is charged before any instruction
+ * runs, and the fee stays charged if execution fails (so it sits outside
+ * the atomic box); a PDA signs only through its own program's
+ * invoke_signed. */
+const LANES = [
+  { title: "Your app", desc: ["Your code,", "offchain"], yours: true },
+  { title: "Wallet", desc: ["Signs and", "pays fees"] },
+  { title: "Network", desc: ["Validators", "verify and run"] },
+  { title: "Your program", desc: ["Your code,", "onchain"], yours: true },
+  { title: "Token Program", desc: ["An existing", "program"] },
+  { title: "Accounts", desc: ["Onchain", "state"] },
+];
+const SEQ = [
+  {
+    from: 0,
+    self: true,
+    label: "build transaction",
+    sub: "instructions, recent blockhash",
+    step: ["Build the transaction: instructions", "and a recent blockhash."],
+  },
+  { from: 0, to: 1, label: "ask to sign", step: ["Ask the wallet to sign."] },
+  {
+    from: 1,
+    to: 0,
+    ret: true,
+    label: "signature",
+    step: ["Sign and return the signature."],
+  },
+  {
+    from: 0,
+    to: 2,
+    label: "send transaction through RPC",
+    step: ["Send the transaction through RPC."],
+  },
+  {
+    from: 2,
+    self: true,
+    label: "verify signatures",
+    step: ["Verify every signature."],
+  },
+  {
+    from: 2,
+    to: 1,
+    label: "charge fee",
+    note: "Charged even if the transaction fails",
+    step: [
+      "Charge the fee to the fee payer. It is",
+      "charged even if the transaction fails.",
+    ],
+  },
+  { atomic: "start" },
+  {
+    from: 2,
+    to: 3,
+    label: "run instruction",
+    step: ["Run your program’s instruction."],
+  },
+  { from: 3, self: true, label: "derive PDA", step: ["Derive a PDA."] },
+  { from: 3, to: 5, label: "read state", step: ["Read state."] },
+  {
+    from: 3,
+    to: 4,
+    label: "transfer (CPI)",
+    label2: "PDA signs",
+    step: ["Transfer tokens through a CPI.", "The PDA signs."],
+  },
+  {
+    from: 4,
+    to: 5,
+    label: "write balances",
+    step: ["Write the new balances."],
+  },
+  { from: 4, to: 3, ret: true, label: "OK", step: ["Return OK."] },
+  { from: 3, to: 5, label: "write state", step: ["Write state."] },
+  { from: 3, to: 2, ret: true, label: "OK", step: ["Return OK."] },
+  { atomic: "end" },
+  {
+    from: 2,
+    to: 0,
+    ret: true,
+    label: "confirmation (signature status)",
+    step: ["Report the confirmation (signature status)."],
+  },
+];
+const FLOW_LABEL =
+  "One transaction, step by step. Your app builds a transaction, the wallet signs it, and your app sends it to the network through RPC. The network verifies the signatures and charges the fee, then runs your program's instruction all or nothing: your program derives a PDA, reads state, calls the Token Program through a CPI that the PDA signs, and writes state. Your app then gets the confirmation.";
+const LAYERS_LABEL =
+  "Layers, top to bottom. The Solana network: validators that each keep the same accounts, where some accounts hold programs (your program, the Token Program) and others hold state (token balances, your program's data). Below it, apps (payments, games, markets) send transactions and read accounts through RPC. Below the apps, wallets hold keys and sign. At the bottom, users.";
+
 const FIGURES = {
   /* ------------------------------------------------------ accounts */
 
@@ -1734,6 +1826,255 @@ const FIGURES = {
     // The links sit inside the network card: lift them above its fill.
     for (let i = 0; i < 5; i++) p.front.push(p.back.pop());
     return [W, net.bottom + 24, label];
+  },
+
+  "diagrams/solana-layers": (p) => {
+    // Layers, top to bottom: the network (validators, and the accounts
+    // they all keep: programs and state), then apps, wallets, and users.
+    // Apps reach the network through RPC: transactions call programs
+    // (solid), reads look at accounts (dashed).
+    const c = p.c;
+    const label = LAYERS_LABEL;
+    const x = 24,
+      w = W - 48,
+      ix = x + 16,
+      iw = w - 32;
+    const vw = 104,
+      vgap = (iw - 5 * vw) / 4,
+      vh = 40;
+    const vy = 24 + HEAD_DESC;
+    const ay = vy + vh + 24; // "Accounts" heading
+    const cy = ay + 48; // program and state cards
+    const cw = (iw - 16) / 2;
+    const tmp = { rows: [["Your program"], ["Token Program"]] };
+    const cardH = HEAD + tmp.rows.length * ROW;
+    const net = p.card({
+      x,
+      y: 24,
+      w,
+      title: "Solana network",
+      tag: "onchain",
+      desc: "Validators: computers that each keep the same copy of every account",
+      accent: true,
+      minH: cy + cardH + 16 - 24,
+    });
+    const nodes = [];
+    for (let i = 0; i < 5; i++) {
+      const nx = ix + i * (vw + vgap);
+      p.rect(nx, vy, vw, vh);
+      p.text(nx + 16, vy + vh / 2, "Validator", { fill: c.ink2 });
+      nodes.push(nx);
+    }
+    for (let i = 0; i < 4; i++)
+      p.edge(
+        [
+          [nodes[i] + vw, vy + vh / 2],
+          [nodes[i + 1], vy + vh / 2],
+        ],
+        { head: false },
+      );
+    for (let i = 0; i < 4; i++) p.front.push(p.back.pop());
+    p.hline(x + 1.25, x + w - 1.25, ay - 12);
+    p.text(ix, ay + 8, "Accounts", { size: 13, weight: 500 });
+    p.text(ix, ay + 26, "Store data, like files on a computer", {
+      fill: c.ink2,
+    });
+    const prog = p.card({
+      x: ix,
+      y: cy,
+      w: cw,
+      title: "Programs",
+      tag: "executable code",
+      rows: [["Your program"], ["Token Program"]],
+    });
+    const state = p.card({
+      x: ix + cw + 16,
+      y: cy,
+      w: cw,
+      title: "State",
+      tag: "data",
+      rows: [["Token balances"], ["Your program’s data"]],
+    });
+    const apy = net.bottom + 72;
+    const bw = (iw - 32) / 3;
+    const apps = p.card({
+      x,
+      y: apy,
+      w,
+      title: "Apps",
+      tag: "offchain",
+      desc: "Your code: websites, mobile apps, and servers",
+      minH: HEAD_DESC + 40 + 16,
+    });
+    ["Payments", "Games", "Markets"].forEach((t, i) => {
+      const bx = ix + i * (bw + 16);
+      p.rect(bx, apy + HEAD_DESC, bw, 40);
+      p.text(bx + 16, apy + HEAD_DESC + 20, t, { fill: c.ink2 });
+    });
+    const tx = prog.x + 40,
+      rx = state.x + 40;
+    p.edge(
+      [
+        [tx, apps.y],
+        [tx, prog.bottom],
+      ],
+      { label: "send transactions through RPC" },
+    );
+    p.edge(
+      [
+        [rx, apps.y],
+        [rx, state.bottom],
+      ],
+      { dashed: true, label: "read accounts through RPC" },
+    );
+    // Both cross the network card's bottom edge: lift them above its fill.
+    p.front.push(p.back.pop(), p.back.pop());
+    const wal = p.card({
+      x,
+      y: apps.bottom + 56,
+      w,
+      title: "Wallets",
+      tag: "offchain",
+      desc: "Hold users’ keys: sign in and approve transactions",
+    });
+    const usr = p.card({
+      x,
+      y: wal.bottom + 56,
+      w,
+      title: "Users",
+      desc: "People using your app",
+    });
+    p.edge(
+      [
+        [tx, wal.y],
+        [tx, apps.bottom],
+      ],
+      { label: "sign" },
+    );
+    p.edge(
+      [
+        [tx, usr.y],
+        [tx, wal.bottom],
+      ],
+      { label: "approve" },
+    );
+    return [W, usr.bottom + 24, label];
+  },
+
+  "diagrams/transaction-flow": (p) => {
+    // A sequence diagram of one transaction: six lanes, the two that hold
+    // your code drawn in the accent.
+    const c = p.c;
+    const pitch = 112,
+      x0 = (W - 6 * pitch) / 2,
+      hw = pitch - 8;
+    const cx = (i) => x0 + pitch * i + pitch / 2;
+    const top = 24,
+      hh = 76;
+    LANES.forEach((l, i) => {
+      const hx = cx(i) - hw / 2;
+      p.rect(hx, top, hw, hh, {
+        stroke: l.yours ? c.accent : c.line,
+        sw: l.yours ? 1.25 : 1,
+      });
+      p.text(cx(i), top + 23, l.title, {
+        size: 13,
+        weight: 500,
+        anchor: "middle",
+      });
+      l.desc.forEach((d, k) =>
+        p.text(cx(i), top + 41 + k * 18, d, {
+          anchor: "middle",
+          fill: l.yours && k === 0 ? c.accent : c.ink2,
+        }),
+      );
+    });
+    // Label backing: lifelines are dotted and run under message labels.
+    const back = (x, y, s, anchor) => {
+      const tw = s.length * 5.9 + 8;
+      const lx = anchor === "middle" ? x - tw / 2 : x - 4;
+      p.front.push(
+        `<rect x="${n(lx)}" y="${n(y - 8)}" width="${n(tw)}" height="16" fill="${c.page}"/>`,
+      );
+    };
+    const label = (x, y, s, o = {}) => {
+      back(x, y, s, o.anchor);
+      p.text(x, y, s, { fill: c.ink2, ...o });
+    };
+    // Rows: a message row puts its label 14px above the line and the line
+    // 24px (42px with a second label line) below the row top; a self row
+    // draws a 16px loop with its label beside it.
+    let y = top + hh + 16;
+    let atomicTop = 0;
+    for (const s of SEQ) {
+      if (s.atomic === "start") {
+        atomicTop = y;
+        const t = "Atomic: all or nothing";
+        const bx = x0 + pitch * 2 + 2;
+        back(bx + 12, y + 20, t + "  ");
+        p.text(bx + 12, y + 20, t, { weight: 500 });
+        y += 40;
+        continue;
+      }
+      if (s.atomic === "end") {
+        const bx = x0 + pitch * 2 + 2,
+          bw = W - x0 - 2 - bx;
+        p.rect(bx, atomicTop, bw, y + 4 - atomicTop, {
+          fill: "none",
+          stroke: c.line,
+          dash: "3 3",
+          layer: p.back,
+        });
+        y += 20;
+        continue;
+      }
+      if (s.self) {
+        const lx = cx(s.from),
+          ly = y + 8;
+        p.edge(
+          [
+            [lx, ly],
+            [lx + 24, ly],
+            [lx + 24, ly + 16],
+            [lx, ly + 16],
+          ],
+          { r: 4 },
+        );
+        label(lx + 32, ly + 8, s.label, { anchor: "start" });
+        if (s.sub)
+          label(lx + 32, ly + 26, s.sub, { anchor: "start", fill: c.ink3 });
+        y += s.sub ? 56 : 36;
+        continue;
+      }
+      const ly = y + (s.label2 ? 42 : 24);
+      const a = cx(s.from),
+        b = cx(s.to);
+      p.edge(
+        [
+          [a, ly],
+          [b, ly],
+        ],
+        { dashed: s.ret },
+      );
+      const mid = (a + b) / 2;
+      label(mid, ly - GAP - 6, s.label2 ?? s.label, { anchor: "middle" });
+      if (s.label2) label(mid, ly - GAP - 24, s.label, { anchor: "middle" });
+      if (s.note)
+        label(Math.max(a, b) + 12, ly, s.note, {
+          anchor: "start",
+          fill: c.ink3,
+        });
+      y = ly + 12;
+    }
+    y += 16;
+    // Lifelines, under everything.
+    const end = y - 8;
+    LANES.forEach((l, i) =>
+      p.back.unshift(
+        `<path d="M${n(cx(i) + 0.5)} ${top + hh}V${n(end)}" stroke="${l.yours ? c.accent : c.line}" stroke-width="${l.yours ? 1.25 : 1}" stroke-dasharray="2 4"/>`,
+      ),
+    );
+    return [W, end + 24, FLOW_LABEL];
   },
 
   "core/fees/fees": (p) => {
@@ -3285,6 +3626,207 @@ const SM = {
     // The links sit inside the network card: lift them above its fill.
     for (let i = 0; i < 7; i++) p.front.push(p.back.pop());
     return [SW, net.bottom + 24, label];
+  },
+
+  "diagrams/solana-layers@sm": (p) => {
+    // The same layers, restacked: three validators, program and state
+    // cards side by side (8px inner margin so the longest row fits).
+    const c = p.c;
+    const ix = SX + 8,
+      iw = SC - 16;
+    const vw = 88,
+      vgap = (iw - 3 * vw) / 2,
+      vh = 40;
+    const ndesc = [
+      "Validators: computers that each keep",
+      "the same copy of every account",
+    ];
+    const nhead = HEAD_DESC + 18;
+    const vy = 24 + nhead;
+    const ay = vy + vh + 24;
+    const cy = ay + 48;
+    const cw = (iw - 8) / 2;
+    const cardH = HEAD_DESC + 2 * ROW;
+    const net = p.card({
+      x: SX,
+      y: 24,
+      w: SC,
+      title: "Solana network",
+      tag: "onchain",
+      desc: ndesc,
+      accent: true,
+      minH: cy + cardH + 8 - 24,
+    });
+    const nodes = [];
+    for (let i = 0; i < 3; i++) {
+      const nx = ix + i * (vw + vgap);
+      p.rect(nx, vy, vw, vh);
+      p.text(nx + 16, vy + vh / 2, "Validator", { fill: c.ink2 });
+      nodes.push(nx);
+    }
+    for (let i = 0; i < 2; i++)
+      p.edge(
+        [
+          [nodes[i] + vw, vy + vh / 2],
+          [nodes[i + 1], vy + vh / 2],
+        ],
+        { head: false },
+      );
+    for (let i = 0; i < 2; i++) p.front.push(p.back.pop());
+    p.hline(SX + 1.25, SX + SC - 1.25, ay - 12);
+    p.text(ix + 8, ay + 8, "Accounts", { size: 13, weight: 500 });
+    p.text(ix + 8, ay + 26, "Store data, like files on a computer", {
+      fill: c.ink2,
+    });
+    const prog = p.card({
+      x: ix,
+      y: cy,
+      w: cw,
+      title: "Programs",
+      desc: "Executable code",
+      rows: [["Your program"], ["Token Program"]],
+    });
+    const state = p.card({
+      x: ix + cw + 8,
+      y: cy,
+      w: cw,
+      title: "State",
+      desc: "Data",
+      rows: [["Token balances"], ["Your program’s data"]],
+    });
+    const apy = net.bottom + 80;
+    const bw = (iw - 16) / 3;
+    const adesc = ["Your code: websites, mobile apps,", "and servers"];
+    const ahead = HEAD_DESC + 18;
+    const apps = p.card({
+      x: SX,
+      y: apy,
+      w: SC,
+      title: "Apps",
+      tag: "offchain",
+      desc: adesc,
+      minH: ahead + 40 + 8,
+    });
+    ["Payments", "Games", "Markets"].forEach((t, i) => {
+      const bx = ix + i * (bw + 8);
+      p.rect(bx, apy + ahead, bw, 40);
+      p.text(bx + 12, apy + ahead + 20, t, { fill: c.ink2 });
+    });
+    const tx = prog.x + 24,
+      rx = state.x + 24;
+    p.edge([
+      [tx, apps.y],
+      [tx, prog.bottom],
+    ]);
+    p.edge(
+      [
+        [rx, apps.y],
+        [rx, state.bottom],
+      ],
+      { dashed: true },
+    );
+    p.front.push(p.back.pop(), p.back.pop());
+    const ly = net.bottom + 24;
+    p.text(tx + GAP, ly, "send transactions", { fill: c.ink2 });
+    p.text(tx + GAP, ly + 18, "through RPC", { fill: c.ink2 });
+    p.text(rx + GAP, ly, "read accounts", { fill: c.ink2 });
+    p.text(rx + GAP, ly + 18, "through RPC", { fill: c.ink2 });
+    const wal = p.card({
+      x: SX,
+      y: apps.bottom + 56,
+      w: SC,
+      title: "Wallets",
+      tag: "offchain",
+      desc: ["Hold users’ keys: sign in and", "approve transactions"],
+    });
+    const usr = p.card({
+      x: SX,
+      y: wal.bottom + 56,
+      w: SC,
+      title: "Users",
+      desc: "People using your app",
+    });
+    p.edge(
+      [
+        [tx, wal.y],
+        [tx, apps.bottom],
+      ],
+      { label: "sign" },
+    );
+    p.edge(
+      [
+        [tx, usr.y],
+        [tx, wal.bottom],
+      ],
+      { label: "approve" },
+    );
+    return [SW, usr.bottom + 24, LAYERS_LABEL];
+  },
+
+  "diagrams/transaction-flow@sm": (p) => {
+    // The sequence, top to bottom: a lane key, then numbered steps, each
+    // with its lane badges (from, to) and one plain sentence.
+    const c = p.c;
+    const badge = (x, y, i) => {
+      const l = LANES[i];
+      const w = l.title.length * 5.9 + 16;
+      p.rect(x, y, w, 24, {
+        stroke: l.yours ? c.accent : c.line,
+        sw: l.yours ? 1.25 : 1,
+      });
+      p.text(x + 8, y + 12, l.title, { fill: l.yours ? c.accent : c.ink });
+      return x + w;
+    };
+    let y = 24;
+    LANES.forEach((l, i) => {
+      badge(SX, y, i);
+      p.text(SX + 120, y + 12, l.desc.join(" "), { fill: c.ink2 });
+      y += 32;
+    });
+    y += 8;
+    p.hline(SX, SW - SX, y);
+    y += 24;
+    let k = 0,
+      atomicTop = 0;
+    for (const s of SEQ) {
+      if (s.atomic === "start") {
+        atomicTop = y;
+        p.text(SX + 34, y + 20, "Atomic: all or nothing", {
+          size: 13,
+          weight: 500,
+        });
+        y += 44;
+        continue;
+      }
+      if (s.atomic === "end") {
+        p.rect(SX + 24, atomicTop, SW - 8 - SX - 24, y - 4 - atomicTop, {
+          fill: "none",
+          stroke: c.line,
+          dash: "3 3",
+          layer: p.back,
+        });
+        y += 20;
+        continue;
+      }
+      k++;
+      p.text(SX, y + 12, String(k), { mono: true, fill: c.ink3 });
+      let bx = badge(SX + 34, y, s.from);
+      if (!s.self) {
+        p.edge(
+          [
+            [bx + 4, y + 12],
+            [bx + 24, y + 12],
+          ],
+          { dashed: s.ret },
+        );
+        badge(bx + 28, y, s.to);
+      }
+      s.step.forEach((t, i) =>
+        p.text(SX + 34, y + 24 + 18 + i * 18, t, { size: 13 }),
+      );
+      y += 24 + 18 * s.step.length + 26;
+    }
+    return [SW, y, FLOW_LABEL];
   },
 
   "core/fees/fees@sm": (p) => {
