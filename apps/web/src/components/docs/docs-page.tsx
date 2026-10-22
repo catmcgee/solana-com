@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
 import type { TOCItemType } from "fumadocs-core/toc";
 import { DocsHeader } from "@/app/[locale]/developers/docs-header";
@@ -19,6 +19,7 @@ import { docsPageMetadata } from "@/lib/docs/metadata";
 import { languagePaths } from "@/lib/docs/language-paths";
 import { DocsSidebar, SidebarNav } from "./docs-sidebar";
 import { DocsToc } from "./docs-toc.client";
+import { smartPunctuation, smartQuotes } from "@/lib/docs/smart-quotes.mjs";
 import { PageActions } from "./page-actions.client";
 import { DocsSearch } from "./docs-search.client";
 import { DocsLink } from "./docs-link";
@@ -117,6 +118,9 @@ export async function DocsPageView({
 }) {
   const resolved = resolveDocsPage(locale, slugs);
   if (!resolved) notFound();
+  // Nav-only pages (`url` frontmatter) send readers to the real page.
+  const target = (resolved.page.data as { url?: string }).url;
+  if (target) redirect(target);
   const { page, contentLocale } = resolved;
   const fm = frontmatter(page);
   const loaded = (await (
@@ -228,7 +232,7 @@ export async function DocsPageView({
                   </div>
                   {fm.description ? (
                     <div className="page-description prose">
-                      <p>{fm.description}</p>
+                      <p>{smartQuotes(smartPunctuation(fm.description))}</p>
                     </div>
                   ) : null}
                   <PageActions

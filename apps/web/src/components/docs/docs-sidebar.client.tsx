@@ -93,3 +93,32 @@ export function SidebarGroup({
     </li>
   );
 }
+
+/**
+ * Keeps the current page in view in the sidebar: on load and after each
+ * navigation the sidebar scrolls so the current item is centred, as before.
+ */
+export function SidebarScrollToCurrent({ current }: { current: string }) {
+  useEffect(() => {
+    const scroller = document.querySelector<HTMLElement>(
+      "#sidebar-content [data-docs-sidebar-viewport]",
+    );
+    const item = scroller?.querySelector<HTMLElement>(
+      '[aria-current="page"], [data-active-nav-item="true"]',
+    );
+    if (!scroller || !item) return;
+    const top =
+      item.getBoundingClientRect().top -
+      scroller.getBoundingClientRect().top +
+      scroller.scrollTop;
+    const visible =
+      top >= scroller.scrollTop &&
+      top + item.offsetHeight <= scroller.scrollTop + scroller.clientHeight;
+    if (visible) return;
+    scroller.scrollTop = Math.max(
+      0,
+      top - (scroller.clientHeight - item.offsetHeight) / 2,
+    );
+  }, [current]);
+  return null;
+}

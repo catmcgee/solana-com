@@ -1,6 +1,5 @@
 import { defaultLocale } from "@workspace/i18n/config";
 import { flattenTree, type Item } from "fumadocs-core/page-tree";
-import { getBreadcrumbItems } from "fumadocs-core/breadcrumb";
 import { docsSource, type DocsPage } from "./source";
 import {
   getDocsNavigation,
@@ -64,13 +63,12 @@ export function resolveDocsPage(
   };
 }
 
-/** Group titles above the page (the eyebrow / breadcrumb). */
+/**
+ * Group titles above the page (the eyebrow / breadcrumb): the section and
+ * the groups down to the page's own, including the group a root page opens.
+ */
 export function breadcrumbs(resolved: ResolvedDocsPage): string[] {
-  const { tab, page } = resolved;
-  if (!tab) return [];
-  return getBreadcrumbItems(page.url, tab.tree)
-    .map((item) => (typeof item.name === "string" ? item.name : ""))
-    .filter(Boolean);
+  return resolved.location?.groups.map((group) => group.title) ?? [];
 }
 
 /** Previous/next page within the page's tab, in nav order. */
@@ -80,7 +78,8 @@ export function neighbours(resolved: ResolvedDocsPage): {
 } {
   const { tab, page } = resolved;
   if (!tab) return {};
-  const list = flattenTree(tab.tree.children).filter((item) => !item.external);
+  // External links in the nav (GitHub, Discord) are neighbours too, as before.
+  const list = flattenTree(tab.tree.children);
   const index = list.findIndex((item) => item.url === page.url);
   if (index === -1) return {};
   return { previous: list[index - 1], next: list[index + 1] };

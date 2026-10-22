@@ -1,5 +1,5 @@
 import type { NavGroup, NavNode, NavTab } from "@/lib/docs/navigation";
-import { SidebarGroup } from "./docs-sidebar.client";
+import { SidebarGroup, SidebarScrollToCurrent } from "./docs-sidebar.client";
 import { ChevronIcon } from "./docs-ui-icons";
 import { DocsLink } from "./docs-link";
 
@@ -180,11 +180,12 @@ export function DocsSidebar({
   return (
     <nav id="sidebar" aria-label={label}>
       <div id="sidebar-content" data-docs-sidebar-scroll="">
-        <div className="sidebar-scroll">
+        <div className="sidebar-scroll" data-docs-sidebar-viewport="">
           <div className="sidebar-inner">
             <div className="sidebar-fade" aria-hidden="true" />
             <SidebarNav tab={tab} current={current} />
           </div>
+          <SidebarScrollToCurrent current={current} />
         </div>
       </div>
     </nav>

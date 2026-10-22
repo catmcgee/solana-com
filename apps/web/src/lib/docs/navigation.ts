@@ -183,7 +183,15 @@ function buildNavigation(locale: string): DocsNavigation {
   const toPage = (path: string): NavPage => {
     const page = resolvePage(path);
     if (!page) throw new Error(`docs nav (${locale}): no page for "${path}"`);
-    return { kind: "page", path, url: page.url, title: navTitle(page), page };
+    // A nav-only page with `url` frontmatter links there (e.g. /microscope).
+    const target = (page.data as { url?: string }).url;
+    return {
+      kind: "page",
+      path,
+      url: target ?? page.url,
+      title: navTitle(page),
+      page,
+    };
   };
 
   const convertEntry = (entry: RawEntry): NavNode => {
@@ -215,7 +223,13 @@ function buildNavigation(locale: string): DocsNavigation {
 
   const toTreeNode = (node: NavNode): PageTree.Node => {
     if (node.kind === "page")
-      return { type: "page", name: node.title, url: node.url, $id: node.path };
+      return {
+        type: "page",
+        name: node.title,
+        url: node.url,
+        $id: node.path,
+        external: /^https?:\/\//.test(node.url) || undefined,
+      };
     if (node.kind === "link")
       return { type: "page", name: node.title, url: node.url, external: true };
     return {
