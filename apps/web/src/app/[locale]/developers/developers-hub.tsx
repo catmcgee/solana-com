@@ -142,10 +142,10 @@ function ApiVisual() {
         /api/forecast
       </div>
       <div className={`${line} [animation-delay:.6s]`}>
-        <span className="text-[var(--dl-code-num)]">402</span> price: $0.01
+        <span className="text-[var(--dl-code-num)]">402</span> price: $0.001
       </div>
       <div className={`${line} [animation-delay:1.2s]`}>
-        <span className="text-[var(--dl-good)]">paid</span> 0.01 USDC
+        <span className="text-[var(--dl-good)]">paid</span> 0.001 USDC
       </div>
       <div className={`${line} [animation-delay:1.8s]`}>
         <span className="text-[var(--dl-good)]">200</span>{" "}
