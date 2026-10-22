@@ -95,9 +95,15 @@ export function ExternalArrowIcon({ className }: { className?: string }) {
 }
 
 /** Points right; rotated by CSS when open. */
-export function ChevronIcon({ className }: { className?: string }) {
+export function ChevronIcon({
+  className,
+  strokeWidth,
+}: {
+  className?: string;
+  strokeWidth?: number;
+}) {
   return (
-    <Icon18 className={className}>
+    <Icon18 className={className} strokeWidth={strokeWidth}>
       <path d="M6.5 2.75L12.75 9L6.5 15.25" />
     </Icon18>
   );

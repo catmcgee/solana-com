@@ -4,7 +4,13 @@ import {
   getDocsFooterColumns,
 } from "@/data/developers/docs-nav";
 import { localizedHref } from "@/data/developers/hub";
-import { SOCIAL_ICONS, SocialIcon, SolanaLogo } from "./docs-icons";
+import {
+  DocsSocialGlyph,
+  SOCIAL_ICONS,
+  SocialIcon,
+  SolanaLogo,
+} from "./docs-icons";
+import { ThemeChoice } from "./docs-header.client";
 
 /**
  * The docs footer (Mintlify's, styled by apps/docs/styles/theme.css section
@@ -51,7 +57,11 @@ export async function DocsFooter({
                       title={name}
                       rel="noopener noreferrer"
                     >
-                      <SocialIcon id={id} />
+                      {developers ? (
+                        <DocsSocialGlyph id={id} />
+                      ) : (
+                        <SocialIcon id={id} />
+                      )}
                     </a>
                   </li>
                 );
@@ -75,16 +85,21 @@ export async function DocsFooter({
         </div>
         <div className="df-bottom">
           <p>{t("copyright", { year: String(new Date().getFullYear()) })}</p>
-          <ul>
-            <li>
-              <a href={localizedHref(locale, "/privacy-policy")}>
-                {t("privacy")}
-              </a>
-            </li>
-            <li>
-              <a href={localizedHref(locale, "/tos")}>{t("terms")}</a>
-            </li>
-          </ul>
+          {developers ? (
+            // The docs footer ends with the theme switch, as before.
+            <ThemeChoice className="df-theme-choice" />
+          ) : (
+            <ul>
+              <li>
+                <a href={localizedHref(locale, "/privacy-policy")}>
+                  {t("privacy")}
+                </a>
+              </li>
+              <li>
+                <a href={localizedHref(locale, "/tos")}>{t("terms")}</a>
+              </li>
+            </ul>
+          )}
         </div>
       </div>
     </footer>

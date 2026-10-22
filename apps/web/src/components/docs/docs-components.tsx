@@ -24,7 +24,12 @@ import {
   CopyCodeButton,
   TabsClient,
 } from "./docs-components.client";
-import { CalloutIcon, CaretIcon, ChevronIcon } from "./docs-ui-icons";
+import {
+  CalloutIcon,
+  CaretIcon,
+  ChevronIcon,
+  ExternalArrowIcon,
+} from "./docs-ui-icons";
 import { DocsLink } from "./docs-link";
 import { isDocsHref } from "@/lib/docs/docs-href";
 import { TxWalkthrough } from "@/components/tx-walkthrough";
@@ -231,7 +236,7 @@ export function Card({
       >
         {href && (external || arrow) ? (
           <div className="card-arrow" aria-hidden="true">
-            <Icon icon="arrow-up-right" size={12} className="card-arrow-icon" />
+            <ExternalArrowIcon className="card-arrow-icon" />
           </div>
         ) : null}
         {icon ? (

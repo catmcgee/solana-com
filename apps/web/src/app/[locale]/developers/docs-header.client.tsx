@@ -48,6 +48,41 @@ function currentTheme(): Theme {
   return document.documentElement.classList.contains("dark") ? "dark" : "light";
 }
 
+/** The docs' theme drawings (18px grid): system, light (sun), dark (moon). */
+const THEME_CHOICES: { value: Preference; label: string; paths: string[] }[] = [
+  {
+    value: "system",
+    label: "Switch to system theme",
+    paths: [
+      "M4.5 15.5L9 14.5L13.5 15.5",
+      "M9 11.75V14.5",
+      "M14.25 2.75H3.75C2.64543 2.75 1.75 3.64543 1.75 4.75V9.75C1.75 10.8546 2.64543 11.75 3.75 11.75H14.25C15.3546 11.75 16.25 10.8546 16.25 9.75V4.75C16.25 3.64543 15.3546 2.75 14.25 2.75Z",
+    ],
+  },
+  {
+    value: "light",
+    label: "Switch to light theme",
+    paths: [
+      "M9 1.25V2.25",
+      "M14.48 3.52002L13.773 4.22702",
+      "M16.75 9H15.75",
+      "M14.48 14.4799L13.773 13.7729",
+      "M9 16.75V15.75",
+      "M3.52 14.4799L4.227 13.7729",
+      "M1.25 9H2.25",
+      "M3.52 3.52002L4.227 4.22702",
+      "M9 13.25C11.3472 13.25 13.25 11.3472 13.25 9C13.25 6.65279 11.3472 4.75 9 4.75C6.65279 4.75 4.75 6.65279 4.75 9C4.75 11.3472 6.65279 13.25 9 13.25Z",
+    ],
+  },
+  {
+    value: "dark",
+    label: "Switch to dark theme",
+    paths: [
+      "M13 11.75C9.548 11.75 6.75 8.95201 6.75 5.50001C6.75 4.14801 7.183 2.90101 7.912 1.87801C4.548 2.50601 2 5.45301 2 9.00001C2 13.004 5.246 16.25 9.25 16.25C12.622 16.25 15.448 13.944 16.259 10.826C15.309 11.409 14.196 11.75 13 11.75Z",
+    ],
+  },
+];
+
 /**
  * One-click light/dark switch, like the docs (apps/docs/theme-toggle.js): the
  * icon is the mode a click switches to (moon in light mode, sun in dark), and
@@ -124,34 +159,37 @@ export function ThemeToggle({
         xmlns="http://www.w3.org/2000/svg"
         width="16"
         height="16"
-        viewBox="0 0 24 24"
+        viewBox="0 0 18 18"
         fill="none"
         stroke="currentColor"
-        strokeWidth="2"
+        strokeWidth="1.5"
         strokeLinecap="round"
         strokeLinejoin="round"
         aria-hidden="true"
         focusable="false"
         className="dh-icon dh-icon-moon"
       >
-        <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
+        {THEME_CHOICES[2]!.paths.map((d) => (
+          <path key={d} d={d} />
+        ))}
       </svg>
       <svg
         xmlns="http://www.w3.org/2000/svg"
         width="16"
         height="16"
-        viewBox="0 0 24 24"
+        viewBox="0 0 18 18"
         fill="none"
         stroke="currentColor"
-        strokeWidth="2"
+        strokeWidth="1.5"
         strokeLinecap="round"
         strokeLinejoin="round"
         aria-hidden="true"
         focusable="false"
         className="dh-icon dh-icon-sun"
       >
-        <circle cx="12" cy="12" r="4" />
-        <path d="M12 2v2M12 20v2m-7.07-17.07 1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
+        {THEME_CHOICES[1]!.paths.map((d) => (
+          <path key={d} d={d} />
+        ))}
       </svg>
       {children?.(theme)}
     </button>
@@ -289,39 +327,6 @@ export function DocsSearchField({
  * Closes the header's <details> menus (language, mobile menu) on Escape, on
  * a click outside, and when another one opens. Renders nothing.
  */
-const THEME_CHOICES: { value: Preference; label: string; paths: string[] }[] = [
-  {
-    value: "system",
-    label: "Switch to system theme",
-    paths: [
-      "M4.5 15.5L9 14.5L13.5 15.5",
-      "M9 11.75V14.5",
-      "M14.25 2.75H3.75C2.64543 2.75 1.75 3.64543 1.75 4.75V9.75C1.75 10.8546 2.64543 11.75 3.75 11.75H14.25C15.3546 11.75 16.25 10.8546 16.25 9.75V4.75C16.25 3.64543 15.3546 2.75 14.25 2.75Z",
-    ],
-  },
-  {
-    value: "light",
-    label: "Switch to light theme",
-    paths: [
-      "M9 1.25V2.25",
-      "M14.48 3.52002L13.773 4.22702",
-      "M16.75 9H15.75",
-      "M14.48 14.4799L13.773 13.7729",
-      "M9 16.75V15.75",
-      "M3.52 14.4799L4.227 13.7729",
-      "M1.25 9H2.25",
-      "M3.52 3.52002L4.227 4.22702",
-      "M9 13.25C11.3472 13.25 13.25 11.3472 13.25 9C13.25 6.65279 11.3472 4.75 9 4.75C6.65279 4.75 4.75 6.65279 4.75 9C4.75 11.3472 6.65279 13.25 9 13.25Z",
-    ],
-  },
-  {
-    value: "dark",
-    label: "Switch to dark theme",
-    paths: [
-      "M13 11.75C9.548 11.75 6.75 8.95201 6.75 5.50001C6.75 4.14801 7.183 2.90101 7.912 1.87801C4.548 2.50601 2 5.45301 2 9.00001C2 13.004 5.246 16.25 9.25 16.25C12.622 16.25 15.448 13.944 16.259 10.826C15.309 11.409 14.196 11.75 13 11.75Z",
-    ],
-  },
-];
 
 /**
  * System / light / dark switch in the docs' phone menu, as the docs menu has

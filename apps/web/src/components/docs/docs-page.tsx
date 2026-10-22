@@ -223,7 +223,10 @@ export async function DocsPageView({
                               data-breadcrumb-title={c}
                             >
                               {i > 0 ? (
-                                <ChevronIcon className="breadcrumb-sep" />
+                                <ChevronIcon
+                                  className="breadcrumb-sep"
+                                  strokeWidth={2.5}
+                                />
                               ) : null}
                               <span>{c}</span>
                             </li>

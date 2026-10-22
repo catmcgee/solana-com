@@ -91,11 +91,11 @@ export function Rate({
             type="button"
             className="docs-rate-button"
             aria-pressed={opinion === value}
-            aria-label={value === "positive" ? "Yes" : "No"}
             disabled={response !== ""}
             onClick={() => setOpinion(opinion === value ? null : value)}
           >
             <Thumb down={value === "negative"} />
+            <span>{value === "positive" ? "Yes" : "No"}</span>
           </button>
         ))}
       </div>
