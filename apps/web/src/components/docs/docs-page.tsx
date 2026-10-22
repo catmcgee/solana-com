@@ -21,7 +21,6 @@ import { DocsSidebar, SidebarNav } from "./docs-sidebar";
 import { DocsToc } from "./docs-toc.client";
 import { smartPunctuation, smartQuotes } from "@/lib/docs/smart-quotes.mjs";
 import { PageActions } from "./page-actions.client";
-import { DocsSearch } from "./docs-search.client";
 import { DocsChat } from "./docs-chat.client";
 import { DocsLink } from "./docs-link";
 import { ApiExamplesWrapper, docsComponents } from "./docs-components";
@@ -175,7 +174,6 @@ export async function DocsPageView({
           locale={contentLocale}
           tabs={tabs}
           activeTab={active}
-          inPageSearch
           languagePaths={languagePaths(resolved)}
           languageNames={DOCS_LANGUAGE_NAMES}
           menu={
@@ -263,7 +261,6 @@ export async function DocsPageView({
           </main>
         </div>
         <DocsFooter locale={contentLocale} developers />
-        <DocsSearch locale={contentLocale} />
         {process.env.NOUS_API_KEY ? <DocsChat locale={contentLocale} /> : null}
         <DocsScripts />
       </div>

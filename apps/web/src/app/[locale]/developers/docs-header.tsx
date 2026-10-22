@@ -153,7 +153,6 @@ export async function DocsHeader({
   menu,
   languagePaths,
   languageNames,
-  inPageSearch = false,
 }: {
   locale: string;
   /** Tabs to show (default: the docs' visible tabs for `locale`). */
@@ -166,8 +165,6 @@ export async function DocsHeader({
   languagePaths?: Record<string, string>;
   /** Languages the menu lists (default: every solana.com language). */
   languageNames?: Record<string, string>;
-  /** Docs pages search in place; /developers hands off to the docs. */
-  inPageSearch?: boolean;
 }) {
   const t = await getTranslations({
     locale,
@@ -197,16 +194,12 @@ export async function DocsHeader({
         </a>
         <Tabs tabs={tabs} label={t("sections")} activeTab={activeTab} />
         <div className="dh-tools">
-          <DocsSearchField
-            action={docsRoot}
-            prompt={DOCS_SEARCH_PROMPT}
-            inPage={inPageSearch}
-          />
+          <DocsSearchField action={docsRoot} prompt={DOCS_SEARCH_PROMPT} />
           <a
             href={docsSearchHref(locale)}
             className="dh-search-icon"
             aria-label={DOCS_SEARCH_PROMPT}
-            data-docs-search-open={inPageSearch ? "" : undefined}
+            data-docs-search-open=""
           >
             <SearchIcon />
           </a>

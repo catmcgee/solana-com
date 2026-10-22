@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { openDocsSearch } from "@solana-com/ui-chrome/docs-search";
 import { DOCS_THEME_STORAGE_KEY } from "./theme-prepaint";
 
 /*
@@ -8,7 +9,7 @@ import { DOCS_THEME_STORAGE_KEY } from "./theme-prepaint";
  * header is server-rendered and works without JavaScript: the tabs and
  * language links are plain anchors, the menus are <details>, and the search
  * field is a GET form to the docs. These add the theme toggle, the docs
- * search hand-off on click and ⌘K/Ctrl+K, and closing the menus on Escape or
+ * search dialog on click and ⌘K/Ctrl+K, and closing the menus on Escape or
  * an outside click.
  */
 
@@ -196,38 +197,21 @@ export function ThemeToggle({
   );
 }
 
-function searchUrl(base: string, query: string) {
-  const q = query.trim();
-  return q ? `${base}?q=${encodeURIComponent(q)}` : `${base}?search=1`;
-}
-
-/** Event a docs page's search dialog listens for (docs-search.client.tsx). */
-export const DOCS_SEARCH_OPEN_EVENT = "docs-search:open";
-
-export function openDocsSearch(query = "") {
-  window.dispatchEvent(
-    new CustomEvent(DOCS_SEARCH_OPEN_EVENT, { detail: { query } }),
-  );
-}
-
 /**
- * The docs search field. On a docs page (`inPage`) it opens the docs search
- * dialog: on click, on Enter, and on ⌘K / Ctrl+K anywhere on the page.
- * On /developers it cannot search, so it hands off to the docs: it goes to
- * `<docs>?search=1` (or `?q=<text>` once something is typed), where the
- * docs page opens its search with the text. Keyboard focus alone does not
- * navigate (WCAG 3.2.1 On Focus): keyboard users can type and press Enter.
- * Without JavaScript the form submits to `<docs>?q=<text>`.
+ * The docs search field. It opens the docs search dialog
+ * (components/docs/docs-search.client.tsx) on the page: on click, on Enter,
+ * and on ⌘K / Ctrl+K anywhere on the page, with what was typed. Keyboard
+ * focus alone does not open it (WCAG 3.2.1 On Focus): keyboard users can
+ * type and press Enter. Without JavaScript the form submits to
+ * `<docs>?q=<text>`, where the docs page opens its search with the text.
  */
 export function DocsSearchField({
   action,
   prompt,
-  inPage = false,
 }: {
   /** Localized docs root, e.g. "/developers/docs" or "/ja/developers/docs". */
   action: string;
   prompt: string;
-  inPage?: boolean;
 }) {
   const input = useRef<HTMLInputElement>(null);
   const [mac, setMac] = useState(false);
@@ -236,10 +220,6 @@ export function DocsSearchField({
   useEffect(() => {
     setReady(true);
     setMac(/Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent));
-    const go = (query: string) => {
-      if (inPage) openDocsSearch(query);
-      else window.location.assign(searchUrl(action, query));
-    };
     const onKey = (event: KeyboardEvent) => {
       if (
         (event.metaKey || event.ctrlKey) &&
@@ -250,12 +230,12 @@ export function DocsSearchField({
         // Capture phase, so the browser's own Cmd/Ctrl+K does not run.
         event.preventDefault();
         event.stopImmediatePropagation();
-        go(input.current?.value ?? "");
+        openDocsSearch(input.current?.value ?? "");
       }
     };
-    // The search icon (narrow headers) and other openers on docs pages.
+    // The search icon (narrow headers) and other openers.
     const onClick = (event: MouseEvent) => {
-      if (!inPage || event.defaultPrevented || event.button !== 0) return;
+      if (event.defaultPrevented || event.button !== 0) return;
       if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
         return;
       const opener = (event.target as Element | null)?.closest?.(
@@ -271,12 +251,7 @@ export function DocsSearchField({
       window.removeEventListener("keydown", onKey, true);
       document.removeEventListener("click", onClick);
     };
-  }, [action, inPage]);
-
-  const go = (query: string) => {
-    if (inPage) openDocsSearch(query);
-    else window.location.assign(searchUrl(action, query));
-  };
+  }, []);
 
   return (
     <form
@@ -287,7 +262,7 @@ export function DocsSearchField({
       data-ready={ready ? "" : undefined}
       onSubmit={(event) => {
         event.preventDefault();
-        go(input.current?.value ?? "");
+        openDocsSearch(input.current?.value ?? "");
       }}
     >
       <svg
@@ -315,7 +290,7 @@ export function DocsSearchField({
         placeholder={prompt}
         autoComplete="off"
         enterKeyHint="search"
-        onClick={(event) => go(event.currentTarget.value)}
+        onClick={(event) => openDocsSearch(event.currentTarget.value)}
       />
       <kbd aria-hidden="true">{mac ? "⌘K" : "Ctrl K"}</kbd>
     </form>

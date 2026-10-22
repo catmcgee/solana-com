@@ -53,11 +53,12 @@ Announcement banner at the top of the page. Configurable via
 
 ### SearchBar
 
-The header's search button. It hands off to the docs search (Fumadocs, in
-`apps/web`): a click or `⌘ K` / `Ctrl+K` goes to `/developers/docs?search=1`
-(localized), where the docs page opens its search dialog. It shows the `⌘ K`
-shortcut on larger viewports; the optional `expanded` prop adds a visible label
-and full-width styling.
+The header's search button for the docs search (Fumadocs, in `apps/web`). In
+`apps/web`, which mounts the search dialog on every page, a click or `⌘ K` /
+`Ctrl+K` opens it in place. In the other apps (`NEXT_PUBLIC_APP_NAME` set) it
+goes to `/developers/docs?search=1` (localized), where the docs page opens the
+dialog. It shows the `⌘ K` shortcut on larger viewports; the optional `expanded`
+prop adds a visible label and full-width styling.
 
 ### NewsletterModal
 
@@ -88,6 +89,11 @@ Dropdown for switching locale (uses `@workspace/i18n` and next-intl).
 
 Apps often re-export these from their own `utils/Link` (e.g. `apps/web`,
 `apps/docs`).
+
+### `@solana-com/ui-chrome/docs-search`
+
+- **openDocsSearch(query?)** / **DOCS_SEARCH_OPEN_EVENT** – Open the docs search
+  dialog on the current page (the window event the dialog listens for).
 
 ### `@solana-com/ui-chrome/url-config`
 

@@ -5,7 +5,6 @@ import { DocsThemePrepaint } from "@/app/[locale]/developers/theme-prepaint";
 import type { DocsTab, DocsTabIcon } from "@/data/developers/docs-nav";
 import { DOCS_LANGUAGE_NAMES } from "@/lib/docs/language-paths";
 import { getDocsNavigation } from "@/lib/docs/navigation";
-import { DocsSearch } from "./docs-search.client";
 import { DocsScripts } from "./docs-scripts";
 import { NotFoundSuggestions } from "./docs-not-found.client";
 import "./docs-styles";
@@ -56,7 +55,6 @@ export async function DocsNotFound() {
           locale={defaultLocale}
           tabs={tabs}
           languageNames={DOCS_LANGUAGE_NAMES}
-          inPageSearch
         />
         <main id="content-container" className="not-found-main">
           <div id="content-area">
@@ -87,7 +85,6 @@ export async function DocsNotFound() {
             </div>
           </div>
         </main>
-        <DocsSearch locale={defaultLocale} />
         <DocsScripts />
       </div>
     </>

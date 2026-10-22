@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { cn } from "./classnames";
+import { openDocsSearch } from "./docs-search-event";
 
 const SearchIcon = ({ className }: { className?: string }) => {
   return (
@@ -26,7 +27,13 @@ const SearchIcon = ({ className }: { className?: string }) => {
   );
 };
 
-/** The docs search, opened by the docs page on arrival (docs-search.client.tsx). */
+/**
+ * apps/web (no NEXT_PUBLIC_APP_NAME) has the dialog on every page; the
+ * other apps behind solana.com (media, templates) hand off to the docs.
+ */
+const IN_PLACE = !process.env.NEXT_PUBLIC_APP_NAME;
+
+/** The docs search, opened by the docs page on arrival. */
 function docsSearchHref(locale: string) {
   const root =
     locale === "en" ? "/developers/docs" : `/${locale}/developers/docs`;
@@ -40,10 +47,9 @@ interface SearchBarProps {
 }
 
 /**
- * The header's search. The docs search lives on the docs pages, so this
- * hands off to it, as the /developers header does: a click or ⌘K / Ctrl+K
- * goes to `<docs>?search=1`, where the search dialog opens. It works from
- * every app behind solana.com, and without JavaScript as a plain link.
+ * The header's search: a click or ⌘K / Ctrl+K opens the docs search dialog
+ * in place on apps/web. In the other apps it goes to `<docs>?search=1`,
+ * where the dialog opens. Without JavaScript it is a plain link there.
  */
 export function SearchBar({ className, expanded }: SearchBarProps) {
   const t = useTranslations();
@@ -58,7 +64,8 @@ export function SearchBar({ className, expanded }: SearchBarProps) {
         event.key.toLowerCase() === "k"
       ) {
         event.preventDefault();
-        window.location.assign(href);
+        if (IN_PLACE) openDocsSearch();
+        else window.location.assign(href);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -75,6 +82,13 @@ export function SearchBar({ className, expanded }: SearchBarProps) {
     >
       <a
         href={href}
+        onClick={(event) => {
+          if (!IN_PLACE || event.button !== 0) return;
+          if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
+            return;
+          event.preventDefault();
+          openDocsSearch();
+        }}
         aria-label={t("commands.search")}
         title={`${t("commands.search")} (⌘ K)`}
         className="m-0 flex size-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/[0.06] p-0 text-white/70 no-underline transition-colors duration-200 hover:border-white/25 hover:bg-white/[0.1] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 md:h-9 md:w-auto md:px-2.5 group-data-[expanded]:w-full group-data-[expanded]:justify-start group-data-[expanded]:px-3"

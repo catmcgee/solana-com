@@ -3,14 +3,18 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useDocsSearch } from "fumadocs-core/search/client";
-import { DOCS_SEARCH_OPEN_EVENT } from "@/app/[locale]/developers/docs-header.client";
+import { DOCS_SEARCH_OPEN_EVENT } from "@solana-com/ui-chrome/docs-search";
+import "./docs-search.css";
 
 /**
  * Docs search: Fumadocs' search client against /api/docs-search, for the
- * page's locale. Opens from the header field, the search icon, ⌘K / Ctrl+K
- * and the Ask AI menu (docs-header.client.tsx `openDocsSearch`), and from
- * the hand-off from /developers and the rest of solana.com (`?q=<text>` or
- * `?search=1`, which it then removes from the URL).
+ * page's locale. Mounted once on every apps/web page ([locale]/layout.tsx),
+ * so it opens in place: from the docs header's field and search icon
+ * (docs-header.client.tsx), the solana.com header's search (ui-chrome
+ * SearchBar), ⌘K / Ctrl+K and the Ask AI menu (`openDocsSearch`). It also
+ * opens on arrival with `?q=<text>` or `?search=1` (the no-JS docs header
+ * form, and the header search in apps/media and apps/templates), which it
+ * then removes from the URL.
  */
 export function DocsSearch({ locale }: { locale: string }) {
   const [open, setOpen] = useState(false);
@@ -30,7 +34,7 @@ export function DocsSearch({ locale }: { locale: string }) {
       setOpen(true);
     };
     window.addEventListener(DOCS_SEARCH_OPEN_EVENT, onOpen);
-    // Hand-off from /developers.
+    // Hand-off from another app or the no-JS form.
     const params = new URLSearchParams(window.location.search);
     if (params.has("q") || params.get("search") === "1") {
       setSearch((params.get("q") ?? "").slice(0, 200));

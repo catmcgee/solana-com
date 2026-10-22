@@ -9,7 +9,7 @@ import { Metadata } from "next";
 import { PostHogProvider } from "@@/src/app/components/posthog/PostHogProvider";
 import { config } from "@@/src/config";
 import { getBaseMetadata } from "@@/src/app/metadata";
-import { locales, staticLocales } from "@workspace/i18n/config";
+import { defaultLocale, locales, staticLocales } from "@workspace/i18n/config";
 import { loadMergedMessages } from "@workspace/i18n/messages";
 import { getLangDir } from "rtl-detect";
 import { notFound } from "next/navigation";
@@ -20,6 +20,8 @@ import {
   GoogleTagManagerNoScript,
 } from "@solana-com/ui-chrome";
 import { ChromeWrapper } from "@/components/ChromeWrapper";
+import { DocsSearch } from "@/components/docs/docs-search.client";
+import { DOCS_LOCALES } from "@/lib/docs/locales.mjs";
 import Script from "next/script";
 import { Header, Footer } from "@solana-com/ui-chrome";
 
@@ -61,6 +63,9 @@ export default async function RootLayout({ children, params }: Props) {
                 <Footer />
               </ChromeWrapper>
               <PersistentPodcastPlayer />
+              <DocsSearch
+                locale={DOCS_LOCALES.includes(locale) ? locale : defaultLocale}
+              />
               <Script
                 id="signals-script"
                 strategy="afterInteractive"
