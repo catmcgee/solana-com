@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
-import { CheckIcon, CopyIcon } from "./docs-ui-icons";
+import { CheckIcon, CopyIcon, SparkleIcon } from "./docs-ui-icons";
 
 /**
  * Interactive pieces of the docs content components (docs-components.tsx):
@@ -173,6 +173,39 @@ export function CopyCodeButton({ className }: { className?: string }) {
   );
 }
 
+/** Event the docs Ask AI listens for: ask about a code block. */
+export const DOCS_ASK_CODE_EVENT = "docs-ask-ai:code";
+
+/** "Ask Assistant" next to Copy: hands the block's code to Ask AI. */
+export function AskCodeButton() {
+  const ref = useRef<HTMLButtonElement>(null);
+  return (
+    <div className="code-block-ask-button">
+      <button
+        ref={ref}
+        type="button"
+        aria-label="Ask Assistant"
+        className="code-copy"
+        onClick={() => {
+          const root =
+            ref.current?.closest("[data-code-copy-scope]") ??
+            ref.current?.closest(".code-block");
+          const pre =
+            root?.querySelector('[role="tabpanel"]:not([hidden]) pre') ??
+            root?.querySelector("pre");
+          window.dispatchEvent(
+            new CustomEvent(DOCS_ASK_CODE_EVENT, {
+              detail: { code: pre?.textContent ?? "" },
+            }),
+          );
+        }}
+      >
+        <SparkleIcon className="code-copy-icon" />
+      </button>
+    </div>
+  );
+}
+
 /**
  * <CodeGroup>, <RequestExample>, <ResponseExample>: the fences inside as one
  * box with a tab per fence (its title, else its language).
@@ -214,6 +247,7 @@ export function CodeGroupClient({
         </div>
         <div className="code-group-actions">
           <CopyCodeButton />
+          <AskCodeButton />
         </div>
       </div>
       <div className="code-group-panels">

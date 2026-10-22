@@ -19,6 +19,7 @@ import {
 import { icons as lucideIcons } from "lucide";
 import {
   CodeGroupClient,
+  AskCodeButton,
   CopyCodeButton,
   TabsClient,
 } from "./docs-components.client";
@@ -747,14 +748,19 @@ export function CodeBlock(pre: PreProps) {
           </div>
           <div className="code-block-actions">
             <CopyCodeButton />
+            <AskCodeButton />
           </div>
         </div>
       ) : (
         <div data-floating-buttons="true" className="code-block-floating">
           <CopyCodeButton />
+          <AskCodeButton />
         </div>
       )}
       <CodeBody pre={pre} rounded={!title} />
+      {title ? null : (
+        <div className="code-block-fade-overlay" aria-hidden="true" />
+      )}
     </div>
   );
 }
