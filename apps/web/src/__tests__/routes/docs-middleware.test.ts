@@ -385,3 +385,30 @@ describe("docs locale cookie", () => {
     expect(isDeveloperDocsPath("/developers")).toBe(false);
   });
 });
+
+describe("docs locale alternates", () => {
+  const run = (path: string) =>
+    middleware(
+      request(path),
+      fakeEvent() as unknown as Parameters<typeof middleware>[1],
+    );
+
+  it("does not advertise Greek on docs pages, which have no Greek", async () => {
+    for (const path of [
+      "/developers/docs",
+      "/es/developers/docs/core",
+      "/developers/cookbook",
+      "/learn/what-is-a-wallet",
+    ]) {
+      const link = (await run(path)).headers.get("link") ?? "";
+      expect(link, path).toContain('hreflang="es"');
+      expect(link, path).toContain('rel="llms-txt"');
+      expect(link, path).not.toContain('hreflang="el"');
+    }
+  });
+
+  it("keeps Greek on the rest of solana.com", async () => {
+    const link = (await run("/developers")).headers.get("link") ?? "";
+    expect(link).toContain('hreflang="el"');
+  });
+});

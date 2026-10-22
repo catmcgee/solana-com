@@ -7,6 +7,7 @@ import { NextFetchEvent, NextRequest, NextResponse } from "next/server";
 import { locales } from "@workspace/i18n/config";
 import { getPathnameWithoutLocale } from "@workspace/i18n/pathname";
 import {
+  DROPPED_DOCS_LOCALES,
   canonicalDocsPath,
   getDocsPathInfo,
   getMarkdownRequestSource,
@@ -21,8 +22,25 @@ import { trackMarkdownRequest } from "@/lib/docs-edge/markdown-analytics";
 export const DOCS_AGENT_LINKS =
   '</llms.txt>; rel="llms-txt", </llms-full.txt>; rel="llms-full-txt", </.well-known/mcp/server-card.json>; rel="mcp-server-card"';
 
+/**
+ * The i18n middleware's Link header, without the alternates of locales the
+ * docs have no translations for (Greek: its docs URLs redirect to English).
+ */
+export function withoutDroppedDocsLocales(link: string | null) {
+  if (!link) return link;
+  const kept = link
+    .split(/,\s*(?=<)/)
+    .filter(
+      (entry) =>
+        !DROPPED_DOCS_LOCALES.some((locale) =>
+          entry.includes(`hreflang="${locale}"`),
+        ),
+    );
+  return kept.length ? kept.join(", ") : null;
+}
+
 function withAgentLinks<T extends Response>(res: T): T {
-  const link = res.headers.get("link");
+  const link = withoutDroppedDocsLocales(res.headers.get("link"));
   res.headers.set(
     "link",
     link ? `${link}, ${DOCS_AGENT_LINKS}` : DOCS_AGENT_LINKS,
