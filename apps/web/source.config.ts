@@ -11,9 +11,11 @@
  * inlines every `import X from "/snippets/..."` into the page that uses it,
  * so they compile with the page and appear in its Markdown.
  *
- * Both collections are `async` (frontmatter eagerly, bodies on demand), as
- * the docs app on origin/main had them, so a route only loads the page it
- * renders.
+ * English is `async` (frontmatter eagerly, bodies on demand), as the docs
+ * app on origin/main had it, so a route only loads the page it renders.
+ * Translations are `dynamic`: compiled at request time from the files (then
+ * cached with the page), since bundling 8,000+ MDX modules does not fit in
+ * the build machine's memory. Like main, only English is prerendered.
  */
 import { defineCollections, defineConfig } from "fumadocs-mdx/config";
 import { pageSchema } from "fumadocs-core/source/schema";
@@ -61,7 +63,7 @@ export const docsI18n = defineCollections({
     `${locales}/learn/**/*.mdx`,
   ],
   schema,
-  async: true,
+  dynamic: true,
   postprocess: { includeProcessedMarkdown: true },
 });
 

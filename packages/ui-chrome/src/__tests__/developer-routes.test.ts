@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   isDocsChromeRoute,
+  isDocsPageRoute,
   isThemeRoute,
   shouldShowDevelopersNav,
   shouldShowDocsSidebarToggle,
@@ -75,6 +76,23 @@ describe("developer route matching", () => {
     expect(isDocsChromeRoute("/docs")).toBe(false);
     expect(isDocsChromeRoute("/developership")).toBe(false);
     expect(isDocsChromeRoute(null)).toBe(false);
+  });
+
+  it("gives the docs pages the docs chrome, not the /learn landing", () => {
+    for (const path of [
+      "/developers/docs",
+      "/developers/docs/core/accounts",
+      "/ja/developers/docs/payments",
+      "/developers/cookbook/wallets/create-keypair",
+      "/learn/what-is-solana",
+      "/fr/learn/what-is-solana",
+    ]) {
+      expect(isDocsChromeRoute(path), path).toBe(true);
+      expect(isDocsPageRoute(path), path).toBe(true);
+    }
+    expect(isDocsPageRoute("/developers")).toBe(false);
+    expect(isDocsChromeRoute("/learn")).toBe(false);
+    expect(isDocsChromeRoute("/developers/docsy")).toBe(false);
   });
 
   it("keeps /developers subpages dark-only", () => {

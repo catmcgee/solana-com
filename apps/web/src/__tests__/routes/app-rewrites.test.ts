@@ -3,7 +3,6 @@ import {
   ACCELERATE_APP_URL,
   BREAKPOINT_APP_URL,
   MEDIA_APP_URL,
-  MINTLIFY_ORIGIN,
   templatesAppUrl,
 } from "@@/apps-urls";
 import rewritesAndRedirects from "@@/rewrites-redirects";
@@ -56,14 +55,6 @@ describe("Cross-app rewrites", () => {
       `${MEDIA_APP_URL}/podcasts/:path*`,
     );
     expectBeforeFileRewrite(
-      "/developers/docs/:path((?![^/]+/llms\\.txt$).*)",
-      `${MINTLIFY_ORIGIN}/developers/docs/:path`,
-    );
-    expectBeforeFileRewrite(
-      "/developers/cookbook/:path*",
-      `${MINTLIFY_ORIGIN}/developers/cookbook/:path*`,
-    );
-    expectBeforeFileRewrite(
       "/developers/templates/:path*",
       `${templatesAppUrl}/developers/templates/:path*`,
     );
@@ -77,13 +68,10 @@ describe("Cross-app rewrites", () => {
     );
   });
 
-  it("keeps templates rewrites before the developer docs rewrites", () => {
-    expect(expectSourceIndex("/developers/templates")).toBeLessThan(
-      expectSourceIndex("/developers/:page(cookbook|cookbook\\.md)"),
-    );
-    expect(expectSourceIndex("/developers/templates/:path*")).toBeLessThan(
-      expectSourceIndex("/developers/cookbook/:path*"),
-    );
+  it("rewrites none of the developer docs (this app renders them)", () => {
+    for (const rewrite of beforeFiles) {
+      expect(rewrite.source).not.toMatch(/^\/(:locale[^/]*\/)?developers\/(:page|docs|cookbook)/);
+    }
   });
 
   it("keeps specific Accelerate asset rewrites before the generic fallback", () => {
@@ -111,18 +99,6 @@ describe("Cross-app rewrites", () => {
     expectBeforeFileRewrite(
       "/accelerate-assets/_next/:path+",
       `${ACCELERATE_APP_URL}/_next/:path+`,
-    );
-    expectBeforeFileRewrite(
-      "/docs-assets/:path+",
-      `${MINTLIFY_ORIGIN}/docs-assets/:path+`,
-    );
-    expectBeforeFileRewrite(
-      "/mintlify-assets/:path+",
-      `${MINTLIFY_ORIGIN}/mintlify-assets/:path+`,
-    );
-    expectBeforeFileRewrite(
-      "/_mintlify/:path*",
-      `${MINTLIFY_ORIGIN}/_mintlify/:path*`,
     );
   });
 

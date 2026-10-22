@@ -1,27 +1,58 @@
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { MINTLIFY_ORIGIN, templatesAppUrl } from "@@/apps-urls";
+import { templatesAppUrl } from "@@/apps-urls";
 import rewritesAndRedirects from "@@/rewrites-redirects";
-import {
-  buildFallbackRewrites,
-  loadLocaleFallbacks,
-  pageToUrlPath,
-  type LocaleFallback,
-} from "@/lib/docs-edge/fallbacks";
 import { findRepoRoot } from "@/lib/docs-edge/repo-root";
-import { MINTLIFY_LOCALES } from "@/lib/docs-edge/paths";
+import { MINTLIFY_LOCALES as DOCS_LOCALES } from "@/lib/docs-edge/paths";
 import {
   resolve,
   resolveRedirect,
   resolveRewrite,
 } from "./helpers/next-routing";
 
-const M = MINTLIFY_ORIGIN;
 const repoRoot = findRepoRoot()!;
+const docsRoot = path.join(repoRoot, "apps/docs");
 
-function expectRewrite(pathname: string, destination: string) {
-  expect(resolve(pathname)).toMatchObject({ kind: "rewrite", destination });
+/**
+ * True when `pathname` is a docs page this app renders (the Fumadocs routes
+ * under src/app/[locale]/{developers/{docs,cookbook},learn}): its content
+ * file exists in apps/docs, in the locale or (untranslated pages and the
+ * English-only cookbook) in English. `.md` twins and `/index` paths too.
+ */
+function docsPageExists(pathname: string): boolean {
+  let p = pathname.split(/[?#]/)[0].replace(/\.md$/, "").replace(/\/index$/, "");
+  const segments = p.split("/").filter(Boolean);
+  const locale = DOCS_LOCALES.includes(segments[0] ?? "") ? segments[0] : null;
+  const rest = locale ? segments.slice(1) : segments;
+  const isDocs =
+    (rest[0] === "developers" && ["docs", "cookbook"].includes(rest[1] ?? "")) ||
+    (rest[0] === "learn" && rest.length > 1);
+  if (!isDocs) return false;
+  p = rest.join("/");
+  const exists = (base: string) =>
+    [`${base}.mdx`, path.join(base, "index.mdx")].some((f) => fs.existsSync(f));
+  return (
+    (locale !== null && exists(path.join(docsRoot, locale, p))) ||
+    exists(path.join(docsRoot, p))
+  );
+}
+
+function isDocsPath(pathname: string): boolean {
+  const segments = pathname.split("/").filter(Boolean);
+  const rest = DOCS_LOCALES.includes(segments[0] ?? "")
+    ? segments.slice(1)
+    : segments;
+  return (
+    (rest[0] === "developers" && ["docs", "cookbook"].includes(rest[1] ?? "")) ||
+    rest[0] === "learn"
+  );
+}
+
+/** Served by this app's docs routes: no rewrite or redirect, a real page. */
+function expectDocsPage(pathname: string) {
+  expect(resolve(pathname)).toEqual({ kind: "none" });
+  expect(docsPageExists(pathname)).toBe(true);
 }
 
 function expectRedirect(
@@ -40,66 +71,35 @@ function expectAppWebRoute(pathname: string) {
   expect(resolve(pathname)).toEqual({ kind: "none" });
 }
 
-describe("Mintlify origin", () => {
-  it("defaults to the root-hosted *.mintlify.site preview", () => {
-    expect(M).toMatch(/^https?:\/\/[^/]+$/);
-    if (!process.env.MINTLIFY_ORIGIN) {
-      expect(M).toBe("https://solana-f31f4a8d.mintlify.site");
-    }
-  });
-
-  it("no longer proxies anything to the retired solana-com-docs project", () => {
-    const destinations = [
+describe("No docs proxy", () => {
+  it("rewrites nothing to Mintlify any more", () => {
+    const rewrites = [
       ...rewritesAndRedirects.rewrites.beforeFiles,
-      ...rewritesAndRedirects.redirects,
-    ].map((route) => route.destination);
-    for (const destination of destinations) {
-      expect(destination).not.toContain("solana-com-docs");
-      expect(destination).not.toContain("localhost:3003");
-    }
-  });
-
-  it("documents the Enterprise static-export recommendation next to the rewrites", () => {
-    const source = fs.readFileSync(
-      path.join(repoRoot, "apps/web/rewrites-redirects.ts"),
-      "utf8",
-    );
-    expect(source).toContain("RECOMMENDATION: upgrade to Mintlify Enterprise");
-    expect(source).toContain("`mint export`");
-    expect(source).toMatch(/self-hosting as an Enterprise-only feature/);
+      ...rewritesAndRedirects.rewrites.afterFiles,
+      ...rewritesAndRedirects.rewrites.fallback,
+    ];
+    for (const r of rewrites) expect(r.destination).not.toMatch(/mintlify/);
+    for (const source of ["/_mintlify/:path*", "/mintlify-assets/:path+"])
+      expect(rewrites.map((r) => r.source)).not.toContain(source);
   });
 });
 
-describe("Mintlify rewrites", () => {
-  it("proxies the Mintlify runtime, assets and llms files", () => {
-    expectRewrite("/_mintlify/api/v1/e", `${M}/_mintlify/api/v1/e`);
-    expectRewrite(
-      "/mintlify-assets/_next/static/chunks/main.js",
-      `${M}/mintlify-assets/_next/static/chunks/main.js`,
-    );
-    expectRewrite(
+describe("Docs routes", () => {
+  it("serves docs assets and llms files from this app", () => {
+    for (const p of [
       "/docs-assets/assets/docs/core/accounts.svg",
-      `${M}/docs-assets/assets/docs/core/accounts.svg`,
-    );
-    expectRewrite("/llms.txt", `${M}/llms.txt`);
-    expectRewrite("/llms-full.txt", `${M}/llms-full.txt`);
+      "/llms.txt",
+      "/llms-full.txt",
+    ])
+      expect(resolve(p)).toEqual({ kind: "none" });
   });
 
-  it("proxies English docs pages and their markdown twins", () => {
-    expectRewrite("/developers/docs", `${M}/developers/docs`);
-    expectRewrite("/developers/docs.md", `${M}/developers/docs.md`);
-    expectRewrite(
-      "/developers/docs/core/accounts",
-      `${M}/developers/docs/core/accounts`,
-    );
-    expectRewrite(
-      "/developers/docs/core/accounts.md",
-      `${M}/developers/docs/core/accounts.md`,
-    );
-    expectRewrite(
-      "/developers/docs/programs/build-first-program",
-      `${M}/developers/docs/programs/build-first-program`,
-    );
+  it("serves English docs pages and their markdown twins", () => {
+    expectDocsPage("/developers/docs");
+    expectDocsPage("/developers/docs.md");
+    expectDocsPage("/developers/docs/core/accounts");
+    expectDocsPage("/developers/docs/core/accounts.md");
+    expectDocsPage("/developers/docs/programs/build-first-program");
   });
 
   it("redirects every old /docs URL to /developers/docs in one hop", () => {
@@ -114,7 +114,7 @@ describe("Mintlify rewrites", () => {
     // The default locale goes straight to the unprefixed URL.
     expectRedirect("/en/docs", "/developers/docs");
     expectRedirect("/en/docs/core/pda", "/developers/docs/core/pda");
-    for (const locale of MINTLIFY_LOCALES) {
+    for (const locale of DOCS_LOCALES) {
       expectRedirect(`/${locale}/docs`, `/${locale}/developers/docs`);
       expectRedirect(`/${locale}/docs.md`, `/${locale}/developers/docs.md`);
       expectRedirect(
@@ -144,17 +144,11 @@ describe("Mintlify rewrites", () => {
     expect(docsMove?.destination).not.toContain("?");
   });
 
-  it("serves index pages Mintlify would 307 away via their /index path", () => {
-    expectRewrite("/developers/docs/tools", `${M}/developers/docs/tools/index`);
-    expectRewrite(
-      "/fr/developers/docs/tools",
-      `${M}/fr/developers/docs/tools/index`,
-    );
-    expectRewrite(
-      "/developers/docs/tools/kora",
-      `${M}/developers/docs/tools/kora`,
-    );
-    expectRewrite("/developers/docs/tools.md", `${M}/developers/docs/tools.md`);
+  it("serves section index pages at their own path and /index", () => {
+    expectDocsPage("/developers/docs/tools");
+    expectDocsPage("/fr/developers/docs/tools");
+    expectDocsPage("/developers/docs/tools/kora");
+    expectDocsPage("/developers/docs/tools.md");
   });
 
   it("redirects the tokenization hub, merged into the assets hub", () => {
@@ -172,10 +166,7 @@ describe("Mintlify rewrites", () => {
       "/docs/tokenization/token-acl",
       "/developers/docs/tokenization/token-acl",
     );
-    expectRewrite(
-      "/developers/docs/tokenization/token-acl",
-      `${M}/developers/docs/tokenization/token-acl`,
-    );
+    expectDocsPage("/developers/docs/tokenization/token-acl");
   });
 
   it("sends merged duplicate pages straight to their final page", () => {
@@ -197,7 +188,7 @@ describe("Mintlify rewrites", () => {
     );
   });
 
-  it("serves per-section llms.txt from apps/web, not Mintlify", () => {
+  it("serves per-section llms.txt from its own route", () => {
     expectAppWebRoute("/developers/docs/payments/llms.txt");
     expectAppWebRoute("/developers/docs/finance/llms.txt");
     // The old URL redirects to the new one.
@@ -205,43 +196,36 @@ describe("Mintlify rewrites", () => {
       "/docs/payments/llms.txt",
       "/developers/docs/payments/llms.txt",
     );
-    // Deeper paths are not apps/web routes and stay with Mintlify.
-    expectRewrite(
-      "/developers/docs/core/accounts/llms.txt",
-      `${M}/developers/docs/core/accounts/llms.txt`,
+    // Deeper paths have no llms.txt route (they are not docs pages either).
+    expect(resolve("/developers/docs/core/accounts/llms.txt")).toEqual({
+      kind: "none",
+    });
+    expect(docsPageExists("/developers/docs/core/accounts/llms.txt")).toBe(
+      false,
     );
   });
 
-  it("proxies localized docs for the 17 Mintlify locales", () => {
-    expect(MINTLIFY_LOCALES).toHaveLength(17);
-    expect(MINTLIFY_LOCALES).not.toContain("el");
-    expect(MINTLIFY_LOCALES).not.toContain("en");
-    for (const locale of MINTLIFY_LOCALES) {
-      expectRewrite(
-        `/${locale}/developers/docs`,
-        `${M}/${locale}/developers/docs`,
-      );
-      expectRewrite(
-        `/${locale}/developers/docs/core/accounts`,
-        `${M}/${locale}/developers/docs/core/accounts`,
-      );
+  it("serves localized docs for the 17 docs locales", () => {
+    expect(DOCS_LOCALES).toHaveLength(17);
+    expect(DOCS_LOCALES).not.toContain("el");
+    expect(DOCS_LOCALES).not.toContain("en");
+    for (const locale of DOCS_LOCALES) {
+      expectDocsPage(`/${locale}/developers/docs`);
+      expectDocsPage(`/${locale}/developers/docs/core/accounts`);
     }
-    expectRewrite("/ja/developers/docs.md", `${M}/ja/developers/docs.md`);
-    expectRewrite(
-      "/zh/developers/docs/core/pda.md",
-      `${M}/zh/developers/docs/core/pda.md`,
-    );
+    expectDocsPage("/ja/developers/docs.md");
+    expectDocsPage("/zh/developers/docs/core/pda.md");
   });
 
-  it("does not proxy unknown first segments as locales", () => {
+  it("does not treat unknown first segments as locales", () => {
     expectAppWebRoute("/xx/docs/core/accounts");
     expectAppWebRoute("/xx/developers/docs/core/accounts");
   });
 
-  it("proxies learn articles but leaves the /learn landing to apps/web", () => {
-    expectRewrite("/learn/what-is-solana", `${M}/learn/what-is-solana`);
-    expectRewrite("/learn/what-is-solana.md", `${M}/learn/what-is-solana.md`);
-    expectRewrite("/fr/learn/what-is-solana", `${M}/fr/learn/what-is-solana`);
+  it("serves learn articles and leaves the /learn landing to its page", () => {
+    expectDocsPage("/learn/what-is-solana");
+    expectDocsPage("/learn/what-is-solana.md");
+    expectDocsPage("/fr/learn/what-is-solana");
     expectAppWebRoute("/learn");
     expectAppWebRoute("/fr/learn");
   });
@@ -250,30 +234,24 @@ describe("Mintlify rewrites", () => {
     expectAppWebRoute("/developers");
     expectAppWebRoute("/fr/developers");
     expectAppWebRoute("/developers.md");
-    // Only /developers/docs is proxied, not its look-alikes.
+    // Only /developers/docs is the docs, not its look-alikes.
     expectAppWebRoute("/developers/docsy");
     expectAppWebRoute("/developers/payments");
   });
 
   it("keeps /developers/templates on the templates app", () => {
-    expectRewrite(
-      "/developers/templates/foo",
-      `${templatesAppUrl}/developers/templates/foo`,
-    );
+    expect(resolve("/developers/templates/foo")).toMatchObject({
+      kind: "rewrite",
+      destination: `${templatesAppUrl}/developers/templates/foo`,
+    });
   });
 
   it("serves the English cookbook at localized URLs", () => {
-    expectRewrite("/developers/cookbook", `${M}/developers/cookbook`);
-    expectRewrite("/developers/cookbook.md", `${M}/developers/cookbook.md`);
-    expectRewrite(
-      "/developers/cookbook/wallets/create-keypair",
-      `${M}/developers/cookbook/wallets/create-keypair`,
-    );
-    expectRewrite("/fr/developers/cookbook", `${M}/developers/cookbook`);
-    expectRewrite(
-      "/ko/developers/cookbook/wallets/create-keypair.md",
-      `${M}/developers/cookbook/wallets/create-keypair.md`,
-    );
+    expectDocsPage("/developers/cookbook");
+    expectDocsPage("/developers/cookbook.md");
+    expectDocsPage("/developers/cookbook/wallets/create-keypair");
+    expectDocsPage("/fr/developers/cookbook");
+    expectDocsPage("/ko/developers/cookbook/wallets/create-keypair.md");
   });
 
   it("drops the retired docs-app rewrites", () => {
@@ -296,81 +274,31 @@ describe("Mintlify rewrites", () => {
 });
 
 describe("English fallbacks for untranslated locale pages", () => {
-  const fallbacks = loadLocaleFallbacks(repoRoot);
+  const file = path.join(
+    repoRoot,
+    "packages/docs-tooling/generated/locale-fallbacks.json",
+  );
+  const fallbacks: { loc: string; path: string; collection: string }[] =
+    fs.existsSync(file)
+      ? JSON.parse(fs.readFileSync(file, "utf8")).fallbacks
+      : [];
 
-  it("rewrites every missing translation to the English page", () => {
+  it("answers every missing translation with the English page", () => {
     for (const fallback of fallbacks) {
       const prefix =
-        fallback.collection === "docs"
-          ? "/developers/docs"
-          : fallback.collection === "bootcamp"
-            ? "/developers/bootcamp"
-            : "/learn";
-      const urlPath = pageToUrlPath(fallback.path);
+        fallback.collection === "docs" ? "/developers/docs" : "/learn";
+      const urlPath = fallback.path.replace(/(^|\/)index$/, "");
       const english = urlPath ? `${prefix}/${urlPath}` : prefix;
-      // resolveRewrite: a legacy redirect, if any, wins over the fallback,
-      // exactly as it did before.
-      expect(resolveRewrite(`/${fallback.loc}${english}`)).toMatchObject({
-        destination: `${M}${english}`,
-      });
-      expect(resolveRewrite(`/${fallback.loc}${english}.md`)).toMatchObject({
-        destination: `${M}${english}.md`,
-      });
+      // A legacy redirect, if any, wins over the fallback, as before.
+      if (resolveRedirect(`/${fallback.loc}${english}`).kind === "redirect")
+        continue;
+      expect(docsPageExists(`/${fallback.loc}${english}`)).toBe(true);
     }
-  });
-
-  it("compiles the fallbacks into a handful of grouped rules", () => {
-    const rules = buildFallbackRewrites(fallbacks, M);
-    expect(rules.length).toBeLessThanOrEqual(20);
-  });
-
-  it("groups pages by the locales that miss them", () => {
-    const sample: LocaleFallback[] = [
-      { loc: "fr", path: "video-guides/index", collection: "docs" },
-      { loc: "de", path: "video-guides/index", collection: "docs" },
-      { loc: "fr", path: "research", collection: "docs" },
-      { loc: "fr", path: "index", collection: "learn" },
-    ];
-    expect(buildFallbackRewrites(sample, "https://m")).toEqual([
-      {
-        source: "/:locale(de|fr)/developers/docs/:path(video-guides)",
-        destination: "https://m/developers/docs/:path",
-        locale: false,
-      },
-      {
-        source: "/:locale(de|fr)/developers/docs/:path(video-guides).md",
-        destination: "https://m/developers/docs/:path.md",
-        locale: false,
-      },
-      {
-        source: "/:locale(fr)/developers/docs/:path(research)",
-        destination: "https://m/developers/docs/:path",
-        locale: false,
-      },
-      {
-        source: "/:locale(fr)/developers/docs/:path(research).md",
-        destination: "https://m/developers/docs/:path.md",
-        locale: false,
-      },
-      {
-        source: "/:locale(fr)/learn",
-        destination: "https://m/learn",
-        locale: false,
-      },
-      {
-        source: "/:locale(fr)/learn.md",
-        destination: "https://m/learn.md",
-        locale: false,
-      },
-    ]);
   });
 
   it("does not shadow translated pages", () => {
     // A translated page keeps its own locale URL.
-    expectRewrite(
-      "/fr/developers/docs/core/accounts",
-      `${M}/fr/developers/docs/core/accounts`,
-    );
+    expectDocsPage("/fr/developers/docs/core/accounts");
   });
 });
 
@@ -442,7 +370,7 @@ describe("Docs redirects", () => {
       false,
     );
     expectRedirect("/docs/tags", "/developers/docs/tags");
-    expectRewrite("/developers/docs/tags", `${M}/developers/docs/tags`);
+    expectDocsPage("/developers/docs/tags");
   });
 
   it("sends old advanced/transaction URLs straight to existing pages", () => {
@@ -459,7 +387,7 @@ describe("Docs redirects", () => {
     ]) {
       expectRedirect(from, to);
       expect(resolveRedirect(to)).toEqual({ kind: "none" });
-      expect(resolveRewrite(to).kind).toBe("rewrite");
+      expectDocsPage(to);
     }
   });
 
@@ -569,13 +497,14 @@ describe("Legacy URL parity", () => {
   const landing = /^(\/[a-z]{2})?\/(developers|learn)$/;
 
   it.skipIf(legacy.length === 0)(
-    "routes every legacy docs URL to Mintlify, a redirect or an apps/web landing",
+    "routes every legacy docs URL to a docs page, a redirect or an apps/web landing",
     () => {
       const unrouted: string[] = [];
       for (const url of legacy) {
         if (landing.test(url)) continue;
         for (const candidate of [url, `${url}.md`]) {
-          if (resolve(candidate).kind === "none") unrouted.push(candidate);
+          if (resolve(candidate).kind === "none" && !docsPageExists(candidate))
+            unrouted.push(candidate);
         }
       }
       expect(unrouted).toEqual([]);
@@ -607,42 +536,28 @@ describe("Legacy URL parity", () => {
     60_000,
   );
 
-  // Reaching Mintlify is not enough: the page must exist there too (the
-  // locale-only programs/faq.md twins once reached Mintlify and 404'd).
+  // A docs path is not enough: the page must exist too (the locale-only
+  // programs/faq.md twins once 404'd).
   it.skipIf(legacy.length === 0)(
-    "finds an apps/docs file for every legacy URL and .md twin served by Mintlify",
+    "finds an apps/docs file for every legacy URL and .md twin served as a docs page",
     () => {
-      const docsRoot = path.join(repoRoot, "apps/docs");
-      const fileExists = (target: string) => {
-        const base = path.join(docsRoot, target || "index");
-        return [
-          `${base}.mdx`,
-          `${base}.md`,
-          path.join(base, "index.mdx"),
-          path.join(base, "index.md"),
-        ].some((f) => fs.existsSync(f));
-      };
       const missing: string[] = [];
       for (const url of legacy) {
         if (landing.test(url)) continue;
         for (const candidate of [url, `${url}.md`]) {
+          let target = candidate;
           let r = resolve(candidate);
           for (
             let hop = 0;
             hop < 3 && r.kind === "redirect" && r.destination.startsWith("/");
             hop++
           ) {
-            r = resolve(r.destination.split("#")[0].split("?")[0]);
+            target = r.destination.split("#")[0].split("?")[0];
+            r = resolve(target);
           }
-          if (r.kind !== "rewrite" || !r.destination.startsWith(M)) continue;
-          const target = r.destination
-            .slice(M.length)
-            .replace(/^\/+/, "")
-            .replace(/\.md$/, "");
-          // Assets and Mintlify-generated files are not pages.
-          if (/\.[a-z0-9]+$/i.test(target)) continue;
-          if (!fileExists(target))
-            missing.push(`${candidate} -> ${r.destination}`);
+          if (r.kind !== "none") continue;
+          if (!isDocsPath(target)) continue;
+          if (!docsPageExists(target)) missing.push(`${candidate} -> ${target}`);
         }
       }
       expect(missing).toEqual([]);
@@ -666,7 +581,11 @@ describe("Legacy URL parity", () => {
         if (!destination.startsWith("/")) continue;
         const target = destination.split("#")[0].split("?")[0];
         if (landing.test(target)) continue;
-        if (resolveRewrite(target).kind === "none") {
+        if (
+          resolveRewrite(target).kind === "none" &&
+          isDocsPath(target) &&
+          !docsPageExists(target)
+        ) {
           dangling.push(`${url} -> ${destination}`);
         }
       }

@@ -12,9 +12,6 @@
  *                   transforms/dollar-escape.ts). Pages and snippets.
  *  3. navigation    exact nav coverage (src/nav/verify-nav.ts) + legacy URL
  *                   parity (src/verify/verify-urls.ts)
- *     + index pages whose sub-pages come earlier in nav order (Mintlify
- *     307s those to the first sub-page; apps/web must rewrite them, see
- *     MINTLIFY_INDEX_SHADOWED in apps/web/rewrites-redirects.ts)
  *  4. frontmatter   parses; `type` in the allowed enum (dropped keys are
  *                   residual patterns)
  *  5. assets        every /docs-assets/* reference exists; themed pairs
@@ -59,7 +56,6 @@ export const GENERATOR_CHECKS: [string, string[]][] = [
     "gen:manifest/llms/redirects --check",
     ["src/manifest/cli.ts", "all", "--check"],
   ],
-  ["gen:docs-head --check", ["src/generators/docs-head.ts", "--check"]],
 ];
 
 interface Check {
@@ -225,30 +221,6 @@ export async function runVerify(
       ...urls.stray.map((s) => `stray ${s}`),
       `missing translations (reported, not failing): ${urls.missingTranslations.length}`,
     ],
-  });
-
-  const rewritesSrc = readFileSync(
-    path.join(repoRoot, "apps/web/rewrites-redirects.ts"),
-    "utf8",
-  );
-  const listed = new Set(
-    (/MINTLIFY_INDEX_SHADOWED = \[([^\]]*)\]/.exec(rewritesSrc)?.[1] ?? "")
-      .split(",")
-      .map((x) => x.trim().replace(/^"|"$/g, ""))
-      .filter(Boolean),
-  );
-  const shadowed = shadowedIndexPages();
-  const unhandled = shadowed.filter((p) => {
-    const m = /^developers\/docs\/([^/]+)\/index$/.exec(p);
-    return !m || !listed.has(m[1]!);
-  });
-  checks.push({
-    name: `index pages shadowed by earlier sub-pages handled by apps/web (${shadowed.join(", ") || "none"})`,
-    ok: unhandled.length === 0,
-    detail: unhandled.map(
-      (p) =>
-        `${p}: reorder navigation/en.json or add it to MINTLIFY_INDEX_SHADOWED`,
-    ),
   });
 
   checks.push({

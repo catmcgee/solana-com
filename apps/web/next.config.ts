@@ -51,6 +51,8 @@ const svgrOptions = {
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  // apps/web keeps its own AGENTS.md; `next dev` must not rewrite it.
+  agentRules: false,
   productionBrowserSourceMaps: false,
   trailingSlash: false,
   // Pages are TypeScript only; MDX is compiled by Fumadocs for the docs.
@@ -59,6 +61,33 @@ const nextConfig: NextConfig = {
   // The epoch1000 OG card reads font files from disk at request time
   outputFileTracingIncludes: {
     "/api/epoch1000/og": ["./assets/fonts/epoch1000/*.woff"],
+    // The developer social images read their backgrounds and fonts.
+    "/opengraph/developers/[[...slug]]": [
+      "./public/img/og-backgrounds/*.jpg",
+      "./public/img/logomark-color.svg",
+      "./src/fonts/diatype/ABCDiatype-Medium.woff",
+      "./src/fonts/diatype/ABCDiatype-Bold.woff",
+    ],
+    // Translated docs pages are compiled on first request (fumadocs-mdx
+    // `dynamic`, source.config.ts) from their sources and the snippets.
+    ...Object.fromEntries(
+      [
+        "/[locale]/developers/docs/[[...slug]]",
+        "/[locale]/developers/cookbook/[[...slug]]",
+        "/[locale]/learn/[...slug]",
+        "/api/markdown/[...slug]",
+        "/mcp",
+        "/llms-full.txt",
+      ].map((route) => [
+        route,
+        [
+          "../docs/{ar,de,es,fi,fr,id,it,ja,ko,nl,pl,pt,ru,tr,uk,vi,zh}/**/*.mdx",
+          "../docs/snippets/**/*.mdx",
+        ],
+      ]),
+    ),
+    // /llms.txt is the index generated in apps/docs.
+    "/llms.txt": ["../docs/llms.txt"],
   },
 
   async rewrites() {

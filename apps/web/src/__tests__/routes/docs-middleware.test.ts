@@ -39,7 +39,7 @@ function matchesMiddleware(pathname: string) {
 }
 
 describe("docs path detection", () => {
-  it("recognises Mintlify-served paths with and without a locale", () => {
+  it("recognises docs paths with and without a locale", () => {
     for (const path of [
       "/developers/docs",
       "/developers/docs.md",
@@ -143,15 +143,21 @@ describe("docs path normalisation", () => {
     );
   });
 
-  it("passes canonical docs requests through to the Mintlify rewrite", () => {
+  it("leaves canonical docs pages to the locale routing", () => {
     for (const path of [
       "/developers/docs/core/accounts",
       "/docs/core/accounts",
     ]) {
-      const res = handleDocsRequest(request(path), fakeEvent());
-      expect(res?.status, path).toBe(200);
-      expect(res?.headers.get("x-middleware-next"), path).toBe("1");
+      expect(handleDocsRequest(request(path), fakeEvent()), path).toBeNull();
     }
+  });
+
+  it("lets per-section llms.txt reach its route", () => {
+    const res = handleDocsRequest(
+      request("/developers/docs/payments/llms.txt"),
+      fakeEvent(),
+    );
+    expect(res?.headers.get("x-middleware-next")).toBe("1");
   });
 
   it("returns null for non-docs paths", () => {
@@ -192,7 +198,10 @@ describe("markdown request analytics", () => {
     const event = fakeEvent();
     const res = handleDocsRequest(request("/fr/docs/core/accounts.md"), event);
 
-    expect(res?.headers.get("x-middleware-next")).toBe("1");
+    // Rewritten to the Markdown route.
+    expect(res?.headers.get("x-middleware-rewrite")).toBe(
+      "https://solana.com/api/markdown/fr/docs/core/accounts",
+    );
     expect(event.waited).toHaveLength(1);
     await Promise.all(event.waited);
 
@@ -262,7 +271,9 @@ describe("markdown request analytics", () => {
       request("/docs/core.md"),
       event as unknown as Parameters<typeof middleware>[1],
     );
-    expect(res.headers.get("x-middleware-next")).toBe("1");
+    expect(res.headers.get("x-middleware-rewrite")).toBe(
+      "https://solana.com/api/markdown/docs/core",
+    );
     expect(event.waited).toHaveLength(1);
   });
 });
@@ -314,15 +325,17 @@ describe("middleware matcher", () => {
     expect(matchesMiddleware("/developers")).toBe(true);
     expect(isProxiedPath("/learn")).toBe(false);
     expect(isProxiedPath("/developers")).toBe(false);
-    expect(isProxiedPath("/learn/what-is-solana")).toBe(true);
-    expect(isProxiedPath("/developers/docs/core")).toBe(true);
+    // The docs are this app's pages now, with locale routing.
+    expect(isProxiedPath("/learn/what-is-solana")).toBe(false);
+    expect(isProxiedPath("/developers/docs/core")).toBe(false);
   });
 
-  it("skips Mintlify runtime and asset paths", () => {
+  it("skips docs assets, MCP and other files", () => {
     for (const path of [
-      "/_mintlify/api/v1/e",
-      "/mintlify-assets/_next/static/chunks/main.js",
       "/docs-assets/assets/docs/core/accounts.svg",
+      "/docs-scripts/ask-ai.js",
+      "/mcp",
+      "/llms.txt",
     ]) {
       expect(matchesMiddleware(path), path).toBe(false);
     }
