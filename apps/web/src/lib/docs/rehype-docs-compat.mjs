@@ -142,8 +142,11 @@ function quotes(node, state = { prev: "" }) {
   for (const child of node.children ?? []) quotes(child, inner);
 }
 
-/** Markdown images (not JSX <img>) get the docs' rounded corners. */
-function roundImages(node) {
+/**
+ * Markdown images and tables (not JSX <img>/<table>): images get the docs'
+ * rounded corners, tables are marked for the scrolling table frame.
+ */
+function markMarkdown(node) {
   if (node.type === "element" && node.tagName === "img") {
     const cls = node.properties.className ?? [];
     node.properties.className = [
@@ -151,7 +154,9 @@ function roundImages(node) {
       "rounded",
     ];
   }
-  for (const child of node.children ?? []) roundImages(child);
+  if (node.type === "element" && node.tagName === "table")
+    node.properties.dataMdTable = "";
+  for (const child of node.children ?? []) markMarkdown(child);
 }
 
 export function rehypeDocsCompat() {
@@ -159,6 +164,6 @@ export function rehypeDocsCompat() {
     strip(tree);
     stepTitles(tree);
     quotes(tree);
-    roundImages(tree);
+    markMarkdown(tree);
   };
 }

@@ -264,7 +264,14 @@ export function Card({
               {children}
             </div>
           ) : null}
-          {cta ? <div className="card-cta">{cta}</div> : null}
+          {cta ? (
+            <div className="card-cta">
+              <span className="card-cta-button">
+                {cta}
+                <ChevronIcon className="card-cta-icon" />
+              </span>
+            </div>
+          ) : null}
         </div>
       </div>
     </>
@@ -1052,6 +1059,9 @@ function Anchor({
 }
 
 function Table(props: ComponentProps<"table">) {
+  // A <table> written in a page renders as written.
+  if (!(props as Record<string, unknown>)["data-md-table"])
+    return <table {...props} />;
   return (
     <div className="table-wrap" data-table-wrapper="true">
       <div className="table-scroll" role="region">
