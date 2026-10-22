@@ -2,7 +2,7 @@
 /* global console */
 /**
  * One-time: move the docs entries of `.lingo/lock.json` to the docs Lingo
- * project (`apps/docs/.lingo/lock.json`) and re-key them to the Mintlify
+ * project (`apps/docs/.lingo/lock.json`) and re-key them to the apps/docs
  * layout (see projects.mjs and packages/docs-tooling/src/move/rules.ts):
  *
  *   apps/docs/content/docs/en/X               -> docs/X

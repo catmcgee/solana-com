@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(scriptDir, "../..");
-// The Mintlify project: English collections plus every locale folder.
+// The docs content: English collections plus every locale folder.
 const docsDir = path.join(rootDir, "apps/docs");
 const NON_CONTENT = new Set([
   "snippets",

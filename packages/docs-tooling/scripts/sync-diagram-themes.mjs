@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 // Moved from apps/docs/scripts (Fumadocs app) to packages/docs-tooling/scripts.
-// Diagrams now live in the Mintlify project's docs-assets folder.
+// Diagrams now live in apps/docs/docs-assets.
 const docsRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "..",

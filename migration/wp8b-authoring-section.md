@@ -16,8 +16,8 @@ English page. This holds even when a locale has no concepts JSON yet: the chip
 text is English, but the link goes to the translated page.
 
 **Rule for anything that must read without JavaScript.** Never use `{…}` expression
-children in an MDX snippet. Mintlify's server render drops them, and the text then
-exists only in the client payload. Raw `<nav>`, `<details>`, `<noscript>` and
+children in an MDX snippet. The SSR probe showed the server render dropping them,
+and the text then existed only in the client payload. Raw `<nav>`, `<details>`, `<noscript>` and
 `<abbr>` are dropped too. Tooltip `tip`/`headline`/`cta`/`href` are client-only.
 
 | Want | Write |

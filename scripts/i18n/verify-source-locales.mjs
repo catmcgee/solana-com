@@ -2,7 +2,7 @@ import path from "node:path";
 import process from "node:process";
 import { loadProjects, repoRoot } from "./projects.mjs";
 
-// Locales the docs never target (decisions.md: Mintlify has no Greek). The UI
+// Locales the docs never target (decisions.md: no Greek). The UI
 // bundles keep translating them.
 const DOCS_DROPPED_LOCALES = ["el"];
 

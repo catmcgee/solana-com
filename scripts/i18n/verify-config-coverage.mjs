@@ -4,7 +4,7 @@ import process from "node:process";
 import { loadProjects, repoRoot } from "./projects.mjs";
 
 // English sources each Lingo project must cover (project-relative globs).
-// Docs: the Mintlify layout (apps/docs/{docs,learn,developers/bootcamp}) and
+// Docs: the apps/docs layout (apps/docs/{docs,learn,developers/bootcamp}) and
 // the navigation label bucket. The cookbook (developers/cookbook) is
 // English-only by design and has no Lingo bucket.
 const expectedSourcePatterns = {

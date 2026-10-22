@@ -3,8 +3,8 @@
  *
  * - `ui`   (repo root, `.lingo/config.json`): the next-intl message bundles in
  *   packages/i18n/messages. Targets every UI locale, including Greek.
- * - `docs` (`apps/docs/.lingo/config.json`): the Mintlify docs. Greek is not
- *   a target (decisions.md: Mintlify has no `el`).
+ * - `docs` (`apps/docs/.lingo/config.json`): the developer docs content.
+ *   Greek is not a target (decisions.md: no `el`).
  *
  * Lingo CLI 1.16 has one global `targetLocales` per config, so dropping `el`
  * from the docs only is possible with a second project. The CLI finds its

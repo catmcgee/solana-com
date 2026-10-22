@@ -40,7 +40,7 @@ test("derives target paths like the Lingo CLI", () => {
   );
 });
 
-test("re-keys legacy lock entries to the Mintlify layout", () => {
+test("re-keys legacy lock entries to the apps/docs layout", () => {
   assert.deepEqual(rekey("apps/docs/content/docs/en/core/fees.mdx"), {
     key: "docs/core/fees.mdx",
   });
@@ -77,7 +77,7 @@ test("committed Lingo projects: docs drops Greek, UI keeps it, lock keys resolve
   assert.ok(
     docsKeys.every((k) => !k.startsWith("apps/") && !k.startsWith("el/")),
   );
-  // Every docs lock key names a file in the Mintlify layout (allow files that
+  // Every docs lock key names a file in the apps/docs layout (allow files that
   // other work packages delete later, but not a majority).
   const missing = docsKeys.filter(
     (k) => !fs.existsSync(path.join(repoRoot, "apps/docs", k)),
