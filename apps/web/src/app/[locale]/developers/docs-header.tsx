@@ -269,7 +269,7 @@ export async function DocsHeader({
                         label={t("language")}
                         className="dh-lang dh-drawer-select dh-drawer-lang"
                         paths={languagePaths}
-            names={languageNames}
+                        names={languageNames}
                       />
                       <details className="dh-drawer-select dh-drawer-tabs">
                         <summary>
@@ -304,9 +304,12 @@ export async function DocsHeader({
                     label={t("language")}
                     className="dh-lang dh-lang-mobile"
                     paths={languagePaths}
-            names={languageNames}
+                    names={languageNames}
                   />
-                  <ThemeToggle {...toggle} className="dh-theme dh-theme-mobile" />
+                  <ThemeToggle
+                    {...toggle}
+                    className="dh-theme dh-theme-mobile"
+                  />
                 </div>
               </div>
             </details>

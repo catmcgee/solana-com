@@ -395,10 +395,7 @@ export function HeaderMenus({ rootId }: { rootId: string }) {
       // The phone menu's backdrop and close button, and links in it.
       const closer = target.closest?.("[data-dh-close], .dh-drawer-panel a");
       for (const menu of menus())
-        if (
-          !menu.contains(target) ||
-          (closer && menu.contains(closer))
-        )
+        if (!menu.contains(target) || (closer && menu.contains(closer)))
           menu.open = false;
     };
     const onKey = (event: KeyboardEvent) => {

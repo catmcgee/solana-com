@@ -37,7 +37,10 @@ function Item({
   current: string;
 }) {
   // Links out of the docs (nav links, pages with a `url`) open in a new tab.
-  if (node.kind === "link" || (node.kind === "page" && /^https?:/.test(node.url))) {
+  if (
+    node.kind === "link" ||
+    (node.kind === "page" && /^https?:/.test(node.url))
+  ) {
     return (
       <li className="sidebar-item" data-title={node.title}>
         <a

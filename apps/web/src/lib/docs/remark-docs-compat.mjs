@@ -235,7 +235,8 @@ function hasApiExamples(node) {
 export function remarkDocsCompat() {
   const processor = this;
   return (tree, file) => {
-    for (const node of tree.children) if (isComment(node)) replaceSource(file, node, "");
+    for (const node of tree.children)
+      if (isComment(node)) replaceSource(file, node, "");
     inlineSnippets(processor, tree, file);
     // After inlining, so stand-ins imported by snippets go too.
     dropStandInImports(tree);

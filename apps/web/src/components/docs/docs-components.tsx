@@ -691,25 +691,27 @@ function CodeBody({ pre, rounded }: { pre: PreProps; rounded?: boolean }) {
   const collapse = expandable === "true" && count > 8;
   return (
     <>
-    <div
-      role="presentation"
-      data-component-part="code-block-root"
-      className={
-        rounded ? "code-block-root code-block-root-rounded" : "code-block-root"
-      }
-      data-expandable={collapse ? "" : undefined}
-      data-wrap={wrap ? "" : undefined}
-      data-lines={lines ? "" : undefined}
-      style={collapse ? { height: "190px" } : undefined}
-    >
       <div
-        data-component-part="scroll-area-viewport"
-        className="code-block-viewport"
+        role="presentation"
+        data-component-part="code-block-root"
+        className={
+          rounded
+            ? "code-block-root code-block-root-rounded"
+            : "code-block-root"
+        }
+        data-expandable={collapse ? "" : undefined}
+        data-wrap={wrap ? "" : undefined}
+        data-lines={lines ? "" : undefined}
+        style={collapse ? { height: "190px" } : undefined}
       >
-        <pre {...rest}>{children}</pre>
+        <div
+          data-component-part="scroll-area-viewport"
+          className="code-block-viewport"
+        >
+          <pre {...rest}>{children}</pre>
+        </div>
       </div>
-    </div>
-    {collapse ? <CodeExpandFooter count={count} /> : null}
+      {collapse ? <CodeExpandFooter count={count} /> : null}
     </>
   );
 }

@@ -141,8 +141,7 @@ export function Rate({
               <div>
                 {streaming ? (
                   <button type="button" className="docs-rate-action" disabled>
-                    Searching for additional resources you might find
-                    helpful...
+                    Searching for additional resources you might find helpful...
                   </button>
                 ) : response ? (
                   <button

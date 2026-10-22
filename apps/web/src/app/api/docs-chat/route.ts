@@ -48,15 +48,11 @@ function searchTool(locale: string) {
     async execute({ query, limit }): Promise<InferToolOutput<DocsSearchTool>> {
       const hits = await docsSearchServer.search(query, { locale });
       const urls = [
-        ...new Set(
-          hits.map((hit) => hit.url.split("#")[0]).filter(Boolean),
-        ),
+        ...new Set(hits.map((hit) => hit.url.split("#")[0]).filter(Boolean)),
       ].slice(0, limit);
       return Promise.all(
         urls.map(async (url) => {
-          const page = docsSource
-            .getPages()
-            .find((p) => p.url === url);
+          const page = docsSource.getPages().find((p) => p.url === url);
           if (!page) return { doc: null };
           const data = page.data as unknown as {
             title: string;
