@@ -498,7 +498,7 @@ export async function DevelopersHub({
             {WHY_REASONS.map((id) => (
               <li
                 key={id}
-                className="rounded-2xl border border-[var(--dl-purple-line)] bg-[var(--dl-purple-soft)] p-5"
+                className="rounded-2xl border border-[var(--dl-box-line)] bg-[var(--dl-purple-soft)] p-5"
               >
                 <h3 className="m-0 mb-1.5 font-brand text-base font-medium leading-snug tracking-[-0.01em] text-[var(--dl-text)]">
                   {t(`why.reasons.${id}.title`)}
@@ -702,7 +702,7 @@ export async function DevelopersHub({
             })}
           </ul>
           <div
-            className="mt-3 flex flex-col gap-3 rounded-2xl border border-[var(--dl-purple-line)] bg-[var(--dl-purple-soft)] px-5 py-4 sm:flex-row sm:items-center sm:justify-between"
+            className="mt-3 flex flex-col gap-3 rounded-2xl border border-[var(--dl-box-line)] bg-[var(--dl-purple-soft)] px-5 py-4 sm:flex-row sm:items-center sm:justify-between"
             data-testid="hackathons"
           >
             <div>
@@ -742,7 +742,7 @@ export async function DevelopersHub({
           />
           <div
             id="newsletter"
-            className="mb-6 flex flex-col items-start justify-between gap-5 rounded-2xl border border-[var(--dl-purple-line)] bg-[var(--dl-purple-soft)] px-6 py-6 md:flex-row md:items-center md:px-8"
+            className="mb-6 flex flex-col items-start justify-between gap-5 rounded-2xl border border-[var(--dl-box-line)] bg-[var(--dl-purple-soft)] px-6 py-6 md:flex-row md:items-center md:px-8"
           >
             <div>
               <h3
