@@ -173,6 +173,53 @@ export function CopyCodeButton({ className }: { className?: string }) {
   );
 }
 
+/**
+ * "See all N lines" under a collapsed (expandable) code block; toggles the
+ * block open and to "Collapse".
+ */
+export function CodeExpandFooter({ count }: { count: number }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(false);
+  return (
+    <div
+      ref={ref}
+      data-component-part="code-block-footer"
+      className="code-block-footer"
+    >
+      <button
+        type="button"
+        data-component-part="code-block-footer-button"
+        className="code-block-expand"
+        data-lines-count={count}
+        aria-expanded={open}
+        onClick={() => {
+          const block = ref.current?.closest(".code-block");
+          if (open) block?.removeAttribute("data-expanded");
+          else block?.setAttribute("data-expanded", "");
+          setOpen(!open);
+        }}
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="18"
+          height="18"
+          viewBox="0 0 18 18"
+          fill="currentColor"
+          stroke="currentColor"
+          strokeWidth="2"
+          aria-hidden="true"
+          className="code-block-expand-icon"
+        >
+          <path d="M9 9.5C9.27614 9.5 9.5 9.27614 9.5 9C9.5 8.72386 9.27614 8.5 9 8.5C8.72386 8.5 8.5 8.72386 8.5 9C8.5 9.27614 8.72386 9.5 9 9.5Z" />
+          <path d="M3.25 9.5C3.52614 9.5 3.75 9.27614 3.75 9C3.75 8.72386 3.52614 8.5 3.25 8.5C2.97386 8.5 2.75 8.72386 2.75 9C2.75 9.27614 2.97386 9.5 3.25 9.5Z" />
+          <path d="M14.75 9.5C15.0261 9.5 15.25 9.27614 15.25 9C15.25 8.72386 15.0261 8.5 14.75 8.5C14.4739 8.5 14.25 8.72386 14.25 9C14.25 9.27614 14.4739 9.5 14.75 9.5Z" />
+        </svg>
+        <span>{open ? "Collapse" : `See all ${count} lines`}</span>
+      </button>
+    </div>
+  );
+}
+
 /** Event the docs Ask AI listens for: ask about a code block. */
 export const DOCS_ASK_CODE_EVENT = "docs-ask-ai:code";
 

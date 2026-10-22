@@ -19,6 +19,7 @@ import {
 import { icons as lucideIcons } from "lucide";
 import {
   CodeGroupClient,
+  CodeExpandFooter,
   AskCodeButton,
   CopyCodeButton,
   TabsClient,
@@ -294,7 +295,7 @@ export function Columns({
   const n = Number(cols) || 2;
   return (
     <div
-      className="columns not-prose"
+      className="columns prose"
       data-cols={n}
       style={{ "--cols": n } as CSSProperties}
     >
@@ -689,6 +690,7 @@ function CodeBody({ pre, rounded }: { pre: PreProps; rounded?: boolean }) {
   const count = lineCount(children);
   const collapse = expandable === "true" && count > 8;
   return (
+    <>
     <div
       role="presentation"
       data-component-part="code-block-root"
@@ -706,22 +708,9 @@ function CodeBody({ pre, rounded }: { pre: PreProps; rounded?: boolean }) {
       >
         <pre {...rest}>{children}</pre>
       </div>
-      {collapse ? (
-        <div
-          data-component-part="code-block-footer"
-          className="code-block-footer"
-        >
-          <button
-            type="button"
-            data-component-part="code-block-footer-button"
-            className="code-block-expand"
-            data-lines-count={count}
-          >
-            <span>See all {count} lines</span>
-          </button>
-        </div>
-      ) : null}
     </div>
+    {collapse ? <CodeExpandFooter count={count} /> : null}
+    </>
   );
 }
 

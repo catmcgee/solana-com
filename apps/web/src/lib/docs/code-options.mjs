@@ -84,6 +84,11 @@ const transformerDocsLines = {
     if (focus && parseRanges(focus).has(line))
       this.addClassToHast(node, "line-focus");
   },
+  // Every line ends with a newline, the last one too, as the docs have
+  // rendered code: a fence that ends with a blank line shows it.
+  code(node) {
+    node.children.push({ type: "text", value: "\n" });
+  },
   pre(node) {
     node.properties["data-language"] = this.options.lang;
     if (this.options.meta?.["data-focus"])
