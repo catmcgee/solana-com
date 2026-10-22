@@ -233,13 +233,8 @@ function AssetVisual({ t }: { t: (key: string) => string }) {
     "flex min-w-0 items-center justify-between gap-1.5 rounded-[10px] border border-[var(--dl-line)] bg-[var(--dl-raised)] px-2 py-[7px] text-[12.5px] leading-tight text-[var(--dl-text)] motion-safe:animate-[dl-row_4s_infinite]";
   return (
     <div className="grid w-full max-w-[20rem] grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2 gap-y-3 px-3">
-      <div className="flex max-w-[4.75rem] flex-col items-center rounded-2xl border border-[var(--dl-gold-line)] bg-[var(--dl-gold-soft)] px-2 py-2 text-center text-[var(--dl-gold)] motion-safe:animate-[dl-bob_4s_ease-in-out_infinite]">
-        <span className="text-[12.5px] font-semibold leading-tight">
-          {t("picker.visuals.assetToken")}
-        </span>
-        <span className="font-[family-name:var(--dl-mono)] text-[11px] leading-tight opacity-80">
-          {t("picker.visuals.assetKind")}
-        </span>
+      <div className="rounded-2xl border border-[var(--dl-gold-line)] bg-[var(--dl-gold-soft)] px-3 py-2.5 text-[13px] font-semibold leading-tight text-[var(--dl-gold)] motion-safe:animate-[dl-bob_4s_ease-in-out_infinite]">
+        {t("picker.visuals.assetToken")}
       </div>
       <div className="flex min-w-0 flex-col gap-2">
         <div className={row}>
