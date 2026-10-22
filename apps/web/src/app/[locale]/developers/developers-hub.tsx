@@ -18,6 +18,7 @@ import {
   JOB_PATHS,
   LEARN_ROUTES,
   MORE_USE_CASES,
+  PAYMENT_SNIPPET,
   PRODUCTION_USERS,
   WHY_REASONS,
   computeCosts,
@@ -152,6 +153,76 @@ function ApiVisual() {
         {'{ "sky": "clear" }'}
       </div>
     </div>
+  );
+}
+
+/** Comments, strings, keywords, numbers, and called names, in that order. */
+const CODE_TOKEN =
+  /(\/\/.*$)|("(?:[^"\\]|\\.)*")|\b(const|await|import|from)\b|\b(\d[\d_]*n?)\b|([A-Za-z_$][\w$]*)(?=\()/g;
+const CODE_TOKEN_COLOR = [
+  "text-[var(--dl-code-comment)]",
+  "text-[var(--dl-code-str)]",
+  "text-[var(--dl-code-kw)]",
+  "text-[var(--dl-code-num)]",
+  "text-[var(--dl-code-fn)]",
+] as const;
+
+/** One line of TypeScript with the page's code colors; text is unchanged. */
+function CodeLine({ line }: { line: string }) {
+  const parts: ReactNode[] = [];
+  let last = 0;
+  for (const match of line.matchAll(CODE_TOKEN)) {
+    const index = match.index ?? 0;
+    if (index > last) parts.push(line.slice(last, index));
+    const group = match.slice(1).findIndex((g) => g !== undefined);
+    parts.push(
+      <span key={index} className={CODE_TOKEN_COLOR[group]}>
+        {match[0]}
+      </span>,
+    );
+    last = index + match[0].length;
+  }
+  if (last < line.length) parts.push(line.slice(last));
+  return <>{parts}</>;
+}
+
+/**
+ * The few lines that send a USDC payment, from the Quickstart's tested
+ * example, with a link to the full file. No copy button: the lines are a
+ * fragment, and the linked page has the runnable file. The table beside it
+ * stretches to the same height.
+ */
+function PaymentSnippet({ t, href }: { t: Translate; href: string }) {
+  return (
+    <figure
+      data-testid="pay-snippet"
+      className="m-0 flex min-w-0 flex-col overflow-hidden rounded-xl border border-[var(--dl-line)] bg-[var(--dl-surface)]"
+    >
+      <figcaption className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-[var(--dl-line)] px-5 pb-2 pt-4 text-[13px]">
+        <span className="text-[var(--dl-dim)]">{t("calc.snippetCaption")}</span>
+        <a
+          href={href}
+          className={`inline-flex items-center gap-1 font-medium text-[var(--dl-accent-text)] no-underline hover:text-[var(--dl-accent-text)] hover:underline hover:underline-offset-[3px] ${focus}`}
+        >
+          {t("calc.snippetLink")}
+          <ArrowRight aria-hidden className={`!size-3.5 ${arrowDir}`} />
+        </a>
+      </figcaption>
+      <pre
+        dir="ltr"
+        tabIndex={0}
+        aria-label={PAYMENT_SNIPPET.file}
+        className={`m-0 flex-1 overflow-x-auto bg-[var(--dl-surface-2)] px-5 py-4 font-[family-name:var(--dl-mono)] text-[12.5px] leading-[1.7] text-[var(--dl-text)] ${focus}`}
+      >
+        <code data-testid="pay-snippet-code">
+          {PAYMENT_SNIPPET.lines.map((line, i) => (
+            <span key={i} className="block">
+              <CodeLine line={line} />
+            </span>
+          ))}
+        </code>
+      </pre>
+    </figure>
   );
 }
 
@@ -490,59 +561,62 @@ export async function DevelopersHub({
               ),
             })}
           />
-          <div className="mt-3.5 overflow-x-auto rounded-xl border border-[var(--dl-line)] bg-[var(--dl-surface)]">
-            <table
-              className="w-full border-collapse text-start text-sm"
-              data-testid="calc-table"
-            >
-              <caption className="px-5 pb-2 pt-4 text-start text-[13px] text-[var(--dl-dim)]">
-                {t("calc.tableCaption", {
-                  average: formatUsd(defaults.averagePaymentUsd, locale),
-                })}
-              </caption>
-              <thead>
-                <tr className="bg-[var(--dl-surface-2)] text-[var(--dl-muted)]">
-                  {(["tableVolume", "tableCard", "tableSolana"] as const).map(
-                    (key) => (
-                      <th
-                        key={key}
-                        scope="col"
-                        className="border-y border-[var(--dl-line)] px-5 py-2.5 text-start font-medium"
+          <div className="mt-3.5 grid gap-3.5 lg:grid-cols-2">
+            <div className="min-w-0 overflow-x-auto rounded-xl border border-[var(--dl-line)] bg-[var(--dl-surface)] lg:flex lg:flex-col">
+              <table
+                className="w-full border-collapse text-start text-sm lg:flex-1"
+                data-testid="calc-table"
+              >
+                <caption className="px-5 pb-2 pt-4 text-start text-[13px] text-[var(--dl-dim)]">
+                  {t("calc.tableCaption", {
+                    average: formatUsd(defaults.averagePaymentUsd, locale),
+                  })}
+                </caption>
+                <thead>
+                  <tr className="bg-[var(--dl-surface-2)] text-[var(--dl-muted)]">
+                    {(["tableVolume", "tableCard", "tableSolana"] as const).map(
+                      (key) => (
+                        <th
+                          key={key}
+                          scope="col"
+                          className="border-y border-[var(--dl-line)] px-5 py-2.5 text-start font-medium"
+                        >
+                          {t(`calc.${key}`)}
+                        </th>
+                      ),
+                    )}
+                  </tr>
+                </thead>
+                <tbody>
+                  {COST_MODEL.tableVolumes.map((volume) => {
+                    const costs = computeCosts(
+                      volume,
+                      defaults.averagePaymentUsd,
+                    );
+                    return (
+                      <tr
+                        key={volume}
+                        className="border-b border-[var(--dl-line)] last:border-0"
                       >
-                        {t(`calc.${key}`)}
-                      </th>
-                    ),
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                {COST_MODEL.tableVolumes.map((volume) => {
-                  const costs = computeCosts(
-                    volume,
-                    defaults.averagePaymentUsd,
-                  );
-                  return (
-                    <tr
-                      key={volume}
-                      className="border-b border-[var(--dl-line)] last:border-0"
-                    >
-                      <th
-                        scope="row"
-                        className="px-5 py-3 text-start font-normal text-[var(--dl-text)]"
-                      >
-                        {formatInteger(volume, locale)}
-                      </th>
-                      <td className="px-5 py-3 text-[var(--dl-text)]">
-                        {formatUsd(costs.card, locale)}
-                      </td>
-                      <td className="px-5 py-3 font-medium text-[var(--dl-good)]">
-                        {formatUsd(costs.solana, locale)}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                        <th
+                          scope="row"
+                          className="px-5 py-3 text-start font-normal text-[var(--dl-text)]"
+                        >
+                          {formatInteger(volume, locale)}
+                        </th>
+                        <td className="px-5 py-3 text-[var(--dl-text)]">
+                          {formatUsd(costs.card, locale)}
+                        </td>
+                        <td className="px-5 py-3 font-medium text-[var(--dl-good)]">
+                          {formatUsd(costs.solana, locale)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <PaymentSnippet t={t} href={href(PAYMENT_SNIPPET.href)} />
           </div>
         </div>
       </section>

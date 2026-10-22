@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { render, screen, within } from "@testing-library/react";
 import { createTranslator, NextIntlClientProvider } from "next-intl";
 import type { ReactElement } from "react";
@@ -26,8 +28,14 @@ vi.mock("@@/assets/learn/learn-hero.webp", () => ({
 const { DevelopersHub } =
   await import("@/app/[locale]/developers/developers-hub");
 const { LearnLanding } = await import("@/app/[locale]/learn/learn-landing");
-const { AGENT_PROMPT, AGENT_SETUP, HUB_STATS, INSTALL_SETUP, JOB_PATHS } =
-  await import("@/data/developers/hub");
+const {
+  AGENT_PROMPT,
+  AGENT_SETUP,
+  HUB_STATS,
+  INSTALL_SETUP,
+  JOB_PATHS,
+  PAYMENT_SNIPPET,
+} = await import("@/data/developers/hub");
 
 function renderWithIntl(ui: ReactElement, locale = "en") {
   return render(
@@ -182,6 +190,37 @@ describe("/developers landing", () => {
     const rows = within(screen.getByTestId("calc-table")).getAllByRole("row");
     expect(rows).toHaveLength(4);
     expect(rows[2]).toHaveTextContent("10,000$8,800$10.00");
+  });
+
+  it("shows the payment snippet beside the calculator, copied from the tested Quickstart example", async () => {
+    renderWithIntl(await DevelopersHub({ locale: "en", updates: [] }));
+    const snippet = screen.getByTestId("pay-snippet");
+    expect(snippet).toHaveTextContent("Sending a payment is one instruction.");
+    expect(
+      within(snippet).getByRole("link", { name: "See the full example" }),
+    ).toHaveAttribute("href", "/developers/docs/quickstart/send-dollars");
+    const shown = Array.from(
+      screen.getByTestId("pay-snippet-code").children,
+      (line) => line.textContent,
+    );
+    expect(shown).toEqual([...PAYMENT_SNIPPET.lines]);
+
+    // Every line but the leading "// …" is a contiguous run of the tested
+    // file, so the snippet cannot drift from code that runs.
+    const source = readFileSync(
+      path.resolve(__dirname, "../../../../..", PAYMENT_SNIPPET.source),
+      "utf8",
+    ).split("\n");
+    const [lead, ...code] = PAYMENT_SNIPPET.lines;
+    expect(lead).toMatch(/^\/\/ … /);
+    const start = source.indexOf(code[0]!);
+    expect(start).toBeGreaterThan(-1);
+    expect(
+      source.slice(start, start + code.length + 1).filter(Boolean),
+    ).toEqual(code);
+    expect(source.join("\n")).toContain(
+      'getTransferCheckedInstruction,\n  TOKEN_PROGRAM_ADDRESS,\n} from "@solana-program/token";',
+    );
   });
 
   it("uses a native Iterable form for the newsletter", async () => {
