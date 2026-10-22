@@ -23,7 +23,7 @@ import {
   CopyCodeButton,
   TabsClient,
 } from "./docs-components.client";
-import { CalloutIcon, ChevronIcon } from "./docs-ui-icons";
+import { CalloutIcon, CaretIcon, ChevronIcon } from "./docs-ui-icons";
 import { DocsLink } from "./docs-link";
 import { isDocsHref } from "@/lib/docs/docs-href";
 import { TxWalkthrough } from "@/components/tx-walkthrough";
@@ -446,7 +446,7 @@ export function Accordion({
           {icon ? (
             <Icon icon={icon} size={12} />
           ) : (
-            <ChevronIcon className="accordion-chevron" />
+            <CaretIcon className="accordion-chevron" />
           )}
         </div>
         <div
