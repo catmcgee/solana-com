@@ -118,7 +118,7 @@ export function TxWalkthroughClient({
       <header className="txw-head">
         <p className="txw-eyebrow">See a transaction in action</p>
         <p className="txw-title" id={titleId}>
-          Settle a trade: {model.cash} USDC for {model.asset} LSF
+          Settle a trade: {model.cash} USDC for {model.asset} fund shares
         </p>
         <p className="txw-lead">
           One real transaction, recorded from a test run, from the line of code

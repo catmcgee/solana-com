@@ -197,7 +197,7 @@ export const STEPS: Step[] = [
     title: "Your app builds the transaction",
     lanes: ["app"],
     body: [
-      "A buyer and a seller agreed a trade: {cash} USDC for {asset} LSF. Each has already moved its side into an escrow account that the DvP program controls. Now the settlement agent's app asks the program to settle.",
+      "A buyer and a seller agreed a trade: {cash} USDC for {asset} fund shares. Each has already moved its side into an escrow account that the DvP program controls. Now the settlement agent's app asks the program to settle.",
       "The generated client turns the call into an instruction: the program's address, every account the program will read or write, and a few bytes of data. `send()` puts it in a transaction message after four `createAccounts` instructions that make sure each receiving token account exists. The message names the fee payer, lists every account once with what it may do (sign, be written to), and carries a recent blockhash, so the transaction expires if it isn't processed soon.",
     ],
     excerpts: ["build", "message"],
@@ -248,7 +248,7 @@ export const STEPS: Step[] = [
     lanes: ["program", "token", "accounts"],
     body: [
       "The DvP program can't change token balances itself: the Token Program owns every token account. So it makes a cross-program invocation (CPI). It calls `TransferChecked` to move {cash} USDC from the USDC escrow to the seller, and signs as the trade record with the seeds from the last step.",
-      "The Token Program checks that signature, moves the tokens, and writes the new balances. The {asset} LSF goes to the buyer the same way, through Token-2022. Then the program closes both escrows and the trade record, and returns OK.",
+      "The Token Program checks that signature, moves the tokens, and writes the new balances. The {asset} fund shares goes to the buyer the same way, through Token-2022. Then the program closes both escrows and the trade record, and returns OK.",
     ],
     excerpts: ["cpi", "invoke"],
     atomic: true,

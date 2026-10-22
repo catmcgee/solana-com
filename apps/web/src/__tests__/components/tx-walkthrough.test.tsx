@@ -134,7 +134,7 @@ describe("tx-walkthrough model (from the recorded run)", () => {
     expect(asset).toMatchObject({
       name: "TransferChecked",
       amount: "80",
-      symbol: "LSF",
+      symbol: "fund shares",
     });
     expect(closes.map((c) => c.name)).toEqual(["CloseAccount", "CloseAccount"]);
   });
@@ -145,8 +145,8 @@ describe("tx-walkthrough model (from the recorded run)", () => {
     );
     expect(by["USDC escrow"]).toEqual(["100", null]);
     expect(by["Seller's USDC account"]).toEqual([null, "100"]);
-    expect(by["LSF escrow"]).toEqual(["80", null]);
-    expect(by["Buyer's LSF account"]).toEqual(["0", "80"]);
+    expect(by["Fund share escrow"]).toEqual(["80", null]);
+    expect(by["Buyer's fund share account"]).toEqual(["0", "80"]);
     expect(model.succeeded).toBe(true);
     expect(model.fee).toBeGreaterThan(0);
   });

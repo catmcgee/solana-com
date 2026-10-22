@@ -182,9 +182,21 @@ export const INSTRUCTION_NAMES: Record<string, Record<number, string>> = {
   [ATA]: { 0: "Create", 1: "CreateIdempotent" },
 };
 
+/**
+ * The recorded run uses the tutorial's demo asset, LSF (Lisbon Solar Fund).
+ * The walkthrough never introduces it, so it calls it "fund shares".
+ */
+const ASSET_NAME = "fund shares";
+
+function displayLabel(label: string) {
+  return label
+    .replace(/^LSF (escrow|mint)$/, "Fund share $1")
+    .replace(/\bLSF account\b/, "fund share account");
+}
+
 function symbolFor(label: string) {
   if (label.startsWith("USDC")) return "USDC";
-  if (label.startsWith("LSF")) return "LSF";
+  if (label.startsWith("LSF")) return ASSET_NAME;
   return label;
 }
 
@@ -216,8 +228,9 @@ export function buildModel(f: RecordedFixture): WalkthroughModel {
     const writable = signer
       ? index < signedCount - header.numReadonlySignedAccounts
       : index < n - header.numReadonlyUnsignedAccounts;
-    const label = f.labels[address];
-    if (!label) throw new Error(`fixture has no label for ${address}`);
+    const recorded = f.labels[address];
+    if (!recorded) throw new Error(`fixture has no label for ${address}`);
+    const label = displayLabel(recorded);
     return { index, address, label, signer, writable };
   });
 
