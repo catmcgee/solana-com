@@ -26,6 +26,8 @@ import { smartPunctuation, smartQuotes } from "@/lib/docs/smart-quotes.mjs";
 import { PageActions } from "./page-actions.client";
 import { DocsSearch } from "./docs-search.client";
 import { DocsChat } from "./docs-chat.client";
+import { Rate } from "./feedback/rate.client";
+import { onRateAction } from "./feedback/feedback-action";
 import { DocsLink } from "./docs-link";
 import { ApiExamplesWrapper, docsComponents } from "./docs-components";
 import { ChevronIcon, TocIcon } from "./docs-ui-icons";
@@ -256,6 +258,7 @@ export async function DocsPageView({
                 >
                   <MDX components={docsComponents} />
                 </div>
+                <Rate onRateAction={onRateAction} />
                 <Pagination previous={previous} next={next} />
               </div>
             </div>
