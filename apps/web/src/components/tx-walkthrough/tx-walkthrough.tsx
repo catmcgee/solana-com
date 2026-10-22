@@ -1,7 +1,7 @@
 /**
  * "See a transaction in action": one real SettleDvp transaction, stepped
- * through on a sequence diagram (Your app, Wallet, Network, the program,
- * Token Program, Accounts) with the code and data for each step.
+ * through one scene at a time (the two actors of each step and what passes
+ * between them), with the recorded data and the code behind each step.
  *
  * Server component: reads the recorded fixture at build time, derives what
  * each step shows (model.ts), and highlights the excerpts with the docs'
@@ -9,9 +9,11 @@
  *
  * Registered in the docs MDX components (components/docs/docs-components)
  * and mounted on How Solana works (apps/docs/developers/docs/core/index.mdx)
- * around the static transaction-flow diagram, which it draws live. Children
- * (that static diagram, for the Markdown twin) are not rendered here.
+ * around the static transaction-flow diagram. Children (that static diagram,
+ * which the Markdown twin shows on its own) sit behind the
+ * walkthrough's "See the whole flow".
  */
+import type { ReactNode } from "react";
 import { highlight } from "fumadocs-core/highlight";
 import fixture from "../../../../../packages/docs-examples/paths/defi/settle-trade/settle-walkthrough.json";
 import { EXCERPTS } from "./excerpts";
@@ -34,7 +36,7 @@ const THEMES = { light: "github-light", dark: "github-dark-dimmed" } as const;
 export const EXPLORER_URL = `https://explorer.solana.com/address/${DVP_PROGRAM}?cluster=devnet`;
 export const RPC_REFERENCE_HREF = "/developers/docs/rpc/http/gettransaction";
 
-export async function TxWalkthrough(_props: { children?: unknown }) {
+export async function TxWalkthrough({ children }: { children?: ReactNode }) {
   const recorded = fixture as unknown as RecordedFixture;
   const model = buildModel(recorded);
   const code = Object.fromEntries(
@@ -63,6 +65,7 @@ export async function TxWalkthrough(_props: { children?: unknown }) {
       response={response}
       explorerUrl={EXPLORER_URL}
       rpcReferenceHref={RPC_REFERENCE_HREF}
+      flow={children}
     />
   );
 }

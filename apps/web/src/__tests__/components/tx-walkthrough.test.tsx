@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, within } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
 import fixture from "../../../../../packages/docs-examples/paths/defi/settle-trade/settle-walkthrough.json";
 import {
   DVP_COMMIT,
@@ -18,11 +18,8 @@ import {
   trimmedResponse,
   type RecordedFixture,
 } from "@/components/tx-walkthrough/model";
-import { ROWS, STEPS } from "@/components/tx-walkthrough/steps";
-import {
-  STEP_MS,
-  TxWalkthroughClient,
-} from "@/components/tx-walkthrough/tx-walkthrough.client";
+import { STEPS } from "@/components/tx-walkthrough/steps";
+import { TxWalkthroughClient } from "@/components/tx-walkthrough/tx-walkthrough.client";
 
 const repoRoot = path.resolve(__dirname, "../../../../..");
 const recorded = fixture as unknown as RecordedFixture;
@@ -161,10 +158,6 @@ describe("tx-walkthrough model (from the recorded run)", () => {
 });
 
 describe("TxWalkthroughClient", () => {
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
   const code = Object.fromEntries(
     Object.values(EXCERPTS).map((e) => [e.id, <pre key={e.id}>{e.code}</pre>]),
   );
@@ -176,28 +169,32 @@ describe("TxWalkthroughClient", () => {
         response={<pre>response</pre>}
         explorerUrl={`https://explorer.solana.com/address/${DVP_PROGRAM}?cluster=devnet`}
         rpcReferenceHref="/developers/docs/rpc/http/gettransaction"
+        flow={<img alt="The whole transaction flow" src="/flow.svg" />}
       />,
     );
-  const panelTitle = () =>
+  const stageTitle = () =>
     screen.getByRole("heading", { level: 3 }).textContent;
+  const railSteps = () =>
+    within(screen.getByRole("list", { name: "Steps" })).getAllByRole("button");
+  const next = () =>
+    screen.getByRole("button", { name: /^Next: |^Start again$/ });
 
-  it("renders all seven steps from the fixture with Next", () => {
+  it("steps through all seven steps with Next, labelled with the next step", () => {
     renderIt();
     expect(STEPS).toHaveLength(7);
-    expect(panelTitle()).toBe(STEPS[0].title);
-    expect(screen.getByText(/getSettleDvpInstruction\(/)).toBeInTheDocument();
-    const next = screen.getByRole("button", { name: "Next" });
+    expect(stageTitle()).toBe(STEPS[0].title);
+    expect(screen.getByRole("button", { name: "Back" })).toBeDisabled();
     for (let i = 1; i < STEPS.length; i++) {
-      fireEvent.click(next);
-      expect(panelTitle()).toBe(STEPS[i].title);
+      expect(next()).toHaveTextContent(`Next: ${STEPS[i].short}`);
+      fireEvent.click(next());
+      expect(stageTitle()).toBe(STEPS[i].title);
       expect(
         screen.getByText(`Step ${i + 1} of 7: ${STEPS[i].title}`),
       ).toBeInTheDocument();
     }
-    expect(next).toBeDisabled();
-    // Result: the recorded signature, balances, and links.
-    expect(screen.getAllByText(model.signature).length).toBeGreaterThan(0);
-    expect(screen.getAllByText("closed")).toHaveLength(2);
+    expect(next()).toHaveTextContent("Start again");
+    // Result: the recorded status and links.
+    expect(screen.getByText("Succeeded")).toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: "View the program on Explorer" }),
     ).toHaveAttribute(
@@ -207,100 +204,120 @@ describe("TxWalkthroughClient", () => {
     expect(
       screen.getByRole("link", { name: "getTransaction reference" }),
     ).toHaveAttribute("href", "/developers/docs/rpc/http/gettransaction");
+    fireEvent.click(next());
+    expect(stageTitle()).toBe(STEPS[0].title);
   });
 
-  it("shows the recorded transaction and CPIs on their steps", () => {
-    renderIt();
-    expect(
-      screen.getByText(`${model.sizeBytes} of 1,232 bytes`, { exact: false }),
-    ).toBeInTheDocument();
-    expect(screen.getByText(model.recentBlockhash)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /^Step 4:/ }));
-    expect(
-      screen.getByText(`${model.fee.toLocaleString("en-US")} lamports`, {
-        exact: false,
-      }),
-    ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /^Step 6:/ }));
-    expect(
-      screen.getByText("USDC escrow → Seller's USDC account", { exact: false }),
-    ).toBeInTheDocument();
-    expect(screen.getAllByText(/All or nothing/).length).toBeGreaterThan(0);
-  });
-
-  it("lights the transaction-flow rows of the current step; a row click picks its step", () => {
+  it("shows the recorded values as chips and packets", () => {
     const { container } = renderIt();
-    for (const s of STEPS)
-      expect(
-        ROWS.some((r) => r.step === s.id),
-        s.id,
-      ).toBe(true);
-    const rows = container.querySelectorAll(".txw-row");
-    expect(rows).toHaveLength(ROWS.length);
-    const active = () =>
-      [...rows].filter((r) => r.getAttribute("data-state") === "active").length;
-    expect(active()).toBe(1); // build transaction
-    fireEvent.click(rows[ROWS.findIndex((r) => r.step === "cpi")]);
-    expect(panelTitle()).toBe(STEPS[5].title);
-    expect(active()).toBe(ROWS.filter((r) => r.step === "cpi").length);
-    // The fee and the confirmation sit outside the atomic box.
+    const short = (a: string) => `${a.slice(0, 4)}…${a.slice(-4)}`;
+    expect(
+      screen.getByText(`${model.sizeBytes} of 1,232 bytes`),
+    ).toBeInTheDocument();
+    fireEvent.click(railSteps()[1]);
+    const packets = () =>
+      [...container.querySelectorAll(".txw-packet")].map((p) => p.textContent);
+    expect(packets()).toEqual([
+      `message, ${model.messageBytes} bytes`,
+      "signature",
+    ]);
+    expect(screen.getByText(short(model.signature))).toBeInTheDocument();
+    fireEvent.click(railSteps()[3]);
+    const fee = `${model.fee.toLocaleString("en-US")} lamports`;
+    expect(screen.getAllByText(fee).length).toBeGreaterThan(0);
+    expect(
+      screen.getByText(
+        new RegExp(
+          `charges the ${model.fee.toLocaleString("en-US")}-lamport fee`,
+        ),
+      ),
+    ).toBeInTheDocument();
+    fireEvent.click(railSteps()[5]);
+    expect(packets()).toEqual(["$100 USDC"]);
+    expect(container.querySelector(".txw-badge")).toHaveTextContent(
+      "all or nothing",
+    );
+    expect(screen.getByText(/fund shares go to the buyer/)).toBeInTheDocument();
+  });
+
+  it("step 6 shows the balance board from the run", () => {
+    const { container } = renderIt();
+    fireEvent.click(railSteps()[5]);
+    const rows = [...container.querySelectorAll(".txw-board li")].map((r) => [
+      r.querySelector(".txw-board-name")!.textContent,
+      r.querySelector(".txw-was")!.textContent,
+      r.querySelector(".txw-now")!.textContent,
+    ]);
+    expect(rows).toEqual([
+      ["USDC escrow", "100", "0"],
+      ["Seller's USDC account", "0", "100"],
+      ["Fund share escrow", "80", "0"],
+      ["Buyer's fund share account", "0", "80"],
+    ]);
+    expect(screen.getAllByText("closed")).toHaveLength(2);
+    fireEvent.click(railSteps()[6]);
+    expect(container.querySelector(".txw-board")).toBeNull();
+  });
+
+  it("marks steps 5 and 6 as all or nothing on the rail", () => {
+    renderIt();
     expect(STEPS.filter((s) => s.atomic).map((s) => s.id)).toEqual([
       "run",
       "cpi",
     ]);
+    expect(railSteps()[4]).toHaveAccessibleName(
+      "Step 5: Run program (all or nothing)",
+    );
+  });
+
+  it("Show the code reveals the step's excerpts", () => {
+    renderIt();
+    const toggle = screen.getByRole("button", { name: "Show the code" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText(/getSettleDvpInstruction\(/)).toBeNull();
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText(/getSettleDvpInstruction\(/)).toBeInTheDocument();
+    // Step 4 has no code; the result step adds the trimmed response.
+    fireEvent.click(railSteps()[3]);
+    expect(screen.queryByRole("button", { name: "Show the code" })).toBeNull();
+    fireEvent.click(railSteps()[6]);
+    expect(screen.getByText("response")).toBeInTheDocument();
+  });
+
+  it("See the whole flow reveals the static diagram", () => {
+    renderIt();
+    const toggle = screen.getByRole("button", { name: "See the whole flow" });
+    expect(
+      screen.queryByRole("img", { name: "The whole transaction flow" }),
+    ).toBeNull();
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(
+      screen.getByRole("img", { name: "The whole transaction flow" }),
+    ).toBeVisible();
   });
 
   it("moves with the arrow keys, Home, and End", () => {
     const { container } = renderIt();
     const section = container.querySelector("section")!;
     fireEvent.keyDown(section, { key: "ArrowRight" });
-    expect(panelTitle()).toBe(STEPS[1].title);
+    expect(stageTitle()).toBe(STEPS[1].title);
     fireEvent.keyDown(section, { key: "End" });
-    expect(panelTitle()).toBe(STEPS[6].title);
+    expect(stageTitle()).toBe(STEPS[6].title);
     fireEvent.keyDown(section, { key: "ArrowLeft" });
-    expect(panelTitle()).toBe(STEPS[5].title);
+    expect(stageTitle()).toBe(STEPS[5].title);
     fireEvent.keyDown(section, { key: "Home" });
-    expect(panelTitle()).toBe(STEPS[0].title);
+    expect(stageTitle()).toBe(STEPS[0].title);
   });
 
-  it("Run plays every step and stops at the end; Pause stops it", () => {
-    vi.useFakeTimers();
+  it("marks the current step on the rail for assistive tech", () => {
     renderIt();
-    const run = screen.getByRole("button", { name: "Run" });
-    fireEvent.click(run);
-    expect(run).toHaveAttribute("aria-pressed", "true");
-    for (let i = 1; i < STEPS.length; i++) {
-      act(() => {
-        vi.advanceTimersByTime(STEP_MS);
-      });
-      expect(panelTitle()).toBe(STEPS[i].title);
-    }
-    act(() => {
-      vi.advanceTimersByTime(STEP_MS * 2);
-    });
-    expect(panelTitle()).toBe(STEPS[6].title);
-    expect(screen.getByRole("button", { name: "Run again" })).toHaveAttribute(
-      "aria-pressed",
-      "false",
-    );
-    fireEvent.click(screen.getByRole("button", { name: "Run again" }));
-    expect(panelTitle()).toBe(STEPS[0].title);
-    fireEvent.click(screen.getByRole("button", { name: "Pause" }));
-    act(() => {
-      vi.advanceTimersByTime(STEP_MS * 3);
-    });
-    expect(panelTitle()).toBe(STEPS[0].title);
-  });
-
-  it("marks the current step for assistive tech", () => {
-    renderIt();
-    const dots = within(
-      screen.getByRole("group", { name: "Walkthrough controls" }),
-    ).getAllByRole("button", { name: /^Step \d:/ });
-    expect(dots).toHaveLength(7);
-    expect(dots[0]).toHaveAttribute("aria-current", "step");
-    fireEvent.click(dots[3]);
-    expect(dots[3]).toHaveAttribute("aria-current", "step");
-    expect(dots[0]).not.toHaveAttribute("aria-current");
+    const steps = railSteps();
+    expect(steps).toHaveLength(7);
+    expect(steps[0]).toHaveAttribute("aria-current", "step");
+    fireEvent.click(steps[3]);
+    expect(steps[3]).toHaveAttribute("aria-current", "step");
+    expect(steps[0]).not.toHaveAttribute("aria-current");
   });
 });
