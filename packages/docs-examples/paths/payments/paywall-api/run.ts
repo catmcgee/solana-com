@@ -3,7 +3,7 @@
 // replay the same payment, and try a client whose cap is below the price.
 //   npx tsx paywall-api/run.ts
 // The client key is read from CLIENT_KEYPAIR, or from the Solana CLI default
-// ~/.config/solana/id.json. It needs SOL for fees and 0.01 USDC.
+// ~/.config/solana/id.json. It needs SOL for fees and 0.001 USDC.
 import { readFile } from "node:fs/promises";
 import type { AddressInfo } from "node:net";
 import { homedir } from "node:os";
@@ -49,7 +49,7 @@ export async function run(
 }> {
   // The wallet that gets paid. Use your own address in a real API.
   const payTo = (await generateKeyPairSigner()).address;
-  const server = createPaywallServer({ payTo, price: 10_000n }); // 0.01 USDC
+  const server = createPaywallServer({ payTo, price: 1_000n }); // 0.001 USDC
   await new Promise<void>((resolve, reject) =>
     server.once("error", reject).listen(port, resolve),
   );
@@ -98,10 +98,10 @@ export async function run(
     );
     console.log("  payTo:", option!.payTo, "network:", option!.network);
 
-    // 2. Pay (at most 0.05 USDC) and retry with the X-PAYMENT header.
+    // 2. Pay (at most 0.005 USDC) and retry with the X-PAYMENT header.
     const header = await createPaymentHeader(required, {
       signer: client,
-      maxAmount: 50_000n,
+      maxAmount: 5_000n,
     });
     const paid = await fetch(url, { headers: { "X-PAYMENT": header } });
     const settlement = decodeHeader<SettlementResponse>(
@@ -130,10 +130,10 @@ export async function run(
       ((await replay.json()) as PaymentRequired).error,
     );
 
-    // 4. A client that pays at most 0.005 USDC refuses and signs nothing.
+    // 4. A client that pays at most 0.0005 USDC refuses and signs nothing.
     let refused = false;
     try {
-      await fetchWithPayment(url, { signer: client, maxAmount: 5_000n });
+      await fetchWithPayment(url, { signer: client, maxAmount: 500n });
     } catch (err) {
       refused = true;
       console.log("client refused:", (err as Error).message);

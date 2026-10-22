@@ -5,7 +5,7 @@
 // replay the same payment, and try a client whose cap is below the price.
 //   npx tsx paywall-api/run.ts
 // The client key is read from CLIENT_KEYPAIR, or from the Solana CLI default
-// ~/.config/solana/id.json. It needs SOL for fees and 0.01 USDC.
+// ~/.config/solana/id.json. It needs SOL for fees and 0.001 USDC.
 import { readFile } from "node:fs/promises";
 import type { AddressInfo } from "node:net";
 import { homedir } from "node:os";
@@ -51,7 +51,7 @@ export async function run(
 }> {
   // The wallet that gets paid. Use your own address in a real API.
   const payTo = (await generateKeyPairSigner()).address;
-  const server = createPaywallServer({ payTo, price: 10_000n }); // 0.01 USDC
+  const server = createPaywallServer({ payTo, price: 1_000n }); // 0.001 USDC
   await new Promise<void>((resolve, reject) =>
     server.once("error", reject).listen(port, resolve),
   );
@@ -100,10 +100,10 @@ export async function run(
     );
     console.log("  payTo:", option!.payTo, "network:", option!.network);
 
-    // 2. Pay (at most 0.05 USDC) and retry with the X-PAYMENT header.
+    // 2. Pay (at most 0.005 USDC) and retry with the X-PAYMENT header.
     const header = await createPaymentHeader(required, {
       signer: client,
-      maxAmount: 50_000n,
+      maxAmount: 5_000n,
     });
     const paid = await fetch(url, { headers: { "X-PAYMENT": header } });
     const settlement = decodeHeader<SettlementResponse>(
@@ -132,10 +132,10 @@ export async function run(
       ((await replay.json()) as PaymentRequired).error,
     );
 
-    // 4. A client that pays at most 0.005 USDC refuses and signs nothing.
+    // 4. A client that pays at most 0.0005 USDC refuses and signs nothing.
     let refused = false;
     try {
-      await fetchWithPayment(url, { signer: client, maxAmount: 5_000n });
+      await fetchWithPayment(url, { signer: client, maxAmount: 500n });
     } catch (err) {
       refused = true;
       console.log("client refused:", (err as Error).message);
@@ -174,13 +174,13 @@ if (
 <div className="sol-term-step" data-step="1" data-pending="http">
 <div className="sol-term-row sol-term-cmd"><span className="sol-term-ps" aria-hidden="true">\$</span> npx tsx paywall-api/run.ts</div>
 <div className="sol-term-row sol-term-ln" data-tone="warn">GET /api/forecast -\> <span className="sol-term-code" data-code="4xx">402</span> X-PAYMENT header is required</div>
-<div className="sol-term-row sol-term-ln" data-indent="2"><span className="sol-term-k">price\:</span> 10000 base units of <span className="sol-h" title="4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU"><span className="sol-h-f">4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU</span><span className="sol-h-s" aria-hidden="true">4zMM…ncDU</span></span> (0.01 USDC)</div>
-<div className="sol-term-row sol-term-ln" data-indent="2"><span className="sol-term-k">payTo\:</span> <span className="sol-h" title="6BEupU7A28R7LiZkzVRMH1tMFWcCMNjeDiVvPpn3KfZ7"><span className="sol-h-f">6BEupU7A28R7LiZkzVRMH1tMFWcCMNjeDiVvPpn3KfZ7</span><span className="sol-h-s" aria-hidden="true">6BEu…KfZ7</span></span> <span className="sol-term-k">network\:</span> solana\:<span className="sol-h" title="EtWTRABZaYq6iMfeYKouRu166VU2xqa1"><span className="sol-h-f">EtWTRABZaYq6iMfeYKouRu166VU2xqa1</span><span className="sol-h-s" aria-hidden="true">EtWT…xqa1</span></span></div>
+<div className="sol-term-row sol-term-ln" data-indent="2"><span className="sol-term-k">price\:</span> 1000 base units of <span className="sol-h" title="4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU"><span className="sol-h-f">4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU</span><span className="sol-h-s" aria-hidden="true">4zMM…ncDU</span></span> (0.001 USDC)</div>
+<div className="sol-term-row sol-term-ln" data-indent="2"><span className="sol-term-k">payTo\:</span> <span className="sol-h" title="4SnM7PENj3Amhyc6rRA5XG2rq3NpiyZbPvpgAQbA3FLE"><span className="sol-h-f">4SnM7PENj3Amhyc6rRA5XG2rq3NpiyZbPvpgAQbA3FLE</span><span className="sol-h-s" aria-hidden="true">4SnM…3FLE</span></span> <span className="sol-term-k">network\:</span> solana\:<span className="sol-h" title="EtWTRABZaYq6iMfeYKouRu166VU2xqa1"><span className="sol-h-f">EtWTRABZaYq6iMfeYKouRu166VU2xqa1</span><span className="sol-h-s" aria-hidden="true">EtWT…xqa1</span></span></div>
 <div className="sol-term-row sol-term-ln" data-tone="ok">GET /api/forecast (paid) -\> <span className="sol-term-code" data-code="2xx">200</span> `{"city":"Lisbon","tomorrow":"Sunny, 24°C"}`</div>
-<div className="sol-term-row sol-term-ln" data-indent="2">settled <span className="sol-term-k">signature\:</span> <span className="sol-h" title="AewAVmYV8AQ3pv1vQxeyrUK4e93PWQeauAMUpkaLv1kqm9JqT7zfhaqZF8bg132QBRTtAPkw8Fhi81SwcTqzA9L"><span className="sol-h-f">AewAVmYV8AQ3pv1vQxeyrUK4e93PWQeauAMUpkaLv1kqm9JqT7zfhaqZF8bg132QBRTtAPkw8Fhi81SwcTqzA9L</span><span className="sol-h-s" aria-hidden="true">AewA…zA9L</span></span></div>
+<div className="sol-term-row sol-term-ln" data-indent="2">settled <span className="sol-term-k">signature\:</span> <span className="sol-h" title="4JZW7fB3h53qP6f66eat4cwDVDFvxwTtKWbV8tfJJHVo4eHzK9riSvetQSwPEtungFxfbWC968JoyDoqRo7XauLZ"><span className="sol-h-f">4JZW7fB3h53qP6f66eat4cwDVDFvxwTtKWbV8tfJJHVo4eHzK9riSvetQSwPEtungFxfbWC968JoyDoqRo7XauLZ</span><span className="sol-h-s" aria-hidden="true">4JZW…auLZ</span></span></div>
 <div className="sol-term-row sol-term-ln" data-indent="2"><span className="sol-term-k">fee\:</span> 5000 lamports</div>
 <div className="sol-term-row sol-term-ln" data-tone="error">GET /api/forecast (replayed X-PAYMENT) -\> <span className="sol-term-code" data-code="4xx">402</span> payment already used</div>
-<div className="sol-term-row sol-term-ln" data-tone="error">client refused\: price 10000 is above maxAmount 5000; not paying</div>
+<div className="sol-term-row sol-term-ln" data-tone="error">client refused\: price 1000 is above maxAmount 500; not paying</div>
 <div className="sol-term-result"><span className="sol-term-badge" data-tone="warn">402 Payment Required</span><span className="sol-term-badge" data-tone="ok">200 OK</span><span className="sol-term-badge" data-tone="error">402 Payment already used</span><span className="sol-term-badge" data-tone="error">Refused\: price above maxAmount</span></div>
 </div>
 </div>
