@@ -28,7 +28,7 @@ import { onRateAction } from "./feedback/feedback-action";
 import { DocsLink } from "./docs-link";
 import { ApiExamplesWrapper, docsComponents } from "./docs-components";
 import { ChevronIcon, TocIcon } from "./docs-ui-icons";
-import { DocsScripts } from "./docs-scripts";
+import { DocsRunFlag, DocsScripts } from "./docs-scripts";
 import "./docs-styles";
 
 /**
@@ -147,6 +147,7 @@ export async function DocsPageView({
   return (
     <>
       <DocsThemePrepaint />
+      <DocsRunFlag />
       {/* For agents reading the HTML: where the Markdown index is. */}
       <blockquote
         className="sr-only"

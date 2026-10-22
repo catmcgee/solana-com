@@ -717,6 +717,9 @@ function CodeBody({ pre, rounded }: { pre: PreProps; rounded?: boolean }) {
 }
 
 export function CodeBlock(pre: PreProps) {
+  // A <pre> written in a page (e.g. the Run panel's live output) is not a
+  // code fence: render it as written.
+  if (!String(pre.className ?? "").includes("shiki")) return <pre {...pre} />;
   const title = pre.title;
   return (
     <div

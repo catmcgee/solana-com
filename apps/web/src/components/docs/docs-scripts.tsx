@@ -18,6 +18,22 @@ const SCRIPTS = [
   "agent-banner",
 ] as const;
 
+/**
+ * Run output stays folded from the first paint, as before (the runner,
+ * run-examples.js, sets the same flag once it loads). Render before the
+ * content.
+ */
+export function DocsRunFlag() {
+  return (
+    <script
+      dangerouslySetInnerHTML={{
+        __html: `document.documentElement.setAttribute("data-sol-run","")`,
+      }}
+      suppressHydrationWarning
+    />
+  );
+}
+
 export function DocsScripts() {
   return (
     <>

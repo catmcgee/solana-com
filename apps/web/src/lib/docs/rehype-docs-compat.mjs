@@ -142,10 +142,23 @@ function quotes(node, state = { prev: "" }) {
   for (const child of node.children ?? []) quotes(child, inner);
 }
 
+/** Markdown images (not JSX <img>) get the docs' rounded corners. */
+function roundImages(node) {
+  if (node.type === "element" && node.tagName === "img") {
+    const cls = node.properties.className ?? [];
+    node.properties.className = [
+      ...(Array.isArray(cls) ? cls : [cls]),
+      "rounded",
+    ];
+  }
+  for (const child of node.children ?? []) roundImages(child);
+}
+
 export function rehypeDocsCompat() {
   return (tree) => {
     strip(tree);
     stepTitles(tree);
     quotes(tree);
+    roundImages(tree);
   };
 }
