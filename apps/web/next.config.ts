@@ -8,6 +8,10 @@ import withBundleAnalyzer from "@next/bundle-analyzer";
 import { withSentryConfig } from "@sentry/nextjs";
 import { createMDX } from "fumadocs-mdx/next";
 import { getSecurityHeaders } from "./src/lib/security-headers";
+import {
+  DOCS_SOURCE_GLOBS,
+  DOCS_SOURCE_ROUTES,
+} from "./docs-trace-includes.mjs";
 
 // X-Frame-Options, nosniff, X-XSS-Protection, frame-ancestors, plus
 // X-Robots-Tag: noindex on previews. Shared with the docs head injection in
@@ -50,23 +54,11 @@ const nextConfig: NextConfig = {
       "./src/fonts/diatype/ABCDiatype-Medium.woff",
       "./src/fonts/diatype/ABCDiatype-Bold.woff",
     ],
-    // Translated docs pages are compiled on first request (fumadocs-mdx
-    // `dynamic`, source.config.ts) from their sources and the snippets.
+    // Translated docs pages read their sources at request time
+    // (docs-trace-includes.mjs; prerendered routes are covered by
+    // scripts/trace-docs-sources.mjs after the build).
     ...Object.fromEntries(
-      [
-        "/[locale]/developers/docs/[[...slug]]",
-        "/[locale]/developers/cookbook/[[...slug]]",
-        "/[locale]/learn/[...slug]",
-        "/api/markdown/[...slug]",
-        "/mcp",
-        "/llms-full.txt",
-      ].map((route) => [
-        route,
-        [
-          "../docs/{ar,de,es,fi,fr,id,it,ja,ko,nl,pl,pt,ru,tr,uk,vi,zh}/**/*.mdx",
-          "../docs/snippets/**/*.mdx",
-        ],
-      ]),
+      DOCS_SOURCE_ROUTES.map((route) => [route, DOCS_SOURCE_GLOBS]),
     ),
     // /llms.txt is the index generated in apps/docs.
     "/llms.txt": ["../docs/llms.txt"],
