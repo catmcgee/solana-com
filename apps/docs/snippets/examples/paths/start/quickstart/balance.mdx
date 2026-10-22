@@ -2,7 +2,11 @@
 
 ```ts balance.ts
 import { airdropFactory, lamports } from "@solana/kit";
-import { loadWallet, rpc, rpcSubscriptions } from "./config";
+import {
+  findAssociatedTokenPda,
+  TOKEN_PROGRAM_ADDRESS,
+} from "@solana-program/token";
+import { loadWallet, rpc, rpcSubscriptions, USDC_MINT } from "./config";
 
 const wallet = await loadWallet();
 console.log("Wallet:", wallet.address);
@@ -12,7 +16,7 @@ const { value: balance } = await rpc.getBalance(wallet.address).send();
 console.log("Balance:", Number(balance) / 1e9, "SOL");
 
 if (balance < 100_000_000n) {
-  // Ask devnet for 1 free test SOL.
+  // Ask devnet for 1 free test SOL, which pays transaction fees.
   const airdrop = airdropFactory({ rpc, rpcSubscriptions });
   try {
     const signature = await airdrop({
@@ -31,6 +35,24 @@ if (balance < 100_000_000n) {
   const { value: after } = await rpc.getBalance(wallet.address).send();
   console.log("Balance:", Number(after) / 1e9, "SOL");
 }
+
+// Dollars (USDC) sit in a token account: one per wallet per token.
+const [usdcAccount] = await findAssociatedTokenPda({
+  mint: USDC_MINT,
+  owner: wallet.address,
+  tokenProgram: TOKEN_PROGRAM_ADDRESS,
+});
+const usdc = await rpc
+  .getTokenAccountBalance(usdcAccount)
+  .send()
+  .then(({ value }) => value.uiAmountString)
+  .catch(() => "0"); // no token account yet
+console.log("USDC:", usdc);
+if (usdc === "0") {
+  console.log(
+    `Get free devnet USDC for ${wallet.address} at https://faucet.circle.com (pick Solana Devnet).`,
+  );
+}
 ```
 
 <div className="sol-term not-prose" data-term="paths/start/quickstart/balance" data-tab="balance.ts" data-kind="block" data-steps="1" data-l-run="Run" data-l-run-step="Run step" data-l-next="Next step" data-l-all="Run all" data-l-again="Run again" data-l-running="Running…" data-l-tx="Sending transaction…" data-l-http="Requesting…" data-l-call="Running…" data-l-confirming="Confirming…" data-l-done="Done" data-l-copied="Copied" data-l-step="Step">
@@ -38,10 +60,12 @@ if (balance < 100_000_000n) {
 <div className="sol-term-screen" role="region" tabIndex="0" aria-label="Output of npx tsx balance.ts: Output">
 <div className="sol-term-step" data-step="1" data-pending="call">
 <div className="sol-term-row sol-term-cmd"><span className="sol-term-ps" aria-hidden="true">\$</span> npx tsx balance.ts</div>
-<div className="sol-term-row sol-term-ln"><span className="sol-term-k">Wallet\:</span> <span className="sol-h" title="36EJGPtKpTj4zPJfAp4Qur5YfTNPQW2YGF3yFNs5866X"><span className="sol-h-f">36EJGPtKpTj4zPJfAp4Qur5YfTNPQW2YGF3yFNs5866X</span><span className="sol-h-s" aria-hidden="true">36EJ…866X</span></span></div>
+<div className="sol-term-row sol-term-ln"><span className="sol-term-k">Wallet\:</span> <span className="sol-h" title="DL8wHpeDjCUmhaMKgKfgXEquXzGLFhYJAg1ismt8CyrQ"><span className="sol-h-f">DL8wHpeDjCUmhaMKgKfgXEquXzGLFhYJAg1ismt8CyrQ</span><span className="sol-h-s" aria-hidden="true">DL8w…CyrQ</span></span></div>
 <div className="sol-term-row sol-term-ln"><span className="sol-term-k">Balance\:</span> 0 SOL</div>
-<div className="sol-term-row sol-term-ln"><span className="sol-term-k">Airdrop\:</span> <span className="sol-h" title="2fDTFaGsJ1zw2ALkDsxMD3zUuuDPLzeWERBuTNJoNLh5zs2yGGqZ1A1n1vH5yWpwZbczJmAwWfy2kbtmvqnuoRRe"><span className="sol-h-f">2fDTFaGsJ1zw2ALkDsxMD3zUuuDPLzeWERBuTNJoNLh5zs2yGGqZ1A1n1vH5yWpwZbczJmAwWfy2kbtmvqnuoRRe</span><span className="sol-h-s" aria-hidden="true">2fDT…oRRe</span></span></div>
+<div className="sol-term-row sol-term-ln"><span className="sol-term-k">Airdrop\:</span> <span className="sol-h" title="4P9CFHn952DqN4m4wT7GNPCv7R1sXamNcqDEMPVGYtb5yE2XQyjQnEnKb2cbkWWDcpWAa2UZKMrAumBuGKrfoef4"><span className="sol-h-f">4P9CFHn952DqN4m4wT7GNPCv7R1sXamNcqDEMPVGYtb5yE2XQyjQnEnKb2cbkWWDcpWAa2UZKMrAumBuGKrfoef4</span><span className="sol-h-s" aria-hidden="true">4P9C…oef4</span></span></div>
 <div className="sol-term-row sol-term-ln"><span className="sol-term-k">Balance\:</span> 1 SOL</div>
+<div className="sol-term-row sol-term-ln"><span className="sol-term-k">USDC\:</span> 0</div>
+<div className="sol-term-row sol-term-ln">Get free devnet USDC for <span className="sol-h" title="DL8wHpeDjCUmhaMKgKfgXEquXzGLFhYJAg1ismt8CyrQ"><span className="sol-h-f">DL8wHpeDjCUmhaMKgKfgXEquXzGLFhYJAg1ismt8CyrQ</span><span className="sol-h-s" aria-hidden="true">DL8w…CyrQ</span></span> at https\://faucet.circle.com (pick Solana Devnet).</div>
 <div className="sol-term-result"><span className="sol-term-badge" data-tone="ok">Confirmed</span></div>
 </div>
 </div>
