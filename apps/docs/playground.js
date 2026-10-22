@@ -1,7 +1,8 @@
 /*
  * "Open tutorial in Playground" (styles/playground.css).
  *
- * Mintlify injects this file on every page. Each tutorial has exactly one
+ * apps/web loads this script on every docs page
+ * (components/docs/docs-scripts.tsx). Each tutorial has exactly one
  * Playground entry point: a block at the top of its intro page (or, for a
  * single-page tutorial, at the top of the page). Code blocks, demo
  * terminals, and step pages have none.
@@ -41,11 +42,11 @@
   var CONFIG = {
     origin: "https://solana-playground-two.vercel.app",
     // THE one value for owner/repo/ref the playground imports from. Switch to
-    // "solana-foundation/solana-com/tree/main" once mintlify-migration is
-    // merged. The ref may not contain "/" (the playground's URL parser stops
+    // solana-foundation/solana-com/tree/main once docs-redesign is merged.
+    // The ref may not contain "/" (the playground's URL parser stops
     // there). Never prefix "https://": the playground's router collapses
     // "//" and then rejects the URL ("URL path not found").
-    source: "catmcgee/solana-com/tree/mintlify-migration",
+    source: "catmcgee/solana-com/tree/docs-redesign",
     enabledKinds: ["anchor", "native"],
   };
   var LABEL = "Open tutorial in Playground";
@@ -97,7 +98,7 @@
     for (var i = 0; i < btns.length; i++) apply(btns[i]);
   }
 
-  // Mintlify navigates client-side, so new pages arrive as DOM mutations.
+  // The docs navigate client-side, so new pages arrive as DOM mutations.
   var pending = false;
   function schedule() {
     if (pending) return;

@@ -1,12 +1,12 @@
 /*
  * Floating "Ask AI" pill, bottom right (redesign 2026-10-15), matching the
- * pill on solana.com/developers. Mintlify injects every .js file in the
- * project root on every page.
+ * pill on solana.com/developers. apps/web loads this script on every docs
+ * page (components/docs/docs-scripts.tsx).
  *
- * - When Mintlify's assistant is available (paid plans render
- *   #assistant-entry, which styles/theme.css hides from the top bar), the
- *   pill opens it.
- * - Otherwise (Hobby), the pill opens a small menu: ask Claude or ChatGPT
+ * - When the docs assistant is available (apps/web renders
+ *   #assistant-entry, components/docs/docs-chat.client.tsx), the pill
+ *   opens it.
+ * - Otherwise, the pill opens a small menu: ask Claude or ChatGPT
  *   about the current page (the same links as the page's contextual menu),
  *   or open the docs search.
  * Styles: styles/ask-ai.css. Without JavaScript nothing is added, and the

@@ -4,22 +4,18 @@
  * The Fumadocs docs had an interactive request panel on every RPC method page
  * (components/request-client.tsx at 023c6d918): pick devnet, testnet or
  * mainnet-beta, edit the request, Send, read the live response. This brings it
- * back on Mintlify. Mintlify injects this file on every page.
+ * back. apps/web loads this script on every docs page
+ * (components/docs/docs-scripts.tsx).
  *
- * Why not Mintlify's own API playground: it builds the body from <ParamField
- * body="..."> fields (or OpenAPI properties) as a named JSON object, while
- * JSON-RPC params are a positional array of mixed types; its form can only add
- * empty object[] items, it does not prefill the example, an `api:` page has one
- * fixed server, and every request goes through Mintlify's proxy
- * (/_mintlify/api/request), so all readers would share the proxy's IP against
- * the public RPC rate limits. Public Solana RPC endpoints allow CORS, so this
- * panel calls them straight from the reader's browser.
+ * Public Solana RPC endpoints allow CORS, so this panel calls them straight
+ * from the reader's browser (no proxy, so readers do not share one IP against
+ * the public RPC rate limits).
  *
  * Which pages: /developers/docs/rpc/http/<method> and /developers/docs/rpc/websocket/<method>Subscribe
  * (and their locale copies, /<locale>/developers/docs/rpc/...). Same set as the old site:
  * 53 HTTP methods and the 9 subscriptions (unsubscribe pages need a live
  * subscription id, as before). No marker is needed: the request is read from
- * the page's own <RequestExample>, which Mintlify renders server-side with
+ * the page's own <RequestExample>, which the docs render server-side with
  * every tab in the DOM (hidden or not):
  *   - HTTP: the `bash cURL` fence, `curl <url> ... -d '<json>'`;
  *   - WebSocket: the `json WebSocket` fence.
@@ -28,8 +24,7 @@
  * page keeps that contract (src/verify/rpc-try-it.ts), so a page that would
  * silently lose its panel fails CI.
  *
- * UI: a bar under the page header (like Mintlify's own API pages: verb, URL,
- * "Try it"), which opens a native modal <dialog> (focus trap and Esc for
+ * UI: a bar under the page header (verb, URL, "Try it"), which opens a native modal <dialog> (focus trap and Esc for
  * free) with the network select, the editable request, Send (Ctrl/Cmd+Enter)
  * and the response with status, time and size. HTTP methods POST once;
  * subscriptions open a WebSocket, show the confirmation and stream
@@ -251,7 +246,11 @@
     if (m === "requestairdrop" && (err || httpStatus === 429))
       return "\n\nPublic airdrops are rate limited and often refused. Get devnet or testnet SOL from https://faucet.solana.com instead.";
     if (disabledOnPublic(text))
-      return "\n\n" + method + " is disabled on public RPC endpoints because it is expensive to serve. Try it against an RPC provider, or a local validator or Surfpool.";
+      return (
+        "\n\n" +
+        method +
+        " is disabled on public RPC endpoints because it is expensive to serve. Try it against an RPC provider, or a local validator or Surfpool."
+      );
     if (m === "getslotleaders" && err)
       return "\n\nThe example's start slot is outside the range this node serves. Put a recent slot (from getSlot) as the first parameter and send again.";
     if (err || httpStatus !== 200) return "";
@@ -259,7 +258,11 @@
       var r = JSON.parse(text).result;
       var v = r && typeof r === "object" && "value" in r ? r.value : r;
       if (v === null || (Array.isArray(v) && v.length === 0))
-        return "\n\nA valid, empty result: the example's address or parameters have no matching data on " + srv.label + ". Replace them with your own and send again.";
+        return (
+          "\n\nA valid, empty result: the example's address or parameters have no matching data on " +
+          srv.label +
+          ". Replace them with your own and send again."
+        );
     } catch {
       /* not JSON */
     }
@@ -268,8 +271,8 @@
 
   // api.mainnet-beta.solana.com answers browser requests (HTTP and
   // WebSocket) only from allowlisted origins such as https://solana.com, and
-  // returns 403 "Access forbidden" to any other page (localhost, mint dev,
-  // *.mintlify.app previews). Devnet and testnet accept any origin.
+  // returns 403 "Access forbidden" to any other page (localhost, preview
+  // deployments). Devnet and testnet accept any origin.
   function originNote(srv) {
     if (srv.id !== "mainnet-beta") return "";
     if (/(^|\.)solana\.com$/.test(location.hostname)) return "";
@@ -777,7 +780,7 @@
     dlg.querySelector(".sol-rpc-x").addEventListener("click", function () {
       dlg.close();
     });
-    // Click on the backdrop closes, like Mintlify's own dialogs.
+    // Click on the backdrop closes.
     dlg.addEventListener("click", function (e) {
       if (e.target === dlg) dlg.close();
     });
@@ -814,7 +817,7 @@
   }
 
   // ---------------------------------------------------------------------
-  // Mount / unmount (survives Mintlify's client-side navigation)
+  // Mount / unmount (survives the docs' client-side navigation)
   // ---------------------------------------------------------------------
 
   function teardown() {

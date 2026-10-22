@@ -29,9 +29,11 @@
  * status/time slots), never adds or removes elements, and re-applies its
  * state when React re-creates the markup.
  *
- * Mintlify injects this file on every page and navigates client-side, so all
- * handling is delegated from `document`; no per-element setup is needed.
- * Mintlify custom JS cannot import npm packages, hence the inline base58.
+ * apps/web loads this script on every docs page
+ * (components/docs/docs-scripts.tsx) and the docs navigate client-side, so
+ * all handling is delegated from `document`; no per-element setup is needed.
+ * It is a plain script that cannot import npm packages, hence the inline
+ * base58.
  */
 (function () {
   if (window.__solRunExamples) return;

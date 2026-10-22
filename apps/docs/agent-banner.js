@@ -6,7 +6,7 @@
  * https://solana.com/developers/docs/intro/agent-setup.md. With JavaScript
  * this script:
  * - swaps the https://solana.com prefix for the current origin, so the line
- *   works on previews (not on localhost: `mint dev` serves no `.md` pages);
+ *   works on previews and locally;
  * - adds a Copy button that copies the line exactly as shown.
  * Without JavaScript the line keeps the solana.com URL and stays selectable.
  */

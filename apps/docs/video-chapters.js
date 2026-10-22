@@ -1,7 +1,7 @@
 /*
  * In-page video playback for the video tutorials (2026-10-16), restoring what
- * the old docs did with VideoWithChapters and VideoModalTrigger. Mintlify
- * injects every .js file in the project root on every page.
+ * the old docs did with VideoWithChapters and VideoModalTrigger. apps/web
+ * loads this script on every docs page (components/docs/docs-scripts.tsx).
  *
  * The markup is written by the convert transforms
  * (packages/docs-tooling/src/convert/transforms/video-guides.ts and
@@ -83,7 +83,9 @@
   }
 
   function posterFor(id) {
-    var posters = document.querySelectorAll("a.sol-yt[data-video]:not([hidden])");
+    var posters = document.querySelectorAll(
+      "a.sol-yt[data-video]:not([hidden])",
+    );
     for (var i = 0; i < posters.length; i++)
       if (posters[i].getAttribute("data-video") === id) return posters[i];
     return null;
@@ -108,7 +110,7 @@
     box.className = "sol-yt sol-yt-frame";
     box.setAttribute("data-video", id);
     box.appendChild(iframe);
-    // Hide the poster rather than remove it: Mintlify's React tree owns it.
+    // Hide the poster rather than remove it: the page's React tree owns it.
     poster.hidden = true;
     poster.after(box);
     iframe.focus({ preventScroll: true });
@@ -211,8 +213,7 @@
       )
         return;
       var link = e.target.closest && e.target.closest("a[href]");
-      // A Mintlify card is a div[role=link] whose image and text sit outside
-      // its inner <a>: a click anywhere on it means its link.
+      // A click anywhere on a docs card (.card) means its link.
       if (!link) link = cardLink(e.target);
       if (!link) return;
       if (link.classList.contains("sol-yt")) {
@@ -241,7 +242,7 @@
     true,
   );
 
-  /** The single YouTube link of the Mintlify card around `el`, if any. */
+  /** The single YouTube link of the docs card around `el`, if any. */
   function cardLink(el) {
     var card = el && el.closest && el.closest(".card");
     if (!card) return null;
@@ -252,7 +253,7 @@
   }
 
   // Keyboard: Enter or Space on a focused video card opens the same modal
-  // (Mintlify's own handler would open YouTube in a new tab).
+  // (the card's own link would open YouTube in a new tab).
   document.addEventListener(
     "keydown",
     function (e) {
