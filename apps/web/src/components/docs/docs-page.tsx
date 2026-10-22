@@ -25,6 +25,7 @@ import { DocsToc } from "./docs-toc.client";
 import { smartPunctuation, smartQuotes } from "@/lib/docs/smart-quotes.mjs";
 import { PageActions } from "./page-actions.client";
 import { DocsSearch } from "./docs-search.client";
+import { DocsChat } from "./docs-chat.client";
 import { DocsLink } from "./docs-link";
 import { ApiExamplesWrapper, docsComponents } from "./docs-components";
 import { ChevronIcon, TocIcon } from "./docs-ui-icons";
@@ -265,6 +266,7 @@ export async function DocsPageView({
           locale={contentLocale}
           inkeep={Boolean(process.env.INKEEP_API_KEY)}
         />
+        {process.env.NOUS_API_KEY ? <DocsChat locale={contentLocale} /> : null}
         <DocsScripts />
       </div>
     </>
