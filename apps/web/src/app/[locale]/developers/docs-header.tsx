@@ -55,13 +55,16 @@ function LanguageMenu({
   label,
   className = "dh-lang",
   paths,
+  names = languages,
 }: {
   locale: string;
   label: string;
   className?: string;
   paths?: Record<string, string>;
+  /** Languages to list, in order (default: every solana.com language). */
+  names?: Record<string, string>;
 }) {
-  const current = languages[locale as keyof typeof languages] ?? locale;
+  const current = names[locale] ?? locale;
   return (
     <details className={className}>
       <summary aria-label={`${label}: ${current}`}>
@@ -72,7 +75,7 @@ function LanguageMenu({
         <ChevronDownIcon />
       </summary>
       <ul className="dh-lang-list" aria-label={label}>
-        {Object.entries(languages).map(([code, name]) => (
+        {Object.entries(names).map(([code, name]) => (
           <li key={code}>
             <a
               href={languageHref(code, paths)}
@@ -80,7 +83,24 @@ function LanguageMenu({
               lang={code}
               aria-current={code === locale ? "true" : undefined}
             >
-              {name}
+              <span>{name}</span>
+              {code === locale ? (
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="18"
+                  height="18"
+                  viewBox="0 0 18 18"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                  className="dh-lang-check"
+                >
+                  <path d="M2.75 9.5L6.5 13.25L15.25 4.5" />
+                </svg>
+              ) : null}
             </a>
           </li>
         ))}
@@ -133,6 +153,7 @@ export async function DocsHeader({
   activeTab,
   menu,
   languagePaths,
+  languageNames,
   inPageSearch = false,
 }: {
   locale: string;
@@ -144,6 +165,8 @@ export async function DocsHeader({
   menu?: ReactNode;
   /** Language links for the current page (default: /developers). */
   languagePaths?: Record<string, string>;
+  /** Languages the menu lists (default: every solana.com language). */
+  languageNames?: Record<string, string>;
   /** Docs pages search in place; /developers hands off to the docs. */
   inPageSearch?: boolean;
 }) {
@@ -193,6 +216,7 @@ export async function DocsHeader({
             locale={locale}
             label={t("language")}
             paths={languagePaths}
+            names={languageNames}
           />
           {menu ? (
             <details className="dh-mobile dh-mobile-drawer">
@@ -245,6 +269,7 @@ export async function DocsHeader({
                         label={t("language")}
                         className="dh-lang dh-drawer-select dh-drawer-lang"
                         paths={languagePaths}
+            names={languageNames}
                       />
                       <details className="dh-drawer-select dh-drawer-tabs">
                         <summary>
@@ -279,6 +304,7 @@ export async function DocsHeader({
                     label={t("language")}
                     className="dh-lang dh-lang-mobile"
                     paths={languagePaths}
+            names={languageNames}
                   />
                   <ThemeToggle {...toggle} className="dh-theme dh-theme-mobile" />
                 </div>

@@ -91,11 +91,25 @@ export function SearchIcon({ size = 16 }: { size?: number }) {
   );
 }
 
+/** The docs' chevron (18px grid), pointing down. */
 export function ChevronDownIcon() {
   return (
-    <Lucide size={12} className="dh-chevron">
-      <path d="m6 9 6 6 6-6" />
-    </Lucide>
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="12"
+      height="12"
+      viewBox="0 0 18 18"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+      className="dh-chevron"
+    >
+      <path d="M2.75 6.5L9 12.75L15.25 6.5" />
+    </svg>
   );
 }
 

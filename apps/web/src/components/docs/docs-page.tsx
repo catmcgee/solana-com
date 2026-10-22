@@ -16,7 +16,10 @@ import {
 } from "@/lib/docs/page-data";
 import { getDocsUiStrings } from "@/lib/docs/ui-strings";
 import { docsPageMetadata } from "@/lib/docs/metadata";
-import { languagePaths } from "@/lib/docs/language-paths";
+import {
+  DOCS_LANGUAGE_NAMES,
+  languagePaths,
+} from "@/lib/docs/language-paths";
 import { DocsSidebar, SidebarNav } from "./docs-sidebar";
 import { DocsToc } from "./docs-toc.client";
 import { smartPunctuation, smartQuotes } from "@/lib/docs/smart-quotes.mjs";
@@ -175,6 +178,7 @@ export async function DocsPageView({
           activeTab={active}
           inPageSearch
           languagePaths={languagePaths(resolved)}
+          languageNames={DOCS_LANGUAGE_NAMES}
           menu={
             tab ? (
               <div id="mobile-nav">
