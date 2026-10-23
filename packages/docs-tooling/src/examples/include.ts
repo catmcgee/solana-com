@@ -111,14 +111,6 @@ function stripIndent(line: string, n: number) {
   return line.slice(i);
 }
 
-/** Every region name defined in a source file (both comment styles). */
-export function listRegions(source: string): string[] {
-  const out = new Set<string>();
-  for (const m of source.matchAll(/^\s*(?:\/\/|#)\s*#region\s+(\S+)\s*$/gm))
-    out.add(m[1]!);
-  return [...out];
-}
-
 export type LineRange = [number, number];
 
 /** `"24-30,33"` -> `[[24,30],[33,33]]`. Throws on malformed input. */

@@ -32,11 +32,7 @@ import {
 } from "node:fs";
 import path from "node:path";
 import { mdxCodec, treeFingerprint } from "../convert/codec.ts";
-import {
-  docsRoot as defaultDocsRoot,
-  repoRoot,
-  toPosix,
-} from "../lib/paths.ts";
+import { docsRoot as defaultDocsRoot, toPosix } from "../lib/paths.ts";
 import { DEFAULT_LOCALE, TARGET_LOCALES } from "../lib/locales.ts";
 import type { AstNode } from "../types.ts";
 
@@ -119,17 +115,6 @@ export function attr(name: string, s: string) {
  */
 export function jsAttr(name: string, s: string) {
   return `${name}={${JSON.stringify(s)}}`;
-}
-
-/**
- * A plain-text value as a JSX expression child (`{"..."}`).
- * WARNING: the SSR probe dropped expression children inside imported MDX
- * snippets (2026-10-13: the text was only in the client payload), so
- * never use this for content that must read without JavaScript. Use
- * `mdText` instead.
- */
-export function jsText(s: string) {
-  return `{${JSON.stringify(s)}}`;
 }
 
 /**
@@ -502,11 +487,6 @@ export function syncSnippetImports(
     }
   }
   return changed;
-}
-
-/** Repo-relative path for messages. */
-export function repoRel(abs: string) {
-  return toPosix(path.relative(repoRoot, abs));
 }
 
 // ---------------------------------------------------------------------------

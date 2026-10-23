@@ -254,7 +254,6 @@ function brand(svg, dark, file = "") {
  *    shape in source order); every other accent stroke folds to neutral
  *    zinc, and accent text folds to the muted label colour.
  */
-const ACCENT_RE = /#(?:7a2fe0|b78aff)(?![0-9a-f])/i;
 const FOCAL = {
   // file (relative, no -light / .svg) -> index of the shape that keeps it
   "frontend/sign-in-decision": 0, // "Wallet connected", the entry point

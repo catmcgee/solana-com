@@ -110,32 +110,6 @@ export function checkFrontmatterAndAssets(
   return { fm, assets, counts };
 }
 
-/** Nav order, flattened (pages and group roots). */
-function flatNav(x: unknown, out: string[] = []): string[] {
-  if (typeof x === "string") out.push(x);
-  else if (Array.isArray(x)) for (const y of x) flatNav(y, out);
-  else if (x && typeof x === "object") {
-    const o = x as Record<string, unknown>;
-    if (typeof o.root === "string") out.push(o.root);
-    for (const k of ["tabs", "groups", "pages"]) if (o[k]) flatNav(o[k], out);
-  }
-  return out;
-}
-
-/** `developers/docs/<section>/index` pages preceded in nav order by one of their sub-pages. */
-export function shadowedIndexPages(
-  navFile = path.join(repoRoot, "apps/docs/navigation/en.json"),
-) {
-  const order = flatNav(JSON.parse(readFileSync(navFile, "utf8")));
-  const out: string[] = [];
-  order.forEach((p, i) => {
-    if (!p.endsWith("/index")) return;
-    const prefix = `${p.slice(0, -"/index".length)}/`;
-    if (order.slice(0, i).some((q) => q.startsWith(prefix))) out.push(p);
-  });
-  return out;
-}
-
 /**
  * Blocks where remark-math (single-dollar inline math) would turn prose
  * dollar amounts into KaTeX. No page intends math; a page that does can opt out with

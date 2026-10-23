@@ -90,12 +90,6 @@ export function exprAttr(name: string, expression: string): JsxAttr {
   };
 }
 
-export function removeAttrs(n: Jsx, names: readonly string[]) {
-  n.attributes = (n.attributes ?? []).filter(
-    (a) => !(a.type === "mdxJsxAttribute" && names.includes(a.name ?? "")),
-  );
-}
-
 /** Attribute names other than `allowed` (spread attributes count as "..."). */
 export function unknownAttrs(n: Jsx, allowed: readonly string[]): string[] {
   return (n.attributes ?? [])

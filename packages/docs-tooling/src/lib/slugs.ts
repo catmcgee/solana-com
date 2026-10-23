@@ -103,8 +103,3 @@ function encodedSlug(title: string): string {
       })
     : librarySlugify(encoded, { decamelize: false, preserveCharacters: ["_"] });
 }
-
-/** Docs heading id without deduplication, as rendered. */
-export function docsHeadingSlug(title: string): string {
-  return cleanHeadingId(encodedSlug(title));
-}
