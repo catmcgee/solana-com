@@ -16,6 +16,7 @@ import { SitewideTopAlert } from "@solana-com/ui-chrome/sitewide-top-alert";
 import { PodcastPlayer } from "@/components/podcast-player.client";
 import { GoogleTagManagerNoScript } from "@solana-com/ui-chrome/google-tag-manager-noscript";
 import { DocsSearch } from "@/components/docs/docs-search.client";
+import { AskAi } from "@/components/docs/ask-ai.client";
 import { DOCS_LOCALES } from "@/lib/docs/locales.mjs";
 import Script from "next/script";
 
@@ -40,6 +41,7 @@ export function SiteShell({
   children: React.ReactNode;
 }) {
   const googleTagManagerID = config.siteMetadata.googleTagManagerID;
+  const docsLocale = DOCS_LOCALES.includes(locale) ? locale : defaultLocale;
   return (
     <html
       lang={locale}
@@ -59,9 +61,8 @@ export function SiteShell({
               {children}
               {footer}
               <PodcastPlayer />
-              <DocsSearch
-                locale={DOCS_LOCALES.includes(locale) ? locale : defaultLocale}
-              />
+              <DocsSearch locale={docsLocale} />
+              <AskAi locale={docsLocale} chat={!!process.env.NOUS_API_KEY} />
               <Script
                 id="signals-script"
                 strategy="afterInteractive"

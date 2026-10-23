@@ -21,7 +21,6 @@ import { DocsSidebar, SidebarItems, SidebarNav } from "./docs-sidebar";
 import { DocsToc } from "./docs-toc.client";
 import { smartPunctuation, smartQuotes } from "@/lib/docs/smart-quotes.mjs";
 import { PageActions } from "./page-actions.client";
-import { DocsChat } from "./docs-chat.client";
 import { DocsLink } from "./docs-link";
 import { ApiExamplesWrapper, docsComponents } from "./docs-components";
 import { ChevronIcon, TocIcon } from "./docs-ui-icons";
@@ -263,7 +262,6 @@ export async function DocsPageView({
           </main>
         </div>
         <DocsFooter locale={contentLocale} developers />
-        {process.env.NOUS_API_KEY ? <DocsChat locale={contentLocale} /> : null}
         <DocsScripts />
       </div>
     </>

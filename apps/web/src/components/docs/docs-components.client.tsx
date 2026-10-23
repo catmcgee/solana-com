@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { CheckIcon, CopyIcon, SparkleIcon } from "./docs-ui-icons";
+import { DOCS_ASK_CODE_EVENT } from "@/lib/docs/chat";
 
 /**
  * Interactive pieces of the docs content components (docs-components.tsx):
@@ -219,9 +220,6 @@ export function CodeExpandFooter({ count }: { count: number }) {
     </div>
   );
 }
-
-/** Event the docs Ask AI listens for: ask about a code block. */
-export const DOCS_ASK_CODE_EVENT = "docs-ask-ai:code";
 
 /** "Ask Assistant" next to Copy: hands the block's code to Ask AI. */
 export function AskCodeButton() {

@@ -10,6 +10,7 @@ import { VolumeFull as Volume2 } from "@boxicons/react/VolumeFull";
 import { VolumeMute as VolumeX } from "@boxicons/react/VolumeMute";
 import { X } from "@boxicons/react/X";
 import { Link } from "./link";
+import { useAskAiAvoid } from "./ask-ai-avoid";
 import {
   clearPodcastPlayerState,
   DEFAULT_PODCAST_PLAYER_STATE,
@@ -73,6 +74,7 @@ async function syncPlayback(audio: HTMLAudioElement, isPlaying: boolean) {
 
 export function PersistentPodcastPlayer() {
   const audioRef = useRef<HTMLAudioElement>(null);
+  const avoidRef = useAskAiAvoid();
   const [state, setState] = useState<PodcastPlayerState>(
     DEFAULT_PODCAST_PLAYER_STATE,
   );
@@ -286,7 +288,11 @@ export function PersistentPodcastPlayer() {
         }}
       />
 
-      <div className="fixed bottom-0 left-0 right-0 z-[70] border-t border-white/10 bg-black/90 text-white backdrop-blur-xl shadow-[0_-8px_32px_rgba(0,0,0,0.4)]">
+      <div
+        ref={avoidRef}
+        data-ask-ai-avoid=""
+        className="fixed bottom-0 left-0 right-0 z-[70] border-t border-white/10 bg-black/90 text-white backdrop-blur-xl shadow-[0_-8px_32px_rgba(0,0,0,0.4)]"
+      >
         <div className="group relative h-1 w-full bg-white/10">
           <div
             className="h-full bg-[#14F195] transition-[width] duration-100 ease-linear"

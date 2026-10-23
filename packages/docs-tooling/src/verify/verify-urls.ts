@@ -340,8 +340,6 @@ export function layoutKey(
 export function strayAssetsInDocsRoot(
   allow: readonly string[] = [
     "apps/docs/run-examples.js",
-    // Floating "Ask AI" pill (redesign 2026-10-15; styles/ask-ai.css).
-    "apps/docs/ask-ai.js",
     // "Open tutorial in Playground" block on tutorial intro pages (styles/playground.css).
     "apps/docs/playground.js",
     // Live "Try it" on RPC method pages (styles/rpc-try-it.css).

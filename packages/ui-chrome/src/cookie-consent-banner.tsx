@@ -5,10 +5,12 @@ import { Shield } from "@boxicons/react/Shield";
 import { Button } from "@workspace/ui";
 import { useCookieConsent } from "./use-cookie-consent";
 import { Link } from "./link";
+import { useAskAiAvoid } from "./ask-ai-avoid";
 
 export function CookieConsentBanner() {
   const t = useTranslations();
   const { isLoaded, setCookieConsent, shouldShowBanner } = useCookieConsent();
+  const avoidRef = useAskAiAvoid();
 
   if (!isLoaded) {
     return null;
@@ -20,7 +22,11 @@ export function CookieConsentBanner() {
 
   return (
     <>
-      <div className="fixed bottom-5 left-5 z-[9999] w-[calc(100%-2.5rem)] max-w-[28rem] max-md:bottom-0 max-md:left-0 max-md:w-full max-md:max-w-full">
+      <div
+        ref={avoidRef}
+        data-ask-ai-avoid=""
+        className="fixed bottom-5 left-5 z-[9999] w-[calc(100%-2.5rem)] max-w-[28rem] max-md:bottom-0 max-md:left-0 max-md:w-full max-md:max-w-full"
+      >
         <div className="relative overflow-hidden bg-zinc-950/95 p-5 text-white shadow-[0_24px_80px_-32px_rgba(0,0,0,0.9)] backdrop-blur-xl max-md:rounded-none">
           <div className="relative space-y-4">
             <div className="flex items-start gap-3">

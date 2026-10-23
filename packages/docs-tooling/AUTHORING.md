@@ -31,12 +31,11 @@ be checked on a deployment is listed under "Release gates" below.
 Rules for `apps/docs`:
 
 - Never add `.js`, `.jsx` or `.css` files except the owned globals
-  (`run-examples.js`, `ask-ai.js`, `playground.js`, `video-chapters.js`,
-  `styles/*.css`, and the others in the `strayAssetsInDocsRoot` allowlist).
-  apps/web copies the scripts to `/docs-scripts/`
-  (`scripts/copy-docs-static.mjs`) and imports the styles
-  (`components/docs/docs-styles.ts`); a new file needs an entry in both and in
-  the allowlist. `verify-urls` fails on strays.
+  (`run-examples.js`, `playground.js`, `video-chapters.js`, `styles/*.css`, and
+  the others in the `strayAssetsInDocsRoot` allowlist). apps/web copies the
+  scripts to `/docs-scripts/` (`scripts/copy-docs-static.mjs`) and imports the
+  styles (`components/docs/docs-styles.ts`); a new file needs an entry in both
+  and in the allowlist. `verify-urls` fails on strays.
 - Never add `.md` notes (README, CLAUDE.md, AGENTS.md) to `apps/docs`. Put them
   in `packages/docs-tooling`.
 - Folder paths are public URLs. Moving a file changes its URL and needs an

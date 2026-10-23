@@ -334,7 +334,7 @@ describe("middleware matcher", () => {
   it("skips docs assets, MCP and other files", () => {
     for (const path of [
       "/docs-assets/assets/docs/core/accounts.svg",
-      "/docs-scripts/ask-ai.js",
+      "/docs-scripts/run-examples.js",
       "/mcp",
       "/llms.txt",
     ]) {

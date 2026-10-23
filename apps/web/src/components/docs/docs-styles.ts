@@ -12,7 +12,6 @@ import "../../../../docs/styles/nojs.css";
 import "../../../../docs/styles/run.css";
 import "../../../../docs/styles/stepper.css";
 import "../../../../docs/styles/theme.css";
-import "../../../../docs/styles/ask-ai.css";
 import "../../../../docs/styles/diagrams.css";
 import "../../../../docs/styles/paths-sidebar.css";
 import "../../../../docs/styles/demo.css";

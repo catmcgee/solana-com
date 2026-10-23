@@ -27,10 +27,10 @@ const nous = createOpenAI({
 });
 
 const INSTRUCTIONS = [
-  "You are the assistant for the Solana developer docs at solana.com.",
-  "Use the `search` tool to find the relevant docs pages before answering, and answer from them.",
+  "You are Ask AI on solana.com, the assistant for the Solana developer docs. Readers may ask from any solana.com page, not only the docs.",
+  "Use the `search` tool to find the relevant docs pages before answering, and answer from them. Search with short keyword queries (for example `transaction fees` or `send USDC`), and search again with other words if the first results do not answer the question.",
   "A user message may begin with [Client Context], the page they are reading; for questions about this page, search its title.",
-  "Cite pages as Markdown links to their `url` (paths are on https://solana.com).",
+  "Cite the pages you used as Markdown links with the `url` the search returned, as a path, for example [Fees](/developers/docs/core/fees). Only link pages the search returned; never make up a URL.",
   "Prefer @solana/kit for TypeScript examples. Keep answers short and concrete.",
   "If the docs do not cover the question, say so and suggest where to look.",
 ].join("\n");
@@ -52,7 +52,10 @@ function searchTool(locale: string) {
       ].slice(0, limit);
       return Promise.all(
         urls.map(async (url) => {
-          const page = docsSource.getPages().find((p) => p.url === url);
+          const page = [
+            ...docsSource.getPages(locale),
+            ...docsSource.getPages(),
+          ].find((p) => p.url === url);
           if (!page) return { doc: null };
           const data = page.data as unknown as {
             title: string;

@@ -24,7 +24,6 @@ const docs = path.resolve(web, "../docs");
 const pub = path.join(web, "public");
 
 const SCRIPTS = [
-  "ask-ai.js",
   "rpc-try-it.js",
   "run-examples.js",
   "playground.js",
