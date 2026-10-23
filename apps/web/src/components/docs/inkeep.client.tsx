@@ -1,7 +1,13 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
 import type {
   AIChatFunctions,
   InkeepEmbeddedSearchAndChatFunctions,
@@ -71,6 +77,30 @@ export function DocsInkeep() {
       window.removeEventListener(DOCS_ASK_CODE_EVENT, onAsk);
     };
   }, [onOpenChange]);
+
+  // defaultQuery only applies when the search first mounts, so hand later
+  // queries over once it is ready, as ui-chrome's config does for ?search=.
+  const searchFunctions = config.searchSettings
+    .searchFunctionsRef as RefObject<{
+    updateQuery: (query: string) => void;
+    focusInput: () => void;
+  } | null>;
+  useEffect(() => {
+    if (!isOpen || !query) return;
+    let frame = 0;
+    let tries = 0;
+    const apply = () => {
+      const search = searchFunctions.current;
+      if (search) {
+        search.updateQuery(query);
+        search.focusInput();
+      } else if (++tries < 120) {
+        frame = requestAnimationFrame(apply);
+      }
+    };
+    apply();
+    return () => cancelAnimationFrame(frame);
+  }, [isOpen, query, searchFunctions]);
 
   return (
     <InkeepModalSearchAndChat
