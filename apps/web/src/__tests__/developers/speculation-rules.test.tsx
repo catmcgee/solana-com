@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   DeveloperSpeculationRules,
   getDeveloperSpeculationRules,
-} from "@/app/[locale]/developers/speculation-rules";
+} from "@/app/(docs)/[locale]/developers/speculation-rules";
 
 describe("speculation rules on /developers", () => {
   it("prefetches the docs home and prerenders docs links on hover", () => {

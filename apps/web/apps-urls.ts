@@ -13,7 +13,7 @@ export const MEDIA_APP_URL =
     ? vercelMediaUrl
     : developmentMediaUrl);
 
-// Docs: rendered by this app (Fumadocs, src/app/[locale]/developers/docs).
+// Docs: rendered by this app (Fumadocs, src/app/(docs)/[locale]/developers/docs).
 
 // Templates app URLs
 const vercelTemplatesUrl = withRelatedProject({

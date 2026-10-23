@@ -28,7 +28,8 @@ if (sources.length === 0)
   throw new Error("trace-docs-sources: no docs sources found");
 
 let patched = 0;
-for (const route of DOCS_SOURCE_ROUTES) {
+// The docs pages are in the (docs) route group (their own root layout).
+for (const route of DOCS_SOURCE_ROUTES.flatMap((r) => [r, `/(docs)${r}`])) {
   for (const kind of ["page", "route"]) {
     const traceFile = path.join(appDir, `${route}/${kind}.js.nft.json`);
     if (!existsSync(traceFile)) continue;

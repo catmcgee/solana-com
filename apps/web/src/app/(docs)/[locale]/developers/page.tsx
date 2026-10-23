@@ -19,6 +19,10 @@ import "./docs-chrome.css";
 
 type Props = { params: Promise<{ locale: string }> };
 
+// Static, refreshed every five minutes (the updates feed): nothing here
+// reads the request, and the site's locale routing would otherwise render it
+// on every request.
+export const dynamic = "force-static";
 export const revalidate = 300;
 
 export default async function Page({ params }: Props) {

@@ -2,9 +2,9 @@ import type { ReactNode } from "react";
 import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
 import type { TOCItemType } from "fumadocs-core/toc";
-import { DocsHeader } from "@/app/[locale]/developers/docs-header";
-import { DocsFooter } from "@/app/[locale]/developers/docs-footer";
-import { DocsThemePrepaint } from "@/app/[locale]/developers/theme-prepaint";
+import { DocsHeader } from "@/app/(docs)/[locale]/developers/docs-header";
+import { DocsFooter } from "@/app/(docs)/[locale]/developers/docs-footer";
+import { DocsThemePrepaint } from "@/app/(docs)/[locale]/developers/theme-prepaint";
 import type { DocsTab, DocsTabIcon } from "@/data/developers/docs-nav";
 import {
   breadcrumbs,

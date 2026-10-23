@@ -1,29 +1,11 @@
-import "@workspace/ui/scrollbar.css";
-import "@/app/globals.css";
-import "@/scss/index.scss";
-
-import CookieConsent from "@/components/CookieConsent/CookieConsent";
-import GTMTrackingSnippet from "@/components/GTMTrackingSnippet";
-import { NextIntlClientProvider } from "next-intl";
 import { Metadata } from "next";
-import { PostHogProvider } from "@@/src/app/components/posthog/PostHogProvider";
-import { config } from "@@/src/config";
 import { getBaseMetadata } from "@@/src/app/metadata";
-import { defaultLocale, locales, staticLocales } from "@workspace/i18n/config";
+import { locales, staticLocales } from "@workspace/i18n/config";
 import { loadMergedMessages } from "@workspace/i18n/messages";
-import { getLangDir } from "rtl-detect";
 import { notFound } from "next/navigation";
-import {
-  ThemeProvider,
-  SitewideTopAlert,
-  PersistentPodcastPlayer,
-  GoogleTagManagerNoScript,
-} from "@solana-com/ui-chrome";
-import { ChromeWrapper } from "@/components/ChromeWrapper";
-import { DocsSearch } from "@/components/docs/docs-search.client";
-import { DOCS_LOCALES } from "@/lib/docs/locales.mjs";
-import Script from "next/script";
 import { Header, Footer } from "@solana-com/ui-chrome";
+import { ChromeWrapper } from "@/components/ChromeWrapper";
+import { SiteShell } from "@/components/site-shell";
 
 type Props = {
   children: React.ReactNode;
@@ -37,66 +19,24 @@ export default async function RootLayout({ children, params }: Props) {
     notFound();
   }
 
-  const direction = getLangDir(locale);
   const messages = await loadMergedMessages({ app: "web", locale });
-  const googleTagManagerID = config.siteMetadata.googleTagManagerID;
   return (
-    <html
-      lang={locale}
-      dir={direction}
-      data-scroll-behavior="smooth"
-      suppressHydrationWarning
+    <SiteShell
+      locale={locale}
+      messages={messages}
+      header={
+        <ChromeWrapper>
+          <Header />
+        </ChromeWrapper>
+      }
+      footer={
+        <ChromeWrapper>
+          <Footer />
+        </ChromeWrapper>
+      }
     >
-      <body suppressHydrationWarning>
-        <GoogleTagManagerNoScript containerId={googleTagManagerID} />
-        <NextIntlClientProvider messages={messages} locale={locale}>
-          <PostHogProvider>
-            <ThemeProvider>
-              <GTMTrackingSnippet />
-              <SitewideTopAlert />
-              <CookieConsent />
-              <ChromeWrapper>
-                <Header />
-              </ChromeWrapper>
-              {children}
-              <ChromeWrapper>
-                <Footer />
-              </ChromeWrapper>
-              <PersistentPodcastPlayer />
-              <DocsSearch
-                locale={DOCS_LOCALES.includes(locale) ? locale : defaultLocale}
-              />
-              <Script
-                id="signals-script"
-                strategy="afterInteractive"
-                dangerouslySetInnerHTML={{
-                  __html: `
-                    (function() {
-                      if (typeof window === 'undefined') return;
-                      if (typeof window.signals !== 'undefined') return;
-                      var script = document.createElement('script');
-                      script.src = 'https://cdn.cr-relay.com/v1/site/d7901f15-da9a-4a7a-bf5e-679354ce2f55/signals.js';
-                      script.async = true;
-                      window.signals = Object.assign(
-                        [],
-                        ['page', 'identify', 'form'].reduce(function (acc, method){
-                          acc[method] = function () {
-                            signals.push([method, arguments]);
-                            return signals;
-                          };
-                        return acc;
-                        }, {})
-                      );
-                      document.head.appendChild(script);
-                    })();
-                  `,
-                }}
-              />
-            </ThemeProvider>
-          </PostHogProvider>
-        </NextIntlClientProvider>
-      </body>
-    </html>
+      {children}
+    </SiteShell>
   );
 }
 

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { getIndexMetadata } from "@/app/metadata";
-import { ThemePrepaint } from "../developers/theme-prepaint";
+import { ThemePrepaint } from "@/app/(docs)/[locale]/developers/theme-prepaint";
 import { LearnLanding } from "./learn-landing";
 
 type Props = { params: Promise<{ locale: string }> };

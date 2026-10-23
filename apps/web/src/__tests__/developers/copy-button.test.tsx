@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { renderToString } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { CopyButton } from "@/app/[locale]/developers/copy-button.client";
+import { CopyButton } from "@/app/(docs)/[locale]/developers/copy-button.client";
 
 const COMMAND =
   "claude mcp add --transport http solana-mcp https://mcp.solana.com/mcp";

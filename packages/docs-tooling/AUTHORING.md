@@ -265,19 +265,19 @@ Theme rules:
   use `#B78AFF` (8.1:1 on black). The dark page background is `#000`, like
   solana.com.
 - **Top bar.** The docs header is apps/web
-  `src/app/[locale]/developers/docs-header.tsx` (logo, tabs, search, theme and
-  language), shared with the /developers landing and kept to one row at every
-  width. Tabs and labels come from the docs navigation
+  `src/app/(docs)/[locale]/developers/docs-header.tsx` (logo, tabs, search,
+  theme and language), shared with the /developers landing and kept to one row
+  at every width. Tabs and labels come from the docs navigation
   (`src/data/developers/docs-nav.ts`), including the divider after tab 4
   (Markets, `DOCS_TAB_DIVIDER_AFTER`). Links from other solana.com pages into
   the docs open in a new tab (`isDocsHref` in
   packages/ui-chrome/src/url-config.ts).
 - **RTL (`ar`).** apps/web sets `<html lang="ar" dir="rtl">` (rtl-detect in
-  `src/app/[locale]/layout.tsx`). `theme.css` flips the text regions (content,
+  `src/components/site-shell.tsx`). `theme.css` flips the text regions (content,
   header, sidebar, TOC, pagination) to RTL and keeps code LTR.
 - **Theme without JS.** `DocsThemePrepaint` (apps/web
-  `src/app/[locale]/developers/theme-prepaint.tsx`) sets the theme class and
-  `html[data-theme-preference]` before paint. Without JS neither is set; the
+  `src/app/(docs)/[locale]/developers/theme-prepaint.tsx`) sets the theme class
+  and `html[data-theme-preference]` before paint. Without JS neither is set; the
   theme must read in that case too.
 - **Verify** with
   `pnpm --filter @workspace/docs-tooling theme-check --base <url>`
@@ -351,10 +351,10 @@ deployment) and checks HTTP 200 plus the page title in the HTML.
 - `site-links` (650): root-relative links to pages apps/web serves (`/skills`,
   `/discord`, `/developers/templates`, …) become `https://solana.com/…`; the
   docs routes are only `/developers/docs/**`, `/learn/<article>`,
-  `/developers/cookbook/**`, `/docs-assets/**`
-  (optionally locale-prefixed; old `/docs/**` links are left alone because they
-  redirect). Bare relative links are resolved the way the legacy browser did.
-  GFM autolinks that swallowed CJK/Arabic punctuation are cut.
+  `/developers/cookbook/**`, `/docs-assets/**` (optionally locale-prefixed; old
+  `/docs/**` links are left alone because they redirect). Bare relative links
+  are resolved the way the legacy browser did. GFM autolinks that swallowed
+  CJK/Arabic punctuation are cut.
 - `anchors` (920): docs heading ids come from @sindresorhus/slugify
   (`actions.json` -> `#actions-json`), not github-slugger (`#actionsjson`):
   `docsSlugger` in `src/lib/slugs.ts`, and `docsSlug` in apps/web
@@ -505,11 +505,11 @@ Release gate: check this before the docs leave the fork.
   `docs/tools/index`) is a live page: its content (SendAI Agent Kit, Eliza,
   GOAT, LangChain, onchain agent programs) is about agents that transact, not
   coding assistants (`intro/coding-with-agents`, "Build with AI agents"); the
-  two pages link to each other. The Video tutorials tab lists
-  the `video-guides` pages; old `/developers/bootcamp/**` URLs redirect there. oxfmt
-  runs on staged EN content at commit, so generator output must be oxfmt-stable
-  (it de-indents JSX children after a blank line and re-wraps attributes longer
-  than 80 characters).
+  two pages link to each other. The Video tutorials tab lists the `video-guides`
+  pages; old `/developers/bootcamp/**` URLs redirect there. oxfmt runs on staged
+  EN content at commit, so generator output must be oxfmt-stable (it de-indents
+  JSX children after a blank line and re-wraps attributes longer than 80
+  characters).
 - **Cross-tab cards (2026-10-16, `cross-tab-cards.ts`).** A `<Card>` on a
   Payments, Assets or Markets page whose href is filed under another tab in
   `navigation/en.json` gets the `arrow` prop (a small ↗, server-rendered, light

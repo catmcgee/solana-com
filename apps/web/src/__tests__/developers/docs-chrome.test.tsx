@@ -17,10 +17,12 @@ vi.mock("@workspace/i18n/server", () => ({
   }) => createTranslator({ locale, messages: en, namespace } as never),
 }));
 
-const { DocsHeader } = await import("@/app/[locale]/developers/docs-header");
-const { DocsFooter } = await import("@/app/[locale]/developers/docs-footer");
+const { DocsHeader } =
+  await import("@/app/(docs)/[locale]/developers/docs-header");
+const { DocsFooter } =
+  await import("@/app/(docs)/[locale]/developers/docs-footer");
 const { DOCS_THEME_PREPAINT_SCRIPT } =
-  await import("@/app/[locale]/developers/theme-prepaint");
+  await import("@/app/(docs)/[locale]/developers/theme-prepaint");
 const {
   DOCS_SEARCH_PROMPT,
   docsSearchHref,

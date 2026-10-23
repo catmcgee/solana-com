@@ -26,7 +26,7 @@ vi.mock("@@/assets/learn/learn-hero.webp", () => ({
 }));
 
 const { DevelopersHub } =
-  await import("@/app/[locale]/developers/developers-hub");
+  await import("@/app/(docs)/[locale]/developers/developers-hub");
 const { LearnLanding } = await import("@/app/[locale]/learn/learn-landing");
 const {
   AGENT_PROMPT,

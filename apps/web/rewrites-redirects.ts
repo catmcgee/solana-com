@@ -678,7 +678,7 @@ const chainMigrationRedirects: RedirectInput[] = [
 /*
  * The developer docs (/developers/docs, /developers/cookbook,
  * /developers/bootcamp, /learn/<article> and their locale copies) are pages
- * of this app (Fumadocs, src/app/[locale]/developers/docs etc.), so they
+ * of this app (Fumadocs, src/app/(docs)/[locale]/developers/docs etc.), so they
  * need no rewrites: only the redirects above and src/proxy.ts (canonical
  * paths, Markdown twins).
  */

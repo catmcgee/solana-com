@@ -1,6 +1,6 @@
 /**
  * The docs header and footer, as shown on the /developers landing
- * (apps/web/src/app/[locale]/developers/docs-header.tsx, docs-footer.tsx).
+ * (apps/web/src/app/(docs)/[locale]/developers/docs-header.tsx, docs-footer.tsx).
  *
  * Everything here is read at build time from the docs content (apps/docs),
  * so the landing cannot drift from the docs:

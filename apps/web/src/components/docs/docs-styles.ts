@@ -5,7 +5,7 @@
  * apps/docs/styles (theme tokens and overrides, path boxes, demos, ...), in
  * the order the docs have always applied them.
  */
-import "@/app/[locale]/developers/docs-chrome.css";
+import "@/app/(docs)/[locale]/developers/docs-chrome.css";
 import "./docs.css";
 import "../../../../docs/styles/concepts.css";
 import "../../../../docs/styles/nojs.css";

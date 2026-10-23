@@ -1,7 +1,7 @@
 import { defaultLocale } from "@workspace/i18n/config";
 import docsConfig from "../../../../docs/docs.json";
-import { DocsHeader } from "@/app/[locale]/developers/docs-header";
-import { DocsThemePrepaint } from "@/app/[locale]/developers/theme-prepaint";
+import { DocsHeader } from "@/app/(docs)/[locale]/developers/docs-header";
+import { DocsThemePrepaint } from "@/app/(docs)/[locale]/developers/theme-prepaint";
 import type { DocsTab, DocsTabIcon } from "@/data/developers/docs-nav";
 import { DOCS_LANGUAGE_NAMES } from "@/lib/docs/language-paths";
 import { getDocsNavigation } from "@/lib/docs/navigation";
