@@ -25,9 +25,10 @@
  * the total time of the run, and offers Next step / Run all / Run again.
  * Values shortened with a middle ellipsis copy their full text on click (or
  * Enter/Space). Under prefers-reduced-motion every step appears at once and
- * the footer shows just "Done" (no total time). It only sets attributes (and text on the empty
- * status/time slots), never adds or removes elements, and re-applies its
- * state when React re-creates the markup.
+ * the footer shows just "Done" (no total time).
+ *
+ * Both only set attributes (and text on empty slots), never add or remove
+ * elements, and re-apply their state when React re-creates the markup.
  *
  * apps/web loads this script on every docs page
  * (components/docs/docs-scripts.tsx) and the docs navigate client-side, so
@@ -43,10 +44,39 @@
   document.documentElement.setAttribute("data-sol-run", "");
 
   function reducedMotion() {
-    return (
-      typeof window.matchMedia === "function" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches
-    );
+    return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  }
+
+  // React may re-create the snippet DOM (tab remounts, navigation), which
+  // drops attributes this script set, so state is kept by key and re-applied:
+  // key = path | id attribute | tab | nth occurrence on the page.
+  function keyed(selector, idAttr) {
+    var els = document.querySelectorAll(selector);
+    var seen = {};
+    var list = [];
+    for (var i = 0; i < els.length; i++) {
+      var el = els[i];
+      var id =
+        (el.getAttribute(idAttr) || "") +
+        "|" +
+        (el.getAttribute("data-tab") || "");
+      var n = seen[id] || 0;
+      seen[id] = n + 1;
+      list.push({ el: el, key: location.pathname + "|" + id + "|" + n });
+    }
+    return list;
+  }
+  function keyOf(selector, idAttr, el) {
+    var list = keyed(selector, idAttr);
+    for (var i = 0; i < list.length; i++)
+      if (list[i].el === el) return list[i].key;
+    return "";
+  }
+  function byKey(selector, idAttr, key) {
+    var list = keyed(selector, idAttr);
+    for (var i = 0; i < list.length; i++)
+      if (list[i].key === key) return list[i].el;
+    return null;
   }
 
   // ---------------------------------------------------------------------
@@ -54,34 +84,17 @@
   // ---------------------------------------------------------------------
   var B58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
   function base58(bytes) {
-    var digits = [0];
-    for (var i = 0; i < bytes.length; i++) {
-      var carry = bytes[i];
-      for (var j = 0; j < digits.length; j++) {
-        carry += digits[j] << 8;
-        digits[j] = carry % 58;
-        carry = (carry / 58) | 0;
-      }
-      while (carry > 0) {
-        digits.push(carry % 58);
-        carry = (carry / 58) | 0;
-      }
-    }
+    var n = 0n;
+    for (var i = 0; i < bytes.length; i++) n = n * 256n + BigInt(bytes[i]);
     var out = "";
-    for (var k = 0; k < bytes.length && bytes[k] === 0; k++) out += "1";
-    for (var d = digits.length - 1; d >= 0; d--) out += B58[digits[d]];
+    for (; n > 0n; n /= 58n) out = B58[Number(n % 58n)] + out;
+    for (var k = 0; k < bytes.length && bytes[k] === 0; k++) out = "1" + out;
     return out;
   }
 
   /** Python's repr() of a bytes object, e.g. b'G\xcd\x7e' (solders prints this). */
   function pythonBytes(bytes) {
-    var hasSingle = false;
-    var hasDouble = false;
-    for (var i = 0; i < bytes.length; i++) {
-      if (bytes[i] === 0x27) hasSingle = true;
-      if (bytes[i] === 0x22) hasDouble = true;
-    }
-    var quote = hasSingle && !hasDouble ? '"' : "'";
+    var quote = bytes.includes(0x27) && !bytes.includes(0x22) ? '"' : "'";
     var out = "";
     for (var j = 0; j < bytes.length; j++) {
       var b = bytes[j];
@@ -96,79 +109,37 @@
     return "b" + quote + out + quote;
   }
 
-  function generateKeyPair() {
-    var subtle = window.crypto && window.crypto.subtle;
-    if (!subtle) return Promise.reject(new Error("WebCrypto unavailable"));
-    return subtle
-      .generateKey({ name: "Ed25519" }, true, ["sign", "verify"])
-      .then(function (kp) {
-        return Promise.all([
-          subtle.exportKey("raw", kp.publicKey),
-          subtle.exportKey("pkcs8", kp.privateKey),
-        ]);
-      })
-      .then(function (keys) {
-        var pub = new Uint8Array(keys[0]);
-        var pkcs8 = new Uint8Array(keys[1]);
-        // PKCS#8 Ed25519 keys end with the 32-byte seed (the Solana "secret").
-        return { address: base58(pub), secret: pkcs8.slice(pkcs8.length - 32) };
-      });
+  async function generateKeyPair() {
+    var subtle = window.crypto.subtle;
+    if (!subtle) throw new Error("WebCrypto unavailable"); // insecure context
+    var kp = await subtle.generateKey({ name: "Ed25519" }, true, [
+      "sign",
+      "verify",
+    ]);
+    var pub = new Uint8Array(await subtle.exportKey("raw", kp.publicKey));
+    var pkcs8 = new Uint8Array(await subtle.exportKey("pkcs8", kp.privateKey));
+    // PKCS#8 Ed25519 keys end with the 32-byte seed (the Solana "secret").
+    return { address: base58(pub), secret: pkcs8.slice(pkcs8.length - 32) };
   }
 
   var RUNNERS = {
     // cookbook/wallets/create-keypair: every run prints a new address, so
     // generate a real Ed25519 key pair in the browser. Formats match what each
     // flavour prints (see the recorded .output.txt files).
-    "generate-keypair": function (tab) {
-      return generateKeyPair().then(function (k) {
-        if (tab === "Kit") return "address:  " + k.address; // console.log("address: ", x)
-        if (tab === "Python")
-          return "address: " + k.address + "\nsecret: " + pythonBytes(k.secret);
-        return "address: " + k.address;
-      });
+    "generate-keypair": async function (tab) {
+      var k = await generateKeyPair();
+      if (tab === "Kit") return "address:  " + k.address; // console.log("address: ", x)
+      if (tab === "Python")
+        return "address: " + k.address + "\nsecret: " + pythonBytes(k.secret);
+      return "address: " + k.address;
     },
   };
 
   // ---------------------------------------------------------------------
   // Run button
   // ---------------------------------------------------------------------
-  // React may re-create the snippet DOM (breakpoint changes, tab remounts),
-  // which drops attributes this script set. Finished runs are therefore
-  // remembered by key and re-applied to re-created elements.
-  var finished = {};
-
-  // One pass over the page: key = path | block | tab | nth occurrence.
-  function indexBoxes() {
-    var boxes = document.querySelectorAll(".sol-run");
-    var seen = {};
-    var list = [];
-    for (var i = 0; i < boxes.length; i++) {
-      var b = boxes[i];
-      var id =
-        (b.getAttribute("data-run") || "") +
-        "|" +
-        (b.getAttribute("data-tab") || "");
-      var n = seen[id] || 0;
-      seen[id] = n + 1;
-      list.push({ box: b, key: location.pathname + "|" + id + "|" + n });
-    }
-    return list;
-  }
-
-  function keyOf(box) {
-    var list = indexBoxes();
-    for (var i = 0; i < list.length; i++)
-      if (list[i].box === box) return list[i].key;
-    return "";
-  }
-
-  function findByKey(key) {
-    var list = indexBoxes();
-    for (var i = 0; i < list.length; i++)
-      if (list[i].key === key) return list[i].box;
-    return null;
-  }
-
+  var BOX = ".sol-run";
+  var finished = {}; // key -> finished run
   // Button semantics: it discloses the output region it controls.
   var outIds = 0;
   function ensureAria(box) {
@@ -212,7 +183,7 @@
 
   function run(box, button) {
     if (box.getAttribute("data-state") === "running") return;
-    var key = keyOf(box);
+    var key = keyOf(BOX, "data-run", box);
     box.setAttribute("data-state", "running");
     box.setAttribute("aria-busy", "true");
     ensureAria(box);
@@ -234,7 +205,7 @@
     Promise.all([fresh, delay]).then(function (results) {
       var record = { live: results[0], runner: !!runner };
       finished[key] = record;
-      var target = box.isConnected ? box : findByKey(key);
+      var target = box.isConnected ? box : byKey(BOX, "data-run", key);
       if (target) applyDone(target, record);
     });
   }
@@ -245,37 +216,17 @@
   var terms = {}; // key -> run state
   var gen = 0; // bumps on every reset so stale timers stop
 
-  function termList() {
-    var roots = document.querySelectorAll(".sol-term:not([data-norun])");
-    var seen = {};
-    var list = [];
-    for (var i = 0; i < roots.length; i++) {
-      var r = roots[i];
-      var id =
-        (r.getAttribute("data-term") || "") +
-        "|" +
-        (r.getAttribute("data-tab") || "");
-      var n = seen[id] || 0;
-      seen[id] = n + 1;
-      list.push({ root: r, key: location.pathname + "|" + id + "|" + n });
-    }
-    return list;
-  }
+  var TERM = ".sol-term:not([data-norun])";
   function termKey(root) {
-    var list = termList();
-    for (var i = 0; i < list.length; i++)
-      if (list[i].root === root) return list[i].key;
-    return "";
+    return keyOf(TERM, "data-term", root);
   }
   function termRoot(key) {
-    var list = termList();
-    for (var i = 0; i < list.length; i++)
-      if (list[i].key === key) return list[i].root;
-    return null;
+    return byKey(TERM, "data-term", key);
   }
 
-  function label(root, name, fallback) {
-    return root.getAttribute("data-l-" + name) || fallback;
+  /** UI strings: every panel carries them (data-l-*, terminal.ts). */
+  function label(root, name) {
+    return root.getAttribute("data-l-" + name) || "";
   }
   function setAttr(el, name, value) {
     if (!el) return;
@@ -372,7 +323,6 @@
       }
       setAttr(step, "data-on", show > 0 || i === next ? "" : null);
       setAttr(step, "data-done", i < st.done ? "" : null);
-      setAttr(step, "data-current", i === next && !finished ? "" : null);
     }
 
     var plan = root.querySelectorAll(".sol-term-plan > li");
@@ -395,14 +345,14 @@
       setText(
         run,
         running
-          ? label(root, "running", "Running…")
+          ? label(root, "running")
           : finished
-            ? label(root, "again", "Run again")
+            ? label(root, "again")
             : st.done > 0
-              ? label(root, "next", "Next step")
+              ? label(root, "next")
               : multi
-                ? label(root, "run-step", "Run step") + " 1"
-                : label(root, "run", "Run"),
+                ? label(root, "run-step") + " 1"
+                : label(root, "run"),
       );
       setAttr(run, "aria-disabled", running ? "true" : null);
     }
@@ -437,12 +387,7 @@
     var jitter = ((index * 37) % 100) / 100; // deterministic, 0..1
     if (row.classList.contains("sol-term-cmd")) return 180 + jitter * 120;
     if (row.classList.contains("sol-term-note")) return 100;
-    var prev = rows[index - 1];
-    var first =
-      !prev ||
-      prev.classList.contains("sol-term-cmd") ||
-      prev.classList.contains("sol-term-note");
-    if (!first) return 35 + jitter * 50;
+    if (!isSlow(rows, index)) return 35 + jitter * 50;
     var kind = step.getAttribute("data-pending") || "call";
     if (kind === "tx") return 380 + jitter * 120;
     if (kind === "http") return 300 + jitter * 150;
@@ -467,17 +412,7 @@
    */
   function pendingText(root, step, st) {
     var kind = step.getAttribute("data-pending") || "call";
-    if (kind === "tx" && st.confirming)
-      return label(root, "confirming", "Confirming…");
-    return label(
-      root,
-      kind,
-      kind === "tx"
-        ? "Sending transaction…"
-        : kind === "http"
-          ? "Requesting…"
-          : "Running…",
-    );
+    return label(root, kind === "tx" && st.confirming ? "confirming" : kind);
   }
 
   function scrollScreen(root) {
@@ -500,26 +435,26 @@
     // for several transactions would read as fake: show just "Done".
     st.status = finished
       ? reducedMotion()
-        ? label(root, "done", "Done")
-        : label(root, "done", "Done") +
+        ? label(root, "done")
+        : label(root, "done") +
           " · " +
           seconds(
             st.durs.reduce(function (sum, d) {
               return sum + (d || 0);
             }, 0),
           )
-      : label(root, "step", "Step") +
+      : label(root, "step") +
         " " +
         st.done +
         "/" +
         st.total +
         " · " +
-        label(root, "done", "Done");
+        label(root, "done");
     applyTerm(root, st);
     announce(
       root,
-      (multi ? label(root, "step", "Step") + " " + st.done + ": " : "") +
-        (summary || label(root, "done", "Done")),
+      (multi ? label(root, "step") + " " + st.done + ": " : "") +
+        (summary || label(root, "done")),
     );
     scrollScreen(root);
     if (!finished && st.all) {
@@ -655,7 +590,7 @@
     return Promise.reject(new Error("no clipboard"));
   }
   function flash(el, root) {
-    setAttr(el, "data-copied", label(root, "copied", "Copied"));
+    setAttr(el, "data-copied", label(root, "copied"));
     clearTimeout(el.__solCopied);
     el.__solCopied = setTimeout(function () {
       el.removeAttribute("data-copied");
@@ -665,7 +600,7 @@
     writeClipboard(screenText(root)).then(
       function () {
         flash(button, root);
-        announce(root, label(root, "copied", "Copied"));
+        announce(root, label(root, "copied"));
       },
       function () {},
     );
@@ -676,45 +611,37 @@
       function () {
         if (root) {
           flash(h, root);
-          announce(root, label(root, "copied", "Copied"));
+          announce(root, label(root, "copied"));
         }
       },
       function () {},
     );
   }
 
-  function reapplyTerms() {
-    var list = termList();
-    for (var i = 0; i < list.length; i++) {
-      var st = terms[list[i].key];
-      applyTerm(list[i].root, st || freshState(list[i].root));
-    }
-  }
-
   var pending = false;
   function reapply() {
     pending = false;
-    reapplyTerms();
-    var list = indexBoxes();
-    for (var i = 0; i < list.length; i++) {
-      var box = list[i].box;
+    var list = keyed(TERM, "data-term");
+    for (var i = 0; i < list.length; i++)
+      applyTerm(list[i].el, terms[list[i].key] || freshState(list[i].el));
+    list = keyed(BOX, "data-run");
+    for (var j = 0; j < list.length; j++) {
+      var box = list[j].el;
       ensureAria(box);
       if (box.hasAttribute("data-state")) continue;
-      var record = finished[list[i].key];
+      var record = finished[list[j].key];
       if (record) applyDone(box, record);
     }
   }
   function schedule() {
     if (pending) return;
     pending = true;
-    (window.requestAnimationFrame || setTimeout)(reapply);
+    requestAnimationFrame(reapply);
   }
-  if (typeof MutationObserver === "function") {
-    new MutationObserver(schedule).observe(document.documentElement, {
-      childList: true,
-      subtree: true,
-    });
-  }
+  new MutationObserver(schedule).observe(document.documentElement, {
+    childList: true,
+    subtree: true,
+  });
 
   if (document.readyState === "complete") schedule();
   else window.addEventListener("load", schedule);
