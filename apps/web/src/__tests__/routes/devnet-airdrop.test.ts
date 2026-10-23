@@ -225,6 +225,7 @@ describe("devnet airdrop route", () => {
 
   it("is off (503, pointing to faucet.solana.com) without a faucet key", async () => {
     vi.stubEnv("DEVNET_FAUCET_SECRET_KEY", "");
+    vi.stubEnv("DEMO_PAYER_SECRET_KEY", "");
     const response = await POST(
       jsonRequest("11111111111111111111111111111111"),
     );
@@ -238,6 +239,7 @@ describe("devnet airdrop route", () => {
   it("is off in production, where the preview faucet key is not set", async () => {
     vi.stubEnv("VERCEL_ENV", "production");
     vi.stubEnv("DEVNET_FAUCET_SECRET_KEY", undefined);
+    vi.stubEnv("DEMO_PAYER_SECRET_KEY", undefined);
     const response = await POST(
       jsonRequest("11111111111111111111111111111111"),
     );
@@ -268,5 +270,17 @@ describe("devnet airdrop route", () => {
     expect(text).not.toContain(faucetSecret);
     expect(text).not.toContain("HTTP 429");
     expect(text).toContain("faucet.solana.com");
+  });
+  it("sends from the demo payer wallet when no separate faucet key is set", async () => {
+    vi.stubEnv("DEVNET_FAUCET_SECRET_KEY", "");
+    vi.stubEnv("DEMO_PAYER_SECRET_KEY", faucetSecret);
+    const response = await POST(
+      jsonRequest(
+        "Sysvar1nstructions1111111111111111111111111",
+        "203.0.113.77",
+      ),
+    );
+    expect(response.status).toBe(200);
+    expect(lastTransfer().feePayer).toBe(faucetAddress);
   });
 });

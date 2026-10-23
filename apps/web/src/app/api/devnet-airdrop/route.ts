@@ -34,8 +34,10 @@ import { allow, clientKey } from "@/lib/delivery-vs-payment/server/rateLimit";
  * account, the EXF Token-2022 mint with its metadata, and two EXF token
  * accounts), the CLI tabs 0.0076 SOL. The docs-examples tests check it.
  *
- * DEVNET_FAUCET_SECRET_KEY is the faucet wallet's 64-byte secret key as a JSON
- * array (solana-keygen's format), set per Vercel environment. Without it
+ * The faucet is the "Solana in action" demo payer (DEMO_PAYER_SECRET_KEY),
+ * which is funded with plenty of devnet SOL; DEVNET_FAUCET_SECRET_KEY, if set,
+ * overrides it with a separate wallet. Both are 64-byte secret keys as a JSON
+ * array (solana-keygen's format), set per Vercel environment. Without either
  * (production until it gets its own funded wallet, and local dev) the route
  * answers 503 and points to faucet.solana.com. HELIUS_API_KEY, when set, picks
  * Helius's devnet RPC over public devnet. Neither the key nor the keyed RPC
@@ -154,7 +156,8 @@ async function send(rpc: DevnetRpc, faucet: KeyPairSigner, to: Address) {
 }
 
 export async function POST(request: Request) {
-  const secret = process.env.DEVNET_FAUCET_SECRET_KEY;
+  const secret =
+    process.env.DEVNET_FAUCET_SECRET_KEY || process.env.DEMO_PAYER_SECRET_KEY;
   if (!secret) return unavailable();
 
   const address = await readAddress(request);
