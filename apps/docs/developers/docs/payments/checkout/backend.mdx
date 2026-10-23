@@ -16,20 +16,17 @@ import RunExample from "/snippets/examples/paths/payments/checkout/run.mdx";
 
 <Stepper />
 
-The checkout in the browser gives you a signature. Your server takes that
-signature, fetches the transaction from the network, and checks that it paid
-you, in USDC, the right amount, for this order. Only then does it mark the
-order paid. This step builds that server in a project on your machine and runs
-it against a local test network or devnet.
+The checkout in the browser gives you a signature. Your server fetches that
+transaction and checks that it paid you the right amount of USDC for this order
+before marking the order paid. This step builds that server and runs it
+against a local test network or devnet.
 
 ## 1. Create the project
 
 You need Node.js 20.18 or later. Create a project folder, `solana-payments`,
 with a `checkout` folder inside it. Every file in this tutorial goes in
-`checkout/`, and you run every command from `solana-payments`. The
-[Paywall an endpoint](/developers/docs/payments/paywall-api) tutorial adds a
-`paywall-api/` folder next to it in the same project, so the two tutorials
-never overwrite each other's files.
+`checkout/`, and you run every command from `solana-payments`. (The Paywall an
+endpoint tutorial adds a `paywall-api/` folder next to it.)
 
 ```bash Terminal
 mkdir -p solana-payments/checkout && cd solana-payments
@@ -51,9 +48,7 @@ to devnet. Save this as `checkout/config.ts`:
 
 <ConfigExample />
 
-Save the payment code from the [previous step](/developers/docs/payments/checkout/browser)
-as `checkout/pay.ts`. It is shown again here so you have every file on this
-page:
+Save the payment code from the previous step as `checkout/pay.ts`:
 
 <PayExample />
 
@@ -84,23 +79,20 @@ concurrent requests can't both succeed.
 
 The endpoint receives `{ "signature": "…" }` for an order, runs
 `verifyPayment`, and marks the order paid. It refuses a signature that was
-already used, so one payment can never pay for two orders. Save the Node.js
-version as `checkout/server.ts`. It has no framework, and its handler body
-ports directly to Express, Fastify, or Hono: read the signature, verify it, mark
-it used. The Next.js tab is the same handler as an App Router route file. In a
-Next.js app, save it at `app/api/orders/[orderId]/confirm/route.ts` and change
-its imports to point at where you keep `config`, `orders` and
-`verify-payment`.
+already used, so one payment can't pay for two orders. Save the Node.js version
+as `checkout/server.ts`. It uses no framework, so the handler ports directly to
+Express, Fastify, or Hono. The Next.js tab is the same handler as an App Router
+route: save it at `app/api/orders/[orderId]/confirm/route.ts` and point its
+imports at your `config`, `orders`, and `verify-payment` files.
 
 <RouteExample />
 
 <Note>
-  The endpoint passes the order's reference, which the `@solana/kit` payment
-  code attaches to the transfer. `reference` is optional in `verifyPayment`,
-  but keep it. Transactions are public, so without a reference anyone who sees
-  a payment to your store could submit its signature for their own order of
-  the same amount. If your checkout can't attach your reference, also check
-  who paid, for example that the signer is the customer's wallet.
+  `reference` is optional in `verifyPayment`, but keep it. Transactions are
+  public, so without it anyone who sees a payment to your store could submit
+  its signature for their own order of the same amount. If your checkout can't
+  attach a reference, also check who paid, for example that the signer is the
+  customer's wallet.
 </Note>
 
 The output shows the three cases your endpoint must handle:
@@ -111,9 +103,8 @@ The output shows the three cases your endpoint must handle:
 
 ## 4. Call it from the checkout
 
-Build the customer's payment with `payStore`, not with the live demo's
-`PaymentButton`. `payStore` attaches the order's reference to the transfer,
-and this endpoint requires it.
+Build the customer's payment with `payStore`, which attaches the order's
+reference that this endpoint requires.
 
 1. When the customer checks out, create the order on your server with a fresh
    reference (`(await generateKeyPairSigner()).address`) and send the order's
@@ -131,14 +122,12 @@ Show the confirmation page only when the response is `200` with
 retry.
 
 <Warning>
-  This endpoint can't confirm a `PaymentButton` payment. The button builds its
-  own transfer and doesn't take your order's reference, so `verifyPayment`
-  answers `reference not found` and the endpoint returns `402`. If you use the
-  button anyway, you need a different check: drop `reference` from the
-  `verifyPayment` call and check instead that the payer is the customer's
-  wallet and that the signature hasn't paid for another order. Without the
-  reference, anyone who sees a payment to your store on the public ledger could
-  submit its signature for their own order of the same amount.
+  This endpoint can't confirm a `PaymentButton` payment. The button doesn't
+  attach your order's reference, so `verifyPayment` answers
+  `reference not found` and the endpoint returns `402`. If you use the button
+  anyway, drop `reference` from the `verifyPayment` call and instead check that
+  the payer is the customer's wallet and the signature hasn't paid for another
+  order.
 </Warning>
 
 ## 5. Run it on your machine
@@ -152,11 +141,10 @@ account, creates order `order-1001` for 1 USDC, pays it as the customer with
 
 <RunExample />
 
-The script pays as the customer with a key file: the file named in
+The script pays as the customer with a key file: the one named in
 `CUSTOMER_KEYPAIR`, or the Solana CLI default `~/.config/solana/id.json`. If
-you already have one (for example from `solana-keygen new`), skip this.
-Otherwise save this as `keygen.ts` in `solana-payments`. It writes a new key
-file in the same format, a JSON array of 64 bytes, and prints its address:
+you don't have one yet, save this as `keygen.ts` in `solana-payments`. It
+writes a new key file in the same format and prints its address:
 
 ```ts keygen.ts
 import { generateKeyPairSync } from "node:crypto";
@@ -225,8 +213,7 @@ code uses. Pick a network:
 Leave `RPC_URL` and `RPC_SUBSCRIPTIONS_URL` unset. Paste the customer's
 address into the [Solana Faucet](https://faucet.solana.com/) for devnet SOL,
 and into [Circle's faucet](https://faucet.circle.com/) with **Solana Devnet**
-selected for devnet USDC. Other SOL faucets are listed in
-[Airdrops and faucets](/developers/cookbook/development/airdrops-and-faucets).
+selected for devnet USDC.
 
 </Tab>
 </Tabs>
@@ -237,11 +224,10 @@ Then run the script:
 npx tsx checkout/run.ts
 ```
 
-The output under the script above is what it printed on a local Surfpool
-network. Expect the same lines with different addresses and signatures: `200`
-with `"paid": true` for the payment, then `402` with `already used` for the
-same signature sent again. Each run creates a new store wallet, so you can run
-it as often as the customer has USDC.
+Expect the output shown under the script, with your own addresses and
+signatures: `200` with `"paid": true` for the payment, then `402` with
+`already used` for the same signature sent again. Each run creates a new store
+wallet, so you can run it as often as the customer has USDC.
 
 <Note>
   Port 3000 in use? Set another one for the run, for example
@@ -250,12 +236,11 @@ it as often as the customer has USDC.
 
 ### Run the tests instead
 
-The code on this page and the tests that produced its output live in the docs
-repository under `packages/docs-examples/paths/payments/checkout`. The test
-starts its own Surfpool network from npm and funds a test customer, so you
-need no Surfpool CLI, keys, SOL, or USDC. It also checks that `verifyPayment`
-rejects a wrong amount, mint, recipient, or reference. The repository is a pnpm
-workspace, so these commands use pnpm:
+The code on this page and its tests live in the docs repository under
+`packages/docs-examples/paths/payments/checkout`. The test starts its own
+Surfpool network and funds a test customer, so you need no Surfpool CLI, keys,
+SOL, or USDC. It also checks that `verifyPayment` rejects a wrong amount, mint,
+recipient, or reference:
 
 ```bash Terminal
 git clone --branch docs-redesign https://github.com/catmcgee/solana-com.git
@@ -269,9 +254,4 @@ pnpm --filter @workspace/docs-examples exec vitest run paths/payments/checkout
   These examples are on the `docs-redesign` branch of the
   [catmcgee/solana-com](https://github.com/catmcgee/solana-com/tree/docs-redesign/packages/docs-examples/paths/payments/checkout)
   fork until it is merged into `solana-foundation/solana-com`.
-</Note>
-
-<Note>
-  Want the Solana CLI or Anchor? You don't need them for payments.
-  [Installation](/developers/docs/quickstart) covers them if you do.
 </Note>
