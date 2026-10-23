@@ -39,7 +39,7 @@ import {
  * itself gives it history, so it can never be funded again. In-memory limits
  * per IP, per address, and per instance (see rateLimit.ts) are a cheap first
  * layer. Across all instances, each transfer carries a memo and the faucet
- * wallet's own history caps them at AIRDROP_DAILY_CAP a day (default 50, see
+ * wallet's own history caps them at AIRDROP_DAILY_CAP a day (default 1000, see
  * onchainLimits.ts), and it never sends below AIRDROP_RESERVE_SOL (default 5),
  * which keeps the demos running. The amount is fixed here, never read from
  * the request, so the worst case is the cap times 0.02 SOL a day.
@@ -63,7 +63,7 @@ export const runtime = "nodejs";
 const AMOUNT = 20_000_000n; // 0.02 SOL
 const LAMPORTS_PER_SOL = 1_000_000_000;
 /** Airdrops a day across every instance, counted onchain. */
-const dailyCap = () => envNumber("AIRDROP_DAILY_CAP", 50);
+const dailyCap = () => envNumber("AIRDROP_DAILY_CAP", 1000);
 /** SOL the faucet wallet always keeps, so the demos it pays for keep working. */
 const reserve = () =>
   BigInt(Math.round(envNumber("AIRDROP_RESERVE_SOL", 5) * LAMPORTS_PER_SOL));

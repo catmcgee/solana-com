@@ -48,15 +48,29 @@ function keypairJson(): string {
 let faucetSecret = "";
 let faucetAddress = "";
 
+/** One getSignaturesForAddress page, newest first, honouring limit and before. */
+const sigPage = <T>(
+  list: T[],
+  { limit = 1000, before }: { limit?: number; before?: string } = {},
+) => {
+  const start = before ? Number(before) + 1 : 0;
+  return list
+    .slice(start, start + limit)
+    .map((tx, i) => ({ ...tx, signature: String(start + i) }));
+};
+
 function fakeRpc() {
   return {
     getBalance: (address: string) => ({
       send: async () => ({ value: mocks.balances.get(address) ?? 0n }),
     }),
-    getSignaturesForAddress: (address: string) => ({
+    getSignaturesForAddress: (
+      address: string,
+      opts?: { limit?: number; before?: string },
+    ) => ({
       send: async () =>
         address === faucetAddress
-          ? mocks.faucetSigs
+          ? sigPage(mocks.faucetSigs, opts)
           : mocks.history.has(address)
             ? [{ signature: "1".repeat(88) }]
             : [],
@@ -160,12 +174,13 @@ describe("devnet airdrop route", () => {
     expect(transfer.memo).toBe(MEMO);
   });
 
-  it("caps airdrops across all instances at 50 a day, counted from the faucet's tagged transfers", async () => {
-    // 49 airdrops today, plus demo transfers and older airdrops that don't count.
+  it("caps airdrops across all instances at 1000 a day, counted from the faucet's tagged transfers", async () => {
+    // 999 airdrops today across two pages, plus demo transfers and older
+    // airdrops that don't count.
     mocks.faucetSigs = [
-      ...faucetSigs(30, MEMO),
-      ...faucetSigs(200, "solana.com docs demo"),
-      ...faucetSigs(19, MEMO, 23 * 60 * 60),
+      ...faucetSigs(600, MEMO),
+      ...faucetSigs(900, "solana.com docs demo"),
+      ...faucetSigs(399, MEMO, 23 * 60 * 60),
       ...faucetSigs(5, null),
       ...faucetSigs(100, MEMO, 25 * 60 * 60),
     ];
@@ -196,8 +211,8 @@ describe("devnet airdrop route", () => {
     expect(mocks.sent).toHaveLength(0);
   });
 
-  it("fails closed when a full page of signatures is all inside the last day", async () => {
-    mocks.faucetSigs = faucetSigs(1000, null);
+  it("fails closed when every page it reads is inside the last day", async () => {
+    mocks.faucetSigs = faucetSigs(4000, null);
     const response = await POST(
       jsonRequest("SysvarFees111111111111111111111111111111111"),
     );

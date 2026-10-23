@@ -16,6 +16,7 @@ import {
   type Address,
   type Instruction,
   type Rpc,
+  type Signature,
   type SolanaRpcApi,
 } from "@solana/kit";
 
@@ -23,6 +24,8 @@ const MEMO_PROGRAM = address("MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr");
 const DAY_SECONDS = 24 * 60 * 60;
 /** getSignaturesForAddress's largest page. */
 const PAGE = 1000;
+/** Pages read before failing closed: both routes share one wallet. */
+const MAX_PAGES = 4;
 
 export const MEMOS = {
   airdrop: "solana.com quickstart airdrop",
@@ -45,8 +48,9 @@ export function envNumber(name: string, fallback: number): number {
 
 /**
  * True once `wallet` has sent `cap` transactions tagged `memo` in the last
- * 24 hours. Fails closed: a full page that is still inside the window, or a
- * signature without a block time, counts against the cap.
+ * 24 hours. Pages back through the wallet's history and fails closed: if
+ * every page read is still inside the window, or a signature has no block
+ * time, it counts against the cap.
  */
 export async function dailyCapReached(
   rpc: Rpc<SolanaRpcApi>,
@@ -55,14 +59,23 @@ export async function dailyCapReached(
   cap: number,
 ): Promise<boolean> {
   const since = Math.floor(Date.now() / 1000) - DAY_SECONDS;
-  const recent = await rpc
-    .getSignaturesForAddress(wallet, { limit: PAGE, commitment: "confirmed" })
-    .send();
   let count = 0;
-  for (const tx of recent) {
-    if (tx.blockTime !== null && Number(tx.blockTime) < since) return false;
-    // The RPC reports memos as "[length] text".
-    if (tx.memo?.includes(memo) && ++count >= cap) return true;
+  let before: Signature | undefined;
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const recent = await rpc
+      .getSignaturesForAddress(wallet, {
+        limit: PAGE,
+        commitment: "confirmed",
+        ...(before ? { before } : {}),
+      })
+      .send();
+    for (const tx of recent) {
+      if (tx.blockTime !== null && Number(tx.blockTime) < since) return false;
+      // The RPC reports memos as "[length] text".
+      if (tx.memo?.includes(memo) && ++count >= cap) return true;
+    }
+    if (recent.length < PAGE) return false;
+    before = recent[recent.length - 1]!.signature;
   }
-  return recent.length >= PAGE;
+  return true;
 }

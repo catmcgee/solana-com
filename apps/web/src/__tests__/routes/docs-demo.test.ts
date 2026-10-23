@@ -43,6 +43,17 @@ const SIG_STATUS = () => ({
   ],
 });
 
+/** One getSignaturesForAddress page, newest first, honouring limit and before. */
+const sigPage = <T>(
+  list: T[],
+  { limit = 1000, before }: { limit?: number; before?: string } = {},
+) => {
+  const start = before ? Number(before) + 1 : 0;
+  return list
+    .slice(start, start + limit)
+    .map((tx, i) => ({ ...tx, signature: String(start + i) }));
+};
+
 function fakeRpc() {
   let n = 0;
   return {
@@ -53,7 +64,10 @@ function fakeRpc() {
         return { value: { amount } };
       },
     }),
-    getSignaturesForAddress: () => ({ send: async () => mocks.payerSigs }),
+    getSignaturesForAddress: (
+      _: string,
+      opts?: { limit?: number; before?: string },
+    ) => ({ send: async () => sigPage(mocks.payerSigs, opts) }),
     getLatestBlockhash: () => ({
       send: async () => ({
         value: {
@@ -186,15 +200,16 @@ describe("demo transfer routes", () => {
     expect(mocks.sent).toHaveLength(0);
   });
 
-  it("caps demo transfers across all instances at 500 a day, counted onchain", async () => {
+  it("caps demo transfers across all instances at 1000 a day, counted onchain", async () => {
     const recent = (n: number, memo: string | null, ageSeconds = 60) =>
       Array.from({ length: n }, () => ({
         memo: memo && `[${memo.length}] ${memo}`,
         blockTime: BigInt(Math.floor(Date.now() / 1000) - ageSeconds),
       }));
     mocks.payerSigs = [
-      ...recent(499, "solana.com docs demo"),
-      ...recent(40, "solana.com quickstart airdrop"),
+      ...recent(600, "solana.com docs demo"),
+      ...recent(900, "solana.com quickstart airdrop"),
+      ...recent(399, "solana.com docs demo"),
       ...recent(300, "solana.com docs demo", 25 * 60 * 60),
     ];
     const { checkout, paywall } = await routes();

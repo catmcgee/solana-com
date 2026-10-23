@@ -48,9 +48,9 @@ search engines without any extra switches. Undo the preview-only bits:
 ## Devnet wallet limits
 
 The routes already cap spending onchain, across every instance: at most
-AIRDROP_DAILY_CAP airdrops a day (default 50, so 1 SOL a day), never below
+AIRDROP_DAILY_CAP airdrops a day (default 1000, so at most 20 SOL a day), never below
 AIRDROP_RESERVE_SOL left in the faucet wallet (default 5), and at most
-DEMO_DAILY_CAP demo transfers a day (default 500, fees only). Recipients and
+DEMO_DAILY_CAP demo transfers a day (default 1000, fees only). Recipients and
 amounts are fixed server-side. Add Vercel Firewall rate limits in front, so a
 burst can't overshoot the caps or burn the RPC quota:
 

@@ -11,7 +11,7 @@
  * here takes a recipient or an amount from the request: both are fixed below.
  *
  * Every demo transfer carries a memo, and the payer's own history caps them
- * at DEMO_DAILY_CAP a day across every instance (default 500, see
+ * at DEMO_DAILY_CAP a day across every instance (default 1000, see
  * onchainLimits.ts). Past that the routes answer "capped".
  *
  * DEMO_PAYER_SECRET_KEY and DEMO_PAYEE_SECRET_KEY hold each wallet's 64-byte
@@ -165,7 +165,7 @@ async function transfer(
       rpc,
       payer.address,
       MEMOS.demo,
-      envNumber("DEMO_DAILY_CAP", 500),
+      envNumber("DEMO_DAILY_CAP", 1000),
     ),
     tokenBalance(rpc, payerAta),
   ]);
