@@ -8,7 +8,7 @@
  *   opens it.
  * - Otherwise, the pill opens a small menu: ask Claude or ChatGPT
  *   about the current page (the same links as the page's contextual menu),
- *   or open the docs search.
+ *   or open the docs search dialog.
  * Styles: styles/ask-ai.css. Without JavaScript nothing is added, and the
  * page's own "Copy page" menu still offers the same options.
  */
@@ -100,10 +100,13 @@
     );
     menu.appendChild(
       item("Search the docs", "Ctrl K", function () {
-        var s =
-          document.getElementById("search-bar-entry") ||
-          document.getElementById("search-bar-entry-mobile");
-        if (s) s.click();
+        // Focus the pill first, so closing the dialog returns focus there.
+        btn.focus();
+        // openDocsSearch (@solana-com/ui-chrome/docs-search): the event the
+        // docs search dialog (docs-search.client.tsx) listens for.
+        window.dispatchEvent(
+          new CustomEvent("docs-search:open", { detail: { query: "" } }),
+        );
       }),
     );
     btn.addEventListener("click", function () {
