@@ -4,7 +4,7 @@
  * and `--url devnet` pointed at the local Surfnet. Needs the Solana CLI
  * (`solana`, `solana-keygen`, `spl-token`); skipped when it isn't installed.
  */
-import { spawnSync } from "node:child_process";
+import { execFile, spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -22,6 +22,10 @@ import {
   TOKEN_2022_PROGRAM_ADDRESS,
 } from "@solana-program/token-2022";
 import { afterAll, describe, expect, it } from "vitest";
+import {
+  AIRDROP_URL,
+  startAirdropServer,
+} from "../../../test/fixtures/airdrop";
 import { RPC_URL, setTokenBalance } from "../../../test/fixtures/fund";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -67,6 +71,21 @@ function run(script: string, { strict = true } = {}) {
   return { out: r.stdout, all, status: r.status };
 }
 
+/** Like run(), without blocking the event loop (for the local faucet). */
+function runAsync(script: string) {
+  return new Promise<{ out: string }>((resolve) =>
+    execFile(
+      "bash",
+      ["-euo", "pipefail", "-c", script],
+      { cwd: home, env, encoding: "utf8" },
+      (error, stdout, stderr) => {
+        expect(error, `${stdout}${stderr}`).toBeNull();
+        resolve({ out: stdout });
+      },
+    ),
+  );
+}
+
 const spl = (args: string) => run(`spl-token ${args}`).out.trim();
 const rpc = createSolanaRpc(RPC_URL);
 
@@ -77,11 +96,14 @@ describe.skipIf(!cli)("paths/start/quickstart (CLI)", () => {
   let mint: ReturnType<typeof address>;
 
   it("1: creates a wallet, gets SOL, and reads the USDC balance", async () => {
-    // The page points the CLI at devnet; here, at this Surfnet.
+    // The page points the CLI at devnet and solana.com's devnet faucet; here,
+    // at this Surfnet and a local stand-in for the faucet.
+    const faucet = await startAirdropServer();
     const [before, after] = region("balance")
       .replace("--url devnet", `--url ${RPC_URL}`)
+      .replace(AIRDROP_URL, faucet.url)
       .split(/^# After the Circle faucet.*$/m);
-    const first = run(before!);
+    const first = await runAsync(before!).finally(faucet.close);
     wallet = address(run("solana address").out.trim());
     expect(first.out).toContain("1 SOL");
     // Stands in for Circle's devnet faucet: 10 USDC in the reader's wallet.

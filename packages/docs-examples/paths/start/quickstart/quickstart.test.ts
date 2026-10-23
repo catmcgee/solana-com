@@ -16,6 +16,7 @@ import {
   TOKEN_2022_PROGRAM_ADDRESS,
 } from "@solana-program/token-2022";
 import { describe, expect, it } from "vitest";
+import { stubAirdropFetch } from "../../../test/fixtures/airdrop";
 import { setTokenBalance } from "../../../test/fixtures/fund";
 import { runExample } from "../../../test/record";
 
@@ -24,6 +25,8 @@ import { runExample } from "../../../test/record";
 // asset.json, holder.json) in the working directory, so run them in a fresh
 // one: step 1 always takes the airdrop branch.
 process.chdir(mkdtempSync(join(tmpdir(), "quickstart-")));
+// Step 1's airdrop request to solana.com lands on the local Surfnet instead.
+stubAirdropFetch();
 
 const out = (name: string) => new URL(`./${name}.output.txt`, import.meta.url);
 const client = async () => (await import("./client")).client;

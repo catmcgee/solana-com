@@ -7,7 +7,8 @@
 solana config set --url devnet
 solana-keygen new --no-bip39-passphrase  # your wallet; skip if you have one
 solana address    # your address, for the faucets
-solana airdrop 1  # 1 free test SOL, for fees
+# 1 free test SOL, for fees. Refused? Use https://faucet.solana.com
+curl -d address=$(solana address) https://solana.com/api/devnet-airdrop
 solana balance
 # After the Circle faucet sends you test USDC:
 spl-token balance 4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU
