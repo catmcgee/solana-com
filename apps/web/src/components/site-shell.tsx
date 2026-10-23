@@ -10,12 +10,12 @@ import { PostHogProvider } from "@@/src/app/components/posthog/PostHogProvider";
 import { config } from "@@/src/config";
 import { defaultLocale } from "@workspace/i18n/config";
 import { getLangDir } from "rtl-detect";
-import {
-  ThemeProvider,
-  SitewideTopAlert,
-  PersistentPodcastPlayer,
-  GoogleTagManagerNoScript,
-} from "@solana-com/ui-chrome";
+// Module imports, not the package index: through it, the docs pages also
+// shipped the site Header, Footer, and their dialogs.
+import { ThemeProvider } from "@solana-com/ui-chrome/theme-provider";
+import { SitewideTopAlert } from "@solana-com/ui-chrome/sitewide-top-alert";
+import { PersistentPodcastPlayer } from "@solana-com/ui-chrome/persistent-podcast-player";
+import { GoogleTagManagerNoScript } from "@solana-com/ui-chrome/google-tag-manager-noscript";
 import { DocsSearch } from "@/components/docs/docs-search.client";
 import { DOCS_LOCALES } from "@/lib/docs/locales.mjs";
 import Script from "next/script";

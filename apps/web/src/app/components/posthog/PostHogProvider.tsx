@@ -5,10 +5,10 @@ import { Suspense, useEffect, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import {
   COOKIE_CONSENT_EVENT,
-  getBrowserStorage,
   readCookieConsent,
   type CookieConsentValue,
-} from "@solana-com/ui-chrome";
+} from "@solana-com/ui-chrome/cookie-consent";
+import { getBrowserStorage } from "@solana-com/ui-chrome/browser-storage";
 
 let client: PostHog | undefined;
 
