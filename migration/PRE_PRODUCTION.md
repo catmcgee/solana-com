@@ -27,6 +27,13 @@ search engines without any extra switches. Undo the preview-only bits:
       returns the Markdown guide (the banner's copied line points there;
       `agent-banner.js` swaps in the preview origin before launch).
 
+## Keys
+
+- [ ] Set a production HELIUS_API_KEY (and SOLANA_RPC_URL for the live feed)
+      in Vercel Production; the current key is preview-only and must be
+      rotated. Without it, the Quickstart's `/api/devnet-airdrop` answers 503
+      and readers are sent to faucet.solana.com.
+
 ## Translations
 
 - [ ] Run Lingo for all English changes since the migration.
