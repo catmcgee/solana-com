@@ -8,6 +8,7 @@ import Script from "next/script";
  * and the agent banner's Copy button. Each script delegates from `document`
  * and survives client-side navigation. The search hand-off, the theme
  * toggle and the logo link are React now (docs-header, docs-search).
+ * They load once the page has, so they don't compete with its first paint.
  */
 const SCRIPTS = [
   "ask-ai",
@@ -42,7 +43,7 @@ export function DocsScripts() {
           key={name}
           id={`docs-script-${name}`}
           src={`/docs-scripts/${name}.js`}
-          strategy="afterInteractive"
+          strategy="lazyOnload"
         />
       ))}
       <script
