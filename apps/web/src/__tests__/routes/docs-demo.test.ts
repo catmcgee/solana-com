@@ -7,7 +7,7 @@ import {
 } from "@solana/kit";
 
 const mocks = vi.hoisted(() => ({
-  isBot: false,
+  isBot: false as boolean | "throw",
   createSolanaRpc: vi.fn(),
   balances: new Map<string, string>(),
   sent: [] as string[],
@@ -15,7 +15,10 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("botid/server", () => ({
-  checkBotId: async () => ({ isBot: mocks.isBot }),
+  checkBotId: async () => {
+    if (mocks.isBot === "throw") throw new Error("x-vercel-oidc-token missing");
+    return { isBot: mocks.isBot };
+  },
 }));
 vi.mock("@solana/kit", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@solana/kit")>()),
@@ -200,11 +203,13 @@ describe("demo transfer routes", () => {
     expect(mocks.sent).toHaveLength(5);
   });
 
-  it("refuses bots", async () => {
-    mocks.isBot = true;
+  it("refuses bots, and fails closed when BotId can't run", async () => {
     const { checkout } = await routes();
-    const res = await checkout(post("/api/demo/checkout"));
-    expect(res.status).toBe(403);
+    for (const isBot of [true, "throw"] as const) {
+      mocks.isBot = isBot;
+      const res = await checkout(post("/api/demo/checkout"));
+      expect(res.status).toBe(403);
+    }
     expect(mocks.sent).toHaveLength(0);
   });
 

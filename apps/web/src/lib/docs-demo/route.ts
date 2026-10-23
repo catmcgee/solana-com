@@ -1,6 +1,7 @@
 import { checkBotId } from "botid/server";
 import { allow, clientKey } from "@/lib/delivery-vs-payment/server/rateLimit";
 import {
+  demoConfigured,
   DemoUnconfigured,
   DemoUnfunded,
   sendDemoTransfer,
@@ -15,7 +16,10 @@ import {
  * Explorer link.
  *
  * Browser calls only: BotId (instrumentation-client.ts protects these paths)
- * plus in-memory limits per IP a minute and per instance an hour.
+ * plus in-memory limits per IP a minute and per instance an hour. BotId runs
+ * on Vercel only; elsewhere (next start locally) the route answers "bot"
+ * unless the wallets are missing, in which case it answers "unconfigured"
+ * first.
  */
 const MINUTE = 60 * 1000;
 const HOUR = 60 * MINUTE;
@@ -34,7 +38,13 @@ export function demoRoute(kind: DemoKind, perMinute: number) {
     ) {
       return json({ error: "rate-limited" }, 429);
     }
-    if ((await checkBotId()).isBot) return json({ error: "bot" }, 403);
+    if (!demoConfigured()) return json({ error: "unconfigured" }, 503);
+    // Fail closed: off Vercel, or without its OIDC token, checkBotId throws.
+    const human = await checkBotId().then(
+      (r) => !r.isBot,
+      () => false,
+    );
+    if (!human) return json({ error: "bot" }, 403);
 
     try {
       const { signature, ms } = await sendDemoTransfer(kind);
