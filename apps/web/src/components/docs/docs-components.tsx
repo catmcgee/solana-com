@@ -34,6 +34,7 @@ import { DocsLink } from "./docs-link";
 import { isDocsHref } from "@/lib/docs/docs-href";
 import { TxWalkthrough } from "@/components/tx-walkthrough";
 import { LiveFeed } from "./docs-live-feed.client";
+import { InActionScene } from "./docs-inaction-scene.client";
 
 type P = { children?: ReactNode };
 
@@ -1125,6 +1126,7 @@ export const docsComponents = {
   Tree,
   TxWalkthrough,
   LiveFeed,
+  InActionScene,
 };
 
 export { text as textContent };

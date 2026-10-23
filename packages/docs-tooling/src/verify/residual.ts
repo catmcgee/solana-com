@@ -178,6 +178,7 @@ export const DOCS_COMPONENTS = new Set([
   "Expandable",
   "Frame",
   "Icon",
+  "InActionScene",
   "Info",
   "Latex",
   "LiveFeed",

@@ -598,7 +598,13 @@ function inline(text: string) {
 const short = (a: string) => `${a.slice(0, 4)}…${a.slice(-4)}`;
 const fmt = (n: number) => n.toLocaleString("en-US");
 
-function Icon({ children, size = 22 }: { children: ReactNode; size?: number }) {
+export function Icon({
+  children,
+  size = 22,
+}: {
+  children: ReactNode;
+  size?: number;
+}) {
   return (
     <svg
       className="txw-icon"
@@ -612,7 +618,7 @@ function Icon({ children, size = 22 }: { children: ReactNode; size?: number }) {
   );
 }
 
-const ACTOR_ICONS: Record<ActorId, ReactNode> = {
+export const ACTOR_ICONS: Record<ActorId, ReactNode> = {
   app: (
     <Icon>
       <rect x="3" y="4" width="18" height="12" rx="2" />

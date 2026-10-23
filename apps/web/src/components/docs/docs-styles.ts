@@ -16,6 +16,8 @@ import "../../../../docs/styles/ask-ai.css";
 import "../../../../docs/styles/diagrams.css";
 import "../../../../docs/styles/paths-sidebar.css";
 import "../../../../docs/styles/demo.css";
+import "@/components/tx-walkthrough/tx-walkthrough.css";
+import "./docs-inaction-scene.css";
 import "../../../../docs/styles/playground.css";
 import "../../../../docs/styles/rpc-try-it.css";
 import "../../../../docs/styles/video.css";
