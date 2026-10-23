@@ -5,6 +5,7 @@ import { loadMergedMessages } from "@workspace/i18n/messages";
 import { notFound } from "next/navigation";
 import { Header, Footer } from "@solana-com/ui-chrome";
 import { ChromeWrapper } from "@/components/ChromeWrapper";
+import "@/app/globals.css";
 import { SiteShell } from "@/components/site-shell";
 
 type Props = {

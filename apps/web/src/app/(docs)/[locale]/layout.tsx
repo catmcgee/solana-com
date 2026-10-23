@@ -4,6 +4,8 @@ import { getBaseMetadata } from "@@/src/app/metadata";
 import { locales, staticLocales } from "@workspace/i18n/config";
 import { loadMergedMessages } from "@workspace/i18n/messages";
 import { notFound } from "next/navigation";
+// Only the Tailwind classes these pages use (not the site's globals.css).
+import "@/app/docs-globals.css";
 import { SiteShell } from "@/components/site-shell";
 
 type Props = {

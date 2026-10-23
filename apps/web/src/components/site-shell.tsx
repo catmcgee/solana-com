@@ -1,5 +1,4 @@
 import "@workspace/ui/scrollbar.css";
-import "@/app/globals.css";
 import "@/scss/index.scss";
 
 import type { AbstractIntlMessages } from "next-intl";
@@ -25,7 +24,7 @@ import Script from "next/script";
  * solana.com pages, with the site Header and Footer as `header`/`footer`)
  * and (docs)/[locale]/layout.tsx (the /developers landing and the docs,
  * which bring their own chrome and only the messages their client
- * components read).
+ * components read). Each layout imports its Tailwind stylesheet first.
  */
 export function SiteShell({
   locale,
