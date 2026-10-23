@@ -46,8 +46,7 @@ type DocsTab = {
   /** Draw the divider after this tab (between the domain and core tabs). */
   dividerAfter?: boolean;
   /**
-   * External-style tab (decisions.md: "Video tutorials ↗ (external, right)"):
-   * pushed to the right end of the bar and marked with ↗.
+   * External-style tab: pushed to the right end of the bar and marked with ↗.
    */
   external?: boolean;
 };

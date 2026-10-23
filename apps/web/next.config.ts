@@ -228,7 +228,7 @@ const nextConfig: NextConfig = {
       },
       // Applies to every path, docs included: X-Frame-Options, nosniff,
       // X-XSS-Protection and frame-ancestors, plus X-Robots-Tag: noindex on
-      // previews (spec §5.12).
+      // previews.
       {
         source: "/:path*",
         headers: securityHeaders,

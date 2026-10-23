@@ -351,7 +351,7 @@ const movedDocsRedirects: RedirectInput[] = withMdVariants([
     source: "/developers/guides/token-extensions/confidential-transfer",
     destination: "/developers/docs/tokens/extensions/confidential-transfer",
   },
-  // Ported from the deleted apps/docs/next.config.ts (spec §5.8; saved in
+  // Ported from the deleted apps/docs/next.config.ts (saved in
   // migration/docs-app-redirects.json). They also cover the 17 stale
   // locale-only payment-button pages that were removed (R8).
   {
@@ -559,8 +559,8 @@ const bootcampRedirects: RedirectInput[] = [
 ];
 
 /**
- * /docs/tags/<tag> never had pages; the tags index is a hidden docs page
- * (spec §5.3). Temporary, so the index can grow real tag pages later. The
+ * /docs/tags/<tag> never had pages; the tags index is a hidden docs page.
+ * Temporary, so the index can grow real tag pages later. The
  * old /docs prefix gets its own rule so it takes one hop, not two.
  */
 const docsTagRedirects: RedirectInput[] = [
@@ -610,7 +610,7 @@ const docsPrefixMoveRedirects: RedirectInput[] = [
 ].map((r) => ({ ...r, permanent: true, localize: false as const }));
 
 /**
- * Greek (el) docs were dropped (decisions.md). One rule,
+ * Greek (el) docs were dropped. One rule,
  * placed first, sends every el-prefixed docs collection URL (and its `.md`
  * twin) to the same path without `/el`:
  *   /el/docs[.md|/*], /el/learn[.md|/*], /el/developers[.md] and
@@ -1239,7 +1239,7 @@ export default {
       destination: "/developers/docs/core/transactions/versioned-transactions",
     },
     // /docs/core/rent and /docs/core/transactions/confirmation are pages
-    // again (new concept pages, spec §6.1), so their old redirects are gone.
+    // again (new concept pages), so their old redirects are gone.
     {
       source: "/docs/intro/rent",
       destination: "/developers/docs/core/rent",
@@ -1778,7 +1778,7 @@ export default {
     },
     {
       // `:path+`, not `:path*`: /docs/programs/anchor itself is the new
-      // "Anchor framework" overview page (spec §6.1); only old subpages leave.
+      // "Anchor framework" overview page; only old subpages leave.
       source: "/docs/programs/anchor/:path+",
       destination: "https://www.anchor-lang.com/docs",
     },

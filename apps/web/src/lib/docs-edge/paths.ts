@@ -7,7 +7,7 @@
 import { defaultLocale, locales } from "@workspace/i18n/config";
 
 /**
- * Locales the docs are not translated into (decisions.md: no `el`).
+ * Locales the docs are not translated into (Greek was dropped).
  * Their docs URLs redirect to the English page.
  */
 export const DROPPED_DOCS_LOCALES: readonly string[] = ["el"];
@@ -86,7 +86,7 @@ export function getDocsPathInfo(pathname: string): DocsPathInfo | null {
 
 /**
  * The canonical form of a docs path, applying the three normalisations the
- * old docs-app middleware did (spec §5.8), in one hop:
+ * old docs-app middleware did, in one hop:
  * 1. lowercase the path;
  * 2. remove duplicate locale segments, keeping the first;
  * 3. drop a leading default-locale segment

@@ -236,7 +236,7 @@ describe("Docs routes", () => {
     expectAppWebRoute("/fr/learn");
   });
 
-  it("leaves the /developers landing to apps/web (WP10)", () => {
+  it("leaves the /developers landing to apps/web", () => {
     expectAppWebRoute("/developers");
     expectAppWebRoute("/fr/developers");
     expectAppWebRoute("/developers.md");
@@ -499,7 +499,7 @@ describe("Legacy URL parity", () => {
     ? fs.readFileSync(legacyFile, "utf8").split("\n").filter(Boolean)
     : [];
 
-  // Served by apps/web pages that WP10 builds.
+  // Served by apps/web pages.
   const landing = /^(\/[a-z]{2})?\/(developers|learn)$/;
 
   it.skipIf(legacy.length === 0)(

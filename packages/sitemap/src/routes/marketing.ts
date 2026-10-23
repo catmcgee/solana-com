@@ -38,14 +38,13 @@ const archivedRoutes = new Set([
 ]);
 
 /**
- * Developer landings served by apps/web (spec §5.11: moved here from
- * docs.ts). WP10 builds them under src/app/[locale]/{developers,learn}; they
- * are listed even before their page files exist, as they were before.
+ * Developer landings served by apps/web from
+ * src/app/[locale]/{developers,learn}.
  */
 const developerLandingRoutes = ["/developers", "/learn"];
 
 /**
- * Greek developer URLs redirect to English (decisions.md drops Greek docs),
+ * Greek developer URLs redirect to English (Greek docs were dropped),
  * so they are not listed even though apps/web still serves other /el pages.
  */
 const greekRedirectedUrls = new Set(

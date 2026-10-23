@@ -1,5 +1,5 @@
 /**
- * PostHog capture for markdown requests to the docs (spec §5.5). Ported from
+ * PostHog capture for markdown requests to the docs. Ported from
  * the deleted apps/docs/src/lib/posthog/server.ts so the event name, the
  * distinct id and the property shape stay continuous across the migration.
  */
