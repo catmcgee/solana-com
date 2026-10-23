@@ -91,47 +91,88 @@ describe("InActionScene", () => {
     expect(screen.queryByRole("link")).toBeNull();
   });
 
-  it("paywall: each call pays with a devnet transfer and adds to the counter", async () => {
-    const fetch = serve({ signature: SIG, ms: 412 });
-    const { container } = render(<InActionScene kind="paywall" />);
-    const count = () =>
-      container.querySelector(".sol-scene-count")!.textContent;
-    expect(count()).toBe("calls: 0 · spent: $0.000");
+  it("token: Create token makes a devnet mint, then links the token and the transaction", async () => {
+    const MINT = "So11111111111111111111111111111111111111112";
+    const fetch = serve({ signature: SIG, ms: 412, mint: MINT });
+    render(<InActionScene kind="token" />);
+    expect(screen.getByText("No token yet")).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: "Call again" }));
-    await flush(3000);
+    fireEvent.click(screen.getByRole("button", { name: "Create token" }));
+    await flush(1000);
     expect(fetch).toHaveBeenCalledWith(
-      "/api/demo/paywall-call",
+      "/api/demo/create-token",
       expect.objectContaining({ method: "POST" }),
     );
-    expect(screen.getByText("in 0.4 s")).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Created in 0.4 s" }),
+    ).toBeTruthy();
+    expect(screen.getByText("Mint So11…1112")).toBeTruthy();
     expect(
       screen
-        .getByRole("link", { name: "View on Explorer" })
+        .getByRole("link", { name: "Token on Explorer" })
         .getAttribute("href"),
+    ).toBe(`https://explorer.solana.com/address/${MINT}?cluster=devnet`);
+    expect(
+      screen.getByRole("link", { name: "Transaction" }).getAttribute("href"),
     ).toBe(`https://explorer.solana.com/tx/${SIG}?cluster=devnet`);
-    expect(screen.getByText("Sunny, 24°C", { exact: false })).toBeTruthy();
-    expect(count()).toBe("calls: 1 · spent: $0.001");
 
-    fireEvent.click(screen.getByRole("button", { name: "Call again" }));
-    await flush(3000);
-    expect(count()).toBe("calls: 2 · spent: $0.002");
+    fireEvent.click(screen.getByRole("button", { name: "Create another" }));
+    await flush(1000);
+    expect(fetch).toHaveBeenCalledTimes(2);
   });
 
-  it("paywall: when the route fails, the call still completes without a link", async () => {
+  it("token: when the route fails, still finishes without a link", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => {
         throw new Error("offline");
       }),
     );
-    const { container } = render(<InActionScene kind="paywall" />);
-    fireEvent.click(screen.getByRole("button", { name: "Call again" }));
-    await flush(3000);
+    render(<InActionScene kind="token" />);
+    fireEvent.click(screen.getByRole("button", { name: "Create token" }));
+    await flush(1000);
+    expect(screen.getByRole("button", { name: "Created" })).toBeTruthy();
     expect(screen.getByText("Explorer link unavailable")).toBeTruthy();
-    expect(container.querySelector(".sol-scene-count")!.textContent).toBe(
-      "calls: 1 · spent: $0.001",
+  });
+
+  it("lights up sign, then send once the route streams sent, then final", async () => {
+    let finish = () => {};
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        const enc = new TextEncoder();
+        const body = new ReadableStream<Uint8Array>({
+          start(c) {
+            c.enqueue(enc.encode('{"step":"sent"}\n'));
+            finish = () => {
+              c.enqueue(
+                enc.encode(JSON.stringify({ signature: SIG, ms: 300 })),
+              );
+              c.close();
+            };
+          },
+        });
+        return new Response(body);
+      }),
     );
+    const { container } = render(<InActionScene kind="checkout" />);
+    const on = () =>
+      container.querySelector(".sol-inaction-steps li[data-on]")
+        ?.firstElementChild?.textContent;
+    expect(on()).toBeUndefined();
+    expect(screen.getByText("What Solana is doing")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Pay 1 USDC" }));
+    expect(on()).toMatch(/^Sign/);
+    await flush(500);
+    expect(on()).toMatch(/^Send/);
+    await flush(2000);
+    // Still waiting on the confirmation.
+    expect(on()).toMatch(/^Send/);
+    finish();
+    await flush(500);
+    expect(on()).toMatch(/^Final/);
+    expect(screen.getByRole("button", { name: "Paid in 0.3 s" })).toBeTruthy();
   });
 
   it("with reduced motion, skips the animation but still sends the transfer", async () => {
@@ -144,37 +185,27 @@ describe("InActionScene", () => {
     expect(screen.getByText("Order #1001 paid")).toBeTruthy();
   });
 
-  it("scrolling into view never sends: checkout waits on Pay, the paywall plays without links", async () => {
+  it("scrolling into view never sends: both scenes wait on a tap", async () => {
     const fetch = serve({ signature: SIG, ms: 500 });
     inView();
     const { container } = render(
       <>
         <InActionScene kind="checkout" />
-        <InActionScene kind="paywall" />
+        <InActionScene kind="token" />
       </>,
     );
     for (let i = 0; i < 30; i++) await flush(500);
     expect(fetch).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: "Pay 1 USDC" })).toBeTruthy();
-    expect(
-      container
-        .querySelector('[data-kind="checkout"]')!
-        .hasAttribute("data-intro"),
-    ).toBe(true);
-    expect(container.querySelector(".sol-scene-count")!.textContent).toBe(
-      "calls: 3 · spent: $0.003",
-    );
+    expect(screen.getByRole("button", { name: "Create token" })).toBeTruthy();
+    for (const kind of ["checkout", "token"]) {
+      expect(
+        container
+          .querySelector(`[data-kind="${kind}"]`)!
+          .hasAttribute("data-intro"),
+      ).toBe(true);
+    }
     expect(screen.queryByText(/Explorer/)).toBeNull();
-
-    // A tap on Call again sends one real transfer.
-    fireEvent.click(screen.getByRole("button", { name: "Call again" }));
-    await flush(3000);
-    expect(fetch).toHaveBeenCalledTimes(1);
-    expect(fetch).toHaveBeenCalledWith(
-      "/api/demo/paywall-call",
-      expect.objectContaining({ method: "POST" }),
-    );
-    expect(screen.getByRole("link", { name: "View on Explorer" })).toBeTruthy();
   });
 
   it("never calls the scenes recorded, replayed, sampled, or simulated", async () => {
@@ -182,11 +213,11 @@ describe("InActionScene", () => {
     const { container } = render(
       <>
         <InActionScene kind="checkout" />
-        <InActionScene kind="paywall" />
+        <InActionScene kind="token" />
       </>,
     );
     fireEvent.click(screen.getByRole("button", { name: "Pay 1 USDC" }));
-    fireEvent.click(screen.getByRole("button", { name: "Call again" }));
+    fireEvent.click(screen.getByRole("button", { name: "Create token" }));
     await flush(3000);
     expect(container.textContent).not.toMatch(/record|replay|sample|simulat/i);
   });
