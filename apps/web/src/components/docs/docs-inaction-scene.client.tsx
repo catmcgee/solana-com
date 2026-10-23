@@ -206,16 +206,13 @@ function CheckoutScene() {
         </button>
         <p className="sol-scene-foot">
           {done ? (
-            <>
-              <ExplorerLink sent={sent} />
-              <button
-                type="button"
-                className="sol-scene-again"
-                onClick={() => void pay()}
-              >
-                Pay again
-              </button>
-            </>
+            <button
+              type="button"
+              className="sol-scene-again"
+              onClick={() => void pay()}
+            >
+              Pay again
+            </button>
           ) : null}
         </p>
       </div>
@@ -223,9 +220,12 @@ function CheckoutScene() {
       <div className="sol-scene-note" aria-live="polite">
         <span className="sol-scene-sub">Sticker shop</span>
         {done ? (
-          <p className="sol-scene-order" key={order} data-ok="">
-            <CheckIcon /> Order #{order} paid
-          </p>
+          <>
+            <p className="sol-scene-order" key={order} data-ok="">
+              <CheckIcon /> Order #{order} paid
+            </p>
+            <ExplorerLink sent={sent} />
+          </>
         ) : (
           <p className="sol-scene-order">Order #{order} waiting</p>
         )}
