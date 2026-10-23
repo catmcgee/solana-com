@@ -14,7 +14,7 @@ import {
   STAT_MAX_AGE_DAYS,
   WHY_REASONS,
   computeCosts,
-  formatAsOf,
+  formatDate,
   formatStatValue,
   formatUsd,
   localizedHref,
@@ -45,7 +45,7 @@ describe("developers hub stats", () => {
     for (const stat of HUB_STATS) {
       expect(new URL(stat.source.url).protocol).toBe("https:");
       expect(stat.source.name.length).toBeGreaterThan(0);
-      expect(landing.why.stats[stat.labelKey]?.label).toBeTruthy();
+      expect(landing.why.stats[stat.id]?.label).toBeTruthy();
       expect(stat.asOf).toMatch(/^\d{4}-(\d{2}(-\d{2})?|Q[1-4])$/);
     }
   });
@@ -70,10 +70,8 @@ describe("developers hub stats", () => {
     expect(formatStatValue(dex, "ja")).toBe(`${jaCompact}+`);
   });
 
-  it("formats as-of dates", () => {
-    expect(formatAsOf("2026-08-09", "en")).toBe("Aug 9, 2026");
-    expect(formatAsOf("2026-02", "en")).toBe("February 2026");
-    expect(formatAsOf("2026-Q3", "en")).toBe("Q3 2026");
+  it("formats dates", () => {
+    expect(formatDate("2026-08-09", "en")).toBe("Aug 9, 2026");
   });
 });
 

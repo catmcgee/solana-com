@@ -1,11 +1,8 @@
 /**
- * Data for the /developers landing (apps/web/src/app/[locale]/developers).
- *
- * Copy lives in `developers.landing` (packages/i18n/messages/web/en/common.json).
- * This file holds destinations, durations, and every number the page shows,
- * each with a source and a retrieval date. `hub.test.ts` fails when a stat's
- * `retrievedAt` is more than STAT_MAX_AGE_DAYS old, so the figures get
- * re-checked at least twice a year.
+ * Data for the /developers landing. Copy lives in `developers.landing`
+ * (packages/i18n/messages/web/en/common.json). Every number has a source and
+ * a retrieval date; hub-data.test.ts fails when a stat is more than
+ * STAT_MAX_AGE_DAYS old.
  */
 
 /** Job paths. `href` points at the path intro page in the docs. */
@@ -63,13 +60,9 @@ export const HERO_LINKS = {
 } as const;
 
 /**
- * "Set up in one command" hero card: two tabs, "With your AI agent"
- * (`allAgentsCommand`, then a link to Build with AI agents for per-agent
- * setup) and "Install manually" (`INSTALL_SETUP`). The MCP server URL and
- * the per-agent commands are copied verbatim from https://mcp.solana.com
- * (checked 2026-10-15). The Build with AI agents page
- * (apps/docs/developers/docs/intro/coding-with-agents.mdx) shows the same
- * commands; hub-data.test.ts fails when the two drift apart.
+ * MCP setup commands, verbatim from https://mcp.solana.com (checked
+ * 2026-10-15). Not shown on this page: hub-data.test.ts checks that the
+ * Build with AI agents page and the Quickstart still show them.
  */
 const MCP_SERVER_URL = "https://mcp.solana.com/mcp";
 
@@ -96,21 +89,15 @@ export const AGENT_SETUP = {
 
 /**
  * The line a reader pastes into their coding agent, as on the docs' Start
- * here banner. The guide is an agents-only page (developers/docs/intro/
- * agent-setup.mdx) served as Markdown.
+ * here banner. The guide (intro/agent-setup.mdx) is served as Markdown.
  */
 export const AGENT_PROMPT = {
   origin: "https://solana.com",
-  guidePath: "/developers/docs/intro/agent-setup.md",
-  lead: "Set up Solana for me: fetch and follow this guide",
   line: (origin: string) =>
     `Set up Solana for me: fetch and follow this guide ${origin}/developers/docs/intro/agent-setup.md`,
 } as const;
 
-/**
- * The one-line installer (Rust, Solana CLI, Anchor, Surfpool, Node.js, and
- * Yarn), as in the Quickstart's "Follow along manually" tab.
- */
+/** The one-line installer, as in the Quickstart; checked like AGENT_SETUP. */
 export const INSTALL_SETUP = {
   command:
     "curl --proto '=https' --tlsv1.2 -sSfL https://solana-install.solana.workers.dev | bash",
@@ -168,11 +155,7 @@ export const WHY_REASONS = [
 ] as const;
 
 /**
- * Companies named under "In production at". Product-owner approved list from
- * the redesign mockup. Names only, no logos.
- */
-/**
- * Firms with public announcements of live products on Solana, across
+ * Names (no logos) under "In production at": firms with public announcements of live products on Solana, across
  * payments, assets, and markets. Each name needs a public source:
  * - BlackRock: BUIDL fund on Solana (The Block, 2025-03-25,
  *   https://www.theblock.co/post/348048/solana-becomes-7th-blockchain-onboard-blackrocks-yield-bearing-money-market).
@@ -197,20 +180,19 @@ export const PRODUCTION_USERS = [
 export type StatSource = { name: string; url: string };
 
 export type HubStat = {
+  /** The label is developers.landing.why.stats.<id>.label. */
   id: string;
-  /** Numeric value, formatted per locale with Intl.NumberFormat. */
+  /** Formatted per locale with Intl.NumberFormat. */
   value: number;
-  /** How to format `value`. */
-  format: "usd-compact" | "compact" | "integer";
+  format: "usd-compact" | "integer";
   /** Text appended after the formatted number (e.g. "+"). */
   suffix?: string;
-  /** Key under developers.landing.why.stats.<id> holding `label` and `note`. */
-  labelKey: string;
   source: StatSource;
   /** When the figure was last checked against the source (YYYY-MM-DD). */
   retrievedAt: string;
   /** Date or period the figure describes, as stated by the source. */
   asOf: string;
+  /** What the source says, for whoever re-checks the figure. */
   note?: string;
 };
 
@@ -222,7 +204,6 @@ export const HUB_STATS: readonly HubStat[] = [
     id: "stablecoinSupply",
     value: 16_700_000_000,
     format: "usd-compact",
-    labelKey: "stablecoinSupply",
     source: {
       name: "Solana Compass",
       url: "https://solanacompass.com/news/solana-stablecoin-supply-reaches-167b-growing-11x-in-three-years-to-rank-third-globally",
@@ -235,7 +216,6 @@ export const HUB_STATS: readonly HubStat[] = [
     id: "tokenizedAssets",
     value: 4_300_000_000,
     format: "usd-compact",
-    labelKey: "tokenizedAssets",
     source: {
       name: "FinanceFeeds (RWA.xyz data)",
       url: "https://financefeeds.com/solanas-tokenized-real-world-asset-market-surges-from-700-million-to-4-3-billion-in-one-year/",
@@ -249,7 +229,6 @@ export const HUB_STATS: readonly HubStat[] = [
     value: 200_000_000_000,
     format: "usd-compact",
     suffix: "+",
-    labelKey: "dexVolume",
     source: {
       name: "DefiLlama",
       url: "https://defillama.com/dexs/chain/solana",
@@ -263,7 +242,6 @@ export const HUB_STATS: readonly HubStat[] = [
     value: 100,
     format: "integer",
     suffix: "%",
-    labelKey: "uptime",
     source: {
       name: "Crypto Briefing",
       url: "https://cryptobriefing.com/solana-100-percent-uptime-30-months/",
@@ -362,47 +340,26 @@ export function formatInteger(value: number, locale: string): string {
 }
 
 export function formatStatValue(stat: HubStat, locale: string): string {
-  let formatted: string;
-  switch (stat.format) {
-    case "usd-compact":
-      formatted = new Intl.NumberFormat(locale, {
-        style: "currency",
-        currency: "USD",
-        notation: "compact",
-        maximumFractionDigits: 1,
-      }).format(stat.value);
-      break;
-    case "compact":
-      formatted = new Intl.NumberFormat(locale, {
-        notation: "compact",
-        maximumFractionDigits: 1,
-      }).format(stat.value);
-      break;
-    default:
-      formatted = formatInteger(stat.value, locale);
-  }
+  const formatted =
+    stat.format === "usd-compact"
+      ? new Intl.NumberFormat(locale, {
+          style: "currency",
+          currency: "USD",
+          notation: "compact",
+          maximumFractionDigits: 1,
+        }).format(stat.value)
+      : formatInteger(stat.value, locale);
   return `${formatted}${stat.suffix ?? ""}`;
 }
 
-/**
- * Formats a stat's `asOf` ("YYYY-MM-DD", "YYYY-MM", or "YYYY-Qn") for display.
- */
-export function formatAsOf(asOf: string, locale: string): string {
-  const quarter = /^(\d{4})-Q([1-4])$/.exec(asOf);
-  if (quarter) return `Q${quarter[2]} ${quarter[1]}`;
-  if (/^\d{4}-\d{2}$/.test(asOf)) {
-    return new Intl.DateTimeFormat(locale, {
-      month: "long",
-      year: "numeric",
-      timeZone: "UTC",
-    }).format(new Date(`${asOf}-01T00:00:00Z`));
-  }
+/** Formats a "YYYY-MM-DD" date, e.g. "Aug 9, 2026". */
+export function formatDate(date: string, locale: string): string {
   return new Intl.DateTimeFormat(locale, {
     dateStyle: "medium",
     timeZone: "UTC",
-  }).format(new Date(`${asOf}T00:00:00Z`));
+  }).format(new Date(`${date}T00:00:00Z`));
 }
 
-/** Newsletter list used by the developer hub since the docs-app version. */
+/** Iterable list for the developer newsletter. */
 export const DEVELOPER_NEWSLETTER_FORM_ID =
   "f1bc79b9-a1cd-463a-8c2c-e761b2fa108d";

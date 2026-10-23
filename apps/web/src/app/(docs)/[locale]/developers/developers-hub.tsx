@@ -22,7 +22,7 @@ import {
   PRODUCTION_USERS,
   WHY_REASONS,
   computeCosts,
-  formatAsOf,
+  formatDate,
   formatInteger,
   formatStatValue,
   formatUsd,
@@ -36,14 +36,11 @@ import { AgentPrompt } from "./agent-prompt.client";
 import { ExternalArrowIcon } from "./docs-icons";
 import { NewsletterForm } from "./newsletter-form.client";
 
-/**
- * Links on this page open in the same tab, docs included: /developers wears
- * the docs header, so going to /developers/docs is moving within one site. Only
- * off-site links (hackathons, MCP setup) open a new tab, with the arrow.
- */
+/** Links open in the same tab; only off-site ones open a new tab, with the arrow. */
 const HACKATHONS_URL = "https://hackathons.solana.com";
-/** Live payments on Solana. It refuses framing, so it is a link, not an embed. */
 const PAYMENTS_ORG_URL = "https://payments.org";
+
+type Translate = (key: string, values?: Record<string, string>) => string;
 
 type IconComponent = ComponentType<{
   className?: string;
@@ -61,7 +58,6 @@ const inlineLink = `text-[var(--dl-link)] underline decoration-[var(--dl-link-un
 /** Docs card (styles/stepper.css .sol-dpick > a): hairline, purple lift. */
 const card =
   "rounded-2xl border border-[var(--dl-line)] bg-[var(--dl-surface)] shadow-[var(--dl-shadow)]";
-/** Where "All news" under the developer updates goes. */
 const UPDATES_ALL_HREF = "/news";
 
 const cardLink = `${card} text-[var(--dl-text)] no-underline transition-[border-color,box-shadow,transform] duration-150 hover:border-[var(--dl-purple-line)] hover:text-[var(--dl-text)] hover:shadow-[var(--dl-lift)] motion-safe:hover:-translate-y-px ${focus}`;
@@ -111,7 +107,7 @@ function SectionHead({
   );
 }
 
-function PaymentVisual({ t }: { t: (key: string) => string }) {
+function PaymentVisual({ t }: { t: Translate }) {
   const node =
     "rounded-full border border-[var(--dl-line)] bg-[var(--dl-raised)] px-3 py-[7px] text-[12.5px] leading-none text-[var(--dl-text)]";
   return (
@@ -184,10 +180,8 @@ function CodeLine({ line }: { line: string }) {
 }
 
 /**
- * The few lines that send a USDC payment, from the Quickstart's tested
- * example, with a link to the full file. No copy button: the lines are a
- * fragment, and the linked page has the runnable file. The table beside it
- * stretches to the same height.
+ * The lines that send a USDC payment, from the Quickstart's tested example.
+ * No copy button: it is a fragment; the linked page has the runnable file.
  */
 function PaymentSnippet({ t, href }: { t: Translate; href: string }) {
   return (
@@ -223,7 +217,7 @@ function PaymentSnippet({ t, href }: { t: Translate; href: string }) {
   );
 }
 
-function AssetVisual({ t }: { t: (key: string) => string }) {
+function AssetVisual({ t }: { t: Translate }) {
   const row =
     "flex min-w-0 items-center justify-between gap-1.5 rounded-[10px] border border-[var(--dl-line)] bg-[var(--dl-raised)] px-2 py-[7px] text-[12.5px] leading-tight text-[var(--dl-text)] motion-safe:animate-[dl-row_4s_infinite]";
   return (
@@ -247,7 +241,7 @@ function AssetVisual({ t }: { t: (key: string) => string }) {
   );
 }
 
-function TradeVisual({ t }: { t: (key: string) => string }) {
+function TradeVisual({ t }: { t: Translate }) {
   const leg =
     "rounded-[10px] border border-[var(--dl-line)] bg-[var(--dl-raised)] px-3 py-[7px] font-[family-name:var(--dl-mono)] text-[12.5px] text-[var(--dl-text)] motion-safe:animate-[dl-row_4s_infinite]";
   return (
@@ -263,8 +257,6 @@ function TradeVisual({ t }: { t: (key: string) => string }) {
   );
 }
 
-type Translate = (key: string, values?: Record<string, string>) => string;
-
 /** Visually hidden "(opens in a new tab)" plus the decorative arrow. */
 function NewTabHint({ text }: { text: string }) {
   return (
@@ -275,12 +267,7 @@ function NewTabHint({ text }: { text: string }) {
   );
 }
 
-/**
- * The agent setup line: a short heading, then the one line a reader pastes
- * into their coding agent, in a single-line field with a copy button. The
- * line is plain, selectable text in the server render; the copy button turns
- * on after hydration. The manual and local setup options live in the docs.
- */
+/** The agent setup line: a heading, then the line to paste, with a copy button. */
 function AgentCard({ t }: { t: Translate }) {
   return (
     <section
@@ -315,7 +302,6 @@ export async function DevelopersHub({
     namespace: "developers.landing",
   });
   const href = (path: string) => localizedHref(locale, path);
-  const tt = (key: string, values?: Record<string, string>) => t(key, values);
   const newTabText = t("newTab");
 
   const defaults = COST_MODEL.defaults;
@@ -324,10 +310,10 @@ export async function DevelopersHub({
     defaults.averagePaymentUsd,
   );
   const visuals: Record<JobPathId, ReactNode> = {
-    payments: <PaymentVisual t={tt} />,
+    payments: <PaymentVisual t={t} />,
     payPerCall: <ApiVisual />,
-    asset: <AssetVisual t={tt} />,
-    trade: <TradeVisual t={tt} />,
+    asset: <AssetVisual t={t} />,
+    trade: <TradeVisual t={t} />,
   };
 
   return (
@@ -365,7 +351,7 @@ export async function DevelopersHub({
               </a>
             </div>
           </div>
-          <AgentCard t={tt} />
+          <AgentCard t={t} />
         </div>
       </section>
 
@@ -394,9 +380,8 @@ export async function DevelopersHub({
                     data-testid={`job-card-${job.id}`}
                     className={`group flex w-full flex-col overflow-hidden ${cardLink}`}
                   >
-                    {/* Headline first, so a reader knows what the
-                        animation shows before they see it. A fixed-height
-                        row keeps the visuals lined up across cards. */}
+                    {/* Headline first; a fixed-height row keeps the visuals
+                        lined up across cards. */}
                     <div className="flex h-[5.25rem] items-center gap-3 px-5 pt-5">
                       <span className={`${iconTile} shrink-0`}>
                         <Icon aria-hidden className="!size-[18px]" />
@@ -486,7 +471,7 @@ export async function DevelopersHub({
                   {formatStatValue(stat, locale)}
                 </b>
                 <span className="text-sm leading-[1.45] text-[var(--dl-muted)]">
-                  {t(`why.stats.${stat.labelKey}.label`)}
+                  {t(`why.stats.${stat.id}.label`)}
                 </span>
               </li>
             ))}
@@ -742,10 +727,7 @@ export async function DevelopersHub({
             className="mb-6 flex flex-col items-start justify-between gap-5 rounded-2xl border border-[var(--dl-box-line)] bg-[var(--dl-purple-soft)] px-6 py-6 md:flex-row md:items-center md:px-8"
           >
             <div>
-              <h3
-                id="dl-news-title"
-                className="m-0 mb-1 font-brand text-lg font-medium tracking-[-0.015em] text-[var(--dl-text)]"
-              >
+              <h3 className="m-0 mb-1 font-brand text-lg font-medium tracking-[-0.015em] text-[var(--dl-text)]">
                 {t("newsletter.title")}
               </h3>
               <p className="m-0 text-[15px] text-[var(--dl-muted)]">
@@ -766,7 +748,7 @@ export async function DevelopersHub({
                       <span className="text-xs text-[var(--dl-dim)]">
                         {t(`updates.kinds.${update.kind}`)}
                         {update.publishedAt
-                          ? ` · ${formatAsOf(update.publishedAt.slice(0, 10), locale)}`
+                          ? ` · ${formatDate(update.publishedAt.slice(0, 10), locale)}`
                           : ""}
                       </span>
                       <h3 className="m-0 font-brand text-base font-medium leading-snug text-[var(--dl-text)]">
