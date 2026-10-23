@@ -6,11 +6,9 @@ import {
 } from "@/app/(docs)/[locale]/developers/speculation-rules";
 
 describe("speculation rules on /developers", () => {
-  it("prefetches the docs home and prerenders docs links on hover", () => {
+  it("prerenders docs links on hover and fetches nothing up front", () => {
     const rules = getDeveloperSpeculationRules("en");
-    expect(rules.prefetch).toEqual([
-      { source: "list", urls: ["/developers/docs"], eagerness: "immediate" },
-    ]);
+    expect(rules).not.toHaveProperty("prefetch");
     expect(rules.prerender[0]).toMatchObject({
       source: "document",
       eagerness: "moderate",
@@ -22,7 +20,6 @@ describe("speculation rules on /developers", () => {
 
   it("localizes the URLs", () => {
     const rules = getDeveloperSpeculationRules("ja");
-    expect(rules.prefetch[0]!.urls).toEqual(["/ja/developers/docs"]);
     expect(JSON.stringify(rules.prerender)).toContain(
       '"href_matches":"/ja/developers/docs{/*}?"',
     );
