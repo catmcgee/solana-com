@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { openDocsSearch } from "@solana-com/ui-chrome/docs-search";
+import { openDocsSearch } from "@/lib/docs/search-hand-off";
 import { DOCS_THEME_STORAGE_KEY } from "./theme-prepaint";
 
 /*
@@ -198,9 +198,9 @@ export function ThemeToggle({
 }
 
 /**
- * The docs search field. It opens the docs search dialog
- * (components/docs/docs-search.client.tsx) on the page: on click, on Enter,
- * and on ⌘K / Ctrl+K anywhere on the page, with what was typed. Keyboard
+ * The docs search field. It opens Inkeep's search (components/docs/
+ * inkeep.client.tsx) on the page: on click, on Enter, and on ⌘K / Ctrl+K
+ * anywhere on the page, with what was typed. Keyboard
  * focus alone does not open it (WCAG 3.2.1 On Focus): keyboard users can
  * type and press Enter. Without JavaScript the form submits to
  * `<docs>?q=<text>`, where the docs page opens its search with the text.

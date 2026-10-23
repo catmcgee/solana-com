@@ -1,8 +1,7 @@
 /**
- * Event Ask AI listens for: open the chat, and ask about a code block when
- * `detail.code` is set. Sent by the floating pill (components/docs/
- * ask-ai.client.tsx) and a code block's Ask button (docs-components.client).
- * The Inkeep modal (components/docs/inkeep.client.tsx) answers it.
+ * Event a code block's Ask button (docs-components.client) sends, with its
+ * code in `detail.code`. Inkeep's chat answers it (components/docs/
+ * inkeep.client.tsx).
  */
 export const DOCS_ASK_CODE_EVENT = "docs-ask-ai:code";
 

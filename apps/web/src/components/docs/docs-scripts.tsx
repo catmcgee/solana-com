@@ -5,9 +5,9 @@ import Script from "next/script";
  * (copied to /docs-scripts/ at build, scripts/copy-docs-static.mjs) until
  * they become React components: the RPC "Try it" panel, Run buttons for
  * recorded output, Playground links, in-page video playback and the agent
- * banner's Copy button. Ask AI is React (ask-ai.client.tsx, in SiteShell). Each script delegates from `document`
- * and survives client-side navigation. The search hand-off, the theme
- * toggle and the logo link are React now (docs-header, docs-search).
+ * banner's Copy button. Each script delegates from `document` and survives
+ * client-side navigation. The search hand-off, the theme toggle and the
+ * logo link are React now (docs-header, inkeep.client).
  * They load once the page has, so they don't compete with its first paint.
  */
 const SCRIPTS = [

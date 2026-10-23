@@ -7,6 +7,8 @@ import { notFound } from "next/navigation";
 // Only the Tailwind classes these pages use (not the site's globals.css).
 import "@/app/docs-globals.css";
 import { SiteShell } from "@/components/site-shell";
+import { InkeepChatButton } from "@solana-com/ui-chrome/inkeep-chat-button";
+import { DocsInkeep } from "@/components/docs/inkeep.client";
 
 type Props = {
   children: React.ReactNode;
@@ -17,8 +19,8 @@ type Props = {
  * Root layout of the /developers landing and the docs (/developers/docs,
  * /developers/cookbook, /learn/<article>). They wear the docs header and
  * footer, so the site Header and Footer are left out, and the client gets
- * only the messages its components read (cookie banner, landing calculator
- * and newsletter form), not the whole site's.
+ * only the messages its components read (cookie banner, landing calculator,
+ * newsletter form, and Ask AI), not the whole site's.
  */
 export default async function DocsRootLayout({ children, params }: Props) {
   const { locale = "en" } = await params;
@@ -32,6 +34,7 @@ export default async function DocsRootLayout({ children, params }: Props) {
     .landing as AbstractIntlMessages;
   const clientMessages: AbstractIntlMessages = {
     "cookie-consent": messages["cookie-consent"],
+    commands: messages.commands,
     developers: {
       landing: { calc: landing.calc, newsletter: landing.newsletter },
     },
@@ -39,6 +42,9 @@ export default async function DocsRootLayout({ children, params }: Props) {
   return (
     <SiteShell locale={locale} messages={clientMessages}>
       {children}
+      {/* Above the docs' sticky table of contents (z-index 21). */}
+      <InkeepChatButton className="z-40" />
+      <DocsInkeep />
     </SiteShell>
   );
 }

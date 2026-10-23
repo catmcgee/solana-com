@@ -802,10 +802,9 @@ accent; put `data-accent` on one `<li>` to move it.
 
 ##### Search and Ask AI (Inkeep)
 
-- Inkeep search and chat (`@inkeep/cxkit-react`, ui-chrome `inkeep-modal`)
-  through the `/api/inkeep/*` proxy, with the server-only `INKEEP_API_KEY`.
-  Without the key: the Fumadocs search dialog (`/api/docs-search`) and the Ask
-  AI menu (ask Claude or ChatGPT about the page).
+- Inkeep search and chat (`@inkeep/cxkit-react`, ui-chrome `inkeep-config`,
+  `InkeepChatButton`) through the `/api/inkeep/*` proxy, with the server-only
+  `INKEEP_API_KEY`.
 
 #### Key Dependencies (App-Specific)
 

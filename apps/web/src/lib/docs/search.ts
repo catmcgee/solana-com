@@ -8,7 +8,7 @@ import { DOCS_LOCALES } from "./locales.mjs";
  * Docs search: Fumadocs' built-in
  * search over every page's title, description and section, per locale.
  * Bodies are not indexed, so answering a query loads no page module. Used by
- * /api/docs-search (the search dialog) and the MCP `search` tool.
+ * /api/docs-search (the docs not-found page) and the MCP `search` tool.
  */
 export const docsSearchServer = createI18nSearchAPI("simple", {
   i18n: {

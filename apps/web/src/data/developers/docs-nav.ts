@@ -163,7 +163,7 @@ export const DOCS_SEARCH_PROMPT: string = docsConfig.search.prompt;
 export function docsSearchHref(locale: string, query = ""): string {
   const docs = localizedHref(locale, "/developers/docs");
   const q = query.trim();
-  return q ? `${docs}?q=${encodeURIComponent(q)}` : `${docs}?search=1`;
+  return `${docs}?q=${encodeURIComponent(q)}`;
 }
 
 const SITE_ORIGIN = /^https:\/\/solana\.com(?=\/|$)/;

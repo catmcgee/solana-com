@@ -78,7 +78,7 @@ describe("docs tabs on /developers", () => {
   });
 
   it("builds the search hand-off URLs", () => {
-    expect(docsSearchHref("en")).toBe("/developers/docs?search=1");
+    expect(docsSearchHref("en")).toBe("/developers/docs?q=");
     expect(docsSearchHref("en", "  token extensions ")).toBe(
       "/developers/docs?q=token%20extensions",
     );
@@ -137,7 +137,7 @@ describe("DocsHeader", () => {
     );
     expect(
       container.querySelector(".dh-search-icon")!.getAttribute("href"),
-    ).toBe("/ja/developers/docs?search=1");
+    ).toBe("/ja/developers/docs?q=");
 
     const toggles = container.querySelectorAll("button[data-theme-toggle]");
     expect(toggles.length).toBeGreaterThan(0);

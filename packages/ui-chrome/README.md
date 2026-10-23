@@ -1,7 +1,7 @@
 # @solana-com/ui-chrome
 
 Shared UI chrome for the Solana.com monorepo: Header, Footer, ThemeProvider,
-site-wide alerts, the header search, Link with cross-app navigation, and
+site-wide alerts, Inkeep search/chat, Link with cross-app navigation, and
 supporting components.
 
 ## Installation
@@ -16,7 +16,8 @@ import {
   Footer,
   ThemeProvider,
   SitewideTopAlert,
-  SearchBar,
+  InkeepChatButton,
+  InkeepSearchBar,
   NewsletterModal,
   DocsSidebarToggleIcon,
   DOCS_SIDEBAR_TOGGLE_SLOT_ID,
@@ -51,15 +52,16 @@ Provides dark/light theme context to the app.
 Announcement banner at the top of the page. Configurable via
 `sitewideTopAlertConfig` (see [Site-Wide Alerts](#site-wide-alerts)).
 
-### SearchBar
+### InkeepChatButton
 
-The header's search button for the site search (Inkeep with `INKEEP_API_KEY`,
-else Fumadocs, in `apps/web`). In `apps/web`, which mounts the search on every
-page, a click or `⌘ K` / `Ctrl+K` opens it in place. In the other apps
-(`NEXT_PUBLIC_APP_NAME` set) it goes to `/developers/docs?search=1` (localized),
-where the docs page opens the dialog. It shows the `⌘ K` shortcut on larger
-viewports; the optional `expanded` prop adds a visible label and full-width
-styling.
+Floating or inline button that opens the Inkeep AI search + chat modal. Supports
+`variant`: `"fixed"` (default) or `"inline"`.
+
+### InkeepSearchBar
+
+Search button that opens the same Inkeep modal and displays its `⌘ K` keyboard
+shortcut on larger viewports. The optional `expanded` prop adds a visible label
+and full-width styling.
 
 ### NewsletterModal
 
@@ -91,15 +93,6 @@ Dropdown for switching locale (uses `@workspace/i18n` and next-intl).
 Apps often re-export these from their own `utils/Link` (e.g. `apps/web`,
 `apps/docs`).
 
-### `@solana-com/ui-chrome/docs-search`
-
-- **openDocsSearch(query?)** / **DOCS_SEARCH_OPEN_EVENT** – Open the docs search
-  dialog on the current page (the window event the dialog listens for).
-
-### `@solana-com/ui-chrome/inkeep-modal` and `/inkeep-proxy`
-
-See [Inkeep (search and chat)](#inkeep-search-and-chat).
-
 ### `@solana-com/ui-chrome/url-config`
 
 - **shouldUseNextLink(href)** – Returns whether `href` should use Next.js `Link`
@@ -107,32 +100,29 @@ See [Inkeep (search and chat)](#inkeep-search-and-chat).
   under solana.com via rewrites; this keeps cross-app navigation as full loads
   and in-app as client nav. Depends on `NEXT_PUBLIC_APP_NAME` in non-web apps.
 
-## Inkeep (search and chat)
+## Inkeep (AI search & chat)
 
-Inkeep is wired in `src/inkeep-config.ts` (as on production solana.com) and used
-by `inkeep-modal` (default export): Inkeep's search and chat modal, opened by
-the caller. In `apps/web`, `components/docs/inkeep.client.tsx` mounts it on
-every page the first time search or Ask AI opens (it is the module that brings
-in `@inkeep/cxkit-react`). The modal is themed for Solana (dark/light).
+Inkeep is wired in `src/inkeep-config.ts` and used by `InkeepChatButton` and
+`InkeepSearchBar`. The modal is themed for Solana (dark/light) and uses
+`@inkeep/cxkit-react`.
 
-- **Env**: Set the server-only `INKEEP_API_KEY` on the web deployment. Never use
-  a `NEXT_PUBLIC_` Inkeep credential. Without it, `apps/web` uses the Fumadocs
-  search dialog and the docs' Ask AI menu instead.
+- **Env**: Set the server-only `INKEEP_API_KEY` on the web and docs deployments.
+  Never use a `NEXT_PUBLIC_` Inkeep credential.
 - **Internal APIs**: CXKit sends challenge, chat, search, and analytics requests
-  to `/api/inkeep/*` (`proxyInkeepRequest` from `inkeep-proxy`). The routes
-  validate requests and authenticate to Inkeep on the server. The current
+  to `/api/inkeep/*`. Both apps expose the same-origin routes, validate
+  requests, and authenticate to Inkeep on the server. The current
   domain-restricted web credential requires CXKit to solve Inkeep's challenge
   before each chat request. Conversation analytics are write-only; the public
   proxy does not expose conversation reads.
 - **Rate limits**: Configure Vercel WAF rate-limit rules named `inkeep-chat` (30
   requests/minute/IP), `inkeep-search` (120 requests/minute/IP), and
-  `inkeep-analytics` (240 requests/minute/IP). Production builds (Vercel
-  previews included) fail closed when a rule is missing or the rate-limit
-  service fails.
+  `inkeep-analytics` (240 requests/minute/IP) on both deployments. Production
+  requests fail closed when a rule is missing or the rate-limit service fails.
+- **Components**: Use `InkeepChatButton` and/or `InkeepSearchBar`; no extra
+  setup in app code beyond layout placement.
 - **Verification**: Confirm chat streams an answer with working citations,
-  search returns source links, a code block's Ask button sends its code, and
-  browser network requests contain only the non-secret internal proxy
-  identifier.
+  search returns source links, `?search=<query>` opens the modal, and browser
+  network requests contain only the non-secret internal proxy identifier.
 
 ## Site-Wide Alerts
 
@@ -197,6 +187,7 @@ import {
   Footer,
   ThemeProvider,
   SitewideTopAlert,
+  InkeepChatButton,
 } from "@solana-com/ui-chrome";
 
 export default function RootLayout({ children }) {
@@ -206,6 +197,7 @@ export default function RootLayout({ children }) {
       <Header />
       {children}
       <Footer />
+      <InkeepChatButton />
     </ThemeProvider>
   );
 }
@@ -214,3 +206,5 @@ export default function RootLayout({ children }) {
 ## Dependencies
 
 - **Peer**: `@workspace/i18n`, `next`, `next-intl`, `react`, `react-dom`
+- **Inkeep**: `@inkeep/cxkit-react`; the web and docs apps require server-only
+  `INKEEP_API_KEY` and the three Vercel WAF rules described above

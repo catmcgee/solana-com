@@ -245,33 +245,6 @@ test.describe("with JavaScript", () => {
     await context.close();
   });
 
-  test("search hands off to the docs search", async ({ browser }) => {
-    const context = await browser.newContext();
-    const page = await context.newPage();
-    // Do not load the docs; only check where the header sends the reader.
-    await page.route(/\/docs(\?|$)/, (route) =>
-      route.fulfill({ status: 200, body: "docs" }),
-    );
-
-    await page.goto("/developers");
-    await page.locator(".dh-bar .dh-search[data-ready]").waitFor();
-    await page.locator(".dh-bar .dh-search input").click();
-    await expect(page).toHaveURL(/\/docs\?search=1$/);
-
-    await page.goto("/developers");
-    await page.locator(".dh-bar .dh-search[data-ready]").waitFor();
-    await page.keyboard.press("ControlOrMeta+k");
-    await expect(page).toHaveURL(/\/docs\?search=1$/);
-
-    await page.goto("/developers");
-    await page.locator(".dh-bar .dh-search[data-ready]").waitFor();
-    await page.locator(".dh-bar .dh-search input").focus();
-    await page.keyboard.type("token extensions");
-    await page.keyboard.press("Enter");
-    await expect(page).toHaveURL(/\/docs\?q=token%20extensions$/);
-    await context.close();
-  });
-
   test("the copy button copies the agent setup line", async ({ browser }) => {
     const context = await browser.newContext({
       permissions: ["clipboard-read", "clipboard-write"],

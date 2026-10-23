@@ -83,8 +83,7 @@ their source files during the build:
 
 - `@workspace/i18n` - i18n configuration and utilities
 - `@workspace/ui` - Shared UI components (Button, Dialog, Accordion, etc.)
-- `@solana-com/ui-chrome` - Header, Footer, ThemeProvider, SearchBar, the Inkeep
-  search and chat modal (`inkeep-modal`) and proxy (`inkeep-proxy`)
+- `@solana-com/ui-chrome` - Header, Footer, ThemeProvider, InkeepChatButton
 - `@workspace/ecosystem-data` - Canonical company metadata, wallet records, and
   logos
 - `@workspace/sentry` - Shared Sentry configuration helpers

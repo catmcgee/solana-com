@@ -68,15 +68,12 @@ burst can't overshoot the caps or burn the RPC quota:
 
 - [ ] Set the server-only `INKEEP_API_KEY` in Vercel (Preview now, Production
       at launch; the same key as production solana.com). Without it, search
-      is the Fumadocs dialog and Ask AI is the docs' menu (ask Claude or
-      ChatGPT).
+      and Ask AI open but `/api/inkeep/*` answers 503, so nothing loads.
 - [ ] Add the Vercel WAF rate-limit rules `inkeep-chat` (30/min/IP),
       `inkeep-search` (120/min/IP) and `inkeep-analytics` (240/min/IP) to the
       project; without them `/api/inkeep/*` answers 503.
 - [ ] The key is a domain-restricted Inkeep web integration: allow the preview
       host in Inkeep if chat fails there with a challenge error.
-- [ ] Redeploy without the build cache after adding the key: the pages are
-      static and read it at build time.
 
 ## Translations
 

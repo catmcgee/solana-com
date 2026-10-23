@@ -1,20 +1,31 @@
 /**
- * The search hand-off on arrival: `?q=<text>` (the docs header's no-JS
- * form) or `?search=1` (the header search in apps/media and apps/templates).
- * Returns the query to open the search with, or null without one, and
- * removes the parameters from the URL.
+ * Event Inkeep's docs search (components/docs/inkeep.client.tsx) listens
+ * for, sent by the docs header's search field.
+ */
+export const DOCS_SEARCH_OPEN_EVENT = "docs-search:open";
+
+/** Opens the docs search on this page, optionally with a query. */
+export function openDocsSearch(query = "") {
+  window.dispatchEvent(
+    new CustomEvent(DOCS_SEARCH_OPEN_EVENT, { detail: { query } }),
+  );
+}
+
+/**
+ * The docs header's no-JS search form submits to `?q=<text>`. Returns the
+ * text to open the search with (null without `?q=`) and removes it from the
+ * URL.
  */
 export function takeSearchHandOff(): string | null {
   const params = new URLSearchParams(window.location.search);
-  if (!params.has("q") && params.get("search") !== "1") return null;
-  const query = (params.get("q") ?? "").slice(0, 200);
+  const query = params.get("q");
+  if (query === null) return null;
   params.delete("q");
-  if (params.get("search") === "1") params.delete("search");
   const rest = params.toString();
   history.replaceState(
     history.state,
     "",
     location.pathname + (rest ? `?${rest}` : "") + location.hash,
   );
-  return query;
+  return query.slice(0, 200);
 }

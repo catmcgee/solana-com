@@ -1,16 +1,11 @@
 import { defineConfig, devices } from "@playwright/test";
 
 /**
- * Search and Ask AI (e2e/ask-ai.spec.ts). Without INKEEP=1 it checks the
- * fallbacks on a build without INKEEP_API_KEY; with INKEEP=1, Inkeep's modal
- * against a mocked /api/inkeep/* on a build with the key set (any value).
+ * Inkeep search and Ask AI (e2e/ask-ai.spec.ts), with /api/inkeep/* mocked.
+ * INKEEP_MOCK=0 sends its requests to the server instead.
  *
  *   next build && next start -p 3830
  *   BASE_URL=http://localhost:3830 pnpm --filter solana-com exec \
- *     playwright test -c e2e/ask-ai.config.ts
- *
- *   INKEEP_API_KEY=x next build && INKEEP_API_KEY=x next start -p 3830
- *   INKEEP=1 BASE_URL=http://localhost:3830 pnpm --filter solana-com exec \
  *     playwright test -c e2e/ask-ai.config.ts
  */
 export default defineConfig({
