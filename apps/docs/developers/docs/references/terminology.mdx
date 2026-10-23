@@ -86,7 +86,7 @@ The result of interpreting all programs on the ledger at a given
 ## block
 
 A contiguous set of [entries](#entry) on the ledger covered by a
-[vote](#ledger-vote). A [leader](#leader) produces at most one block per
+[vote](#vote). A [leader](#leader) produces at most one block per
 [slot](#slot).
 
 ## blockhash
@@ -123,6 +123,12 @@ the account data to avoid recalculating it.
 An exchange model that maintains a sorted list of resting bids and asks; a trade
 occurs when an incoming order crosses an order on the opposite side. Contrast
 with [automated market maker](#automated-market-maker-amm).
+
+## certificate
+
+An aggregate of [votes](#vote) for a [block](#block) from validators holding a
+given share of [stake](#stake), combined into one BLS signature. A finalization
+certificate makes a block [final](#finality).
 
 ## client
 
@@ -172,13 +178,14 @@ to process a transaction.
 
 ## confirmation time
 
-The wallclock duration between a [leader](#leader) creating a
-[tick entry](#tick) and creating a [confirmed block](#confirmed-block).
+The wallclock duration between a [leader](#leader) producing a
+[block](#block) and the block reaching [finality](#finality), roughly 150
+milliseconds on mainnet.
 
 ## confirmed block
 
-A [block](#block) that has received a [super majority](#supermajority) of
-[ledger votes](#ledger-vote).
+A [block](#block) at `confirmed` commitment. This is the same block as at
+`finalized`: one with a finalization [certificate](#certificate).
 
 ## control plane
 
@@ -228,11 +235,8 @@ A preimage resistant [hash](#hash) over the final contents of an entry, which
 acts as the [entry's](#entry) globally unique identifier. The hash serves as
 evidence of:
 
-- The entry being generated after a duration of time
 - The specified [transactions](#transaction) are those included in the entry
 - The entry's position with respect to other entries in [ledger](#ledger)
-
-See [proof of history](#proof-of-history-poh).
 
 ## epoch
 
@@ -255,8 +259,10 @@ transaction since paying for the transaction reduces the account balance.
 
 ## finality
 
-When nodes representing 2/3rd of the [stake](#stake) have a common
-[root](#root).
+The point at which a [block](#block) cannot be rolled back. A block is final
+once it has a finalization [certificate](#certificate): [votes](#vote) from
+validators holding at least 80% of [stake](#stake) in one round, or at least
+60% in each of two rounds.
 
 ## fork
 
@@ -340,14 +346,6 @@ A list of [entries](#entry) containing [transactions](#transaction) signed by
 may have only newer [blocks](#block) to reduce storage, as older ones are not
 needed for validation of future blocks by design.
 
-## ledger vote
-
-A [hash](#hash) of the [validator's state](#bank-state) at a given
-[tick height](#tick-height). It comprises a [validator's](#validator)
-affirmation that a [block](#block) it has received has been verified, as well as
-a promise not to vote for a conflicting [block](#block) \(i.e. [fork](#fork)\)
-for a specific amount of time, the [lockout](#lockout) period.
-
 ## light client
 
 A type of [client](#client) that can verify it's pointing to a valid
@@ -366,11 +364,6 @@ by liquidity providers who deposit token pairs into the pool.
 
 A [program](#program) with the ability to interpret the binary encoding of other
 [onchain programs](#onchain-program).
-
-## lockout
-
-The duration of time for which a [validator](#validator) is unable to
-[vote](#ledger-vote) on another [fork](#fork).
 
 ## maker
 
@@ -468,10 +461,6 @@ The wallet that is associated with an account. For example, the token program is
 used to store token accounts associated with a particular wallet and mint using
 an address made from that [wallet](#wallet) and [mint](#token-mint).
 
-## PoH
-
-See [Proof of History](#proof-of-history-poh).
-
 ## point
 
 A weighted [credit](#credit) in a rewards regime. In the [validator](#validator)
@@ -502,13 +491,6 @@ is their [owning program](#owning-program).
 
 The public key of the [account](#account) containing a
 [program](#onchain-program).
-
-## proof of history (PoH)
-
-A stack of proofs, each of which proves that some data existed before the proof
-was created and that a precise duration of time passed before the previous
-proof. Like a [VDF](#verifiable-delay-function-vdf), a Proof of History can be
-verified in less time than it took to produce.
 
 ## prioritization fee
 
@@ -546,9 +528,9 @@ account that falls below the rent exemption threshold.
 
 ## root
 
-A [block](#block) or [slot](#slot) that has reached maximum [lockout](#lockout)
-on a [validator](#validator). The root is the highest block that is an ancestor
-of all active forks on a validator. All ancestor blocks of a root are also
+The highest [finalized](#finality) [block](#block) on a
+[validator](#validator). The root is an ancestor of all active forks on a
+validator. All ancestor blocks of a root are also
 transitively a root. Blocks that are not an ancestor and not a descendant of the
 root are excluded from consideration for consensus and can be discarded.
 
@@ -626,8 +608,8 @@ The period of time for which each [leader](#leader) ingests transactions and
 produces a [block](#block).
 
 Collectively, slots create a logical clock. Slots are ordered sequentially and
-non-overlapping, comprising roughly equal real-world time as per
-[PoH](#proof-of-history-poh).
+non-overlapping, and each lasts roughly the same real-world time: a 200ms target
+on mainnet.
 
 ## smart contract
 
@@ -651,10 +633,6 @@ behavior can be proven.
 
 SWQoS allows
 [preferential treatment for transactions that come from staked validators](/developers/docs/defi/stake-weighted-qos).
-
-## supermajority
-
-2/3 of a [cluster](#cluster).
 
 ## system program
 
@@ -742,9 +720,10 @@ used to uniquely identify the transaction across the complete [ledger](#ledger).
 
 ## transaction confirmations
 
-The number of [confirmed blocks](#confirmed-block) since the transaction was
-accepted onto the [ledger](#ledger). A transaction is finalized when its block
-becomes a [root](#root).
+The `confirmations` count that
+[`getSignatureStatuses`](/developers/docs/rpc/http/getsignaturestatuses) returns
+for a transaction: `0` until its block is [finalized](#finality), and `null`
+after.
 
 ## transactions entry
 
@@ -793,7 +772,10 @@ See [versioned transactions](/developers/docs/core/transactions/versioned-transa
 
 ## vote
 
-See [ledger vote](#ledger-vote).
+A [validator's](#validator) signed message about a [block](#block), such as a
+vote to notarize, finalize, or skip it. Validators send votes directly to each
+other rather than as [transactions](#transaction), and votes are aggregated
+into [certificates](#certificate).
 
 ## vote credit
 

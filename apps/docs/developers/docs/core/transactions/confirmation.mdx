@@ -26,22 +26,22 @@ import VerifyPayment from "/snippets/examples/paths/payments/checkout/verify.mdx
 
 When you send a
 <span className="sol-chip" data-concept="transaction"><Tooltip headline="Transactions" tip="A transaction is a signed request to change the shared ledger. It either fully happens or doesn't happen at all, and once confirmed anyone can look it up." cta="Learn more" href="/developers/docs/core/transactions">transaction</Tooltip><span className="nojs-only"> ([Transactions](/developers/docs/core/transactions): A transaction is a signed request to change the shared ledger. It either fully happens or doesn't happen at all, and once confirmed anyone can look it up.)</span>,</span> the
-network does not answer "done" once. The block that contains it gains votes
-from validators over the next seconds, and RPC methods let you choose how much
-of that progress to wait for. That choice is the **commitment level**.
+network does not answer "done" once. Validators vote on the block that
+contains it, and RPC methods let you choose how much of that progress to wait
+for. That choice is the **commitment level**.
 
-| Level       | What has happened                                                                                 | Typical time after sending | Can it still be reversed?                         |
-| ----------- | ------------------------------------------------------------------------------------------------- | -------------------------- | ------------------------------------------------- |
-| `processed` | The RPC node has seen the transaction in its most recent block.                                   | A few hundred milliseconds | Yes. The block can still be skipped.               |
-| `confirmed` | Validators holding more than two-thirds of the stake have voted on the block.                      | Usually under a second     | Very unlikely.                                     |
-| `finalized` | The block has reached maximum lockout: 31 or more confirmed blocks have been built on top of it.  | About 32 slots, roughly 6 to 7 seconds at 200ms slots | No. This is the strongest level the network uses. |
+| Level       | What has happened                                                                                        | Typical time after sending | Can it still be reversed?            |
+| ----------- | -------------------------------------------------------------------------------------------------------- | -------------------------- | ------------------------------------ |
+| `processed` | The RPC node has seen the transaction in its most recent block.                                          | A few hundred milliseconds | Yes. The block can still be skipped. |
+| `confirmed` | The same as `finalized`.                                                                                 | Under a second             | No.                                  |
+| `finalized` | Validators holding at least 80% of stake (in one round) or 60% (in two rounds) have certified the block. | Under a second             | No.                                  |
 
-The `finalized` row describes TowerBFT, which mainnet runs until
-[Alpenglow](https://solana.com/upgrades/alpenglow) activates in epoch 1064
-(starting 21 October 2026). After activation, `confirmed` and `finalized` are
-equivalent and finality takes roughly 150 milliseconds. Keep using `confirmed`
-where you use it today until Alpenglow is live on mainnet; then point new code
-at `finalized`.
+A block is finalized roughly 150 milliseconds after it is produced, so
+`confirmed` and `finalized` arrive together. `confirmed` remains available so
+existing code keeps working and is planned for removal in a later release;
+point new code at `finalized`.
+[Settlement and finality](/developers/docs/defi/finality) explains how
+finality works.
 
 If a method or subscription accepts `commitment` and you leave it out, the
 default is usually `finalized`. See
@@ -50,13 +50,13 @@ RPC reference.
 
 ## Which level to wait for
 
-| You want to                                                       | Wait for    |
-| ----------------------------------------------------------------- | ----------- |
-| Show progress in a UI, such as "payment sent"                     | `processed` |
-| Ship an order, unlock content, or answer a paid API request        | `confirmed` |
-| Credit a large deposit or settle a trade that cannot be undone    | `finalized` |
+| You want to                                                    | Wait for    |
+| -------------------------------------------------------------- | ----------- |
+| Show progress in a UI, such as "payment sent"                  | `processed` |
+| Ship an order, unlock content, or answer a paid API request    | `finalized` |
+| Credit a large deposit or settle a trade that cannot be undone | `finalized` |
 
-Use the same level for reads that follow a write. If you send at `confirmed`
+Use the same level for reads that follow a write. If you send at `processed`
 and then read balances at `finalized`, the read can return the state from
 before your transaction.
 
