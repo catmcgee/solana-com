@@ -1,5 +1,5 @@
 /*
- * Run button for recorded example output (WP5).
+ * Run button for recorded example output.
  *
  * Generated snippets (apps/docs/snippets/examples/**, built by
  * packages/docs-tooling) render each recorded output as
