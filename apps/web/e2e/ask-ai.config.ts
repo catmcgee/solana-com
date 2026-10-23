@@ -1,12 +1,16 @@
 import { defineConfig, devices } from "@playwright/test";
 
 /**
- * Ask AI (components/docs/ask-ai.client.tsx) on the docs, /developers and
- * the solana.com pages, against a mocked /api/docs-chat: run it on a build
- * made with NOUS_API_KEY set (any value), so the pages render the chat.
+ * Search and Ask AI (e2e/ask-ai.spec.ts). Without INKEEP=1 it checks the
+ * fallbacks on a build without INKEEP_API_KEY; with INKEEP=1, Inkeep's modal
+ * against a mocked /api/inkeep/* on a build with the key set (any value).
  *
- *   NOUS_API_KEY=x next build && next start -p 3830
+ *   next build && next start -p 3830
  *   BASE_URL=http://localhost:3830 pnpm --filter solana-com exec \
+ *     playwright test -c e2e/ask-ai.config.ts
+ *
+ *   INKEEP_API_KEY=x next build && INKEEP_API_KEY=x next start -p 3830
+ *   INKEEP=1 BASE_URL=http://localhost:3830 pnpm --filter solana-com exec \
  *     playwright test -c e2e/ask-ai.config.ts
  */
 export default defineConfig({
