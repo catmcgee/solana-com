@@ -12,6 +12,8 @@ const mocks = vi.hoisted(() => ({
   balances: new Map<string, string>(),
   sent: [] as string[],
   status: "confirmed" as string | null,
+  /** The payer's SOL, in lamports. */
+  lamports: 10_000_000_000n,
   /** The payer's recent signatures, newest first. */
   payerSigs: [] as { memo: string | null; blockTime: bigint | null }[],
 }));
@@ -64,6 +66,12 @@ function fakeRpc() {
         return { value: { amount } };
       },
     }),
+    getBalance: () => ({
+      send: async () => ({ value: mocks.lamports }),
+    }),
+    getMinimumBalanceForRentExemption: () => ({
+      send: async () => 3_500_000n,
+    }),
     getSignaturesForAddress: (
       _: string,
       opts?: { limit?: number; before?: string },
@@ -108,8 +116,16 @@ function post(path: string) {
 async function routes() {
   vi.resetModules();
   const checkout = await import("@/app/api/demo/checkout/route");
-  const paywall = await import("@/app/api/demo/paywall-call/route");
-  return { checkout: checkout.POST, paywall: paywall.POST };
+  const token = await import("@/app/api/demo/create-token/route");
+  return { checkout: checkout.POST, token: token.POST };
+}
+
+/** The NDJSON lines a successful demo streams. */
+async function lines(res: Response) {
+  return (await res.text())
+    .trim()
+    .split("\n")
+    .map((l) => JSON.parse(l) as Record<string, unknown>);
 }
 
 beforeEach(() => {
@@ -118,6 +134,7 @@ beforeEach(() => {
   vi.stubEnv("HELIUS_API_KEY", "test-key");
   mocks.isBot = false;
   mocks.status = "confirmed";
+  mocks.lamports = 10_000_000_000n;
   mocks.sent = [];
   mocks.payerSigs = [];
   mocks.balances = new Map([
@@ -132,12 +149,13 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe("demo transfer routes", () => {
-  it("checkout sends 1 USDC on Helius devnet and returns the signature and time", async () => {
+describe("demo routes", () => {
+  it("checkout sends 1 USDC on Helius devnet, streams sent, then the signature and time", async () => {
     const { checkout } = await routes();
     const res = await checkout(post("/api/demo/checkout"));
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const [step, body] = await lines(res);
+    expect(step).toEqual({ step: "sent" });
     expect(typeof body.signature).toBe("string");
     expect(body.signature.length).toBeGreaterThan(80);
     expect(typeof body.ms).toBe("number");
@@ -158,18 +176,52 @@ describe("demo transfer routes", () => {
     expect(data[9]).toBe(6);
   });
 
-  it("uses the public devnet RPC without a Helius key, and charges 0.001 USDC a call", async () => {
+  it("creates a Token-2022 mint with metadata on public devnet without a Helius key", async () => {
     vi.stubEnv("HELIUS_API_KEY", "");
-    const { paywall } = await routes();
-    const res = await paywall(post("/api/demo/paywall-call"));
+    const { token } = await routes();
+    const res = await token(post("/api/demo/create-token"));
     expect(res.status).toBe(200);
     expect(mocks.createSolanaRpc).toHaveBeenCalledWith(
       "https://api.devnet.solana.com",
     );
-    const data = lastInstructions()[1].data!;
-    expect(
-      new DataView(data.buffer, data.byteOffset).getBigUint64(1, true),
-    ).toBe(1_000n);
+    const [step, body] = await lines(res);
+    expect(step).toEqual({ step: "sent" });
+    expect(Object.keys(body).sort()).toEqual(["mint", "ms", "signature"]);
+    // Create the account, metadata pointer, mint, metadata, memo.
+    const ixs = lastInstructions();
+    expect(ixs).toHaveLength(5);
+    expect(new TextDecoder().decode(ixs[4].data)).toBe("solana.com docs demo");
+    // InitializeMint2 (20) with 6 decimals.
+    expect([...ixs[2].data!.slice(0, 2)]).toEqual([20, 6]);
+    expect(new TextDecoder().decode(ixs[3].data)).toContain("Docs demo token");
+  });
+
+  it("won't create a token that takes the payer below the airdrop reserve", async () => {
+    mocks.lamports = 5_000_000_000n;
+    const { token } = await routes();
+    const res = await token(post("/api/demo/create-token"));
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({ error: "unfunded" });
+    expect(mocks.sent).toHaveLength(0);
+  });
+
+  it("streams failed when the transaction doesn't confirm", async () => {
+    mocks.status = null;
+    vi.useFakeTimers({ toFake: ["setTimeout", "Date"] });
+    try {
+      const { checkout } = await routes();
+      const res = await checkout(post("/api/demo/checkout"));
+      const text = res.text();
+      await vi.advanceTimersByTimeAsync(25_000);
+      expect(
+        (await text)
+          .trim()
+          .split("\n")
+          .map((l) => JSON.parse(l)),
+      ).toEqual([{ step: "sent" }, { error: "failed" }]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("moves the payee's USDC back in the same transaction when the payer runs low", async () => {
@@ -200,7 +252,7 @@ describe("demo transfer routes", () => {
     expect(mocks.sent).toHaveLength(0);
   });
 
-  it("caps demo transfers across all instances at 1000 a day, counted onchain", async () => {
+  it("caps demo transactions across all instances at 1000 a day, counted onchain", async () => {
     const recent = (n: number, memo: string | null, ageSeconds = 60) =>
       Array.from({ length: n }, () => ({
         memo: memo && `[${memo.length}] ${memo}`,
@@ -212,7 +264,7 @@ describe("demo transfer routes", () => {
       ...recent(399, "solana.com docs demo"),
       ...recent(300, "solana.com docs demo", 25 * 60 * 60),
     ];
-    const { checkout, paywall } = await routes();
+    const { checkout, token } = await routes();
     expect((await checkout(post("/api/demo/checkout"))).status).toBe(200);
 
     mocks.payerSigs = [
@@ -221,7 +273,7 @@ describe("demo transfer routes", () => {
     ];
     for (const res of [
       await checkout(post("/api/demo/checkout")),
-      await paywall(post("/api/demo/paywall-call")),
+      await token(post("/api/demo/create-token")),
     ]) {
       expect(res.status).toBe(429);
       expect(await res.json()).toEqual({ error: "capped" });

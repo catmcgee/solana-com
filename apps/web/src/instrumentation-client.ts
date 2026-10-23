@@ -26,9 +26,9 @@ initBotId({
       path: "/api/university-ambassador",
       method: "POST",
     },
-    // The devnet transfers behind the demos on "Solana in action".
+    // The devnet transactions behind the demos on "Solana in action".
     { path: "/api/demo/checkout", method: "POST" },
-    { path: "/api/demo/paywall-call", method: "POST" },
+    { path: "/api/demo/create-token", method: "POST" },
   ],
 });
 

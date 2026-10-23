@@ -5,15 +5,19 @@ import {
   demoConfigured,
   DemoUnconfigured,
   DemoUnfunded,
-  sendDemoTransfer,
+  sendDemo,
   type DemoKind,
+  type DemoResult,
 } from "./server";
 
 /**
- * POST handler for one demo on "Solana in action": a real devnet USDC
- * transfer, answered with `{ signature, ms }` once it's confirmed, or
- * `{ error }` with one of "rate-limited", "capped", "bot", "unconfigured",
- * "unfunded", or "failed". The scenes still play on an error; they just leave out the
+ * POST handler for one demo on "Solana in action": a real devnet
+ * transaction (the checkout's USDC transfer, or a new token). Once it's
+ * sent, the answer streams two NDJSON lines: `{ "step": "sent" }`, then
+ * `{ signature, ms }` (plus `mint` for a token) once it's confirmed, or
+ * `{ error: "failed" }`. Before then, an error is a plain JSON `{ error }`
+ * with one of "rate-limited", "capped", "bot", "unconfigured", "unfunded",
+ * or "failed". The scenes still play on an error; they just leave out the
  * Explorer link.
  *
  * Browser calls only: BotId (instrumentation-client.ts protects these paths)
@@ -48,17 +52,41 @@ export function demoRoute(kind: DemoKind, perMinute: number) {
     );
     if (!human) return json({ error: "bot" }, 403);
 
+    let sent = () => {};
+    const isSent = new Promise<void>((r) => (sent = r));
+    const result = sendDemo(kind, sent);
     try {
-      const { signature, ms } = await sendDemoTransfer(kind);
-      return json({ signature, ms });
+      await Promise.race([isSent, result]);
     } catch (error) {
-      if (error instanceof DemoUnconfigured)
-        return json({ error: "unconfigured" }, 503);
-      if (error instanceof DemoCapped) return json({ error: "capped" }, 429);
-      if (error instanceof DemoUnfunded)
-        return json({ error: "unfunded" }, 503);
-      // Never the error text: an RPC error can carry the keyed RPC URL.
-      return json({ error: "failed" }, 502);
+      return failure(error);
     }
+    const line = (body: object) =>
+      new TextEncoder().encode(`${JSON.stringify(body)}\n`);
+    const body = new ReadableStream<Uint8Array>({
+      async start(controller) {
+        controller.enqueue(line({ step: "sent" }));
+        controller.enqueue(
+          line(
+            await result.then(
+              (r: DemoResult) => r,
+              () => ({ error: "failed" }),
+            ),
+          ),
+        );
+        controller.close();
+      },
+    });
+    return new Response(body, {
+      headers: { ...NO_STORE, "Content-Type": "application/x-ndjson" },
+    });
   };
+}
+
+function failure(error: unknown): Response {
+  if (error instanceof DemoUnconfigured)
+    return json({ error: "unconfigured" }, 503);
+  if (error instanceof DemoCapped) return json({ error: "capped" }, 429);
+  if (error instanceof DemoUnfunded) return json({ error: "unfunded" }, 503);
+  // Never the error text: an RPC error can carry the keyed RPC URL.
+  return json({ error: "failed" }, 502);
 }

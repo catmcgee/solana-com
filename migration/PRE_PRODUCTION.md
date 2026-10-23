@@ -41,16 +41,17 @@ search engines without any extra switches. Undo the preview-only bits:
 - [ ] Give the "Solana in action" demos their own production wallets: new
       DEMO_PAYER_SECRET_KEY and DEMO_PAYEE_SECRET_KEY in Vercel Production
       (the current ones are preview-only), and fund the new payer with devnet
-      SOL for fees and devnet USDC from faucet.circle.com. Without them,
-      `/api/demo/checkout` and `/api/demo/paywall-call` answer 503 and the
-      scenes show "Explorer link unavailable".
+      SOL for fees and token rent, and devnet USDC from faucet.circle.com.
+      Without them, `/api/demo/checkout` and `/api/demo/create-token` answer
+      503 and the scenes show "Explorer link unavailable".
 
 ## Devnet wallet limits
 
 The routes already cap spending onchain, across every instance: at most
 AIRDROP_DAILY_CAP airdrops a day (default 1000, so at most 20 SOL a day), never below
 AIRDROP_RESERVE_SOL left in the faucet wallet (default 5), and at most
-DEMO_DAILY_CAP demo transfers a day (default 1000, fees only). Recipients and
+DEMO_DAILY_CAP demo transactions a day (default 1000: fees, plus about
+0.003 SOL of rent per token created, and never below AIRDROP_RESERVE_SOL). Recipients and
 amounts are fixed server-side. Add Vercel Firewall rate limits in front, so a
 burst can't overshoot the caps or burn the RPC quota:
 
