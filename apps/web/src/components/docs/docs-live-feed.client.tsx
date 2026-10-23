@@ -1,25 +1,43 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type FocusEvent,
+  type MouseEvent,
+  type PointerEvent,
+} from "react";
 import {
   usePolledState,
   type TipBlock,
   type TipPayload,
 } from "@/components/slot200/usePolled";
+import { Tooltip } from "./docs-tooltip";
+import concepts from "../../../../docs/concepts/concepts.en.json";
 
 /**
  * <LiveFeed /> on "Solana in action": mainnet as it runs. Polls
  * /api/slot-time/tip about once a second (CDN-cached for a second, so every
- * reader shares one sampling round): the confirmed tip, and every block in
- * the slots just behind it with its transaction count and first signatures.
+ * reader shares one sampling round): the confirmed tip, every block in the
+ * slots just behind it with its transaction count, and one signature from
+ * each of the newest blocks.
  *
  * - The slot counter steps through the slots between two observed tips at
  *   the measured slot time, never past the newest observed tip. As it
- *   passes each block, the block lands as a tile and its first transaction
- *   joins the list.
+ *   passes each block, the block lands as a tile.
+ * - The transaction list stays calm: one transaction per block at most,
+ *   one new row a second, five rows. Most blocks don't add a row; the tiles
+ *   and their counts carry the volume.
  * - Transactions per second: the transactions in the last BLOCK_WINDOW
  *   slots (skipped slots count as empty) over the measured slot time.
- * - Every tile and transaction is real and links to Explorer.
+ * - The terms (slot, blocks, transactions) explain themselves on hover,
+ *   focus, or tap, with the docs' Tooltip. Tiles and transactions open one
+ *   shared popup (the tile row clips its overflow) with the definition, a
+ *   "Learn more" link, and an Explorer link; the tile or signature itself
+ *   also links to Explorer. While a popup is open the feed holds still.
  *
  * Polling and stepping pause while the tab is hidden. With reduced motion,
  * the feed polls every two seconds and redraws in place, with no stepping
@@ -28,14 +46,44 @@ import {
 const POLL_MS = 1_000;
 const POLL_REDUCED_MS = 2_000;
 const MAX_TILES = 12;
-const MAX_ROWS = 6;
-const ROW_MS = 400;
+const MAX_ROWS = 5;
+/** One new transaction row a second at most. */
+const ROW_MS = 1_000;
+/** Rows waiting to be shown: only the newest, so the list stays current. */
+const QUEUE_MAX = 2;
 const SAMPLE_WINDOW = 20;
 const BLOCK_WINDOW = 20;
 const KEEP_SLOTS = 60;
+const CLOSE_MS = 150;
 const EXPLORER = "https://explorer.solana.com";
+const GLOSSARY = "/developers/docs/references/terminology";
 
 const nf = new Intl.NumberFormat("en-US");
+
+/** The first sentence of a glossary entry, without inline markdown. */
+function firstSentence(md: string) {
+  const plain = md.replace(/[*_`]/g, "");
+  return plain.match(/^.*?\.(?=\s|$)/)?.[0] ?? plain;
+}
+
+const TERMS = {
+  slot: {
+    headline: "Slot",
+    tip: "A slot is a short window, about 200 milliseconds, in which one validator can produce a block. The number counts every slot since the network started.",
+    href: `${GLOSSARY}#slot`,
+  },
+  block: {
+    headline: "Blocks",
+    tip: "A block is the batch of transactions one validator produces in its slot. Each tile is one block, with how many transactions it held.",
+    href: `${GLOSSARY}#block`,
+  },
+  transaction: {
+    headline: concepts.transaction.name,
+    tip: `${firstSentence(concepts.transaction.short)} This list shows about one a second, taken from the newest blocks.`,
+    href: concepts.transaction.href,
+  },
+};
+const LEARN_MORE = concepts._ui.learnMore;
 
 interface Row {
   sig: string;
@@ -44,6 +92,14 @@ interface Row {
 interface Sample {
   tip: number;
   at: number;
+}
+type Pop =
+  | { kind: "block"; slot: number; txs: number }
+  | { kind: "skipped"; slot: number }
+  | { kind: "tx"; slot: number; sig: string };
+
+function popKey(p: Pop) {
+  return p.kind === "tx" ? p.sig : `${p.kind}-${p.slot}`;
 }
 
 function short(sig: string) {
@@ -72,6 +128,8 @@ function slotMs(samples: Sample[]): number | null {
   return ms > 50 && ms < 2_000 ? ms : null;
 }
 
+const POP_ID = "sol-live-pop";
+
 export function LiveFeed() {
   const reduced = useReducedMotion();
   const { data, failed } = usePolledState<TipPayload>(
@@ -80,25 +138,44 @@ export function LiveFeed() {
   );
   const [shown, setShown] = useState(0);
   const [rows, setRows] = useState<Row[]>([]);
+  const [pop, setPop] = useState<Pop | null>(null);
   const known = useRef(new Map<number, TipBlock | null>());
   const samples = useRef<Sample[]>([]);
   const target = useRef({ from: 0, to: 0, t0: 0, step: 200 });
   const passed = useRef(0);
   const queue = useRef<Row[]>([]);
+  const hold = useRef(false);
+  const root = useRef<HTMLDivElement>(null);
+  const popEl = useRef<HTMLSpanElement>(null);
+  const anchor = useRef<HTMLElement | null>(null);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
+  const tap = useRef({ touch: false, wasOpen: false });
+
+  useEffect(() => {
+    hold.current = !!pop;
+  }, [pop]);
 
   // A new poll: remember its blocks, and step toward its tip.
   useEffect(() => {
     if (!data) return;
     const map = known.current;
-    for (const b of data.blocks) map.set(b.slot, b);
+    for (const b of data.blocks) {
+      // Older blocks come back without their signature: keep the one we have.
+      const sig = b.sig ?? map.get(b.slot)?.sig;
+      map.set(b.slot, sig ? { ...b, sig } : b);
+    }
     for (const s of data.skipped) map.set(s, null);
-    for (const s of map.keys()) if (s <= data.tip - KEEP_SLOTS) map.delete(s);
 
     const list = samples.current;
     if (!list.length || data.tip > list[list.length - 1].tip) {
       list.push({ tip: data.tip, at: data.serverTime });
       while (list.length > SAMPLE_WINDOW) list.shift();
     }
+    // While a popup is open, the tiles hold still under it.
+    if (hold.current) return;
+    for (const s of map.keys()) if (s <= data.tip - KEEP_SLOTS) map.delete(s);
 
     const t = target.current;
     const now = performance.now();
@@ -109,11 +186,7 @@ export function LiveFeed() {
     const jump = !!current && data.tip - current > 30;
     const from = reduced || !current || jump ? data.tip : current;
     // Back from a hidden tab: start the list over from the new tip.
-    if (jump && !reduced) {
-      queue.current = [];
-      passed.current = 0;
-      setRows([]);
-    }
+    if (jump) queue.current = [];
     const gap = Math.max(1, data.tip - from);
     target.current = {
       from,
@@ -128,7 +201,7 @@ export function LiveFeed() {
   useEffect(() => {
     if (reduced) return;
     const id = setInterval(() => {
-      if (document.hidden) return;
+      if (document.hidden || hold.current) return;
       const t = target.current;
       if (!t.to) return;
       const next = Math.min(
@@ -140,38 +213,24 @@ export function LiveFeed() {
     return () => clearInterval(id);
   }, [reduced]);
 
-  // Blocks the counter has passed send their first transaction to the list.
+  // Blocks the counter has passed offer their transaction to the list; only
+  // the newest QUEUE_MAX wait, so at most one row a block, never a backlog.
   useEffect(() => {
     if (!shown) return;
     const map = known.current;
-    if (reduced) {
-      passed.current = shown;
-      const fresh: Row[] = [];
-      for (
-        let s = shown;
-        s > shown - BLOCK_WINDOW && fresh.length < MAX_ROWS;
-        s--
-      ) {
-        const b = map.get(s);
-        if (b?.sigs[0]) fresh.push({ sig: b.sigs[0], slot: s });
-      }
-      setRows(fresh);
-      return;
-    }
-    const start = Math.max(passed.current + 1, shown - MAX_ROWS);
+    const start = Math.max(passed.current + 1, shown - BLOCK_WINDOW);
     for (let s = start; s <= shown; s++) {
-      const b = map.get(s);
-      if (b?.sigs[0]) queue.current.push({ sig: b.sigs[0], slot: s });
+      const sig = map.get(s)?.sig;
+      if (sig) queue.current.push({ sig, slot: s });
     }
-    queue.current = queue.current.slice(-MAX_ROWS);
+    queue.current = queue.current.slice(-QUEUE_MAX);
     passed.current = shown;
-  }, [shown, reduced]);
+  }, [shown]);
 
-  // Drain the queue a row at a time, so the list moves at a readable pace.
+  // One row a second, newest on top; the oldest drops off.
   useEffect(() => {
-    if (reduced) return;
     const id = setInterval(() => {
-      if (document.hidden || !queue.current.length) return;
+      if (document.hidden || hold.current || !queue.current.length) return;
       const row = queue.current.shift()!;
       setRows((prev) =>
         prev.some((r) => r.sig === row.sig)
@@ -180,7 +239,98 @@ export function LiveFeed() {
       );
     }, ROW_MS);
     return () => clearInterval(id);
-  }, [reduced]);
+  }, []);
+
+  // ---- The shared popup for tiles and transactions.
+  const cancelClose = useCallback(() => clearTimeout(closeTimer.current), []);
+  const close = useCallback(() => {
+    cancelClose();
+    anchor.current = null;
+    setPop(null);
+  }, [cancelClose]);
+  const closeSoon = useCallback(() => {
+    cancelClose();
+    closeTimer.current = setTimeout(close, CLOSE_MS);
+  }, [cancelClose, close]);
+  const open = useCallback(
+    (p: Pop, el: HTMLElement) => {
+      cancelClose();
+      anchor.current = el;
+      setPop((cur) => (cur && popKey(cur) === popKey(p) ? cur : p));
+    },
+    [cancelClose],
+  );
+
+  // Place the popup above its tile or row (below it near the top of the
+  // window), inside the feed's edges.
+  useLayoutEffect(() => {
+    const el = popEl.current;
+    const a = anchor.current;
+    const box = root.current;
+    if (!pop || !el || !a || !box) return;
+    const r = box.getBoundingClientRect();
+    const ar = a.getBoundingClientRect();
+    const w = el.offsetWidth;
+    const h = el.offsetHeight;
+    const center = ar.left + ar.width / 2 - r.left;
+    const left = Math.max(4, Math.min(center - w / 2, r.width - w - 4));
+    const below = ar.top - h - 8 < 0;
+    el.style.left = `${left}px`;
+    el.style.top = `${below ? ar.bottom - r.top + 8 : ar.top - r.top - h - 8}px`;
+  }, [pop]);
+
+  // Close on Escape, or on a tap or click anywhere else.
+  useEffect(() => {
+    if (!pop) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") close();
+    };
+    const onDown = (e: Event) => {
+      const t = e.target as Node;
+      if (popEl.current?.contains(t) || anchor.current?.contains(t)) return;
+      close();
+    };
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("pointerdown", onDown);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("pointerdown", onDown);
+    };
+  }, [pop, close]);
+
+  useEffect(() => cancelClose, [cancelClose]);
+
+  /** Hover, focus, and tap handlers for a tile or row that opens `p`. */
+  function trigger(p: Pop) {
+    const key = popKey(p);
+    const isOpen = !!pop && popKey(pop) === key;
+    return {
+      "aria-describedby": isOpen ? POP_ID : undefined,
+      // Read before the tap's focus opens the popup, so the click below
+      // knows whether this tap is the first.
+      onPointerDown: (e: PointerEvent<HTMLElement>) => {
+        tap.current = { touch: e.pointerType === "touch", wasOpen: isOpen };
+      },
+      onPointerEnter: (e: PointerEvent<HTMLElement>) => {
+        if (e.pointerType !== "touch") open(p, e.currentTarget);
+      },
+      onPointerLeave: (e: PointerEvent<HTMLElement>) => {
+        if (e.pointerType !== "touch") closeSoon();
+      },
+      onFocus: (e: FocusEvent<HTMLElement>) => open(p, e.currentTarget),
+      onBlur: (e: FocusEvent<HTMLElement>) => {
+        if (!popEl.current?.contains(e.relatedTarget as Node)) closeSoon();
+      },
+      // On touch, the first tap explains; a second tap follows the link.
+      onClick: (e: MouseEvent<HTMLElement>) => {
+        if (tap.current.touch && !tap.current.wasOpen) {
+          e.preventDefault();
+          open(p, e.currentTarget);
+        }
+        tap.current = { touch: false, wasOpen: false };
+      },
+    };
+  }
 
   if (!data) {
     return (
@@ -213,15 +363,23 @@ export function LiveFeed() {
 
   return (
     <div
+      ref={root}
       className="sol-live not-prose"
       data-stale={failed || undefined}
       data-motion={reduced ? "reduce" : undefined}
     >
       <div className="sol-live-head">
-        <span className="sol-live-dot" data-stale={failed || undefined} />
+        <span
+          className="sol-live-dot"
+          data-stale={failed || undefined}
+          data-held={pop ? "" : undefined}
+        />
         <span className="sol-live-title">Mainnet</span>
         <span className="sol-live-slot">
-          slot <b>{nf.format(head)}</b>
+          <Tooltip {...TERMS.slot} cta={LEARN_MORE}>
+            slot
+          </Tooltip>{" "}
+          <b>{nf.format(head)}</b>
         </span>
         <span className="sol-live-rate">
           {failed ? (
@@ -241,12 +399,21 @@ export function LiveFeed() {
         </span>
       </div>
 
-      <p className="sol-live-h">Blocks as they&apos;re produced</p>
+      <p className="sol-live-h">
+        <Tooltip {...TERMS.block} cta={LEARN_MORE}>
+          Blocks
+        </Tooltip>{" "}
+        as they&apos;re produced
+      </p>
       <ol className="sol-live-tiles">
         {tiles.map(({ slot, block }) =>
           block ? (
             <li key={slot}>
-              <a href={`${EXPLORER}/block/${slot}`} rel="noopener">
+              <a
+                href={`${EXPLORER}/block/${slot}`}
+                rel="noopener"
+                {...trigger({ kind: "block", slot, txs: block.txs })}
+              >
                 <span className="sol-live-n">{nf.format(block.txs)}</span>
                 <span className="sol-live-u">txs</span>
                 <span className="sol-live-s">{nf.format(slot)}</span>
@@ -255,13 +422,20 @@ export function LiveFeed() {
             </li>
           ) : (
             <li key={slot} data-skipped="">
-              <span title={`Slot ${nf.format(slot)} was skipped`}>skipped</span>
+              <span tabIndex={0} {...trigger({ kind: "skipped", slot })}>
+                skipped
+              </span>
             </li>
           ),
         )}
       </ol>
 
-      <p className="sol-live-h">Latest transactions</p>
+      <p className="sol-live-h">
+        Latest{" "}
+        <Tooltip {...TERMS.transaction} cta={LEARN_MORE}>
+          transactions
+        </Tooltip>
+      </p>
       <ol className="sol-live-list">
         {rows.map((r) => (
           <li key={r.sig}>
@@ -269,6 +443,7 @@ export function LiveFeed() {
               href={`${EXPLORER}/tx/${r.sig}`}
               rel="noopener"
               className="sol-live-sig"
+              {...trigger({ kind: "tx", slot: r.slot, sig: r.sig })}
             >
               {short(r.sig)}
             </a>
@@ -276,6 +451,84 @@ export function LiveFeed() {
           </li>
         ))}
       </ol>
+
+      {pop ? (
+        <span
+          ref={popEl}
+          id={POP_ID}
+          role="tooltip"
+          className="tooltip-popup sol-live-pop"
+          onPointerEnter={cancelClose}
+          onPointerLeave={(e) => {
+            if (e.pointerType !== "touch") closeSoon();
+          }}
+        >
+          <PopBody pop={pop} />
+        </span>
+      ) : null}
     </div>
+  );
+}
+
+function PopBody({ pop }: { pop: Pop }) {
+  if (pop.kind === "skipped") {
+    return (
+      <>
+        <span className="tooltip-headline">
+          Slot {nf.format(pop.slot)}: skipped
+        </span>
+        <span className="tooltip-tip">
+          The validator scheduled for this slot didn&apos;t produce a block, so
+          the network moved on to the next slot.
+        </span>
+        <a href={TERMS.slot.href} className="tooltip-cta">
+          Learn more about slots
+        </a>
+      </>
+    );
+  }
+  if (pop.kind === "block") {
+    return (
+      <>
+        <span className="tooltip-headline">Block {nf.format(pop.slot)}</span>
+        <span className="tooltip-tip">
+          {nf.format(pop.txs)} transactions, validator votes included.{" "}
+          {TERMS.block.tip.split(". ")[0]}.
+        </span>
+        <span className="sol-live-pop-links">
+          <a href={TERMS.block.href} className="tooltip-cta">
+            Learn more about blocks
+          </a>
+          <a
+            href={`${EXPLORER}/block/${pop.slot}`}
+            rel="noopener"
+            className="tooltip-cta"
+          >
+            View in Explorer
+          </a>
+        </span>
+      </>
+    );
+  }
+  return (
+    <>
+      <span className="tooltip-headline">Transaction {short(pop.sig)}</span>
+      <span className="tooltip-tip">
+        {firstSentence(concepts.transaction.short)} This one is in block{" "}
+        {nf.format(pop.slot)}.
+      </span>
+      <span className="sol-live-pop-links">
+        <a href={TERMS.transaction.href} className="tooltip-cta">
+          Learn more about transactions
+        </a>
+        <a
+          href={`${EXPLORER}/tx/${pop.sig}`}
+          rel="noopener"
+          className="tooltip-cta"
+        >
+          View in Explorer
+        </a>
+      </span>
+    </>
   );
 }

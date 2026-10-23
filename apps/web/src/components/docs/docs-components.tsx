@@ -34,6 +34,7 @@ import { DocsLink } from "./docs-link";
 import { isDocsHref } from "@/lib/docs/docs-href";
 import { TxWalkthrough } from "@/components/tx-walkthrough";
 import { LiveFeed } from "./docs-live-feed.client";
+import { Tooltip } from "./docs-tooltip";
 import { InActionScene } from "./docs-inaction-scene.client";
 
 type P = { children?: ReactNode };
@@ -877,29 +878,6 @@ export function Frame({
 }
 
 // ------------------------------------------------------- Inline helpers
-
-export function Tooltip({
-  tip,
-  headline,
-  cta,
-  href,
-  children,
-}: P & { tip: string; headline?: string; cta?: string; href?: string }) {
-  return (
-    <span className="tooltip" tabIndex={0} data-tooltip="">
-      {children}
-      <span className="tooltip-popup" role="tooltip">
-        {headline ? <span className="tooltip-headline">{headline}</span> : null}
-        <span className="tooltip-tip">{tip}</span>
-        {cta && href ? (
-          <a href={href} className="tooltip-cta">
-            {cta}
-          </a>
-        ) : null}
-      </span>
-    </span>
-  );
-}
 
 export function Badge({ children, color }: P & { color?: string }) {
   return (

@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { LiveFeed } from "@/components/docs/docs-live-feed.client";
 
 const SIG =
@@ -9,22 +15,36 @@ function tip(slot: number) {
   return {
     tip: slot,
     blocks: [
-      { slot: slot - 2, txs: 412, sigs: [`a${SIG.slice(1)}`] },
-      { slot, txs: 386, sigs: [SIG] },
+      { slot: slot - 2, txs: 412, sig: `a${SIG.slice(1)}` },
+      { slot, txs: 386, sig: SIG },
     ],
     skipped: [slot - 1],
     serverTime: Date.now(),
   };
 }
 
+function serve(body: unknown) {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => new Response(JSON.stringify(body))),
+  );
+}
+
+/** jsdom has no PointerEvent: a pointerdown that says it came from touch. */
+function touch(el: Element) {
+  fireEvent(
+    el,
+    Object.assign(new Event("pointerdown", { bubbles: true }), {
+      pointerType: "touch",
+    }),
+  );
+}
+
 afterEach(() => vi.unstubAllGlobals());
 
 describe("docs LiveFeed", () => {
   it("shows each block as a tile and links its transactions to Explorer", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => new Response(JSON.stringify(tip(460_172_365)))),
-    );
+    serve(tip(460_172_365));
     render(<LiveFeed />);
 
     expect(
@@ -45,6 +65,94 @@ describe("docs LiveFeed", () => {
     expect(tx.getAttribute("href")).toBe(
       `https://explorer.solana.com/tx/${SIG}`,
     );
+  });
+
+  it("explains slot, blocks, and transactions, with links to the concepts", async () => {
+    serve(tip(460_172_365));
+    render(<LiveFeed />);
+    await screen.findByText("386");
+
+    const hrefs = screen
+      .getAllByRole("link", { name: "Learn more" })
+      .map((a) => a.getAttribute("href"));
+    expect(hrefs).toEqual([
+      "/developers/docs/references/terminology#slot",
+      "/developers/docs/references/terminology#block",
+      "/developers/docs/core/transactions",
+    ]);
+    for (const term of ["slot", "Blocks", "transactions"]) {
+      expect(screen.getByText(term, { selector: ".tooltip" }).tabIndex).toBe(0);
+    }
+  });
+
+  it("opens a tile's explanation on keyboard focus and closes it on Escape", async () => {
+    serve(tip(460_172_365));
+    render(<LiveFeed />);
+    const tile = (await screen.findByText("386")).closest("a")!;
+
+    fireEvent.focus(tile);
+    const pop = await screen.findByRole("tooltip", {
+      name: /Block 460,172,365/,
+    });
+    expect(tile.getAttribute("aria-describedby")).toBe(pop.id);
+    expect(pop.textContent).toContain("386 transactions");
+    expect(
+      within(pop)
+        .getByRole("link", { name: "Learn more about blocks" })
+        .getAttribute("href"),
+    ).toBe("/developers/docs/references/terminology#block");
+    expect(
+      within(pop)
+        .getByRole("link", { name: "View in Explorer" })
+        .getAttribute("href"),
+    ).toBe("https://explorer.solana.com/block/460172365");
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("tooltip", { name: /Block 460,172,365/ }),
+      ).toBeNull(),
+    );
+  });
+
+  it("explains a tile on the first tap and follows the link on the second", async () => {
+    serve(tip(460_172_365));
+    render(<LiveFeed />);
+    const tile = (await screen.findByText("386")).closest("a")!;
+
+    // Read what the feed decided, then stop jsdom from navigating.
+    const prevented: boolean[] = [];
+    const record = (e: Event) => {
+      prevented.push(e.defaultPrevented);
+      e.preventDefault();
+    };
+    document.addEventListener("click", record);
+
+    // A tap focuses the tile before its click, as in a browser.
+    touch(tile);
+    fireEvent.focus(tile);
+    fireEvent.click(tile);
+    await screen.findByRole("tooltip", { name: /Block 460,172,365/ });
+    touch(tile);
+    fireEvent.click(tile);
+    document.removeEventListener("click", record);
+    expect(prevented).toEqual([true, false]);
+  });
+
+  it("adds at most one transaction a second, however many blocks arrive", async () => {
+    const slot = 460_172_365;
+    const blocks = Array.from({ length: 12 }, (_, i) => ({
+      slot: slot - 11 + i,
+      txs: 1_000 + i,
+      sig: `${i}${SIG.slice(2)}x`,
+    }));
+    serve({ tip: slot, blocks, skipped: [], serverTime: Date.now() });
+    render(<LiveFeed />);
+    await screen.findByText("1,011");
+
+    await new Promise((r) => setTimeout(r, 1_300));
+    const list = document.querySelector(".sol-live-list")!;
+    expect(list.querySelectorAll("li").length).toBe(1);
   });
 
   it("says the data is unavailable when the route fails", async () => {
