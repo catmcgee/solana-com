@@ -10,7 +10,7 @@ import {
   paymentsFromSliderPosition,
 } from "@/data/developers/hub";
 
-export type CostCalculatorInitial = {
+type CostCalculatorInitial = {
   payments: string;
   average: string;
   card: string;
@@ -19,11 +19,9 @@ export type CostCalculatorInitial = {
 };
 
 /**
- * Cost calculator island. The server render shows the default inputs and
- * results (formatted on the server and passed in as `initial`, so hydration
- * cannot disagree about number formatting). Range inputs appear only after
- * hydration; without JS the reader gets the defaults plus the static table
- * the page renders next to this component.
+ * Cost calculator. Until a slider moves it shows `initial`, formatted on the
+ * server, so hydration cannot disagree about number formatting. The sliders
+ * appear after hydration; without JS the page's static table stands in.
  */
 export function CostCalculator({
   locale,

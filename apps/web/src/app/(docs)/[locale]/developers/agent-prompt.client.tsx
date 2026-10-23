@@ -5,13 +5,10 @@ import { CopyButton } from "./copy-button.client";
 import { AGENT_PROMPT } from "@/data/developers/hub";
 
 /**
- * The one line a reader pastes into their coding agent, on one line that
- * scrolls sideways (with no visible scrollbar), and a Copy button. It shows the URL without
- * "https://"; the button copies the full line. The ">" prompt is CSS, so it
- * is never copied or selected. It is the same line as the docs' Start here
- * banner (apps/docs/snippets/agent-banner.mdx). It points at the production
- * URL in the server render and switches to the current origin after
- * hydration, so previews link to their own copy of the guide.
+ * The line a reader pastes into their coding agent, scrolling sideways, and a
+ * Copy button that copies it in full (the field drops "https://"; the ">" is
+ * CSS). After hydration it points at the current origin, so previews link to
+ * their own copy of the guide.
  */
 export function AgentPrompt({
   copyText,
@@ -43,7 +40,6 @@ export function AgentPrompt({
         {shown}
       </code>
       <CopyButton
-        tone="accent"
         text={text}
         label={label}
         copyText={copyText}
