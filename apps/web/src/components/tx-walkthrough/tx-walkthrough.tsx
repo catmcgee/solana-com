@@ -33,8 +33,8 @@ const THEMES = { light: "github-light", dark: "github-dark-dimmed" } as const;
  * public cluster. The Explorer link goes to the DvP program on devnet, which
  * is real; swap in a devnet transaction URL once one is recorded there.
  */
-export const EXPLORER_URL = `https://explorer.solana.com/address/${DVP_PROGRAM}?cluster=devnet`;
-export const RPC_REFERENCE_HREF = "/developers/docs/rpc/http/gettransaction";
+const EXPLORER_URL = `https://explorer.solana.com/address/${DVP_PROGRAM}?cluster=devnet`;
+const RPC_REFERENCE_HREF = "/developers/docs/rpc/http/gettransaction";
 
 export async function TxWalkthrough({ children }: { children?: ReactNode }) {
   const recorded = fixture as unknown as RecordedFixture;

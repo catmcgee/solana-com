@@ -57,7 +57,7 @@ type DocsTab = {
  * navigation/en.json): Start here · Payments · Assets · Markets | How Solana
  * works · Resources · API · Video tutorials ↗ (right-aligned).
  */
-export const DOCS_TABS: DocsTab[] = [
+const DOCS_TABS: DocsTab[] = [
   {
     label: "quickstart",
     to: "/developers/docs",

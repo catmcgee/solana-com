@@ -41,6 +41,3 @@ export const docsSource = loader({
 });
 
 export type DocsPage = InferPageType<typeof docsSource>;
-
-/** Locales that have docs (English first). */
-export const docsLanguages: string[] = [defaultLocale, ...DOCS_LOCALES];

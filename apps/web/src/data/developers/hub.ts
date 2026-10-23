@@ -71,7 +71,7 @@ export const HERO_LINKS = {
  * (apps/docs/developers/docs/intro/coding-with-agents.mdx) shows the same
  * commands; hub-data.test.ts fails when the two drift apart.
  */
-export const MCP_SERVER_URL = "https://mcp.solana.com/mcp";
+const MCP_SERVER_URL = "https://mcp.solana.com/mcp";
 
 export const AGENT_SETUP = {
   serverUrl: MCP_SERVER_URL,
@@ -315,7 +315,7 @@ function toCents(value: number): number {
  * Rounds a dollar amount the way `formatUsd` displays it: whole dollars from
  * $100 up, cents below.
  */
-export function roundUsd(value: number): number {
+function roundUsd(value: number): number {
   return value >= 100 ? Math.round(value) : toCents(value);
 }
 

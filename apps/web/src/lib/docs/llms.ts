@@ -9,7 +9,7 @@ import { frontmatter } from "./page-data";
  * remark-docs-compat), headed by the docs' agent instructions
  * (docs.json `markdown.instructions`) and an index pointer, as before.
  */
-export const SITE = "https://solana.com";
+const SITE = "https://solana.com";
 
 const INSTRUCTIONS: string[] = docsConfig.markdown.instructions;
 

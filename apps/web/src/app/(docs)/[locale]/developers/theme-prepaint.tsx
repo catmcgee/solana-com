@@ -21,7 +21,7 @@
  * Rendered from the page rather than [locale]/layout.tsx because the layout
  * cannot see the pathname; this keeps each script on its own routes.
  */
-export const THEME_PREPAINT_SCRIPT = `(function(){try{var d=document.documentElement,t=null;try{t=window.localStorage.getItem("theme")}catch(e){}if(t!=="light"&&t!=="dark"){t=window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"}d.classList.remove("dark","tw-dark","light","tw-light");d.classList.add(t,"tw-"+t)}catch(e){}})();`;
+const THEME_PREPAINT_SCRIPT = `(function(){try{var d=document.documentElement,t=null;try{t=window.localStorage.getItem("theme")}catch(e){}if(t!=="light"&&t!=="dark"){t=window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"}d.classList.remove("dark","tw-dark","light","tw-light");d.classList.add(t,"tw-"+t)}catch(e){}})();`;
 
 export const DOCS_THEME_STORAGE_KEY = "isDarkMode";
 

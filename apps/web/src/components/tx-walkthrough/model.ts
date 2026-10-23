@@ -124,11 +124,11 @@ export interface WalkthroughModel {
 }
 
 /** Solana's packet limit for one transaction. */
-export const MAX_TRANSACTION_BYTES = 1232;
+const MAX_TRANSACTION_BYTES = 1232;
 
 const B58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 
-export function base58Decode(text: string): number[] {
+function base58Decode(text: string): number[] {
   let n = 0n;
   for (const ch of text) {
     const v = B58.indexOf(ch);
@@ -202,7 +202,7 @@ function symbolFor(label: string) {
 }
 
 /** "100.000000" -> "100", "4.999296" stays. */
-export function trimAmount(ui: string) {
+function trimAmount(ui: string) {
   return ui.includes(".") ? ui.replace(/\.?0+$/, "") : ui;
 }
 

@@ -41,9 +41,9 @@ import { NewsletterForm } from "./newsletter-form.client";
  * the docs header, so going to /developers/docs is moving within one site. Only
  * off-site links (hackathons, MCP setup) open a new tab, with the arrow.
  */
-export const HACKATHONS_URL = "https://hackathons.solana.com";
+const HACKATHONS_URL = "https://hackathons.solana.com";
 /** Live payments on Solana. It refuses framing, so it is a link, not an embed. */
-export const PAYMENTS_ORG_URL = "https://payments.org";
+const PAYMENTS_ORG_URL = "https://payments.org";
 
 type IconComponent = ComponentType<{
   className?: string;

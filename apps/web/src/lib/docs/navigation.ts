@@ -18,6 +18,7 @@
  */
 import type * as PageTree from "fumadocs-core/page-tree";
 import { defaultLocale } from "@workspace/i18n/config";
+import { labelSlug } from "@/data/developers/docs-nav";
 import { docsSource, type DocsPage } from "./source";
 import ar from "../../../../docs/navigation/ar.json";
 import de from "../../../../docs/navigation/de.json";
@@ -135,19 +136,6 @@ export interface PageLocation {
   /** Groups from the section down to the page's own group. */
   groups: NavGroup[];
   item: NavPage;
-}
-
-/** Same slug as packages/docs-tooling/src/nav/labels.ts. */
-export function labelSlug(s: string): string {
-  return (
-    s
-      .toLowerCase()
-      .normalize("NFKD")
-      .replace(/[̀-ͯ]/g, "")
-      .replace(/&/g, " and ")
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "") || "x"
-  );
 }
 
 function resolvePage(path: string): DocsPage | undefined {
@@ -311,16 +299,4 @@ export function getDocsNavigation(locale: string): DocsNavigation {
     cache.set(key, nav);
   }
   return nav;
-}
-
-/** Every group (any depth) under `nodes`, depth-first. */
-export function walkGroups(
-  nodes: NavNode[],
-  visit: (group: NavGroup) => void,
-): void {
-  for (const node of nodes) {
-    if (node.kind !== "group") continue;
-    visit(node);
-    walkGroups(node.children, visit);
-  }
 }

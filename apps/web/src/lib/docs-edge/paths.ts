@@ -1,5 +1,5 @@
 /**
- * Path rules for the docs URL space (spec §8, WP9), which apps/web serves
+ * Path rules for the docs URL space, which apps/web serves
  * itself (Fumadocs). Pure functions only: this module is imported by
  * `src/proxy.ts` and by `rewrites-redirects.ts`, so it must not touch
  * the filesystem or any Next.js runtime API.
@@ -28,24 +28,18 @@ export const DOCS_TRANSLATED_LOCALE_PATTERN = DOCS_TRANSLATED_LOCALES.join("|");
 
 /**
  * Path prefixes (without a locale) of docs pages. `/learn` itself is the
- * apps/web landing (WP10), so only articles below it are docs paths.
+ * apps/web landing, so only articles below it are docs paths.
  * `/docs` moved to `/developers/docs` (2026-10-16); the old prefix is only
  * redirects now (next.config, before middleware), but stays listed so that a
  * mixed-case `/Docs/x` still gets the lowercase 308 and then the redirect.
  */
-export const DOCS_COLLECTION_PREFIXES = [
+const DOCS_COLLECTION_PREFIXES = [
   "/developers/docs",
   "/docs",
   "/developers/cookbook",
   "/developers/bootcamp",
 ] as const;
-export const LEARN_ARTICLE_PREFIX = "/learn/";
-
-/** Prefixes that used to belong to the docs app and are now only redirects. */
-export const LEGACY_DOCS_PREFIXES = [
-  "/developers/guides",
-  "/developers/learn",
-] as const;
+const LEARN_ARTICLE_PREFIX = "/learn/";
 
 export interface DocsPathInfo {
   /** First path segment when it is a known locale code (any case). */
@@ -67,7 +61,7 @@ function matchesPrefix(pathname: string, prefix: string) {
  * `/developers/{docs,cookbook,bootcamp}[...]` (and the old `/docs`),
  * `/learn/<article>`, plus their `.md` twins.
  */
-export function isDocsContentPath(restLower: string) {
+function isDocsContentPath(restLower: string) {
   const path = stripMd(restLower);
   if (path.startsWith(LEARN_ARTICLE_PREFIX) && path.length > 7) return true;
   return DOCS_COLLECTION_PREFIXES.some((prefix) => matchesPrefix(path, prefix));

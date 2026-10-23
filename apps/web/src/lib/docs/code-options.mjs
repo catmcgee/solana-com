@@ -35,7 +35,7 @@ export function parseRanges(value) {
  * Docs fence meta -> attributes. Bare words before the first
  * attribute or `{range}` form the title ("bash Install the CLI").
  */
-export function parseDocsMeta(meta) {
+function parseDocsMeta(meta) {
   const attrs = {};
   const titleWords = [];
   let titleOpen = true;
