@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { CheckIcon, CopyIcon, SparkleIcon } from "./docs-ui-icons";
-import { DOCS_ASK_CODE_EVENT } from "@/lib/docs/chat";
+import { openAskAi } from "@/lib/docs/ask-ai";
 
 /**
  * Interactive pieces of the docs content components (docs-components.tsx):
@@ -238,11 +238,7 @@ export function AskCodeButton() {
           const pre =
             root?.querySelector('[role="tabpanel"]:not([hidden]) pre') ??
             root?.querySelector("pre");
-          window.dispatchEvent(
-            new CustomEvent(DOCS_ASK_CODE_EVENT, {
-              detail: { code: pre?.textContent ?? "" },
-            }),
-          );
+          openAskAi(pre?.textContent ?? "");
         }}
       >
         <SparkleIcon className="code-copy-icon" />

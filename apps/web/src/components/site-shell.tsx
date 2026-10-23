@@ -17,6 +17,7 @@ import { PodcastPlayer } from "@/components/podcast-player.client";
 import { GoogleTagManagerNoScript } from "@solana-com/ui-chrome/google-tag-manager-noscript";
 import { DocsSearch } from "@/components/docs/docs-search.client";
 import { AskAi } from "@/components/docs/ask-ai.client";
+import { InkeepMount } from "@/components/docs/inkeep-mount.client";
 import { DOCS_LOCALES } from "@/lib/docs/locales.mjs";
 import Script from "next/script";
 
@@ -42,6 +43,9 @@ export function SiteShell({
 }) {
   const googleTagManagerID = config.siteMetadata.googleTagManagerID;
   const docsLocale = DOCS_LOCALES.includes(locale) ? locale : defaultLocale;
+  // Search and Ask AI use Inkeep through /api/inkeep when the key is set;
+  // without it, the Fumadocs search dialog and the Ask AI menu on the docs.
+  const inkeep = Boolean(process.env.INKEEP_API_KEY?.trim());
   return (
     <html
       lang={locale}
@@ -61,8 +65,8 @@ export function SiteShell({
               {children}
               {footer}
               <PodcastPlayer />
-              <DocsSearch locale={docsLocale} />
-              <AskAi locale={docsLocale} chat={!!process.env.NOUS_API_KEY} />
+              {inkeep ? <InkeepMount /> : <DocsSearch locale={docsLocale} />}
+              <AskAi chat={inkeep} />
               <Script
                 id="signals-script"
                 strategy="afterInteractive"

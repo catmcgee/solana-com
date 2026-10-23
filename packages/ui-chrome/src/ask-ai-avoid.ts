@@ -4,7 +4,7 @@ import { useCallback, useRef } from "react";
 
 /**
  * Fixed bars at the bottom of the window (the cookie banner, the podcast
- * player) that the floating Ask AI pill and panel in apps/web
+ * player) that the floating Ask AI pill in apps/web
  * (components/docs/ask-ai.client.tsx) move up to stay clear of. A bar
  * carries `data-ask-ai-avoid` and this ref, which announces it when it
  * appears, changes size or goes, so Ask AI measures only then.

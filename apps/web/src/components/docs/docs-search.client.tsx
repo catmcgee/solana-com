@@ -4,17 +4,17 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useDocsSearch } from "fumadocs-core/search/client";
 import { DOCS_SEARCH_OPEN_EVENT } from "@solana-com/ui-chrome/docs-search";
+import { takeSearchHandOff } from "@/lib/docs/search-hand-off";
 import "./docs-search.css";
 
 /**
- * Docs search: Fumadocs' search client against /api/docs-search, for the
- * page's locale. Mounted once on every apps/web page ([locale]/layout.tsx),
- * so it opens in place: from the docs header's field and search icon
- * (docs-header.client.tsx), the solana.com header's search (ui-chrome
- * SearchBar), ⌘K / Ctrl+K and the Ask AI menu (`openDocsSearch`). It also
- * opens on arrival with `?q=<text>` or `?search=1` (the no-JS docs header
- * form, and the header search in apps/media and apps/templates), which it
- * then removes from the URL.
+ * Docs search without Inkeep (no INKEEP_API_KEY): Fumadocs' search client
+ * against /api/docs-search, for the page's locale. With the key, Inkeep's
+ * search (inkeep.client.tsx) takes its place. Mounted once on every apps/web
+ * page (SiteShell), so it opens in place: from the docs header's field and
+ * search icon (docs-header.client.tsx), the solana.com header's search
+ * (ui-chrome SearchBar), ⌘K / Ctrl+K and the Ask AI menu (`openDocsSearch`),
+ * and on arrival with `?q=<text>` or `?search=1` (lib/docs/search-hand-off).
  */
 export function DocsSearch({ locale }: { locale: string }) {
   const [open, setOpen] = useState(false);
@@ -35,18 +35,10 @@ export function DocsSearch({ locale }: { locale: string }) {
     };
     window.addEventListener(DOCS_SEARCH_OPEN_EVENT, onOpen);
     // Hand-off from another app or the no-JS form.
-    const params = new URLSearchParams(window.location.search);
-    if (params.has("q") || params.get("search") === "1") {
-      setSearch((params.get("q") ?? "").slice(0, 200));
+    const handOff = takeSearchHandOff();
+    if (handOff !== null) {
+      setSearch(handOff);
       setOpen(true);
-      params.delete("q");
-      if (params.get("search") === "1") params.delete("search");
-      const rest = params.toString();
-      history.replaceState(
-        history.state,
-        "",
-        location.pathname + (rest ? `?${rest}` : "") + location.hash,
-      );
     }
     return () => window.removeEventListener(DOCS_SEARCH_OPEN_EVENT, onOpen);
   }, [setSearch]);

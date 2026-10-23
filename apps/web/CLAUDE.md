@@ -73,6 +73,7 @@ ANALYZE=true pnpm build
 
 ### External APIs
 
+- **Inkeep** - Search and Ask AI (`INKEEP_API_KEY`)
 - **Luma** - Events calendar (`LUMA_PRIVATE_API_KEY`)
 - **YouTube** - Video content (`YOUTUBE_API_KEY`, `YOUTUBE_CHANNEL_ID`)
 

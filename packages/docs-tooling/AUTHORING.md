@@ -812,17 +812,19 @@ are HTML, not images: `<ol className="sol-flow not-prose">` with
 (horizontal from 640px, vertical below). The last step's badge carries the
 accent; put `data-accent` on one `<li>` to move it.
 
-##### AI Chat (Vercel AI SDK)
+##### Search and Ask AI (Inkeep)
 
-- OpenAI integration for documentation search
-- Configured via `@ai-sdk/openai`
+- Inkeep search and chat (`@inkeep/cxkit-react`, ui-chrome `inkeep-modal`)
+  through the `/api/inkeep/*` proxy, with the server-only `INKEEP_API_KEY`.
+  Without the key: the Fumadocs search dialog (`/api/docs-search`) and the Ask
+  AI menu (ask Claude or ChatGPT about the page).
 
 #### Key Dependencies (App-Specific)
 
 - `fumadocs-core`, `fumadocs-mdx`, `fumadocs-ui` - Documentation framework
 - `codehike` - Advanced code blocks
 - `mermaid` - Diagram rendering
-- `ai`, `@ai-sdk/openai` - AI integration
+- `@inkeep/cxkit-react` - Search and Ask AI
 - `@boxicons/react` - UI and file type icons
 - `svg-pan-zoom` - Zoomable diagrams
 - `zod` - Schema validation

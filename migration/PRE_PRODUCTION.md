@@ -46,6 +46,20 @@ search engines without any extra switches. Undo the preview-only bits:
       `/api/demo/checkout` and `/api/demo/paywall-call` answer 503 and the
       scenes show "Explorer link unavailable".
 
+## Search and Ask AI (Inkeep)
+
+- [ ] Set the server-only `INKEEP_API_KEY` in Vercel (Preview now, Production
+      at launch; the same key as production solana.com). Without it, search
+      is the Fumadocs dialog and Ask AI is the docs' menu (ask Claude or
+      ChatGPT).
+- [ ] Add the Vercel WAF rate-limit rules `inkeep-chat` (30/min/IP),
+      `inkeep-search` (120/min/IP) and `inkeep-analytics` (240/min/IP) to the
+      project; without them `/api/inkeep/*` answers 503.
+- [ ] The key is a domain-restricted Inkeep web integration: allow the preview
+      host in Inkeep if chat fails there with a challenge error.
+- [ ] Redeploy without the build cache after adding the key: the pages are
+      static and read it at build time.
+
 ## Translations
 
 - [ ] Run Lingo for all English changes since the migration.

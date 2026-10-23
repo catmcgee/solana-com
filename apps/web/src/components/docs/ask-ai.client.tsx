@@ -1,101 +1,47 @@
 "use client";
 
-import {
-  Component,
-  lazy,
-  Suspense,
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { isDocsPageRoute } from "@solana-com/ui-chrome/developer-routes";
 import { openDocsSearch } from "@solana-com/ui-chrome/docs-search";
 import { ASK_AI_AVOID_EVENT } from "@solana-com/ui-chrome/ask-ai-avoid";
-import { DOCS_ASK_CODE_EVENT } from "@/lib/docs/chat";
+import { DOCS_ASK_CODE_EVENT, openAskAi } from "@/lib/docs/ask-ai";
 import "./ask-ai.css";
 
-const loadPanel = () => import("./docs-chat-panel.client");
-const DocsChatPanel = lazy(loadPanel);
-
-/** One request to open the chat, and the code to ask about, if any. */
-export type AskAiRequest = { seq: number; code?: string };
+// Fetches Inkeep's modal early (the chunk inkeep.client.tsx loads on open).
+const loadInkeep = () => import("@solana-com/ui-chrome/inkeep-modal");
 
 /**
  * The floating Ask AI pill, bottom right on every apps/web page (SiteShell).
  *
- * With the assistant configured (`chat`, NOUS_API_KEY), the pill opens
- * Fumadocs' AI chat (docs-chat-panel.client.tsx, against /api/docs-chat).
- * The chat, with the AI SDK and its Markdown renderer, loads the first time
- * it is opened (from the pill, a docs code block's Ask button or Ctrl+/)
- * and is fetched early when the pointer or focus reaches the pill.
+ * With Inkeep configured (`chat`, INKEEP_API_KEY), the pill opens Inkeep's
+ * chat (inkeep.client.tsx), which loads the first time it is opened and is
+ * fetched early when the pointer or focus reaches the pill.
  *
- * Without it, on the docs, the pill opens a menu instead: ask Claude or
- * ChatGPT about the page (its Markdown), or search the docs. Other pages
- * show no pill then.
+ * Without it, on the docs, the pill (and a code block's Ask button) opens a
+ * menu instead: ask Claude or ChatGPT about the page (its Markdown), or
+ * search the docs. Other pages show no pill then.
  *
- * The pill and panel stay clear of the cookie banner and the podcast
- * player ([data-ask-ai-avoid]) and the panel sits under the page's header.
+ * The pill stays clear of the cookie banner and the podcast player
+ * ([data-ask-ai-avoid]).
  */
-export function AskAi({ locale, chat }: { locale: string; chat: boolean }) {
+export function AskAi({ chat }: { chat: boolean }) {
   const pathname = usePathname();
   const docsPage = isDocsPageRoute(pathname);
-  const [request, setRequest] = useState<AskAiRequest>();
-  const [open, setOpen] = useState(false);
-  // The chat has loaded and reports its open state.
-  const [ready, setReady] = useState(false);
   const [menu, setMenu] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const pill = useRef<HTMLButtonElement>(null);
-  const wasOpen = useRef(false);
   const shown = chat || docsPage;
 
-  const ask = useCallback(
-    (code?: string) =>
-      setRequest((last) => ({ seq: (last?.seq ?? 0) + 1, code })),
-    [],
-  );
-
-  // A code block's Ask button; Ctrl+/ until the chat (which then handles
-  // it) has loaded.
+  // Without Inkeep, a code block's Ask button opens the menu.
   useEffect(() => {
-    if (!chat) return;
-    const onCode = (event: Event) =>
-      ask((event as CustomEvent<{ code?: string }>).detail?.code);
+    if (chat || !docsPage) return;
+    const onCode = () => setMenu(true);
     window.addEventListener(DOCS_ASK_CODE_EVENT, onCode);
     return () => window.removeEventListener(DOCS_ASK_CODE_EVENT, onCode);
-  }, [chat, ask]);
-  const loaded = request !== undefined;
-  useEffect(() => {
-    if (!chat || loaded) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "/" && (event.metaKey || event.ctrlKey)) {
-        event.preventDefault();
-        ask();
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [chat, loaded, ask]);
+  }, [chat, docsPage]);
 
-  // Closing the chat returns focus to the pill (unless the reader moved it).
-  useEffect(() => {
-    if (wasOpen.current && !open) {
-      const active = document.activeElement;
-      if (!active || active === document.body || active.closest(".docs-chat"))
-        pill.current?.focus({ preventScroll: true });
-    }
-    wasOpen.current = open;
-  }, [open]);
-
-  const onOpenChange = useCallback((next: boolean) => {
-    setOpen(next);
-    setReady(true);
-  }, []);
-
-  // The loading panel sits where the chat will.
-  useAvoidOverlaps(shown, open || (loaded && !ready));
+  useAvoidOverlaps(shown);
 
   // The menu closes on Escape and on a click elsewhere.
   useEffect(() => {
@@ -106,7 +52,9 @@ export function AskAi({ locale, chat }: { locale: string; chat: boolean }) {
       pill.current?.focus();
     };
     const onClick = (event: MouseEvent) => {
-      if (!root.current?.contains(event.target as Node)) setMenu(false);
+      const target = event.target as Element;
+      if (target.closest?.(".code-block-ask-button")) return;
+      if (!root.current?.contains(target)) setMenu(false);
     };
     document.addEventListener("keydown", onKeyDown);
     document.addEventListener("click", onClick);
@@ -118,95 +66,27 @@ export function AskAi({ locale, chat }: { locale: string; chat: boolean }) {
 
   if (!shown) return null;
   return (
-    <>
-      <div
-        ref={root}
-        id="sol-ask-ai"
-        data-open={open ? "" : undefined}
-        onPointerEnter={chat ? () => void loadPanel() : undefined}
-        onFocus={chat ? () => void loadPanel() : undefined}
+    <div
+      ref={root}
+      id="sol-ask-ai"
+      onPointerEnter={chat ? () => void loadInkeep() : undefined}
+      onFocus={chat ? () => void loadInkeep() : undefined}
+    >
+      {!chat && menu ? <AskMenu close={() => setMenu(false)} /> : null}
+      <button
+        ref={pill}
+        type="button"
+        className="sol-ask-pill"
+        aria-haspopup={chat ? "dialog" : "menu"}
+        aria-expanded={chat ? undefined : menu}
+        aria-keyshortcuts={chat ? "Control+/ Meta+/" : undefined}
+        onClick={() => (chat ? openAskAi() : setMenu((m) => !m))}
       >
-        {!chat && menu ? <AskMenu close={() => setMenu(false)} /> : null}
-        <button
-          ref={pill}
-          type="button"
-          className="sol-ask-pill"
-          aria-haspopup={chat ? undefined : "menu"}
-          aria-expanded={chat ? open : menu}
-          aria-keyshortcuts={chat ? "Control+/ Meta+/" : undefined}
-          onClick={() => (chat ? ask() : setMenu((m) => !m))}
-        >
-          <SolanaMark />
-          <span>Ask AI</span>
-        </button>
-      </div>
-      {chat && request ? (
-        <LoadFailed attempt={request.seq}>
-          <Suspense fallback={<LoadingPanel />}>
-            <DocsChatPanel
-              locale={locale}
-              request={request}
-              onOpenChange={onOpenChange}
-            />
-          </Suspense>
-        </LoadFailed>
-      ) : null}
-    </>
+        <SolanaMark />
+        <span>Ask AI</span>
+      </button>
+    </div>
   );
-}
-
-/** The panel's frame while the chat's code loads (first open only). */
-function LoadingPanel() {
-  return (
-    <aside className="docs-chat" aria-label="Ask AI" aria-busy="true">
-      <p className="docs-chat-loading" role="status">
-        Loading Ask AI…
-      </p>
-    </aside>
-  );
-}
-
-/**
- * If the chat's code cannot load (offline, or a new deployment replaced
- * it), the panel says so, closably, instead of taking the page down; each
- * new open (`attempt`) shows the message again.
- */
-class LoadFailed extends Component<
-  { attempt: number; children: React.ReactNode },
-  { failed: boolean; attempt: number; dismissed: boolean }
-> {
-  state = { failed: false, attempt: this.props.attempt, dismissed: false };
-  static getDerivedStateFromError() {
-    return { failed: true };
-  }
-  static getDerivedStateFromProps(
-    props: { attempt: number },
-    state: { attempt: number },
-  ) {
-    return props.attempt === state.attempt
-      ? null
-      : { attempt: props.attempt, dismissed: false };
-  }
-  render() {
-    if (!this.state.failed) return this.props.children;
-    if (this.state.dismissed) return null;
-    return (
-      <aside className="docs-chat" aria-label="Ask AI">
-        <div className="docs-chat-loading" role="alert">
-          <p>
-            Ask AI couldn't load. Check your connection, or reload the page.
-          </p>
-          <button
-            type="button"
-            className="docs-chat-retry"
-            onClick={() => this.setState({ dismissed: true })}
-          >
-            Close
-          </button>
-        </div>
-      </aside>
-    );
-  }
 }
 
 /** Without the assistant, on the docs: ask an outside AI, or search. */
@@ -261,46 +141,28 @@ function AskMenu({ close }: { close: () => void }) {
 }
 
 /**
- * Lifts the pill (--ask-ai-lift) and the panel's bottom (--ask-ai-panel-lift)
- * above the fixed bars at the bottom of the window that would cover them
- * (the cookie banner, the podcast player), and, while the chat is open,
- * starts the panel under the page's header (--ask-ai-top).
+ * Lifts the pill (--ask-ai-lift) above the fixed bars at the bottom of the
+ * window that would cover it (the cookie banner, the podcast player).
  */
-function useAvoidOverlaps(active: boolean, open: boolean) {
+function useAvoidOverlaps(active: boolean) {
   useEffect(() => {
     if (!active) return;
     const html = document.documentElement;
     let frame = 0;
     const measure = () => {
       frame = 0;
-      const width = window.innerWidth;
       const height = window.innerHeight;
-      const pill = document.querySelector(".sol-ask-pill");
-      const pillBox = pill?.getBoundingClientRect();
-      const panelLeft = width - Math.min(416, width);
+      const pillBox = document
+        .querySelector(".sol-ask-pill")
+        ?.getBoundingClientRect();
       let lift = 0;
-      let panelLift = 0;
       for (const el of document.querySelectorAll("[data-ask-ai-avoid]")) {
         const box = el.getBoundingClientRect();
         if (!box.height || box.bottom < height - 40) continue;
-        const cover = Math.max(0, height - box.top);
         if (pillBox && box.left < pillBox.right && box.right > pillBox.left)
-          lift = Math.max(lift, cover);
-        if (box.right > panelLeft) panelLift = Math.max(panelLift, cover);
+          lift = Math.max(lift, Math.max(0, height - box.top));
       }
       html.style.setProperty("--ask-ai-lift", `${Math.round(lift)}px`);
-      html.style.setProperty(
-        "--ask-ai-panel-lift",
-        `${Math.round(panelLift)}px`,
-      );
-      if (open) {
-        const header = document.querySelector("header.dh, header.sticky");
-        const top = header ? header.getBoundingClientRect().bottom : 0;
-        html.style.setProperty(
-          "--ask-ai-top",
-          `${Math.max(0, Math.round(top))}px`,
-        );
-      }
     };
     const schedule = () => {
       if (!frame) frame = requestAnimationFrame(measure);
@@ -309,14 +171,12 @@ function useAvoidOverlaps(active: boolean, open: boolean) {
     // The bars announce themselves (ui-chrome ask-ai-avoid).
     window.addEventListener(ASK_AI_AVOID_EVENT, schedule);
     window.addEventListener("resize", schedule);
-    if (open) window.addEventListener("scroll", schedule, { passive: true });
     return () => {
       window.removeEventListener(ASK_AI_AVOID_EVENT, schedule);
       window.removeEventListener("resize", schedule);
-      window.removeEventListener("scroll", schedule);
       if (frame) cancelAnimationFrame(frame);
     };
-  }, [active, open]);
+  }, [active]);
 }
 
 function SolanaMark() {

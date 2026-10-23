@@ -53,12 +53,13 @@ Announcement banner at the top of the page. Configurable via
 
 ### SearchBar
 
-The header's search button for the docs search (Fumadocs, in `apps/web`). In
-`apps/web`, which mounts the search dialog on every page, a click or `⌘ K` /
-`Ctrl+K` opens it in place. In the other apps (`NEXT_PUBLIC_APP_NAME` set) it
-goes to `/developers/docs?search=1` (localized), where the docs page opens the
-dialog. It shows the `⌘ K` shortcut on larger viewports; the optional `expanded`
-prop adds a visible label and full-width styling.
+The header's search button for the site search (Inkeep with `INKEEP_API_KEY`,
+else Fumadocs, in `apps/web`). In `apps/web`, which mounts the search on every
+page, a click or `⌘ K` / `Ctrl+K` opens it in place. In the other apps
+(`NEXT_PUBLIC_APP_NAME` set) it goes to `/developers/docs?search=1` (localized),
+where the docs page opens the dialog. It shows the `⌘ K` shortcut on larger
+viewports; the optional `expanded` prop adds a visible label and full-width
+styling.
 
 ### NewsletterModal
 
@@ -95,12 +96,43 @@ Apps often re-export these from their own `utils/Link` (e.g. `apps/web`,
 - **openDocsSearch(query?)** / **DOCS_SEARCH_OPEN_EVENT** – Open the docs search
   dialog on the current page (the window event the dialog listens for).
 
+### `@solana-com/ui-chrome/inkeep-modal` and `/inkeep-proxy`
+
+See [Inkeep (search and chat)](#inkeep-search-and-chat).
+
 ### `@solana-com/ui-chrome/url-config`
 
 - **shouldUseNextLink(href)** – Returns whether `href` should use Next.js `Link`
   (client navigation) or a plain `<a>` (full page load). All apps are served
   under solana.com via rewrites; this keeps cross-app navigation as full loads
   and in-app as client nav. Depends on `NEXT_PUBLIC_APP_NAME` in non-web apps.
+
+## Inkeep (search and chat)
+
+Inkeep is wired in `src/inkeep-config.ts` (as on production solana.com) and used
+by `inkeep-modal` (default export): Inkeep's search and chat modal, opened by
+the caller. In `apps/web`, `components/docs/inkeep.client.tsx` mounts it on
+every page the first time search or Ask AI opens (it is the module that brings
+in `@inkeep/cxkit-react`). The modal is themed for Solana (dark/light).
+
+- **Env**: Set the server-only `INKEEP_API_KEY` on the web deployment. Never use
+  a `NEXT_PUBLIC_` Inkeep credential. Without it, `apps/web` uses the Fumadocs
+  search dialog and the docs' Ask AI menu instead.
+- **Internal APIs**: CXKit sends challenge, chat, search, and analytics requests
+  to `/api/inkeep/*` (`proxyInkeepRequest` from `inkeep-proxy`). The routes
+  validate requests and authenticate to Inkeep on the server. The current
+  domain-restricted web credential requires CXKit to solve Inkeep's challenge
+  before each chat request. Conversation analytics are write-only; the public
+  proxy does not expose conversation reads.
+- **Rate limits**: Configure Vercel WAF rate-limit rules named `inkeep-chat` (30
+  requests/minute/IP), `inkeep-search` (120 requests/minute/IP), and
+  `inkeep-analytics` (240 requests/minute/IP). Production builds (Vercel
+  previews included) fail closed when a rule is missing or the rate-limit
+  service fails.
+- **Verification**: Confirm chat streams an answer with working citations,
+  search returns source links, a code block's Ask button sends its code, and
+  browser network requests contain only the non-secret internal proxy
+  identifier.
 
 ## Site-Wide Alerts
 

@@ -13,7 +13,7 @@ Most apps are not standalone product islands. They share:
 - `@workspace/i18n` for locale config and routing helpers
 - `@workspace/ui` for reusable UI primitives
 - `@solana-com/ui-chrome` for shared header, footer, cross-app links, alerts,
-  and the header search
+  the header search, and Inkeep search and chat
 - Turborepo tasks defined in the root `package.json` and `turbo.json`
 
 ## Fast Routing Map
@@ -35,8 +35,8 @@ Pick the app first. That usually cuts exploration time in half.
 
 - `apps/web`: main `solana.com` app, large surface area, mix of marketing,
   ecosystem, events, news aggregation, and developer entry points
-- `apps/docs`: docs content (MDX), rendered by `apps/web` with Fumadocs.
-  Folders mirror public URLs (`developers/docs/`, `<locale>/developers/docs/`,
+- `apps/docs`: docs content (MDX), rendered by `apps/web` with Fumadocs. Folders
+  mirror public URLs (`developers/docs/`, `<locale>/developers/docs/`,
   `developers/cookbook/`, `learn/`). Tooling and authoring rules live in
   `packages/docs-tooling` (see `packages/docs-tooling/AUTHORING.md`)
 - `apps/media`: Keystatic-backed news and podcast site with content in
@@ -90,7 +90,8 @@ node skills/refresh-agent-context/scripts/workspace_inventory.mjs
 Useful filters:
 
 - `solana-com`
-- `@workspace/docs-tooling` (docs generators and checks; apps/docs has no package)
+- `@workspace/docs-tooling` (docs generators and checks; apps/docs has no
+  package)
 - `solana-com-media`
 - `solana-templates`
 - `solana-com-accelerate`
