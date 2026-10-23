@@ -6,13 +6,9 @@
  * position in the label hierarchy: slug(tab) "." slug(group) "." ...,
  * with "~2", "~3" for siblings that share a slug. `labels/en.json` maps
  * key -> English and is the Lingo source; `labels/<loc>.json` is the Lingo
- * target (seeded once from the legacy locale meta.json titles and the
- * developers.nav.* UI strings). A key missing from a locale file falls back
+ * target. A key missing from a locale file falls back
  * to English and is listed in generated/untranslated.json.
  */
-import { existsSync, readFileSync } from "node:fs";
-import path from "node:path";
-import { repoRoot } from "../lib/paths.ts";
 import type { NavEntry, NavFile, NavGroup, NavTab } from "./types.ts";
 import { isGroup } from "./types.ts";
 
@@ -75,34 +71,4 @@ export function sortKeys<T>(m: Record<string, T>): Record<string, T> {
   return Object.fromEntries(
     Object.entries(m).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
   );
-}
-
-// ---------------------------------------------------------------------------
-// UI message strings (developers.nav.*)
-// ---------------------------------------------------------------------------
-
-const messageCache = new Map<string, Record<string, string>>();
-
-/** packages/i18n/messages/web/<loc>/common.json developers.nav. */
-export function devNavMessages(
-  loc: string,
-  root: string = repoRoot,
-): Record<string, string> {
-  const k = `${root}\0${loc}`;
-  if (messageCache.has(k)) return messageCache.get(k)!;
-  const file = path.join(
-    root,
-    "packages/i18n/messages/web",
-    loc,
-    "common.json",
-  );
-  let nav: Record<string, string> = {};
-  if (existsSync(file)) {
-    const json = JSON.parse(readFileSync(file, "utf8")) as {
-      developers?: { nav?: Record<string, string> };
-    };
-    nav = json.developers?.nav ?? {};
-  }
-  messageCache.set(k, nav);
-  return nav;
 }

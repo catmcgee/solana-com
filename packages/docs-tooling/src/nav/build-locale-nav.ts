@@ -99,10 +99,7 @@ export function readJson<T>(file: string): T | undefined {
 
 export function readEnNav(paths: NavPaths): NavFile {
   const nav = readJson<NavFile>(path.join(paths.navDir, "en.json"));
-  if (!nav)
-    throw new Error(
-      `${path.join(paths.navDir, "en.json")} is missing; run \`nav compile-legacy\` first`,
-    );
+  if (!nav) throw new Error(`${path.join(paths.navDir, "en.json")} is missing`);
   return nav;
 }
 

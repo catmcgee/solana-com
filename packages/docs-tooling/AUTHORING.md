@@ -22,7 +22,6 @@ be checked on a deployment is listed under "Release gates" below.
 | `apps/docs/learn/*.mdx`                      | English learn articles, `/learn/<slug>`. The `/learn` landing is a React page moving to apps/web (WP10).                                                                                                              |
 | `apps/docs/<loc>/{developers/docs,learn}/**` | Translations for ar de es fi fr id it ja ko nl pl pt ru tr uk vi zh. Greek (`el`) was removed.                                                                                                                        |
 | `apps/docs/docs-assets/**`                   | Images/video served at `/docs-assets/<original public path>`.                                                                                                                                                         |
-| `apps/docs/**/meta.json`                     | Removed at integration (WP12): the legacy Fumadocs nav is compiled into `navigation/en.json`; `nav compile-legacy` reads the originals from git (`LEGACY_REF`).                                                       |
 | `packages/docs-tooling/`                     | All build/migration tooling (this package).                                                                                                                                                                           |
 | `packages/docs-tooling/data/`                | Data moved out of the Next app: Surfpool JSON schemas, bootcamp curriculum, learn order, legacy `resources.json`.                                                                                                     |
 | `packages/docs-tooling/legacy/`              | Legacy TypeScript kept for reference by later work packages (not compiled).                                                                                                                                           |
@@ -93,8 +92,8 @@ CLI commands (`src/cli.ts`). Unknown options are rejected before anything runs
 | `convert [--files p] [--exclude p1,p2] [--locale l] [--check\|--dry-run]` | Run the auto-discovered transforms. `--check` fails if any file would change                   |
 | `residual [--json]`                                                       | Residual Fumadocs/Code Hike syntax scan (spec §4.4.2); every pattern must be 0                 |
 | `verify [--skip-generators] [--skip-convert]`                             | All repo-side spec §4.4 checks (see "Integration pipeline")                                    |
-| `nav compile-legacy\|build\|swap\|verify [--check]`                       | Navigation (WP6, `src/nav/`)                                                                   |
-| `examples [--check]`                                                      | Build runnable example snippets (WP5)                                                          |
+| `nav build\|swap\|verify [--check]`                                       | Navigation (`src/nav/`)                                                                        |
+| `examples [--check]`                                                      | Build runnable example snippets                                                                |
 
 Package scripts (`pnpm --filter @workspace/docs-tooling <script>`):
 

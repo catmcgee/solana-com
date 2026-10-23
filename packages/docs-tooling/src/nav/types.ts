@@ -1,7 +1,6 @@
 /**
  * Docs navigation shapes (navigation/<lang>.json, read by apps/web
- * src/lib/docs/navigation.ts) plus the IA template shapes used once by
- * compile-legacy-nav.
+ * src/lib/docs/navigation.ts).
  */
 
 /** A page entry: a path relative to apps/docs, without extension. */
@@ -55,58 +54,6 @@ export interface NavFile {
 
 export const isGroup = (e: NavEntry): e is NavGroup =>
   typeof e === "object" && "group" in e;
-export const isLink = (e: NavEntry): e is NavLink =>
-  typeof e === "object" && (e as NavLink).type === "link";
-
-// ---------------------------------------------------------------------------
-// IA template (one-time compile input)
-// ---------------------------------------------------------------------------
-
-/**
- * `expand(P)`: replaced by the ordered subtree from the legacy meta.json of
- * folder P. Pages placed explicitly anywhere else in the template
- * are skipped, so an expansion never duplicates them.
- */
-export interface ExpandMarker {
-  expand: string;
-}
-
-/**
- * Where a template label's translations come from when seeding
- * labels/<loc>.json:
- * - `meta:<folder>`    the locale meta.json `title` of that legacy folder
- * - `message:<key>`    packages/i18n/messages/web/<loc>/common.json key
- * - `none`             no seed (Lingo translates it later)
- * When omitted, the compiler matches the English label against the legacy
- * meta titles and the developers.nav.* strings (case-insensitive).
- */
-export type LabelSource = `meta:${string}` | `message:${string}` | "none";
-
-export interface TemplateGroup {
-  group: string;
-  root?: NavPage;
-  icon?: string;
-  tag?: string;
-  expanded?: boolean;
-  hidden?: boolean;
-  searchable?: boolean;
-  directory?: "none" | "accordion" | "card";
-  labelFrom?: LabelSource;
-  pages: TemplateEntry[];
-}
-
-export type TemplateEntry = NavPage | ExpandMarker | TemplateGroup;
-
-export interface TemplateTab {
-  tab: string;
-  icon?: string;
-  href?: string;
-  align?: "start" | "end";
-  hidden?: boolean;
-  searchable?: boolean;
-  labelFrom?: LabelSource;
-  groups?: TemplateGroup[];
-}
 
 // ---------------------------------------------------------------------------
 // Generated outputs

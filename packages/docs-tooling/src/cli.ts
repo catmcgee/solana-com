@@ -17,8 +17,8 @@ Commands:
                               --exclude: comma-separated path prefixes (relative to apps/docs) to skip
   verify [--skip-generators] [--skip-convert]   All spec §4.4 checks (src/verify/index.ts)
   residual                    Residual Fumadocs/Code Hike syntax scan (spec §4.4.2)
-  nav [compile-legacy|stubs|build|swap|verify] [--check] [--force]   Navigation (WP6, src/nav/index.ts)
-  examples [--check]          Build runnable example snippets (WP5)
+  nav [build|swap|verify] [--check]   Navigation (src/nav/index.ts)
+  examples [--check]          Build runnable example snippets
 `;
 
 /**
@@ -29,7 +29,7 @@ Commands:
 const KNOWN_FLAGS: Record<string, string[]> = {
   "verify-urls": [],
   convert: ["files", "exclude", "locale", "check", "dry-run"],
-  nav: ["check", "force"],
+  nav: ["check"],
   examples: ["check"],
   verify: ["skip-generators", "skip-convert", "json"],
   residual: ["json"],
@@ -149,10 +149,7 @@ async function main() {
     }
     case "nav": {
       const sub = process.argv.slice(3).find((a) => !a.startsWith("--"));
-      const r = runNav(sub, {
-        check: Boolean(flags.check),
-        force: Boolean(flags.force),
-      });
+      const r = runNav(sub, { check: Boolean(flags.check) });
       console.log(r.message);
       return r.code;
     }

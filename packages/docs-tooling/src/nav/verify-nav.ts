@@ -11,11 +11,10 @@
  *   (run `nav build` / `nav swap`);
  * - a locale nav's structure differs from en.json;
  * - generated files (locale navs, labels/en.json, untranslated.json,
- *   locale-fallbacks.json, docs.json navigation) are stale;
- * - a NEW page (new-pages.ts) is not in en.json.
+ *   locale-fallbacks.json, docs.json navigation) are stale.
  *
- * Reported, not failing (decisions.md): untranslated pages and labels, the
- * NEW pages that are still WP6 stubs, stale keys in labels/<loc>.json.
+ * Reported, not failing (decisions.md): untranslated pages and labels, stale
+ * keys in labels/<loc>.json.
  */
 import path from "node:path";
 import { DEFAULT_LOCALE, TARGET_LOCALES } from "../lib/locales.ts";
@@ -27,7 +26,6 @@ import {
   runBuild,
 } from "./build-locale-nav.ts";
 import { englishLabels, type LabelMap } from "./labels.ts";
-import { NEW_PAGES, remainingStubs } from "./new-pages.ts";
 import { langOf, loadInventory, pageForUrl, stripLocale } from "./pages.ts";
 import type { NavEntry, NavFile, NavPage } from "./types.ts";
 import { isGroup } from "./types.ts";
@@ -90,13 +88,11 @@ function shape(nav: NavFile): string {
 export interface VerifyNavOptions {
   docsRoot?: string;
   locales?: readonly string[];
-  newPages?: readonly { page: NavPage }[];
 }
 
 export function verifyNav(opts: VerifyNavOptions = {}): VerifyNavResult {
   const paths = navPaths(opts.docsRoot);
   const locales = opts.locales ?? TARGET_LOCALES;
-  const newPages = opts.newPages ?? NEW_PAGES;
   const errors: string[] = [];
   const warnings: string[] = [];
   const info: string[] = [];
@@ -147,10 +143,6 @@ export function verifyNav(opts: VerifyNavOptions = {}): VerifyNavResult {
   };
 
   check(DEFAULT_LOCALE, en);
-  const enRefs = new Set(navPageRefs(en));
-  for (const p of newPages)
-    if (!enRefs.has(p.page))
-      errors.push(`en: NEW page "${p.page}" is not in en.json`);
 
   for (const loc of locales) {
     const nav = readJson<NavFile>(path.join(paths.navDir, `${loc}.json`));
@@ -190,11 +182,6 @@ export function verifyNav(opts: VerifyNavOptions = {}): VerifyNavResult {
   if (notInLingo.size)
     warnings.push(
       `${notInLingo.size} page(s) are excluded from the docs Lingo project, so no locale will get them: ${[...notInLingo].join(", ")}`,
-    );
-  const stubs = remainingStubs(paths.docsRoot);
-  if (stubs.length)
-    info.push(
-      `NEW pages still WP6 stubs (WP8a to write): ${stubs.length}: ${stubs.join(", ")}`,
     );
 
   return { errors, warnings, info, counts };
