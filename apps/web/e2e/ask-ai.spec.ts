@@ -274,9 +274,10 @@ test("the panel starts under the site header", async ({ page }) => {
   await setup(page);
   await page.goto("/enterprise");
   await pill(page).click();
+  await expect(panel(page).getByRole("textbox")).toBeVisible();
   const header = (await page.locator("header.sticky").boundingBox())!;
   await expect
-    .poll(async () => Math.round((await panel(page).boundingBox())!.y))
+    .poll(async () => Math.round((await panel(page).boundingBox())?.y ?? -1))
     .toBe(Math.round(header.y + header.height));
 });
 

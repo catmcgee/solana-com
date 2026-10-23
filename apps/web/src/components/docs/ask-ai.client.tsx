@@ -43,6 +43,8 @@ export function AskAi({ locale, chat }: { locale: string; chat: boolean }) {
   const docsPage = isDocsPageRoute(pathname);
   const [request, setRequest] = useState<AskAiRequest>();
   const [open, setOpen] = useState(false);
+  // The chat has loaded and reports its open state.
+  const [ready, setReady] = useState(false);
   const [menu, setMenu] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const pill = useRef<HTMLButtonElement>(null);
@@ -87,7 +89,13 @@ export function AskAi({ locale, chat }: { locale: string; chat: boolean }) {
     wasOpen.current = open;
   }, [open]);
 
-  useAvoidOverlaps(shown, open);
+  const onOpenChange = useCallback((next: boolean) => {
+    setOpen(next);
+    setReady(true);
+  }, []);
+
+  // The loading panel sits where the chat will.
+  useAvoidOverlaps(shown, open || (loaded && !ready));
 
   // The menu closes on Escape and on a click elsewhere.
   useEffect(() => {
@@ -138,7 +146,7 @@ export function AskAi({ locale, chat }: { locale: string; chat: boolean }) {
             <DocsChatPanel
               locale={locale}
               request={request}
-              onOpenChange={setOpen}
+              onOpenChange={onOpenChange}
             />
           </Suspense>
         </LoadFailed>
