@@ -59,7 +59,15 @@ describe("developers hub stats", () => {
     expect(formatStatValue(assets, "en")).toBe("$4.3B");
     const dex = HUB_STATS.find((s) => s.id === "dexVolume")!;
     expect(formatStatValue(dex, "en")).toBe("$200B+");
-    expect(formatStatValue(dex, "ja")).not.toBe("$200B+");
+    // The locale reaches Intl. Compare with this runtime's own ja output, as
+    // a Node build without full ICU formats ja like en.
+    const jaCompact = new Intl.NumberFormat("ja", {
+      style: "currency",
+      currency: "USD",
+      notation: "compact",
+      maximumFractionDigits: 1,
+    }).format(dex.value);
+    expect(formatStatValue(dex, "ja")).toBe(`${jaCompact}+`);
   });
 
   it("formats as-of dates", () => {
