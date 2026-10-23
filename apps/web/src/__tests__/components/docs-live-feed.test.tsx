@@ -5,43 +5,46 @@ import { LiveFeed } from "@/components/docs/docs-live-feed.client";
 const SIG =
   "4JZW7fB3h53qP6f66eat4cwDVDFvxwTtKWbV8tfJJHVo4eHzK9riSvetQSwPEtungFxfbWC968JoyDoqRo7XauLZ";
 
-function sample(slot: number) {
+function tip(slot: number) {
   return {
-    slot,
-    blockTime: Math.floor(Date.now() / 1000) - 3,
+    tip: slot,
+    blocks: [
+      { slot: slot - 2, txs: 412, sigs: [`a${SIG.slice(1)}`] },
+      { slot, txs: 386, sigs: [SIG] },
+    ],
+    skipped: [slot - 1],
     serverTime: Date.now(),
-    txs: 1200,
-    votes: 800,
-    nonVotes: 400,
-    feeLamports: 25_000_000,
-    programs: [{ name: "Jupiter", count: 40 }],
-    tape: [{ sig: SIG.slice(0, 8), p: "Jupiter", id: SIG, fee: 5000 }],
   };
 }
 
 afterEach(() => vi.unstubAllGlobals());
 
 describe("docs LiveFeed", () => {
-  it("shows the sampled block and links each transaction to Explorer", async () => {
+  it("shows each block as a tile and links its transactions to Explorer", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () => new Response(JSON.stringify(sample(460_172_365)))),
+      vi.fn(async () => new Response(JSON.stringify(tip(460_172_365)))),
     );
     render(<LiveFeed />);
 
-    const block = await screen.findByRole("link", {
-      name: "block 460,172,365",
-    });
-    expect(block.getAttribute("href")).toBe(
+    expect(
+      await screen.findByText("460,172,365", { selector: "b" }),
+    ).toBeTruthy();
+    const tile = (await screen.findByText("386")).closest("a");
+    expect(tile?.getAttribute("href")).toBe(
       "https://explorer.solana.com/block/460172365",
     );
-    expect(screen.getByText("1,200")).toBeTruthy();
-    expect(screen.getByText("0.0250 SOL")).toBeTruthy();
-    const tx = screen.getByRole("link", { name: "4JZW7…XauLZ" });
+    expect(screen.getByText("412")).toBeTruthy();
+    expect(screen.getByText("skipped")).toBeTruthy();
+
+    const tx = await screen.findByRole(
+      "link",
+      { name: "4JZW7f…7XauLZ" },
+      { timeout: 2_000 },
+    );
     expect(tx.getAttribute("href")).toBe(
       `https://explorer.solana.com/tx/${SIG}`,
     );
-    expect(screen.getByText("0.000005 SOL")).toBeTruthy();
   });
 
   it("says the data is unavailable when the route fails", async () => {

@@ -117,3 +117,23 @@ export interface BlockSample {
   /** First non-vote transactions; `id` is the full signature. */
   tape: { sig: string; p: string; id?: string; fee?: number }[];
 }
+
+/** One block in /api/slot-time/tip. */
+export interface TipBlock {
+  slot: number;
+  /** Transactions in the block, validator votes included. */
+  txs: number;
+  /** Its first transaction signatures, in block order. */
+  sigs: string[];
+}
+
+/** /api/slot-time/tip: the confirmed tip and the blocks just behind it. */
+export interface TipPayload {
+  /** The confirmed tip when sampled. */
+  tip: number;
+  /** Blocks in the last 20 slots that the server has read, oldest first. */
+  blocks: TipBlock[];
+  /** Slots in that window with no block (skipped by their leader). */
+  skipped: number[];
+  serverTime: number;
+}
