@@ -16,7 +16,10 @@ import {
   TOKEN_2022_PROGRAM_ADDRESS,
 } from "@solana-program/token-2022";
 import { describe, expect, it } from "vitest";
-import { stubAirdropFetch } from "../../../test/fixtures/airdrop";
+import {
+  AIRDROP_LAMPORTS,
+  stubAirdropFetch,
+} from "../../../test/fixtures/airdrop";
 import { setTokenBalance } from "../../../test/fixtures/fund";
 import { runExample } from "../../../test/record";
 
@@ -50,7 +53,7 @@ describe("paths/start/quickstart", () => {
       output: out("balance"),
     });
     expect(r.text).toMatch(
-      /^Wallet: \w+\nAirdrop: \w+\nBalance: 1 SOL\nUSDC: 0\nGet free devnet USDC for \w+ at https:\/\/faucet\.circle\.com \(pick Solana Devnet\)\.$/,
+      /^Wallet: \w+\nAirdrop: \w+\nBalance: 0\.02 SOL\nUSDC: 0\nGet free devnet USDC for \w+ at https:\/\/faucet\.circle\.com \(pick Solana Devnet\)\.$/,
     );
   });
 
@@ -146,5 +149,14 @@ describe("paths/start/quickstart", () => {
       );
     expect(customCode(error)).toBe(TOKEN_2022_ERROR__ACCOUNT_FROZEN);
     await c.sendTransaction([getThawAccountInstruction(ix)]);
+  });
+
+  it("spends under half of the faucet's 0.02 SOL across all five steps", async () => {
+    // Fees plus the deposits for the USDC account, the EXF mint with its
+    // metadata, and two EXF accounts: about 0.0099 SOL. The rest is room to
+    // rerun a step; the faucet funds each wallet only once.
+    const c = await client();
+    const { value } = await c.rpc.getBalance(c.identity.address).send();
+    expect(AIRDROP_LAMPORTS - value).toBeLessThan(AIRDROP_LAMPORTS / 2n);
   });
 });

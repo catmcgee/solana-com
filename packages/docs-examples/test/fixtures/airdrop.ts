@@ -18,11 +18,14 @@ export const AIRDROP_URL = "https://solana.com/api/devnet-airdrop";
 
 const rpc = createSolanaRpc(RPC_URL);
 
-/** What the endpoint does: 1 SOL to the form's `address`, once confirmed. */
+/** The endpoint's amount: 0.02 SOL (apps/web/src/app/api/devnet-airdrop). */
+export const AIRDROP_LAMPORTS = 20_000_000n;
+
+/** What the endpoint does: 0.02 SOL to the form's `address`, once confirmed. */
 async function airdrop(form: string): Promise<{ signature: Signature }> {
   const to = address(new URLSearchParams(form).get("address") ?? "");
   const signature = await rpc
-    .requestAirdrop(to, lamports(1_000_000_000n))
+    .requestAirdrop(to, lamports(AIRDROP_LAMPORTS))
     .send();
   for (let i = 0; i < 40; i++) {
     const { value } = await rpc.getSignatureStatuses([signature]).send();

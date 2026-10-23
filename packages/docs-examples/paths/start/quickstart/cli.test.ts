@@ -23,6 +23,7 @@ import {
 } from "@solana-program/token-2022";
 import { afterAll, describe, expect, it } from "vitest";
 import {
+  AIRDROP_LAMPORTS,
   AIRDROP_URL,
   startAirdropServer,
 } from "../../../test/fixtures/airdrop";
@@ -105,7 +106,7 @@ describe.skipIf(!cli)("paths/start/quickstart (CLI)", () => {
       .split(/^# After the Circle faucet.*$/m);
     const first = await runAsync(before!).finally(faucet.close);
     wallet = address(run("solana address").out.trim());
-    expect(first.out).toContain("1 SOL");
+    expect(first.out).toContain("0.02 SOL");
     // Stands in for Circle's devnet faucet: 10 USDC in the reader's wallet.
     await setTokenBalance(wallet, 10_000_000n);
     expect(run(after!).out.trim()).toBe("10");
@@ -159,5 +160,12 @@ describe.skipIf(!cli)("paths/start/quickstart (CLI)", () => {
       commitment: "confirmed",
     });
     expect(data.state).toBe(AccountState.Initialized);
+  });
+
+  it("spends under half of the faucet's 0.02 SOL across all five steps", async () => {
+    const { value } = await rpc
+      .getBalance(wallet, { commitment: "confirmed" })
+      .send();
+    expect(AIRDROP_LAMPORTS - value).toBeLessThan(AIRDROP_LAMPORTS / 2n);
   });
 });

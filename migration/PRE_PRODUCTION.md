@@ -31,8 +31,14 @@ search engines without any extra switches. Undo the preview-only bits:
 
 - [ ] Set a production HELIUS_API_KEY (and SOLANA_RPC_URL for the live feed)
       in Vercel Production; the current key is preview-only and must be
-      rotated. Without it, the Quickstart's `/api/devnet-airdrop` answers 503
-      and readers are sent to faucet.solana.com.
+      rotated. The Quickstart's `/api/devnet-airdrop` sends over it (public
+      devnet without it).
+- [ ] Give the Quickstart's `/api/devnet-airdrop` its own production faucet
+      wallet: a new keypair as DEVNET_FAUCET_SECRET_KEY (sensitive) in Vercel
+      Production, never the preview one, funded with devnet SOL from
+      faucet.solana.com (each new reader wallet gets 0.02 SOL, so 2 SOL covers
+      about 100). Without it, the route answers 503 and readers are sent to
+      faucet.solana.com.
 - [ ] Give the "Solana in action" demos their own production wallets: new
       DEMO_PAYER_SECRET_KEY and DEMO_PAYEE_SECRET_KEY in Vercel Production
       (the current ones are preview-only), and fund the new payer with devnet
