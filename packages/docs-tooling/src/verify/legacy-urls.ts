@@ -1,11 +1,11 @@
 /**
  * Enumerate every public URL the legacy Fumadocs app served for the docs,
- * cookbook, learn and bootcamp collections, in every locale (spec §4.1
- * `legacy-urls`, §4.2 step 1).
+ * cookbook, learn and bootcamp collections, in every locale. verify-urls.ts
+ * checks each one still resolves; migration/legacy-urls.{txt,tsv} hold the
+ * list.
  *
- * The content tree is read from git at LEGACY_REF, so the output is the same
- * before and after the move. Route rules reproduced from the legacy app
- * (apps/docs/src/app at LEGACY_REF):
+ * The content tree is read from git at LEGACY_REF. Route rules reproduced
+ * from the legacy app (apps/docs/src/app at LEGACY_REF):
  *
  * - All loaders use `hideLocale: "default-locale"`: English has no prefix.
  * - docs/learn/bootcamp use `parser: "dir"`. The Fumadocs loader
@@ -27,12 +27,10 @@
  *   page URL; they are derived 1:1 and not listed separately.
  * - `/docs/tags/<tag>` pages: none exist (no content sets documentationTags).
  */
-import { writeFileSync, mkdirSync } from "node:fs";
-import path from "node:path";
 import type { Collection, LegacyUrl } from "../types.ts";
 import { listFilesAtRef, showFileAtRef } from "../lib/git.ts";
 import { LEGACY_LOCALES, DEFAULT_LOCALE } from "../lib/locales.ts";
-import { LEGACY_REF, migrationDir } from "../lib/paths.ts";
+import { LEGACY_REF } from "../lib/paths.ts";
 import {
   CONTENT_PREFIX,
   COLLECTION_BASE,
@@ -211,40 +209,4 @@ export function loadLegacyTree(ref = LEGACY_REF) {
   const files = listFilesAtRef(ref, CONTENT_PREFIX);
   const curriculum = parseCurriculum(showFileAtRef(ref, CURRICULUM_PATH));
   return { files, curriculum };
-}
-
-export function countBy(urls: readonly LegacyUrl[]) {
-  const counts = new Map<string, number>();
-  for (const u of urls) {
-    const k = `${u.collection}\t${u.locale}\t${u.kind}`;
-    counts.set(k, (counts.get(k) ?? 0) + 1);
-  }
-  return counts;
-}
-
-export function runLegacyUrls(opts: { ref?: string; outDir?: string } = {}) {
-  const ref = opts.ref ?? LEGACY_REF;
-  const outDir = opts.outDir ?? migrationDir;
-  const { files, curriculum } = loadLegacyTree(ref);
-  const { urls, unroutedBootcampFiles } = enumerateLegacyUrls(
-    files,
-    curriculum,
-  );
-  mkdirSync(outDir, { recursive: true });
-  writeFileSync(
-    path.join(outDir, "legacy-urls.txt"),
-    urls.map((u) => u.url).join("\n") + "\n",
-  );
-  writeFileSync(
-    path.join(outDir, "legacy-urls.tsv"),
-    ["url\tcollection\tlocale\tkind\tserved_from"]
-      .concat(
-        urls.map(
-          (u) =>
-            `${u.url}\t${u.collection}\t${u.locale}\t${u.kind}\t${u.servedFrom}`,
-        ),
-      )
-      .join("\n") + "\n",
-  );
-  return { ref, urls, unroutedBootcampFiles, fileCount: files.length };
 }

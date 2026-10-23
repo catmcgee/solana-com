@@ -2,9 +2,6 @@
  * docs-tooling CLI. Run with `pnpm --filter @workspace/docs-tooling cli <cmd>`
  * or `pnpm exec docs-tooling <cmd>`.
  */
-import { runLegacyUrls } from "./verify/legacy-urls.ts";
-import { executeMove } from "./move/move.ts";
-import { removeNextApp } from "./move/remove-next-app.ts";
 import { loadRedirectIndex } from "./verify/redirects.ts";
 import { runVerifyUrls } from "./verify/verify-urls.ts";
 import { runConvert } from "./convert/run.ts";
@@ -14,10 +11,6 @@ import { runExamples } from "./examples/index.ts";
 const USAGE = `docs-tooling <command> [options]
 
 Commands:
-  legacy-urls                 Write migration/legacy-urls.{txt,tsv} from the legacy tree (git ref)
-  move [--dry-run]            R1-R9 git mv/rm, Greek removal, assets; writes migration/move-map.csv
-  remove-next-app [--dry-run] git rm the Fumadocs Next.js app files from apps/docs (spec §1.2)
-  verify-redirects            Show apps/web redirect coverage for R8 and Greek removals
   verify-urls                 Legacy URL parity against the new layout + move map
   convert [--files p1,p2] [--exclude p1,p2] [--locale l] [--check|--dry-run]
                               Run the auto-discovered transforms (src/convert/transforms/*.ts).
@@ -34,10 +27,6 @@ Commands:
  * ran `convert` in WRITE mode over the whole corpus.
  */
 const KNOWN_FLAGS: Record<string, string[]> = {
-  "legacy-urls": ["ref"],
-  move: ["dry-run"],
-  "remove-next-app": ["dry-run", "force"],
-  "verify-redirects": [],
   "verify-urls": [],
   convert: ["files", "exclude", "locale", "check", "dry-run"],
   nav: ["check", "force"],
@@ -85,89 +74,6 @@ async function main() {
     }
   }
   switch (cmd) {
-    case "legacy-urls": {
-      const r = runLegacyUrls({
-        ref: typeof flags.ref === "string" ? flags.ref : undefined,
-      });
-      const counts = new Map<string, number>();
-      for (const u of r.urls)
-        counts.set(
-          `${u.collection}\t${u.kind}`,
-          (counts.get(`${u.collection}\t${u.kind}`) ?? 0) + 1,
-        );
-      console.log(
-        `legacy-urls @ ${r.ref}: ${r.urls.length} URLs from ${r.fileCount} legacy files`,
-      );
-      for (const [k, v] of [...counts].sort())
-        console.log(`  ${k.replace("\t", " / ")}: ${v}`);
-      if (r.unroutedBootcampFiles.length)
-        console.log(
-          `  bootcamp files with no route: ${r.unroutedBootcampFiles.join(", ")}`,
-        );
-      return 0;
-    }
-    case "move": {
-      const redirects = await loadRedirectIndex();
-      const r = executeMove({
-        dryRun: Boolean(flags["dry-run"]),
-        redirects,
-        log: (m) => console.log(m),
-      });
-      const counts = new Map<string, number>();
-      for (const row of r.rows)
-        counts.set(
-          `${row.rule}\t${row.status}`,
-          (counts.get(`${row.rule}\t${row.status}`) ?? 0) + 1,
-        );
-      console.log(
-        table([
-          ["rule", "status", "count"],
-          ...[...counts].sort().map(([k, v]) => [...k.split("\t"), String(v)]),
-        ]),
-      );
-      console.log(`executed: ${JSON.stringify(r.executed)}`);
-      console.log(
-        `Greek URLs with no apps/web redirect yet: ${r.elRedirectsMissingInWeb}`,
-      );
-      if (r.keptUncovered.length) {
-        console.log(
-          `R8 files KEPT (no apps/web redirect): ${r.keptUncovered.length}`,
-        );
-        for (const k of r.keptUncovered) console.log(`  ${k.src}`);
-      }
-      return 0;
-    }
-    case "remove-next-app": {
-      const r = removeNextApp({
-        dryRun: Boolean(flags["dry-run"]),
-        force: Boolean(flags.force),
-      });
-      const did = !flags["dry-run"] && (!r.blockers.length || flags.force);
-      console.log(
-        `${did ? "removed" : "would remove"} ${r.removed.length} tracked files`,
-      );
-      for (const b of r.blockers) console.log(`BLOCKER: ${b}`);
-      if (r.staleContentRefs.length) {
-        console.log(
-          `stale apps/docs/content references outside apps/docs (owned by later WPs): ${r.staleContentRefs.length}`,
-        );
-        for (const s of r.staleContentRefs) console.log(`  ${s}`);
-      }
-      return r.blockers.length ? 1 : 0;
-    }
-    case "verify-redirects": {
-      const { planMove } = await import("./move/move.ts");
-      const plan = planMove({ redirects: await loadRedirectIndex() });
-      for (const row of plan.rows.filter((x) => x.rule === "R8")) {
-        console.log(
-          `${row.status}\t${row.url}\t${row.redirect || row.dest}\t${row.note}`,
-        );
-      }
-      console.log(
-        `Greek URLs with no apps/web redirect yet: ${plan.elMissing}`,
-      );
-      return 0;
-    }
     case "verify-urls": {
       const r = runVerifyUrls({ web: await loadRedirectIndex() });
       const classes = [

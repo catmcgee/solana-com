@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  classify,
   legacyUrl,
   newPath,
   parseLegacyPath,
@@ -73,74 +72,6 @@ describe("path rules", () => {
     expect(routeSuffix("index.mdx")).toBe("");
     expect(routeSuffix("a/b/index.mdx")).toBe("/a/b");
     expect(routeSuffix("a/b.mdx")).toBe("/a/b");
-  });
-});
-
-describe("classify", () => {
-  const files = [
-    `${C}docs/en/clients/index.mdx`,
-    `${C}docs/en/tools/private-channels/index.mdx`,
-    `${C}docs/en/tools/kora/assets/kora.svg`,
-    `${C}docs/en/meta.json`,
-    `${C}docs/fr/clients/index.mdx`,
-    `${C}docs/fr/clients/go.mdx`,
-    `${C}docs/fr/tools/private-channels.mdx`,
-    `${C}docs/fr/tools/private-channels/index.mdx`,
-    `${C}docs/el/clients/index.mdx`,
-    `${C}docs/el/meta.json`,
-    `${C}docs/fr/brand-new.mdx`,
-  ];
-  const { rows, unexpectedLocaleOnly } = classify(files);
-  const by = (src: string) => rows.find((r) => r.src === src)!;
-
-  it("applies R1/R2/R9/META", () => {
-    expect(by(`${C}docs/en/clients/index.mdx`)).toMatchObject({
-      rule: "R1",
-      status: "moved",
-    });
-    expect(by(`${C}docs/fr/clients/index.mdx`)).toMatchObject({
-      rule: "R2",
-      dest: "apps/docs/fr/developers/docs/clients/index.mdx",
-    });
-    expect(by(`${C}docs/en/tools/kora/assets/kora.svg`)).toMatchObject({
-      rule: "R9",
-      status: "moved-asset",
-    });
-    expect(by(`${C}docs/en/meta.json`)).toMatchObject({
-      rule: "META",
-      status: "moved-meta",
-      dest: "apps/docs/developers/docs/meta.json",
-    });
-  });
-
-  it("marks R8 stale files and URL collisions", () => {
-    expect(by(`${C}docs/fr/clients/go.mdx`)).toMatchObject({
-      rule: "R8",
-      status: "removed-redirect",
-    });
-    expect(by(`${C}docs/fr/tools/private-channels.mdx`)).toMatchObject({
-      rule: "R8",
-      status: "removed-collision",
-      dest: "apps/docs/fr/developers/docs/tools/private-channels/index.mdx",
-    });
-  });
-
-  it("removes Greek with a redirect to English", () => {
-    expect(by(`${C}docs/el/clients/index.mdx`)).toMatchObject({
-      rule: "EL",
-      status: "removed-redirect",
-      redirect: "/docs/clients",
-      url: "/el/docs/clients",
-    });
-    expect(by(`${C}docs/el/meta.json`)).toMatchObject({
-      rule: "EL",
-      status: "removed",
-    });
-  });
-
-  it("reports unexpected locale-only files instead of deleting them", () => {
-    expect(unexpectedLocaleOnly).toEqual([`${C}docs/fr/brand-new.mdx`]);
-    expect(by(`${C}docs/fr/brand-new.mdx`)).toMatchObject({ status: "moved" });
   });
 });
 

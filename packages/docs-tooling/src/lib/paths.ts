@@ -9,9 +9,6 @@ export const repoRoot = path.resolve(here, "..", "..", "..", "..");
 /** The docs content root. */
 export const docsRoot = path.join(repoRoot, "apps", "docs");
 
-/** Legacy Fumadocs content root, relative to the repo root. */
-export const legacyContentRel = "apps/docs/content";
-
 /** Review artifacts (move map, legacy URL list, ...). Not published. */
 export const migrationDir = path.join(repoRoot, "migration");
 
@@ -19,9 +16,8 @@ export const migrationDir = path.join(repoRoot, "migration");
 export const toolingRoot = path.resolve(here, "..", "..");
 
 /**
- * The commit the migration started from. `legacy-urls` reads the content tree
- * from this commit with `git ls-tree`, so it gives the same answer before and
- * after the move.
+ * The commit the migration started from. The legacy URL parity check reads
+ * the content tree from this commit with `git ls-tree`.
  */
 export const LEGACY_REF = process.env.DOCS_LEGACY_REF ?? "023c6d918";
 

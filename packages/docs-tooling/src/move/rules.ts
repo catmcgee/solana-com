@@ -1,13 +1,10 @@
 /**
- * Pure path rules for the legacy -> apps/docs layout move (spec §1.3, R1-R9, as
- * adjusted by decisions.md: Greek is removed, not moved).
- *
- * Everything here is a function of legacy repo-relative paths only, so it can
- * be unit tested and re-run after the move (legacy-urls reads the tree from
- * git at LEGACY_REF).
+ * Pure path rules mapping the legacy Fumadocs content tree (read from git at
+ * LEGACY_REF) to its URLs and to the current apps/docs layout. Used by the
+ * legacy URL parity check (verify-urls.ts).
  */
-import type { Collection, MoveRow } from "../types.ts";
-import { DEFAULT_LOCALE, DROPPED_LOCALES } from "../lib/locales.ts";
+import type { Collection } from "../types.ts";
+import { DEFAULT_LOCALE } from "../lib/locales.ts";
 
 export const CONTENT_PREFIX = "apps/docs/content/";
 export const DOCS_PREFIX = "apps/docs/";
@@ -39,27 +36,6 @@ export const COLLECTION_DIR: Record<Collection, string> = {
   learn: "learn",
 };
 
-/**
- * R8: locale-only files English deleted long ago. Listed
- * explicitly so the move never deletes an unexpected file; `classify` also
- * reports any locale-only file outside this list.
- */
-export const R8_STALE_PATHS: readonly string[] = [
-  "clients/game-sdks.mdx",
-  "clients/go.mdx",
-  "clients/java.mdx",
-  "clients/javascript.mdx",
-  "clients/python.mdx",
-  "clients/rust.mdx",
-  "frontend/kit.mdx",
-  "intro/quick-start/cross-program-invocation.mdx",
-  "intro/quick-start/deploying-programs.mdx",
-  "intro/quick-start/program-derived-address.mdx",
-  "payments/accept-payments/payment-button.mdx",
-  "programs/faq.mdx",
-  "tools/private-channels.mdx",
-];
-
 export interface LegacyEntry {
   collection: Collection;
   /** "en" for the English source; cookbook is always "en". */
@@ -89,7 +65,6 @@ export function parseLegacyPath(repoPath: string): LegacyEntry | null {
 }
 
 export const isMdx = (rel: string) => rel.endsWith(".mdx");
-export const isMeta = (rel: string) => rel.endsWith("meta.json");
 
 /** "core/accounts/index.mdx" -> "/core/accounts"; "index.mdx" -> "". */
 export function routeSuffix(rel: string): string {
@@ -129,125 +104,6 @@ export function legacyPath(entry: LegacyEntry): string {
     return `${CONTENT_PREFIX}cookbook/${entry.rel}`;
   }
   return `${CONTENT_PREFIX}${COLLECTION_DIR[entry.collection]}/${entry.locale}/${entry.rel}`;
-}
-
-/** Rule id for a moved entry. */
-function moveRule(entry: LegacyEntry): MoveRow["rule"] {
-  const en = entry.locale === DEFAULT_LOCALE;
-  if (isMeta(entry.rel)) return "META";
-  if (!isMdx(entry.rel)) return "R9";
-  switch (entry.collection) {
-    case "docs":
-      return en ? "R1" : "R2";
-    case "cookbook":
-      return "R3";
-    case "bootcamp":
-      return en ? "R4" : "R5";
-    case "learn":
-      return en ? "R6" : "R7";
-  }
-}
-
-export interface ClassifyResult {
-  rows: MoveRow[];
-  /** Locale-only docs files that are not in R8_STALE_PATHS. */
-  unexpectedLocaleOnly: string[];
-}
-
-/**
- * Plan every legacy content file. R8 rows come out as `removed-redirect`
- * candidates; `move.ts` downgrades them to `kept-uncovered` when the redirect
- * check fails.
- */
-export function classify(files: readonly string[]): ClassifyResult {
-  const entries = files
-    .map((f) => ({ f, e: parseLegacyPath(f) }))
-    .filter((x): x is { f: string; e: LegacyEntry } => x.e !== null);
-
-  const enDocs = new Set(
-    entries
-      .filter((x) => x.e.collection === "docs" && x.e.locale === DEFAULT_LOCALE)
-      .map((x) => x.e.rel),
-  );
-  const r8 = new Set(R8_STALE_PATHS);
-  const unexpectedLocaleOnly: string[] = [];
-  const rows: MoveRow[] = [];
-
-  for (const { f, e } of entries) {
-    const url = isMdx(e.rel) ? legacyUrl(e) : "";
-    const base: Omit<MoveRow, "status" | "rule" | "dest"> = {
-      src: f,
-      url,
-      redirect: "",
-      note: "",
-    };
-
-    if (DROPPED_LOCALES.includes(e.locale)) {
-      const enEntry = { ...e, locale: DEFAULT_LOCALE };
-      rows.push({
-        ...base,
-        dest: "",
-        rule: "EL",
-        status: url ? "removed-redirect" : "removed",
-        redirect: url ? legacyUrl(enEntry) : "",
-        note: url
-          ? `Greek dropped (decisions.md); /${e.locale}${COLLECTION_BASE[e.collection]}/* -> ${COLLECTION_BASE[e.collection]}/*`
-          : "Greek dropped (decisions.md)",
-      });
-      continue;
-    }
-
-    if (
-      e.collection === "docs" &&
-      e.locale !== DEFAULT_LOCALE &&
-      isMdx(e.rel) &&
-      !enDocs.has(e.rel)
-    ) {
-      if (r8.has(e.rel)) {
-        rows.push({
-          ...base,
-          dest: "",
-          rule: "R8",
-          status: "removed-redirect",
-          note: "stale locale-only file (spec Q1/R8)",
-        });
-        continue;
-      }
-      unexpectedLocaleOnly.push(f);
-    }
-
-    const rule = moveRule(e);
-    rows.push({
-      ...base,
-      dest: newPath(e),
-      rule,
-      status:
-        rule === "META"
-          ? "moved-meta"
-          : rule === "R9"
-            ? "moved-asset"
-            : "moved",
-    });
-  }
-
-  // R8 URL collisions: the stale file shares its URL with a surviving file
-  // (tools/private-channels.mdx vs tools/private-channels/index.mdx).
-  const survivingByUrl = new Map<string, MoveRow>();
-  for (const row of rows) {
-    if (row.status === "moved" && row.url) survivingByUrl.set(row.url, row);
-  }
-  for (const row of rows) {
-    if (row.rule !== "R8") continue;
-    const partner = survivingByUrl.get(row.url);
-    if (partner) {
-      row.status = "removed-collision";
-      row.dest = partner.dest;
-      row.note = `stale locale-only file; same URL is served by ${partner.dest}`;
-    }
-  }
-
-  rows.sort((a, b) => (a.src < b.src ? -1 : a.src > b.src ? 1 : 0));
-  return { rows, unexpectedLocaleOnly };
 }
 
 /**

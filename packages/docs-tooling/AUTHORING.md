@@ -89,10 +89,6 @@ CLI commands (`src/cli.ts`). Unknown options are rejected before anything runs
 
 | Command                                                                   | Purpose                                                                                        |
 | ------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `legacy-urls [--ref <sha>]`                                               | Every URL the Fumadocs app served (git `023c6d918`) -> `migration/legacy-urls.{txt,tsv}`       |
-| `move [--dry-run]`                                                        | R1-R9 `git mv`/`git rm`, Greek removal, data + asset moves; writes `migration/move-map.csv`    |
-| `remove-next-app [--dry-run] [--force]`                                   | `git rm` the Next app                                                                          |
-| `verify-redirects`                                                        | apps/web redirect coverage for R8 files                                                        |
 | `verify-urls`                                                             | Legacy URL parity (10,970 URLs): file, apps/web redirect, cookbook rewrite or English fallback |
 | `convert [--files p] [--exclude p1,p2] [--locale l] [--check\|--dry-run]` | Run the auto-discovered transforms. `--check` fails if any file would change                   |
 | `residual [--json]`                                                       | Residual Fumadocs/Code Hike syntax scan (spec §4.4.2); every pattern must be 0                 |
