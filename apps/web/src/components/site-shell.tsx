@@ -13,7 +13,7 @@ import { getLangDir } from "rtl-detect";
 // shipped the site Header, Footer, and their dialogs.
 import { ThemeProvider } from "@solana-com/ui-chrome/theme-provider";
 import { SitewideTopAlert } from "@solana-com/ui-chrome/sitewide-top-alert";
-import { PersistentPodcastPlayer } from "@solana-com/ui-chrome/persistent-podcast-player";
+import { PodcastPlayer } from "@/components/podcast-player.client";
 import { GoogleTagManagerNoScript } from "@solana-com/ui-chrome/google-tag-manager-noscript";
 import { DocsSearch } from "@/components/docs/docs-search.client";
 import { DOCS_LOCALES } from "@/lib/docs/locales.mjs";
@@ -58,7 +58,7 @@ export function SiteShell({
               {header}
               {children}
               {footer}
-              <PersistentPodcastPlayer />
+              <PodcastPlayer />
               <DocsSearch
                 locale={DOCS_LOCALES.includes(locale) ? locale : defaultLocale}
               />
