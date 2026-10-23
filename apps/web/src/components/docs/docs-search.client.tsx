@@ -98,7 +98,12 @@ export function DocsSearch({ locale }: { locale: string }) {
             autoComplete="off"
             onChange={(event) => setSearch(event.target.value)}
             onKeyDown={(event) => {
-              if (event.key === "Enter" && pages[0]) {
+              // A type="search" field takes the first Escape to clear
+              // itself, so the dialog would need two; close it on the first.
+              if (event.key === "Escape") {
+                event.preventDefault();
+                setOpen(false);
+              } else if (event.key === "Enter" && pages[0]) {
                 setOpen(false);
                 router.push(pages[0].url);
               }
