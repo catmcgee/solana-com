@@ -21,8 +21,7 @@
  *
  * Which methods appear on which page, their parameters, result fields and
  * sample payloads are ported from the deleted Fumadocs components
- * (`packages/docs-tooling/legacy/surfpool/*.ts`, from
- * `apps/docs/src/lib/{rpc-endpoints,schema-parser,websocket-endpoints,
+ * (`apps/docs/src/lib/{rpc-endpoints,schema-parser,websocket-endpoints,
  * rpc-endpoint-categories}.ts` at 023c6d918). Deliberate differences:
  *   - parameters keep the schema's (positional) order; the old table moved
  *     object parameters after primitive ones;
@@ -118,7 +117,7 @@ export const SURFPOOL_SNIPPET_DIR = path.join(
 );
 
 // ---------------------------------------------------------------------------
-// Schema model (ported from legacy/surfpool/*.ts)
+// Schema model (ported from the legacy schema-parser.ts)
 // ---------------------------------------------------------------------------
 
 export interface SchemaNode {

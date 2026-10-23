@@ -206,13 +206,6 @@ export function stableJson(value: unknown): string {
   return `${JSON.stringify(value, null, 2)}\n`;
 }
 
-/** Two block definitions describe the same rendered block. */
-export function sameBlock(a: Block, b: Block): boolean {
-  return (
-    JSON.stringify(normalizeBlock(a)) === JSON.stringify(normalizeBlock(b))
-  );
-}
-
 export function normalizeBlock(b: Block): Block {
   const out: Block = {
     runnable: b.runnable,

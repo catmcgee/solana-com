@@ -1,16 +1,13 @@
 /**
  * Runnable examples.
  *
- * - `extract-blocks.ts`: legacy `<CodeTabs ... file=...>` blocks -> blocks.json
- *   in packages/docs-examples (pages are rewritten by the
- *   `codetabs-examples` convert transform, which derives the same ids);
  * - `build-examples.ts [--check]`: blocks.json + recorded `.output.txt`
  *   -> apps/docs/snippets/examples/**.mdx + index.json.
  * Blocks without recorded output get no Run button (decisions.md).
  *
  * `runExamples` is what `docs-tooling examples [--check]` calls. It is
  * synchronous and THROWS on errors or (with --check) stale output, so the CLI
- * exits non-zero. Standalone entry with more commands: `src/examples/main.ts`.
+ * exits non-zero.
  */
 import { buildExamples, type BuildResult } from "./build-examples.ts";
 
@@ -18,7 +15,7 @@ export interface ExamplesOptions {
   check?: boolean;
 }
 
-export function summarize(r: BuildResult, check: boolean): string {
+function summarize(r: BuildResult, check: boolean): string {
   const lines = [
     `examples: ${Object.keys(r.index).length} blocks, ${r.outputsEmbedded} recorded outputs embedded`,
   ];

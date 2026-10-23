@@ -23,8 +23,7 @@ be checked on a deployment is listed under "Release gates" below.
 | `apps/docs/<loc>/{developers/docs,learn}/**` | Translations for ar de es fi fr id it ja ko nl pl pt ru tr uk vi zh. Greek (`el`) was removed.                                                                                                                        |
 | `apps/docs/docs-assets/**`                   | Images/video served at `/docs-assets/<original public path>`.                                                                                                                                                         |
 | `packages/docs-tooling/`                     | All build/migration tooling (this package).                                                                                                                                                                           |
-| `packages/docs-tooling/data/`                | Data moved out of the Next app: Surfpool JSON schemas, bootcamp curriculum, learn order, legacy `resources.json`.                                                                                                     |
-| `packages/docs-tooling/legacy/`              | Legacy TypeScript kept for reference by later work packages (not compiled).                                                                                                                                           |
+| `packages/docs-tooling/data/`                | Data moved out of the Next app: Surfpool JSON schemas, bootcamp curriculum, learn order.                                                                                                                              |
 | `migration/` (repo root)                     | Review artifacts: `legacy-urls.{txt,tsv}`, `move-map.csv`, `assets-diff.txt`, `asset-refs.csv`, `docs-app-redirects.json`, `pending-web-work.json` (WP9/WP10 handoff), `verify-urls.tsv`, `missing-translations.txt`. |
 
 Rules for `apps/docs`:
@@ -97,15 +96,14 @@ CLI commands (`src/cli.ts`). Unknown options are rejected before anything runs
 
 Package scripts (`pnpm --filter @workspace/docs-tooling <script>`):
 
-| Script                                                                    | Entry                                                                    |
-| ------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| `convert`, `residual`, `verify`, `verify-urls`, `nav:*`, `examples:build` | `src/cli.ts`                                                             |
-| `examples:extract`                                                        | `src/examples/main.ts extract` (one-time; `blocks.json` per example dir) |
-| `gen:surfpool [--check\|--sync --ref main]`                               | `src/generators/surfpool-rpc.ts`                                         |
-| `gen:paths`, `gen:concepts`, `gen:addresses` `[--sync] [--check]`         | `src/generators/{paths,concepts,addresses}.ts`                           |
-| `gen:tags [--check]`                                                      | `src/generators/tags.ts`                                                 |
-| `gen:manifest`, `gen:llms` `[--check]`                                    | `src/manifest/cli.ts`                                                    |
-| `generate` / `generate:check`                                             | every generator, in dependency order                                     |
+| Script                                                                    | Entry                                          |
+| ------------------------------------------------------------------------- | ---------------------------------------------- |
+| `convert`, `residual`, `verify`, `verify-urls`, `nav:*`, `examples:build` | `src/cli.ts`                                   |
+| `gen:surfpool [--check\|--sync --ref main]`                               | `src/generators/surfpool-rpc.ts`               |
+| `gen:paths`, `gen:concepts`, `gen:addresses` `[--sync] [--check]`         | `src/generators/{paths,concepts,addresses}.ts` |
+| `gen:tags [--check]`                                                      | `src/generators/tags.ts`                       |
+| `gen:manifest`, `gen:llms` `[--check]`                                    | `src/manifest/cli.ts`                          |
+| `generate` / `generate:check`                                             | every generator, in dependency order           |
 
 ## Writing a convert transform
 
@@ -281,8 +279,8 @@ loads on production deployments only.
 
 Order (each step is idempotent; re-run from the top after any change):
 
-1. `examples:build --check` (and `examples:extract` once): `codetabs-examples`
-   errors when a snippet or `blocks.json` entry is missing.
+1. `examples:build --check`: `codetabs-examples` errors when a snippet or
+   `blocks.json` entry is missing.
 2. `convert` (write), then `convert --check` must report 0 changes.
 3. `generate`: `examples:build`, `gen:surfpool`, `gen:paths`,
    `gen:concepts --sync`, `gen:addresses --sync` (concepts reads the path pages,
@@ -302,9 +300,7 @@ frontmatter (`type` enum, parses), assets, every generator `--check`,
 `convert --check`.
 
 `convert --files` takes a path prefix or a comma-separated list of them
-(`--files docs/index.mdx,docs/core`). The WP8a writer pages were converted this
-way at WP13; `scripts/protected-convert.py` (skip pages that differ from HEAD)
-is only needed again if hand edits and a corpus-wide convert overlap.
+(`--files docs/index.mdx,docs/core`).
 
 Lingo lock after a convert: run
 `node scripts/i18n/rekey-lock.mjs --rehash --source-changed packages/docs-tooling/data/lingo-source-changed.txt`.
@@ -580,8 +576,8 @@ must ship as a root CSS file.
 
 ## Legacy sources
 
-The Fumadocs app was deleted in WP1. Anything not moved into `data/` or
-`legacy/` is available from the pre-migration commit:
+The Fumadocs app was deleted in WP1. Anything not moved into `data/` is
+available from the pre-migration commit:
 
 ```bash
 git show 023c6d918:apps/docs/src/app/llms.txt/route.ts        # llms.txt header (WP9)
