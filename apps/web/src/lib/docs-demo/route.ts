@@ -1,6 +1,7 @@
 import { checkBotId } from "botid/server";
 import { allow, clientKey } from "@/lib/delivery-vs-payment/server/rateLimit";
 import {
+  DemoCapped,
   demoConfigured,
   DemoUnconfigured,
   DemoUnfunded,
@@ -11,12 +12,13 @@ import {
 /**
  * POST handler for one demo on "Solana in action": a real devnet USDC
  * transfer, answered with `{ signature, ms }` once it's confirmed, or
- * `{ error }` with one of "rate-limited", "bot", "unconfigured", "unfunded",
- * or "failed". The scenes still play on an error; they just leave out the
+ * `{ error }` with one of "rate-limited", "capped", "bot", "unconfigured",
+ * "unfunded", or "failed". The scenes still play on an error; they just leave out the
  * Explorer link.
  *
  * Browser calls only: BotId (instrumentation-client.ts protects these paths)
- * plus in-memory limits per IP a minute and per instance an hour. BotId runs
+ * plus in-memory limits per IP a minute and per instance an hour, then the
+ * onchain daily cap across all instances (server.ts). BotId runs
  * on Vercel only; elsewhere (next start locally) the route answers "bot"
  * unless the wallets are missing, in which case it answers "unconfigured"
  * first.
@@ -52,6 +54,7 @@ export function demoRoute(kind: DemoKind, perMinute: number) {
     } catch (error) {
       if (error instanceof DemoUnconfigured)
         return json({ error: "unconfigured" }, 503);
+      if (error instanceof DemoCapped) return json({ error: "capped" }, 429);
       if (error instanceof DemoUnfunded)
         return json({ error: "unfunded" }, 503);
       // Never the error text: an RPC error can carry the keyed RPC URL.

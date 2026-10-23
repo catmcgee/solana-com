@@ -7,7 +7,12 @@
  * real devnet USDC transfer from the payer to the payee, with the payer as
  * fee payer, and reports how long it took to confirm. When the payer runs
  * low, the same transaction first moves the payee's USDC back, so the test
- * USDC only goes round in a circle; only the SOL fees are spent.
+ * USDC only goes round in a circle; only the SOL fees are spent. Nothing
+ * here takes a recipient or an amount from the request: both are fixed below.
+ *
+ * Every demo transfer carries a memo, and the payer's own history caps them
+ * at DEMO_DAILY_CAP a day across every instance (default 500, see
+ * onchainLimits.ts). Past that the routes answer "capped".
  *
  * DEMO_PAYER_SECRET_KEY and DEMO_PAYEE_SECRET_KEY hold each wallet's 64-byte
  * secret key as a JSON array (solana-keygen's format). They are set in
@@ -40,6 +45,12 @@ import {
   getTransferCheckedInstruction,
   TOKEN_PROGRAM_ADDRESS,
 } from "@solana-program/token";
+import {
+  dailyCapReached,
+  envNumber,
+  memoInstruction,
+  MEMOS,
+} from "./onchainLimits";
 
 /** Circle's devnet USDC, as in the Quickstart. */
 export const DEVNET_USDC = address(
@@ -57,6 +68,8 @@ const CONFIRM_TIMEOUT_MS = 20_000;
 export class DemoUnconfigured extends Error {}
 /** The wallets don't hold enough USDC between them. */
 export class DemoUnfunded extends Error {}
+/** The day's demo transfers, counted onchain, are used up. */
+export class DemoCapped extends Error {}
 
 export function demoConfigured(): boolean {
   return !!(
@@ -147,7 +160,16 @@ async function transfer(
     });
   const ixs: Instruction[] = [createAta(payee, payeeAta)];
 
-  const balance = await tokenBalance(rpc, payerAta);
+  const [capped, balance] = await Promise.all([
+    dailyCapReached(
+      rpc,
+      payer.address,
+      MEMOS.demo,
+      envNumber("DEMO_DAILY_CAP", 500),
+    ),
+    tokenBalance(rpc, payerAta),
+  ]);
+  if (capped) throw new DemoCapped("daily cap reached");
   if (balance < amount) {
     // Running low: bring the payee's USDC back first, in the same
     // transaction.
@@ -174,6 +196,7 @@ async function transfer(
       amount,
       decimals: DECIMALS,
     }),
+    memoInstruction(MEMOS.demo),
   );
 
   const { value: blockhash } = await rpc

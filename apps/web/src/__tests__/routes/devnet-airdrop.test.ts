@@ -8,6 +8,7 @@ import {
   getU64Decoder,
 } from "@solana/kit";
 import { POST } from "@/app/api/devnet-airdrop/route";
+import { ipKey } from "@/lib/delivery-vs-payment/server/rateLimit";
 
 const mocks = vi.hoisted(() => ({
   createSolanaRpc: vi.fn(),
@@ -15,6 +16,8 @@ const mocks = vi.hoisted(() => ({
   history: new Set<string>(),
   sent: [] as string[],
   sendError: undefined as Error | undefined,
+  /** The faucet wallet's recent signatures, newest first. */
+  faucetSigs: [] as { memo: string | null; blockTime: bigint | null }[],
 }));
 vi.mock("@solana/kit", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@solana/kit")>()),
@@ -22,7 +25,15 @@ vi.mock("@solana/kit", async (importOriginal) => ({
 }));
 
 const FAKE_HELIUS_KEY = "test-helius-key";
-const FAUCET_SOL = 1_000_000_000n;
+const FAUCET_SOL = 100_000_000_000n; // 100 SOL
+const MEMO = "solana.com quickstart airdrop";
+const now = () => BigInt(Math.floor(Date.now() / 1000));
+/** `n` signatures the faucet sent `ageSeconds` ago, memo as the RPC shows it. */
+const faucetSigs = (n: number, memo: string | null, ageSeconds = 60) =>
+  Array.from({ length: n }, () => ({
+    memo: memo && `[${memo.length}] ${memo}`,
+    blockTime: now() - BigInt(ageSeconds),
+  }));
 
 /** A throwaway keypair in solana-keygen's JSON format (test only). */
 function keypairJson(): string {
@@ -44,7 +55,11 @@ function fakeRpc() {
     }),
     getSignaturesForAddress: (address: string) => ({
       send: async () =>
-        mocks.history.has(address) ? [{ signature: "1".repeat(88) }] : [],
+        address === faucetAddress
+          ? mocks.faucetSigs
+          : mocks.history.has(address)
+            ? [{ signature: "1".repeat(88) }]
+            : [],
     }),
     getLatestBlockhash: () => ({
       send: async () => ({
@@ -76,11 +91,18 @@ function lastTransfer() {
   );
   const msg = getCompiledTransactionMessageDecoder().decode(tx.messageBytes);
   if (msg.version === 1) throw new Error("unexpected v1 message");
-  const [ix] = msg.instructions;
+  const [ix, memo] = msg.instructions;
   const accounts = ix!.accountIndices!.map((i) => msg.staticAccounts[i]);
   // System Program Transfer: u32 instruction index 2, then u64 lamports.
   const amount = getU64Decoder().decode(ix!.data!.subarray(4));
-  return { feePayer: msg.staticAccounts[0], accounts, amount };
+  return {
+    feePayer: msg.staticAccounts[0],
+    accounts,
+    amount,
+    instructions: msg.instructions.length,
+    memoProgram: memo && msg.staticAccounts[memo.programAddressIndex],
+    memo: memo && new TextDecoder().decode(memo.data),
+  };
 }
 
 function request(body: string, contentType: string, ip: string) {
@@ -107,6 +129,7 @@ beforeEach(async () => {
   mocks.history = new Set([faucetAddress]);
   mocks.sent = [];
   mocks.sendError = undefined;
+  mocks.faucetSigs = [];
   mocks.createSolanaRpc.mockImplementation(fakeRpc);
 });
 
@@ -130,6 +153,74 @@ describe("devnet airdrop route", () => {
     expect(transfer.feePayer).toBe(faucetAddress);
     expect(transfer.accounts).toEqual([faucetAddress, address]);
     expect(transfer.amount).toBe(20_000_000n);
+    expect(transfer.instructions).toBe(2);
+    expect(transfer.memoProgram).toBe(
+      "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr",
+    );
+    expect(transfer.memo).toBe(MEMO);
+  });
+
+  it("caps airdrops across all instances at 50 a day, counted from the faucet's tagged transfers", async () => {
+    // 49 airdrops today, plus demo transfers and older airdrops that don't count.
+    mocks.faucetSigs = [
+      ...faucetSigs(30, MEMO),
+      ...faucetSigs(200, "solana.com docs demo"),
+      ...faucetSigs(19, MEMO, 23 * 60 * 60),
+      ...faucetSigs(5, null),
+      ...faucetSigs(100, MEMO, 25 * 60 * 60),
+    ];
+    expect(
+      (await POST(jsonRequest("SysvarS1otHashes111111111111111111111111111")))
+        .status,
+    ).toBe(200);
+    expect(mocks.sent).toHaveLength(1);
+
+    mocks.faucetSigs = [...faucetSigs(1, MEMO), ...mocks.faucetSigs];
+    const response = await POST(
+      jsonRequest("SysvarStakeHistory1111111111111111111111111"),
+    );
+    expect(response.status).toBe(429);
+    expect((await response.json()).error).toBe(
+      "Airdrop limit reached. Get devnet SOL at https://faucet.solana.com instead.",
+    );
+    expect(mocks.sent).toHaveLength(1);
+  });
+
+  it("reads the daily cap from AIRDROP_DAILY_CAP", async () => {
+    vi.stubEnv("AIRDROP_DAILY_CAP", "2");
+    mocks.faucetSigs = faucetSigs(2, MEMO);
+    const response = await POST(
+      jsonRequest("SysvarEpochSchedu1e111111111111111111111111"),
+    );
+    expect(response.status).toBe(429);
+    expect(mocks.sent).toHaveLength(0);
+  });
+
+  it("fails closed when a full page of signatures is all inside the last day", async () => {
+    mocks.faucetSigs = faucetSigs(1000, null);
+    const response = await POST(
+      jsonRequest("SysvarFees111111111111111111111111111111111"),
+    );
+    expect(response.status).toBe(429);
+    expect(mocks.sent).toHaveLength(0);
+  });
+
+  it("keeps a 5 SOL reserve in the faucet wallet (503, pointing to faucet.solana.com)", async () => {
+    mocks.balances.set(faucetAddress, 5_019_999_999n);
+    const response = await POST(
+      jsonRequest("SysvarRewards111111111111111111111111111111"),
+    );
+    expect(response.status).toBe(503);
+    expect((await response.json()).error).toContain(
+      "https://faucet.solana.com",
+    );
+    expect(mocks.sent).toHaveLength(0);
+
+    mocks.balances.set(faucetAddress, 5_020_000_000n);
+    expect(
+      (await POST(jsonRequest("AddressLookupTab1e1111111111111111111111111")))
+        .status,
+    ).toBe(200);
   });
 
   it("uses public devnet without a Helius key", async () => {
@@ -196,19 +287,67 @@ describe("devnet airdrop route", () => {
     expect(mocks.sent).toHaveLength(1);
   });
 
-  it("allows a few requests per IP an hour", async () => {
-    const addresses = [
+  it("allows one request per IP a day", async () => {
+    const statuses = [];
+    for (const address of [
       "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
       "ComputeBudget111111111111111111111111111111",
-      "AddressLookupTab1e1111111111111111111111111",
-      "BPFLoaderUpgradeab1e11111111111111111111111",
-    ];
-    const statuses = [];
-    for (const address of addresses) {
+    ]) {
       statuses.push((await POST(jsonRequest(address, "10.1.0.3"))).status);
     }
-    expect(statuses).toEqual([200, 200, 200, 429]);
-    expect(mocks.sent).toHaveLength(3);
+    expect(statuses).toEqual([200, 429]);
+    expect(mocks.sent).toHaveLength(1);
+  });
+
+  it("keys IPv6 callers by their /64, so rotating within it doesn't help", async () => {
+    expect(ipKey("2001:db8:1:2:aaaa::1")).toBe("2001:db8:1:2::/64");
+    expect(ipKey("2001:0db8:0001:0002:ffff:1:2:3")).toBe("2001:db8:1:2::/64");
+    expect(ipKey("2001:db8::1")).toBe("2001:db8:0:0::/64");
+    expect(ipKey("::ffff:192.0.2.7")).toBe("192.0.2.7");
+    expect(ipKey("192.0.2.7")).toBe("192.0.2.7");
+
+    const first = await POST(
+      jsonRequest(
+        "SysvarLastRestartS1ot1111111111111111111111",
+        "2001:db8:1:2::10",
+      ),
+    );
+    const sameSlash64 = await POST(
+      jsonRequest(
+        "Feature111111111111111111111111111111111111",
+        "2001:db8:1:2:dead:beef:0:1",
+      ),
+    );
+    const otherSlash64 = await POST(
+      jsonRequest(
+        "NativeLoader1111111111111111111111111111111",
+        "2001:db8:1:3::10",
+      ),
+    );
+    expect([first.status, sameSlash64.status, otherSlash64.status]).toEqual([
+      200, 429, 200,
+    ]);
+    // IPv4 neighbours stay separate.
+    expect(
+      (
+        await POST(
+          jsonRequest(
+            "BPFLoader2111111111111111111111111111111111",
+            "10.9.0.1",
+          ),
+        )
+      ).status,
+    ).toBe(200);
+    expect(
+      (
+        await POST(
+          jsonRequest(
+            "BPFLoader1111111111111111111111111111111111",
+            "10.9.0.2",
+          ),
+        )
+      ).status,
+    ).toBe(200);
   });
 
   it("answers 503, pointing to faucet.solana.com, when the faucet wallet is out of SOL", async () => {

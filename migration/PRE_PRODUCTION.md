@@ -45,6 +45,25 @@ search engines without any extra switches. Undo the preview-only bits:
       `/api/demo/checkout` and `/api/demo/paywall-call` answer 503 and the
       scenes show "Explorer link unavailable".
 
+## Devnet wallet limits
+
+The routes already cap spending onchain, across every instance: at most
+AIRDROP_DAILY_CAP airdrops a day (default 50, so 1 SOL a day), never below
+AIRDROP_RESERVE_SOL left in the faucet wallet (default 5), and at most
+DEMO_DAILY_CAP demo transfers a day (default 500, fees only). Recipients and
+amounts are fixed server-side. Add Vercel Firewall rate limits in front, so a
+burst can't overshoot the caps or burn the RPC quota:
+
+- [ ] `/api/devnet-airdrop`: 1 request per IP. Vercel's longest window is
+      10 minutes on Pro (1 hour on Enterprise), so use the longest window
+      available; the route itself allows 1 per IP and 1 per wallet a day.
+      Fixed window, key IP, action Deny (429).
+- [ ] `/api/demo/*` (path starts with): 10 requests per IP per minute, looser
+      because readers tap the demos repeatedly. Fixed window, key IP, Deny.
+- [ ] Optionally the same for `/api/dvp-demo/*`, which spends its own
+      treasury (DVP_DEMO_TREASURY_SECRET) on fees and rent.
+- [ ] Set the caps per environment if production needs different numbers.
+
 ## Search and Ask AI (Inkeep)
 
 - [ ] Set the server-only `INKEEP_API_KEY` in Vercel (Preview now, Production

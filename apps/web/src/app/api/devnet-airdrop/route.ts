@@ -16,7 +16,17 @@ import {
   type Signature,
 } from "@solana/kit";
 import { getTransferSolInstruction } from "@solana-program/system";
-import { allow, clientKey } from "@/lib/delivery-vs-payment/server/rateLimit";
+import {
+  allow,
+  clientKey,
+  ipKey,
+} from "@/lib/delivery-vs-payment/server/rateLimit";
+import {
+  dailyCapReached,
+  envNumber,
+  memoInstruction,
+  MEMOS,
+} from "@/lib/docs-demo/onchainLimits";
 
 /**
  * POST /api/devnet-airdrop: 0.02 devnet SOL for a new Quickstart wallet, sent
@@ -27,7 +37,12 @@ import { allow, clientKey } from "@/lib/delivery-vs-payment/server/rateLimit";
  * Each wallet is funded once, enforced onchain rather than in a database: the
  * recipient must have a zero balance and no transaction history. The transfer
  * itself gives it history, so it can never be funded again. In-memory limits
- * per IP, per address, and per instance (see rateLimit.ts) sit on top.
+ * per IP, per address, and per instance (see rateLimit.ts) are a cheap first
+ * layer. Across all instances, each transfer carries a memo and the faucet
+ * wallet's own history caps them at AIRDROP_DAILY_CAP a day (default 50, see
+ * onchainLimits.ts), and it never sends below AIRDROP_RESERVE_SOL (default 5),
+ * which keeps the demos running. The amount is fixed here, never read from
+ * the request, so the worst case is the cap times 0.02 SOL a day.
  *
  * 0.02 SOL is about twice what the Quickstart's five steps spend: the
  * TypeScript tabs use 0.0098 SOL (fees, plus deposits for the recipient's USDC
@@ -46,11 +61,15 @@ import { allow, clientKey } from "@/lib/delivery-vs-payment/server/rateLimit";
 export const runtime = "nodejs";
 
 const AMOUNT = 20_000_000n; // 0.02 SOL
-// The fee, plus the rent-exempt minimum the faucet wallet itself must keep.
-const FAUCET_RESERVE = 1_000_000n;
+const LAMPORTS_PER_SOL = 1_000_000_000;
+/** Airdrops a day across every instance, counted onchain. */
+const dailyCap = () => envNumber("AIRDROP_DAILY_CAP", 50);
+/** SOL the faucet wallet always keeps, so the demos it pays for keep working. */
+const reserve = () =>
+  BigInt(Math.round(envNumber("AIRDROP_RESERVE_SOL", 5) * LAMPORTS_PER_SOL));
 const HOUR = 60 * 60 * 1000;
 const PER_ADDRESS = { limit: 1, windowMs: 24 * HOUR };
-const PER_IP = { limit: 3, windowMs: HOUR };
+const PER_IP = { limit: 1, windowMs: 24 * HOUR };
 const GLOBAL = { limit: 100, windowMs: HOUR };
 const FAUCET = "https://faucet.solana.com";
 const ELSEWHERE = `Get devnet SOL at ${FAUCET} instead.`;
@@ -139,6 +158,7 @@ async function send(rpc: DevnetRpc, faucet: KeyPairSigner, to: Address) {
             destination: to,
             amount: lamports(AMOUNT),
           }),
+          memoInstruction(MEMOS.airdrop),
         ],
         m,
       ),
@@ -166,7 +186,11 @@ export async function POST(request: Request) {
   }
 
   if (
-    !allow(`airdrop:ip:${clientKey(request)}`, PER_IP.limit, PER_IP.windowMs) ||
+    !allow(
+      `airdrop:ip:${ipKey(clientKey(request))}`,
+      PER_IP.limit,
+      PER_IP.windowMs,
+    ) ||
     !allow(
       `airdrop:address:${address}`,
       PER_ADDRESS.limit,
@@ -191,11 +215,15 @@ export async function POST(request: Request) {
         409,
       );
     }
-    const { value: left } = await rpc
-      .getBalance(faucet.address, { commitment: "confirmed" })
-      .send();
-    if (left < AMOUNT + FAUCET_RESERVE) {
-      return unavailable(); // out of SOL: refill from faucet.solana.com
+    const [{ value: left }, capped] = await Promise.all([
+      rpc.getBalance(faucet.address, { commitment: "confirmed" }).send(),
+      dailyCapReached(rpc, faucet.address, MEMOS.airdrop, dailyCap()),
+    ]);
+    if (left < AMOUNT + reserve()) {
+      return unavailable(); // down to the reserve: refill from faucet.solana.com
+    }
+    if (capped) {
+      return json({ error: `Airdrop limit reached. ${ELSEWHERE}` }, 429);
     }
     return json({ signature: await send(rpc, faucet, address) });
   } catch {

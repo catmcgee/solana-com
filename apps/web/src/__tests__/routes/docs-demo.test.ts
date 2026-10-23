@@ -12,6 +12,8 @@ const mocks = vi.hoisted(() => ({
   balances: new Map<string, string>(),
   sent: [] as string[],
   status: "confirmed" as string | null,
+  /** The payer's recent signatures, newest first. */
+  payerSigs: [] as { memo: string | null; blockTime: bigint | null }[],
 }));
 
 vi.mock("botid/server", () => ({
@@ -51,6 +53,7 @@ function fakeRpc() {
         return { value: { amount } };
       },
     }),
+    getSignaturesForAddress: () => ({ send: async () => mocks.payerSigs }),
     getLatestBlockhash: () => ({
       send: async () => ({
         value: {
@@ -102,6 +105,7 @@ beforeEach(() => {
   mocks.isBot = false;
   mocks.status = "confirmed";
   mocks.sent = [];
+  mocks.payerSigs = [];
   mocks.balances = new Map([
     ["payer", "10000000"],
     ["payee", "0"],
@@ -127,9 +131,10 @@ describe("demo transfer routes", () => {
     expect(mocks.createSolanaRpc).toHaveBeenCalledWith(
       "https://devnet.helius-rpc.com/?api-key=test-key",
     );
-    // Create the shop's token account if needed, then the transfer.
+    // Create the shop's token account if needed, the transfer, the memo.
     const ixs = lastInstructions();
-    expect(ixs).toHaveLength(2);
+    expect(ixs).toHaveLength(3);
+    expect(new TextDecoder().decode(ixs[2].data)).toBe("solana.com docs demo");
     // TransferChecked (12), 1_000_000 base units, 6 decimals.
     const data = ixs[1].data!;
     expect(data[0]).toBe(12);
@@ -161,8 +166,8 @@ describe("demo transfer routes", () => {
     const { checkout } = await routes();
     expect((await checkout(post("/api/demo/checkout"))).status).toBe(200);
     const ixs = lastInstructions();
-    // Payee ATA, payer ATA, the transfer back, then the payment.
-    expect(ixs).toHaveLength(4);
+    // Payee ATA, payer ATA, the transfer back, the payment, the memo.
+    expect(ixs).toHaveLength(5);
     const back = ixs[2].data!;
     expect(
       new DataView(back.buffer, back.byteOffset).getBigUint64(1, true),
@@ -179,6 +184,34 @@ describe("demo transfer routes", () => {
     expect(res.status).toBe(503);
     expect(await res.json()).toEqual({ error: "unfunded" });
     expect(mocks.sent).toHaveLength(0);
+  });
+
+  it("caps demo transfers across all instances at 500 a day, counted onchain", async () => {
+    const recent = (n: number, memo: string | null, ageSeconds = 60) =>
+      Array.from({ length: n }, () => ({
+        memo: memo && `[${memo.length}] ${memo}`,
+        blockTime: BigInt(Math.floor(Date.now() / 1000) - ageSeconds),
+      }));
+    mocks.payerSigs = [
+      ...recent(499, "solana.com docs demo"),
+      ...recent(40, "solana.com quickstart airdrop"),
+      ...recent(300, "solana.com docs demo", 25 * 60 * 60),
+    ];
+    const { checkout, paywall } = await routes();
+    expect((await checkout(post("/api/demo/checkout"))).status).toBe(200);
+
+    mocks.payerSigs = [
+      ...recent(1, "solana.com docs demo"),
+      ...mocks.payerSigs,
+    ];
+    for (const res of [
+      await checkout(post("/api/demo/checkout")),
+      await paywall(post("/api/demo/paywall-call")),
+    ]) {
+      expect(res.status).toBe(429);
+      expect(await res.json()).toEqual({ error: "capped" });
+    }
+    expect(mocks.sent).toHaveLength(1);
   });
 
   it("answers unconfigured without the wallet keys, and never reads the RPC", async () => {
