@@ -9,6 +9,7 @@ import {
   type FocusEvent,
   type MouseEvent,
   type PointerEvent,
+  type Ref,
 } from "react";
 import {
   usePolledState,
@@ -37,7 +38,8 @@ import concepts from "../../../../docs/concepts/concepts.en.json";
  *   and an Explorer link; the tile itself also links to Explorer. While a
  *   popup is open the feed holds still.
  *
- * Polling and stepping pause while the tab is hidden. With reduced motion,
+ * Nothing polls until the feed is near the viewport, so it costs the page
+ * nothing at first paint. Polling and stepping pause while the tab is hidden. With reduced motion,
  * the feed polls every two seconds and redraws in place, with no stepping
  * or sliding.
  */
@@ -119,7 +121,52 @@ function slotMs(samples: Sample[]): number | null {
 
 const POP_ID = "sol-live-pop";
 
+/** The feed, once it's within a screen of the viewport. */
 export function LiveFeed() {
+  const ref = useRef<HTMLDivElement>(null);
+  const [near, setNear] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof IntersectionObserver === "undefined") {
+      setNear(true);
+      return;
+    }
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setNear(true);
+          io.disconnect();
+        }
+      },
+      { rootMargin: "100% 0px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+  return near ? <Feed /> : <Waiting ref={ref} failed={false} />;
+}
+
+function Waiting({
+  ref,
+  failed,
+}: {
+  ref?: Ref<HTMLDivElement>;
+  failed: boolean;
+}) {
+  return (
+    <div
+      ref={ref}
+      className="sol-live not-prose"
+      data-state={failed ? "off" : "wait"}
+    >
+      <p className="sol-live-quiet">
+        {failed ? "Live data unavailable." : "Loading live mainnet data…"}
+      </p>
+    </div>
+  );
+}
+
+function Feed() {
   const reduced = useReducedMotion();
   const { data, failed } = usePolledState<TipPayload>(
     "/api/slot-time/tip",
@@ -284,15 +331,7 @@ export function LiveFeed() {
     };
   }
 
-  if (!data) {
-    return (
-      <div className="sol-live not-prose" data-state={failed ? "off" : "wait"}>
-        <p className="sol-live-quiet">
-          {failed ? "Live data unavailable." : "Loading live mainnet data…"}
-        </p>
-      </div>
-    );
-  }
+  if (!data) return <Waiting failed={failed} />;
 
   const head = shown || data.tip;
   const map = known.current;

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -40,6 +41,31 @@ function touch(el: Element) {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("docs LiveFeed", () => {
+  it("doesn't poll until the feed is near the viewport", async () => {
+    serve(tip(460_172_365));
+    let show = () => {};
+    vi.stubGlobal(
+      "IntersectionObserver",
+      class {
+        constructor(cb: IntersectionObserverCallback) {
+          show = () =>
+            cb(
+              [{ isIntersecting: true } as IntersectionObserverEntry],
+              this as unknown as IntersectionObserver,
+            );
+        }
+        observe() {}
+        disconnect() {}
+      },
+    );
+    render(<LiveFeed />);
+    await new Promise((r) => setTimeout(r, 50));
+    expect(fetch).not.toHaveBeenCalled();
+    expect(screen.getByText("Loading live mainnet data…")).toBeTruthy();
+    act(() => show());
+    expect(await screen.findByText("386")).toBeTruthy();
+  });
+
   it("shows each block as a tile, linked to Explorer, and no transaction list", async () => {
     serve(tip(460_172_365));
     render(<LiveFeed />);
