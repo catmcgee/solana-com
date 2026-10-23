@@ -33,6 +33,12 @@ search engines without any extra switches. Undo the preview-only bits:
       in Vercel Production; the current key is preview-only and must be
       rotated. Without it, the Quickstart's `/api/devnet-airdrop` answers 503
       and readers are sent to faucet.solana.com.
+- [ ] Give the "Solana in action" demos their own production wallets: new
+      DEMO_PAYER_SECRET_KEY and DEMO_PAYEE_SECRET_KEY in Vercel Production
+      (the current ones are preview-only), and fund the new payer with devnet
+      SOL for fees and devnet USDC from faucet.circle.com. Without them,
+      `/api/demo/checkout` and `/api/demo/paywall-call` answer 503 and the
+      scenes show "Explorer link unavailable".
 
 ## Translations
 

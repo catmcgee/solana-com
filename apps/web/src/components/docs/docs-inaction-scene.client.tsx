@@ -5,12 +5,16 @@ import { Icon } from "@/components/tx-walkthrough/tx-walkthrough.client";
 
 /**
  * <InActionScene kind="checkout" /> and <InActionScene kind="paywall" /> on
- * "Solana in action": one device, one action, and the result, in the spirit
- * of payments.org's live demo.
+ * "Solana in action": one action and its result, in the spirit of
+ * payments.org's live demo. Each action sends a real devnet USDC transfer
+ * through /api/demo/checkout or /api/demo/paywall-call (server-held test
+ * wallets) and links it to Explorer once it's confirmed, with the measured
+ * confirmation time. If the route can't send one (no wallets on this
+ * deployment, out of test USDC, rate-limited), the scene still plays and
+ * says quietly that the Explorer link is unavailable.
  *
- * Each scene plays by itself once it scrolls into view, and its button runs
- * it again. With reduced motion the scene starts at its end state and the
- * buttons change the state without animating.
+ * Each scene runs once by itself when it scrolls into view, and its button
+ * runs it again. Reduced motion drops the animation, not the transaction.
  */
 export type SceneKind = "checkout" | "paywall";
 
@@ -18,11 +22,58 @@ export function InActionScene({ kind }: { kind: SceneKind }) {
   return kind === "checkout" ? <CheckoutScene /> : <PaywallScene />;
 }
 
+/** The shortest a pending state shows, so a fast reply still reads. */
 const PENDING_MS = 750;
 const LINE_MS = 520;
 const AUTO_CALLS = 3;
 const CALL_GAP_MS = 1_600;
 const PRICE = 0.001;
+const TIMEOUT_MS = 25_000;
+const EXPLORER = "https://explorer.solana.com/tx";
+
+/** A confirmed devnet transfer, or null when none was sent. */
+type Sent = { signature: string; ms: number } | null;
+
+async function sendTransfer(path: string): Promise<Sent> {
+  try {
+    const res = await fetch(path, {
+      method: "POST",
+      signal: AbortSignal.timeout?.(TIMEOUT_MS),
+    });
+    if (!res.ok) return null;
+    const body = (await res.json()) as Partial<{
+      signature: string;
+      ms: number;
+    }>;
+    return typeof body.signature === "string" && typeof body.ms === "number"
+      ? { signature: body.signature, ms: body.ms }
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Seconds with one decimal, never "0.0". */
+function seconds(ms: number) {
+  return `${Math.max(0.1, ms / 1000).toFixed(1)} s`;
+}
+
+function ExplorerLink({ sent }: { sent: Sent }) {
+  return sent ? (
+    <a
+      className="sol-scene-tx"
+      href={`${EXPLORER}/${sent.signature}?cluster=devnet`}
+      target="_blank"
+      rel="noopener"
+    >
+      View on Explorer
+    </a>
+  ) : (
+    <span className="sol-scene-tx" data-off="">
+      Explorer link unavailable
+    </span>
+  );
+}
 
 function useReducedMotion() {
   const [reduced, setReduced] = useState(false);
@@ -59,13 +110,21 @@ function useSeen<T extends HTMLElement>() {
   return [ref, seen] as const;
 }
 
-/** setTimeout that is cleared when the component unmounts. */
-function useTimers() {
-  const ids = useRef<number[]>([]);
-  useEffect(() => () => ids.current.forEach((id) => clearTimeout(id)), []);
-  return useCallback((fn: () => void, ms: number) => {
-    ids.current.push(window.setTimeout(fn, ms));
+/** A promise that resolves after `ms`, or at once with reduced motion. */
+function useWait(reduced: boolean) {
+  const alive = useRef(true);
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
   }, []);
+  const wait = useCallback(
+    (ms: number) =>
+      new Promise<void>((r) => (reduced ? r() : setTimeout(r, ms))),
+    [reduced],
+  );
+  return [wait, alive] as const;
 }
 
 type PayPhase = "idle" | "pending" | "done";
@@ -73,41 +132,36 @@ type PayPhase = "idle" | "pending" | "done";
 function CheckoutScene() {
   const reduced = useReducedMotion();
   const [ref, seen] = useSeen<HTMLDivElement>();
-  const later = useTimers();
+  const [wait, alive] = useWait(reduced);
   const [phase, setPhase] = useState<PayPhase>("idle");
+  const [sent, setSent] = useState<Sent>(null);
   const [order, setOrder] = useState(1001);
   const started = useRef(false);
 
-  const pay = useCallback(() => {
+  const pay = useCallback(async () => {
     started.current = true;
     if (phase === "pending") return;
     if (phase === "done") setOrder((n) => n + 1);
-    if (reduced) {
-      setPhase("done");
-      return;
-    }
     setPhase("pending");
-    later(() => setPhase("done"), PENDING_MS);
-  }, [phase, reduced, later]);
-
-  // Reduced motion: start paid.
-  useEffect(() => {
-    if (reduced && !started.current) {
-      started.current = true;
-      setPhase("done");
-    }
-  }, [reduced]);
+    const [result] = await Promise.all([
+      sendTransfer("/api/demo/checkout"),
+      wait(PENDING_MS),
+    ]);
+    if (!alive.current) return;
+    setSent(result);
+    setPhase("done");
+  }, [phase, wait, alive]);
 
   // Pay once by itself when the scene comes into view.
   useEffect(() => {
-    if (!seen || reduced || started.current) return;
-    later(() => {
-      if (!started.current) pay();
+    if (!seen || started.current) return;
+    const id = setTimeout(() => {
+      if (!started.current) void pay();
     }, 600);
-  }, [seen, reduced, later, pay]);
+    return () => clearTimeout(id);
+  }, [seen, pay]);
 
   const done = phase === "done";
-  const label = `Order #${order}`;
 
   return (
     <div
@@ -134,8 +188,9 @@ function CheckoutScene() {
           type="button"
           className="sol-scene-btn"
           data-state={phase}
-          disabled={phase === "pending"}
-          onClick={pay}
+          disabled={phase !== "idle"}
+          onClick={() => void pay()}
+          aria-live="polite"
         >
           {phase === "pending" ? (
             <>
@@ -143,108 +198,81 @@ function CheckoutScene() {
             </>
           ) : done ? (
             <>
-              <CheckIcon /> Paid
+              <CheckIcon /> {sent ? `Paid in ${seconds(sent.ms)}` : "Paid"}
             </>
           ) : (
             "Pay 1 USDC"
           )}
         </button>
+        <p className="sol-scene-foot">
+          {done ? (
+            <>
+              <ExplorerLink sent={sent} />
+              <button
+                type="button"
+                className="sol-scene-again"
+                onClick={() => void pay()}
+              >
+                Pay again
+              </button>
+            </>
+          ) : null}
+        </p>
       </div>
 
-      <div className="sol-scene-link" aria-hidden="true">
-        <svg viewBox="0 0 200 40" preserveAspectRatio="none">
-          <path className="sol-scene-arc" d="M4 36 Q100 -10 196 36" />
-        </svg>
-      </div>
-
-      <div className="sol-scene-receipt" aria-live="polite">
+      <div className="sol-scene-note" aria-live="polite">
+        <span className="sol-scene-sub">Sticker shop</span>
         {done ? (
-          <>
-            <p className="sol-scene-receipt-head">
-              <CheckIcon /> Paid
-            </p>
-            <p className="sol-scene-receipt-amt">1 USDC</p>
-            <p className="sol-scene-receipt-time">Settled in under a second</p>
-            <dl>
-              <div>
-                <dt>To</dt>
-                <dd>Sticker shop</dd>
-              </div>
-              <div>
-                <dt>Fee</dt>
-                <dd>under $0.01</dd>
-              </div>
-            </dl>
-            <button type="button" className="sol-scene-again" onClick={pay}>
-              Pay again
-            </button>
-          </>
-        ) : null}
-      </div>
-
-      <div className="sol-scene-device sol-scene-shop">
-        {done ? (
-          <p className="sol-scene-toast" key={order}>
-            <CheckIcon /> Order paid
+          <p className="sol-scene-order" key={order} data-ok="">
+            <CheckIcon /> Order #{order} paid
           </p>
-        ) : null}
-        <p className="sol-scene-name">Sticker shop</p>
-        <p className="sol-scene-sub">Orders</p>
-        <div className="sol-scene-order">
-          <span>
-            <span className="sol-scene-order-id">{label}</span>
-            <span className="sol-scene-sub">1 USDC</span>
-          </span>
-          <span className="sol-scene-pill" data-ok={done || undefined}>
-            {done ? "Paid ✓" : "Waiting"}
-          </span>
-        </div>
+        ) : (
+          <p className="sol-scene-order">Order #{order} waiting</p>
+        )}
       </div>
     </div>
   );
 }
 
-/** Lines in one call: 0 none, 1 request, 2 402, 3 paid, 4 200. */
+/** Lines in one call: 0 none, 1 request, 2 402, 3 paying, 4 paid, 5 200. */
 function PaywallScene() {
   const reduced = useReducedMotion();
   const [ref, seen] = useSeen<HTMLDivElement>();
-  const later = useTimers();
+  const [wait, alive] = useWait(reduced);
   const [step, setStep] = useState(0);
+  const [sent, setSent] = useState<Sent>(null);
   const [calls, setCalls] = useState(0);
   const [running, setRunning] = useState(false);
   const [auto, setAuto] = useState(true);
-  const started = useRef(false);
 
-  const call = useCallback(() => {
-    started.current = true;
-    if (reduced) {
-      setStep(4);
-      setCalls((n) => n + 1);
-      return;
-    }
+  const call = useCallback(async () => {
     setRunning(true);
+    setSent(null);
     setStep(1);
-    for (const s of [2, 3, 4]) later(() => setStep(s), LINE_MS * (s - 1));
-    later(() => {
-      setCalls((n) => n + 1);
-      setRunning(false);
-    }, LINE_MS * 3);
-  }, [reduced, later]);
-
-  // Reduced motion: start after one call.
-  useEffect(() => {
-    if (reduced && !started.current) {
-      started.current = true;
-      setStep(4);
-      setCalls(1);
-    }
-  }, [reduced]);
+    await wait(LINE_MS);
+    if (!alive.current) return;
+    setStep(2);
+    const transfer = sendTransfer("/api/demo/paywall-call");
+    await wait(LINE_MS);
+    if (!alive.current) return;
+    setStep(3);
+    const [result] = await Promise.all([transfer, wait(LINE_MS)]);
+    if (!alive.current) return;
+    setSent(result);
+    setStep(4);
+    await wait(LINE_MS);
+    if (!alive.current) return;
+    setStep(5);
+    setCalls((n) => n + 1);
+    setRunning(false);
+  }, [wait, alive]);
 
   // A few calls by themselves once the scene is in view.
   useEffect(() => {
-    if (!seen || reduced || !auto || running || calls >= AUTO_CALLS) return;
-    later(call, calls === 0 ? 500 : CALL_GAP_MS);
-  }, [seen, reduced, auto, running, calls, later, call]);
+    if (!seen || !auto || running || calls >= AUTO_CALLS) return;
+    const id = setTimeout(() => void call(), calls === 0 ? 500 : CALL_GAP_MS);
+    return () => clearTimeout(id);
+  }, [seen, auto, running, calls, call]);
 
   const spent = `$${(calls * PRICE).toFixed(3)}`;
 
@@ -278,15 +306,25 @@ function PaywallScene() {
             </li>
           ) : null}
           {step >= 3 ? (
-            <li>
+            <li data-wrap="">
               <span className="sol-scene-dir">→</span>{" "}
               <span className="sol-scene-code" data-tone="pay">
                 pays
               </span>{" "}
               $0.001
+              {step === 3 ? (
+                <span className="sol-scene-spin" aria-label="Confirming" />
+              ) : (
+                <>
+                  {sent ? (
+                    <span className="sol-scene-dir">in {seconds(sent.ms)}</span>
+                  ) : null}
+                  <ExplorerLink sent={sent} />
+                </>
+              )}
             </li>
           ) : null}
-          {step >= 4 ? (
+          {step >= 5 ? (
             <li>
               <span className="sol-scene-dir">←</span>{" "}
               <span className="sol-scene-code" data-tone="ok">
@@ -306,7 +344,7 @@ function PaywallScene() {
             disabled={running}
             onClick={() => {
               setAuto(false);
-              call();
+              void call();
             }}
           >
             Call again
