@@ -112,7 +112,6 @@ Package scripts (`pnpm --filter @workspace/docs-tooling <script>`):
 | `gen:tags [--check]`                                                      | `src/generators/tags.ts`                                                 |
 | `gen:manifest`, `gen:llms` `[--check]`                                    | `src/manifest/cli.ts`                                                    |
 | `generate` / `generate:check`                                             | every generator, in dependency order                                     |
-| `theme-check --base <url>`                                                | `scripts/theme-check.mjs` (Playwright, WP11)                             |
 
 ## Writing a convert transform (WP2+)
 
@@ -279,11 +278,6 @@ Theme rules:
   `src/app/(docs)/[locale]/developers/theme-prepaint.tsx`) sets the theme class
   and `html[data-theme-preference]` before paint. Without JS neither is set; the
   theme must read in that case too.
-- **Verify** with
-  `pnpm --filter @workspace/docs-tooling theme-check --base <url>`
-  (`scripts/theme-check.mjs`, default base `http://localhost:3000`). It is
-  Playwright-based and covers light and dark, JS on and off, desktop and mobile.
-  Run it after theme or docs header changes.
 
 Consent and analytics: GTM and PostHog are configured in apps/web
 (`src/components/GTMTrackingSnippet.tsx`,
@@ -390,8 +384,7 @@ appears). Patterns:
 `expandable` code blocks: apps/web server-renders every line but collapses a
 block longer than eight lines to 190px behind an expand button that needs JS
 (`CodeBody` in `components/docs/docs-components.tsx`). `nojs.css` un-collapses
-them without JS and hides the inert button. `theme-check` fails if any code
-block is clipped or the expand button shows with JS off.
+them without JS and hides the inert button.
 
 Known limit: stacked CodeGroup panels without JS are labelled `n · <language>`,
 so match them to the numbered tab row (`2 · Kit`).
