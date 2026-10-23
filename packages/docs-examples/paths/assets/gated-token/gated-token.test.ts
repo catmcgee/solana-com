@@ -567,7 +567,10 @@ describe("paths/assets/gated-token (tokenization tutorials)", () => {
         "--authority",
         payerFile,
       ]);
-      const failed = await mosaic.exec("wire-gate", [], { ...env, MINT: stuck });
+      const failed = await mosaic.exec("wire-gate", [], {
+        ...env,
+        MINT: stuck,
+      });
       expect(failed.code).not.toBe(0);
       expect(failed.text).toContain("Failed:");
       await checkSignatures(failed.text, false);

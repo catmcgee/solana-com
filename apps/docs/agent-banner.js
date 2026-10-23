@@ -30,7 +30,7 @@
       var ok = false;
       try {
         ok = document.execCommand("copy");
-      } catch (e) {
+      } catch {
         ok = false;
       }
       area.remove();

@@ -242,7 +242,6 @@
   function responseNote(method, text, httpStatus, srv) {
     var m = method.toLowerCase();
     var err = rpcError(text);
-    var msg = err && err.message ? String(err.message) : "";
     if (m === "requestairdrop" && (err || httpStatus === 429))
       return "\n\nPublic airdrops are rate limited and often refused. Get devnet or testnet SOL from https://faucet.solana.com instead.";
     if (disabledOnPublic(text))

@@ -24,7 +24,7 @@
  *
  * Frame, captions and images are all in the server HTML.
  */
-import type { AstNode, Transform } from "../../types.ts";
+import type { Transform } from "../../types.ts";
 import {
   attr,
   docsAssetExists,

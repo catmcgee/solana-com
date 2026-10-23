@@ -39,6 +39,8 @@ export async function drawPhone(
       mermaid: {
         initialize(c: unknown): void;
         mermaidAPI: {
+          // mermaid publishes no types for the per-diagram db.
+          // oxlint-disable-next-line typescript/no-explicit-any
           getDiagramFromText(s: string): Promise<{ type: string; db: any }>;
         };
       };

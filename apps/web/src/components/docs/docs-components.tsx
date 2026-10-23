@@ -802,10 +802,10 @@ export function CodeGroup({ children }: P) {
  * they render nothing: DocsPage shows them in the examples column (from
  * 1280px) or under the page header (narrower), via ApiExamples.
  */
-export function RequestExample(_: P) {
+export function RequestExample() {
   return null;
 }
-export function ResponseExample(_: P) {
+export function ResponseExample() {
   return null;
 }
 function ApiRequestExample({ children }: P) {

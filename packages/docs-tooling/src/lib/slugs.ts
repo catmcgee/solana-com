@@ -72,7 +72,7 @@ export function cleanHeadingId(id: string): string {
   return decoded
     .replace(/[?,;:!'"()[\]{}]/g, "")
     .replace(
-      /\p{Emoji_Modifier}|\p{Emoji_Modifier_Base}|\p{Emoji_Presentation}|\p{Extended_Pictographic}|[\u200D\uFE0E\uFE0F]/gu,
+      /\p{Emoji_Modifier}|\p{Emoji_Modifier_Base}|\p{Emoji_Presentation}|\p{Extended_Pictographic}|\u200D|\uFE0E|\uFE0F/gu,
       "",
     );
 }
