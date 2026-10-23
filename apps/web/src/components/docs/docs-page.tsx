@@ -17,7 +17,7 @@ import {
 import { getDocsUiStrings } from "@/lib/docs/ui-strings";
 import { docsPageMetadata } from "@/lib/docs/metadata";
 import { DOCS_LANGUAGE_NAMES, languagePaths } from "@/lib/docs/language-paths";
-import { DocsSidebar, SidebarNav } from "./docs-sidebar";
+import { DocsSidebar, SidebarItems, SidebarNav } from "./docs-sidebar";
 import { DocsToc } from "./docs-toc.client";
 import { smartPunctuation, smartQuotes } from "@/lib/docs/smart-quotes.mjs";
 import { PageActions } from "./page-actions.client";
@@ -137,6 +137,8 @@ export async function DocsPageView({
   const { tabs, active } = headerTabs(resolved);
   const tab = resolved.tab;
   const current = page.url;
+  // One element for both copies of the nav (sidebar and header menu).
+  const navItems = tab ? <SidebarItems tab={tab} current={current} /> : null;
   const examples = api ? (
     <MDX components={{ ...docsComponents, wrapper: ApiExamplesWrapper }} />
   ) : null;
@@ -179,14 +181,14 @@ export async function DocsPageView({
           menu={
             tab ? (
               <div id="mobile-nav">
-                <SidebarNav tab={tab} current={current} id="" />
+                <SidebarNav id="">{navItems}</SidebarNav>
               </div>
             ) : null
           }
         />
         <div id="docs-body" className="docs-body">
           {tab ? (
-            <DocsSidebar tab={tab} current={current} label="Pages" />
+            <DocsSidebar items={navItems} current={current} label="Pages" />
           ) : null}
           <main id="content-container">
             <div className="content-row">

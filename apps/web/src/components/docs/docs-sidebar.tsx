@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { NavGroup, NavNode, NavTab } from "@/lib/docs/navigation";
 import { SidebarGroup, SidebarScrollToCurrent } from "./docs-sidebar.client";
 import { ChevronIcon, ExternalArrowIcon } from "./docs-ui-icons";
@@ -124,63 +125,74 @@ function Item({
   );
 }
 
-export function SidebarNav({
+/**
+ * The tab's sections and pages. docs-page.tsx creates this element once and
+ * shows it twice, in the desktop sidebar and in the header's menu, so the
+ * page's RSC payload carries the (long) nav once.
+ */
+export function SidebarItems({
   tab,
   current,
-  id = "navigation-items",
 }: {
   tab: NavTab;
   current: string;
-  /** The desktop sidebar's list is #navigation-items; the menu copy has none. */
-  id?: string;
 }) {
   const grouped = tab.items.every((n) => n.kind === "group");
   if (!grouped) {
     // Page-only tabs (Start here): each entry is its own list; a group
     // (the Quickstart path box) is set off by a section gap.
-    return (
-      <div id={id || undefined} className="navigation-items">
-        {tab.items.map((node, i) => (
-          <ul
-            key={i}
-            className={
-              node.kind === "group"
-                ? "sidebar-group sidebar-group-spaced"
-                : "sidebar-group"
-            }
-          >
-            <Item node={node} depth={0} current={current} />
-          </ul>
-        ))}
-      </div>
-    );
+    return tab.items.map((node, i) => (
+      <ul
+        key={i}
+        className={
+          node.kind === "group"
+            ? "sidebar-group sidebar-group-spaced"
+            : "sidebar-group"
+        }
+      >
+        <Item node={node} depth={0} current={current} />
+      </ul>
+    ));
   }
+  return (tab.items as NavGroup[]).map((section, i) => (
+    <div key={i} className="sidebar-section">
+      <div className="sidebar-group-header">
+        <h3 className="sidebar-title">
+          <span>{section.title}</span>
+        </h3>
+      </div>
+      <ul className="sidebar-group">
+        {section.children.map((node, j) => (
+          <Item key={j} node={node} depth={0} current={current} />
+        ))}
+      </ul>
+    </div>
+  ));
+}
+
+export function SidebarNav({
+  id = "navigation-items",
+  children,
+}: {
+  /** The desktop sidebar's list is #navigation-items; the menu copy has none. */
+  id?: string;
+  /** A <SidebarItems> element. */
+  children: ReactNode;
+}) {
   return (
     <div id={id || undefined} className="navigation-items">
-      {(tab.items as NavGroup[]).map((section, i) => (
-        <div key={i} className="sidebar-section">
-          <div className="sidebar-group-header">
-            <h3 className="sidebar-title">
-              <span>{section.title}</span>
-            </h3>
-          </div>
-          <ul className="sidebar-group">
-            {section.children.map((node, j) => (
-              <Item key={j} node={node} depth={0} current={current} />
-            ))}
-          </ul>
-        </div>
-      ))}
+      {children}
     </div>
   );
 }
 
 export function DocsSidebar({
-  tab,
+  items,
   current,
   label,
 }: {
-  tab: NavTab;
+  /** A <SidebarItems> element. */
+  items: ReactNode;
   current: string;
   label: string;
 }) {
@@ -190,7 +202,7 @@ export function DocsSidebar({
         <div className="sidebar-scroll" data-docs-sidebar-viewport="">
           <div className="sidebar-inner">
             <div className="sidebar-fade" aria-hidden="true" />
-            <SidebarNav tab={tab} current={current} />
+            <SidebarNav>{items}</SidebarNav>
           </div>
           <SidebarScrollToCurrent current={current} />
         </div>
