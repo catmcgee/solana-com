@@ -10,7 +10,7 @@ Problems relating to
 [transaction confirmation](/developers/docs/references/terminology#transaction-confirmations)
 are common with many newer developers while building applications. This article
 aims to boost the overall understanding of the confirmation mechanism used on
-the Solana blockchain, including some recommended best practices.
+Solana, including some recommended best practices.
 
 ## Brief background on transactions
 
@@ -20,8 +20,6 @@ let's briefly set the base understanding of a few things:
 - what a transaction is
 - the lifecycle of a transaction
 - what a blockhash is
-- and a brief understanding of Proof of History (PoH) and how it relates to
-  blockhashes
 
 ### What is a transaction?
 
@@ -59,25 +57,12 @@ touch on everything except steps 1 and 4.
 
 ### What is a Blockhash?
 
-A [“blockhash”](/developers/docs/references/terminology#blockhash) refers to the last Proof
-of History (PoH) hash for a [“slot”](/developers/docs/references/terminology#slot)
-(description below). Since Solana uses PoH as a trusted clock, a transaction's
-recent blockhash can be thought of as a **timestamp**.
-
-### Proof of History refresher
-
-Solana's Proof of History mechanism uses a very long chain of recursive SHA-256
-hashes to build a trusted clock. The “history” part of the name comes from the
-fact that block producers hash transaction id's into the stream to record which
-transactions were processed in their block.
-
-[PoH hash calculation](https://github.com/anza-xyz/agave/blob/aa0922d6845e119ba466f88497e8209d1c82febc/entry/src/poh.rs#L79):
-`next_hash = hash(prev_hash, hash(transaction_ids))`
-
-PoH can be used as a trusted clock because each hash must be produced
-sequentially. Each produced block contains a blockhash and a list of hash
-checkpoints called “ticks” so that validators can verify the full chain of
-hashes in parallel and prove that some amount of time has actually passed.
+A [“blockhash”](/developers/docs/references/terminology#blockhash) is the hash
+that identifies the block produced in a
+[“slot”](/developers/docs/references/terminology#slot) (description below).
+Validators keep a queue of recent blockhashes in the order their blocks were
+produced, so a transaction's recent blockhash can be thought of as a
+**timestamp**: it shows roughly when the transaction was created.
 
 ## Transaction Expiration
 
@@ -89,13 +74,11 @@ help you diagnose the bulk of your transaction confirmation issues.
 
 ### How does transaction expiration work?
 
-Each transaction includes a “recent blockhash” which is used as a PoH clock
-timestamp and expires when that blockhash is no longer “recent enough”.
+Each transaction includes a “recent blockhash” which is used as a timestamp and
+expires when that blockhash is no longer “recent enough”.
 
-As each block is finalized (i.e. the maximum tick height
-[is reached](https://github.com/anza-xyz/agave/blob/0588ecc6121ba026c65600d117066dbdfaf63444/runtime/src/bank.rs#L3269-L3271),
-reaching the "block boundary"), the final hash of the block is added to the
-`BlockhashQueue` which stores a maximum of the
+As each block is completed (reaching the "block boundary"), its blockhash is
+added to the `BlockhashQueue` which stores a maximum of the
 [300 most recent blockhashes](https://github.com/anza-xyz/agave/blob/e0b0bcc80380da34bb63364cc393801af1e1057f/sdk/program/src/clock.rs#L123-L126).
 During transaction processing, Solana Validators will check if each
 transaction's recent blockhash is recorded within the most recent 151 stored
@@ -111,10 +94,9 @@ max processing age, the transaction is not processed.
 > valid for processing.
 
 Since [slots](/developers/docs/references/terminology#slot) (aka the time period a
-validator can produce a block) target 200ms on mainnet (reduced from 400ms by
-[SIMD-0525](https://github.com/solana-foundation/solana-improvement-documents/blob/main/proposals/0525-reduce-slot-times.md),
-completed in October 2026), but run slightly longer in practice and are
-sometimes skipped, a given blockhash can only be used by transactions for about
+validator can produce a block) target 200ms on mainnet
+([SIMD-0525](https://github.com/solana-foundation/solana-improvement-documents/blob/main/proposals/0525-reduce-slot-times.md))
+but run slightly longer in practice and are sometimes skipped, a given blockhash can only be used by transactions for about
 30 seconds before it will be considered expired by the runtime.
 
 ### Example of transaction expiration
@@ -223,32 +205,16 @@ a different commitment level.
 
 **Recommendation**
 
-The `confirmed` commitment level should almost always be used for RPC requests
-because it's usually only a few slots behind the `processed` commitment and has
-a very low chance of belonging to a dropped
-[fork](https://docs.anza.xyz/consensus/fork-generation).
+Use the [default commitment](/developers/docs/rpc#configuring-state-commitment)
+level, `finalized`. A block is finalized about 150ms after it is produced, so
+the latest finalized blockhash is only a slot or so behind the newest block and
+costs almost none of the expiration window. A finalized blockhash can't belong
+to a block that is later skipped. `confirmed` returns the same blockhash as
+`finalized`.
 
-But feel free to consider the other options:
-
-- Choosing `processed` will let you fetch the most recent blockhash compared to
-  other commitment levels and therefore gives you the most time to prepare and
-  process a transaction. But due to the prevalence of forking in the Solana
-  blockchain, roughly 5% of blocks don't end up being finalized by the cluster
-  so there's a real chance that your transaction uses a blockhash that belongs
-  to a dropped fork. Transactions that use blockhashes for abandoned blocks
-  won't ever be considered recent by any blocks that are in the finalized
-  blockchain.
-- Using the [default commitment](/developers/docs/rpc#configuring-state-commitment) level
-  `finalized` will eliminate any risk that the blockhash you choose will belong
-  to a dropped fork. The tradeoff is that, until
-  [Alpenglow](https://solana.com/upgrades/alpenglow) activates on mainnet
-  (epoch 1064, starting 21 October 2026), there is typically at least a 32
-  slot difference between the most recent confirmed block and the most recent
-  finalized block. This tradeoff is pretty severe and effectively reduces the
-  expiration of your transactions by about 32 slots (roughly 6 to 7 seconds at
-  200ms slots, a fifth of the window) but this could be even more during
-  unstable cluster conditions. After activation, `confirmed` and `finalized`
-  are equivalent, so this gap goes away.
+`processed` is 1 to 2 slots ahead of `finalized`, but its block can still be
+skipped. A transaction that uses the blockhash of a skipped block will never be
+considered recent by the cluster and can't land.
 
 ### Use an appropriate preflight commitment level
 
@@ -319,8 +285,8 @@ is as fresh as possible.
 
 ### Use healthy RPC nodes when fetching blockhashes
 
-By fetching the latest blockhash with the `confirmed` commitment level from an
-RPC node, it's going to respond with the blockhash for the latest confirmed
+By fetching the latest blockhash with the `finalized` commitment level from an
+RPC node, it's going to respond with the blockhash for the latest finalized
 block that it's aware of. Solana's block propagation protocol prioritizes
 sending blocks to staked nodes so RPC nodes naturally lag about a block behind
 the rest of the cluster. They also have to do more work to handle application
@@ -328,7 +294,7 @@ requests and can lag a lot more under heavy user traffic.
 
 Lagging RPC nodes can therefore respond to
 [`getLatestBlockhash`](/developers/docs/rpc/http/getlatestblockhash) requests with
-blockhashes that were confirmed by the cluster quite awhile ago. By default, a
+blockhashes that were finalized by the cluster quite awhile ago. By default, a
 lagging RPC node detects that it is more than 150 slots behind the cluster will
 stop responding to requests, but just before hitting that threshold they can
 still return a blockhash that is just about to expire.
@@ -345,7 +311,7 @@ of the cluster state with one of the following methods:
    get the highest slot that your RPC node has received a “shred” of a block
    for. If the difference between these responses is very large, the cluster is
    producing blocks far ahead of what the RPC node has processed.
-2. Call the `getLatestBlockhash` RPC API with the `confirmed` commitment level
+2. Call the `getLatestBlockhash` RPC API with the `finalized` commitment level
    on a few different RPC API nodes and use the blockhash from the node that
    returns the highest slot for its
    [context slot](/developers/docs/rpc/http/getlatestblockhash).
@@ -359,7 +325,7 @@ API to get a recent blockhash for your transaction, take note of the
 `lastValidBlockHeight` in the response.
 
 Then, poll the [`getBlockHeight`](/developers/docs/rpc/http/getblockheight) RPC API with
-the `confirmed` commitment level until it returns a block height greater than
+the `finalized` commitment level until it returns a block height greater than
 the previously returned last valid block height.
 
 ### Consider using “durable” transactions
