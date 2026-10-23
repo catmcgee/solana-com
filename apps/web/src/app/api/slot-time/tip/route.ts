@@ -16,13 +16,18 @@ export const runtime = "nodejs";
  * about 35 KB a block at 200 ms slots). The docs live feed polls this about
  * once a second; the one-second CDN and data cache mean every reader shares
  * one sampling round a second, however many are watching. Each round reads
- * only the blocks this instance hasn't read yet, at most FETCH_SLOTS.
+ * only the newest blocks this instance hasn't read yet: up to six (every
+ * block) with a configured RPC (SOLANA_RPC_URL), one on the public endpoint,
+ * which allows well under one getBlock a second; after a 429, none for ten
+ * seconds. A block read that fails only leaves that slot out; the round
+ * fails only if the tip can't be read.
  */
 const TIP_CACHE_SECONDS = 1;
 const TIP_EDGE_STALE_SECONDS = 2;
 const TIP_CACHE_KEY = "slot200-tip-v2";
-/** Slots read per round, newest first: about 1.2 s of 200 ms slots. */
-const FETCH_SLOTS = 6;
+/** Blocks read per round, newest first: about 1.2 s of 200 ms slots. */
+const FETCH_SLOTS = process.env.SOLANA_RPC_URL ? 6 : 1;
+const BACKOFF_MS = 10_000;
 /** Slots returned per response, so a reader who missed a poll can catch up. */
 const RETURN_SLOTS = 20;
 const KEEP_SLOTS = 40;
@@ -36,6 +41,7 @@ const NOT_YET = [-32004, -32014];
 
 /** Blocks read so far on this instance, by slot; null for a skipped slot. */
 const known = new Map<number, TipBlock | null>();
+let backoffUntil = 0;
 
 async function readSlot(slot: number): Promise<void> {
   try {
@@ -49,19 +55,21 @@ async function readSlot(slot: number): Promise<void> {
   } catch (error) {
     const code = error instanceof RpcError ? (error.code ?? 0) : 0;
     if (SKIPPED.includes(code)) known.set(slot, null);
-    else if (!NOT_YET.includes(code)) throw error;
+    else if (!NOT_YET.includes(code)) {
+      if (String(error).includes(" 429"))
+        backoffUntil = Date.now() + BACKOFF_MS;
+      throw error;
+    }
   }
 }
 
 async function loadTip(): Promise<TipPayload> {
   const tip = await getConfirmedSlot();
+  const budget = Date.now() < backoffUntil ? 0 : FETCH_SLOTS;
   const wanted: number[] = [];
-  for (let s = tip; s > tip - FETCH_SLOTS; s--)
+  for (let s = tip; s > tip - RETURN_SLOTS && wanted.length < budget; s--)
     if (!known.has(s)) wanted.push(s);
-  const results = await Promise.allSettled(wanted.map(readSlot));
-  const failed = results.filter((r) => r.status === "rejected");
-  if (failed.length === wanted.length && failed.length > 0)
-    throw (failed[0] as PromiseRejectedResult).reason;
+  await Promise.allSettled(wanted.map(readSlot));
 
   for (const s of known.keys()) if (s <= tip - KEEP_SLOTS) known.delete(s);
   const blocks: TipBlock[] = [];
@@ -71,7 +79,6 @@ async function loadTip(): Promise<TipPayload> {
     if (b) blocks.push(b);
     else if (b === null) skipped.push(s);
   }
-  if (!blocks.length) throw new Error("no recent block available");
   return { tip, blocks, skipped, serverTime: Date.now() };
 }
 

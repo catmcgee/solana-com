@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const rpc = vi.hoisted(() => ({
   getConfirmedSlot: vi.fn(),
@@ -18,8 +18,11 @@ vi.mock("@/lib/slot200/rpc", () => ({
 }));
 
 describe("/api/slot-time/tip", () => {
+  afterEach(() => vi.unstubAllEnvs());
+
   beforeEach(() => {
     vi.resetModules();
+    vi.stubEnv("SOLANA_RPC_URL", "https://rpc.test");
     rpc.getConfirmedSlot.mockReset();
     rpc.getBlockSignatures.mockReset();
   });
@@ -51,17 +54,39 @@ describe("/api/slot-time/tip", () => {
     expect(first.skipped).toEqual([98]);
     expect(rpc.getBlockSignatures).toHaveBeenCalledTimes(6);
 
-    // Next round: only the slots not read yet (100 again, and 101).
+    // Next round: the newest unread slots first (101, then 100 again), then
+    // older slots in the window it hasn't read; never one it has.
     rpc.getConfirmedSlot.mockResolvedValue(101);
     rpc.getBlockSignatures.mockClear();
     const second = await (await GET()).json();
-    expect(rpc.getBlockSignatures.mock.calls.map((c) => c[0]).sort()).toEqual([
-      100, 101,
+    expect(rpc.getBlockSignatures.mock.calls.map((c) => c[0])).toEqual([
+      101, 100, 94, 93, 92, 91,
     ]);
     expect(second.blocks.at(-1).slot).toBe(101);
   });
 
-  it("answers 502 when the RPC fails", async () => {
+  it("reads one block a round on the public RPC, and keeps going when a read fails", async () => {
+    vi.stubEnv("SOLANA_RPC_URL", undefined as unknown as string);
+    rpc.getConfirmedSlot.mockResolvedValue(100);
+    rpc.getBlockSignatures.mockImplementation(async (slot: number) => {
+      if (slot === 100) throw new Error("RPC getBlock failed: 429");
+      return { blockTime: null, signatures: ["x"] };
+    });
+    const { GET } = await import("@/app/api/slot-time/tip/route");
+    const res = await GET();
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(rpc.getBlockSignatures).toHaveBeenCalledTimes(1);
+    expect(body).toMatchObject({ tip: 100, blocks: [] });
+
+    // After a 429, no block reads for a while; the tip still advances.
+    rpc.getBlockSignatures.mockClear();
+    rpc.getConfirmedSlot.mockResolvedValue(105);
+    expect((await (await GET()).json()).tip).toBe(105);
+    expect(rpc.getBlockSignatures).not.toHaveBeenCalled();
+  });
+
+  it("answers 502 when the tip can't be read", async () => {
     rpc.getConfirmedSlot.mockRejectedValue(new Error("RPC unavailable"));
     const { GET } = await import("@/app/api/slot-time/tip/route");
     const res = await GET();

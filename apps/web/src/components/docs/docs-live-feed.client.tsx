@@ -106,8 +106,14 @@ export function LiveFeed() {
       ? Math.min(t.to, t.from + Math.floor((now - t.t0) / t.step))
       : 0;
     if (data.tip <= current) return;
-    const from =
-      reduced || !current || data.tip - current > 30 ? data.tip : current;
+    const jump = !!current && data.tip - current > 30;
+    const from = reduced || !current || jump ? data.tip : current;
+    // Back from a hidden tab: start the list over from the new tip.
+    if (jump && !reduced) {
+      queue.current = [];
+      passed.current = 0;
+      setRows([]);
+    }
     const gap = Math.max(1, data.tip - from);
     target.current = {
       from,
@@ -220,10 +226,14 @@ export function LiveFeed() {
         <span className="sol-live-rate">
           {failed ? (
             "Live data unavailable. Retrying…"
-          ) : tps ? (
+          ) : ms ? (
             <>
-              <b>{nf.format(tps)}</b> transactions a second
-              {ms ? <span> · {Math.round(ms)} ms slots</span> : null}
+              {tps ? (
+                <>
+                  <b>{nf.format(tps)}</b> transactions a second ·{" "}
+                </>
+              ) : null}
+              <b>{Math.round(ms)}</b> ms slots
             </>
           ) : (
             "Measuring…"
