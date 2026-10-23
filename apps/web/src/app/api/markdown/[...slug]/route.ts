@@ -5,9 +5,9 @@ import { DOCS_LOCALES } from "@/lib/docs/locales.mjs";
 
 /**
  * Markdown twin of a docs page. src/proxy.ts rewrites `<page>.md` and
- * `Accept: text/markdown` requests here (and records them in PostHog), as
- * the docs app on origin/main did (/api/markdown). The slug is the public
- * path, locale included: /api/markdown/ar/developers/docs/payments.
+ * `Accept: text/markdown` requests here, as the docs app on origin/main did
+ * (/api/markdown). The slug is the public path, locale included:
+ * /api/markdown/ar/developers/docs/payments.
  */
 export const dynamicParams = true;
 

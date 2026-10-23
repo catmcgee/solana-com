@@ -3,16 +3,15 @@ import {
   routing,
   routingWithoutDetection,
 } from "@workspace/i18n/middleware";
-import { NextFetchEvent, NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { locales } from "@workspace/i18n/config";
 import { getPathnameWithoutLocale } from "@workspace/i18n/pathname";
 import {
   DROPPED_DOCS_LOCALES,
   canonicalDocsPath,
   getDocsPathInfo,
-  getMarkdownRequestSource,
+  isMarkdownRequest,
 } from "@/lib/docs-edge/paths";
-import { trackMarkdownRequest } from "@/lib/docs-edge/markdown-analytics";
 
 /**
  * Agent discovery on docs pages and their Markdown twins: the llms.txt
@@ -89,17 +88,14 @@ export function isProxiedPath(normalizedPathname: string) {
  * locale copies and `.md` twins), rendered by this app (Fumadocs). Before
  * the locale routing below:
  * 1. one 308 to the canonical path (lowercase, one locale, no `/en`);
- * 2. Markdown requests (`<page>.md` or `Accept: text/markdown`) are recorded
- *    in PostHog without delaying the response and rewritten to the Markdown
- *    route (/api/markdown/<path>), as the docs app on origin/main did.
+ * 2. Markdown requests (`<page>.md` or `Accept: text/markdown`) are
+ *    rewritten to the Markdown route (/api/markdown/<path>), as the docs app
+ *    on origin/main did.
  * Everything else returns null and takes the normal locale routing.
  * Greek (`/el/...`) docs URLs never get here: next.config redirects run
  * before middleware.
  */
-export function handleDocsRequest(
-  req: NextRequest,
-  event: Pick<NextFetchEvent, "waitUntil">,
-): NextResponse | null {
+export function handleDocsRequest(req: NextRequest): NextResponse | null {
   const { pathname } = req.nextUrl;
   const info = getDocsPathInfo(pathname);
   if (!info) {
@@ -114,14 +110,10 @@ export function handleDocsRequest(
     );
   }
 
-  const source = getMarkdownRequestSource(pathname, req.headers.get("accept"));
-  if (source) {
+  if (isMarkdownRequest(pathname, req.headers.get("accept"))) {
     const route = info.rest.endsWith(".md")
       ? info.rest.slice(0, -3)
       : info.rest;
-    event.waitUntil(
-      trackMarkdownRequest({ route, source, locale: info.locale }),
-    );
     const url = req.nextUrl.clone();
     url.pathname = `/api/markdown${info.locale ? `/${info.locale}` : ""}${route}`;
     return withAgentLinks(NextResponse.rewrite(url));
@@ -134,12 +126,12 @@ export function handleDocsRequest(
   return null;
 }
 
-export default async function proxy(req: NextRequest, event: NextFetchEvent) {
+export default async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const pathSegments = pathname.split("/").filter(Boolean);
   const normalizedPathname = getPathnameWithoutLocale(pathname);
 
-  const docsResponse = handleDocsRequest(req, event);
+  const docsResponse = handleDocsRequest(req);
   if (docsResponse) return docsResponse;
 
   // Skip i18n for paths that are proxied to other Vercel apps via rewrites

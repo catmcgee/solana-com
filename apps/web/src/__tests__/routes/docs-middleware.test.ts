@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { NextRequest } from "next/server";
 import { getPathMatch } from "next/dist/shared/lib/router/utils/path-match";
 import { tryToParsePath } from "next/dist/lib/try-to-parse-path";
@@ -11,26 +11,11 @@ import middleware, {
 import {
   canonicalDocsPath,
   getDocsPathInfo,
-  getMarkdownRequestSource,
+  isMarkdownRequest,
 } from "@/lib/docs-edge/paths";
-import {
-  DOCS_MARKDOWN_DISTINCT_ID,
-  DOCS_MARKDOWN_EVENT,
-  trackMarkdownRequest,
-} from "@/lib/docs-edge/markdown-analytics";
 
 function request(path: string, headers: Record<string, string> = {}) {
   return new NextRequest(new URL(path, "https://solana.com"), { headers });
-}
-
-function fakeEvent() {
-  const waited: Promise<unknown>[] = [];
-  return {
-    waited,
-    waitUntil: (promise: Promise<unknown>) => {
-      waited.push(promise);
-    },
-  };
 }
 
 function matchesMiddleware(pathname: string) {
@@ -123,10 +108,7 @@ describe("docs path normalisation", () => {
   });
 
   it("redirects with 308 and keeps the query string", () => {
-    const res = handleDocsRequest(
-      request("/EN/Docs/Core?tab=rust"),
-      fakeEvent(),
-    );
+    const res = handleDocsRequest(request("/EN/Docs/Core?tab=rust"));
     expect(res?.status).toBe(308);
     expect(res?.headers.get("location")).toBe(
       "https://solana.com/docs/core?tab=rust",
@@ -134,10 +116,7 @@ describe("docs path normalisation", () => {
   });
 
   it("redirects mixed-case .md twins to the lowercase path", () => {
-    const res = handleDocsRequest(
-      request("/FR/Docs/Core/Accounts.MD"),
-      fakeEvent(),
-    );
+    const res = handleDocsRequest(request("/FR/Docs/Core/Accounts.MD"));
     expect(res?.status).toBe(308);
     expect(res?.headers.get("location")).toBe(
       "https://solana.com/fr/docs/core/accounts.md",
@@ -149,133 +128,57 @@ describe("docs path normalisation", () => {
       "/developers/docs/core/accounts",
       "/docs/core/accounts",
     ]) {
-      expect(handleDocsRequest(request(path), fakeEvent()), path).toBeNull();
+      expect(handleDocsRequest(request(path)), path).toBeNull();
     }
   });
 
   it("lets per-section llms.txt reach its route", () => {
     const res = handleDocsRequest(
       request("/developers/docs/payments/llms.txt"),
-      fakeEvent(),
     );
     expect(res?.headers.get("x-middleware-next")).toBe("1");
   });
 
   it("returns null for non-docs paths", () => {
-    expect(handleDocsRequest(request("/wallets"), fakeEvent())).toBeNull();
+    expect(handleDocsRequest(request("/wallets"))).toBeNull();
   });
 });
 
-describe("markdown request analytics", () => {
-  const fetchMock = vi.fn(async () => new Response("ok"));
-
-  beforeEach(() => {
-    vi.stubEnv("NEXT_PUBLIC_POSTHOG_KEY", "phc_test");
-    vi.stubGlobal("fetch", fetchMock);
-    fetchMock.mockClear();
-  });
-
-  afterEach(() => {
-    vi.unstubAllEnvs();
-    vi.unstubAllGlobals();
-  });
-
-  it("classifies .md and Accept: text/markdown requests", () => {
-    expect(getMarkdownRequestSource("/docs/core.md", null)).toBe(
-      "md-extension",
-    );
-    expect(getMarkdownRequestSource("/docs/core", "text/markdown")).toBe(
-      "accept-header",
-    );
+describe("markdown requests", () => {
+  it("recognises .md and Accept: text/markdown requests", () => {
+    expect(isMarkdownRequest("/docs/core.md", null)).toBe(true);
+    expect(isMarkdownRequest("/docs/core", "text/markdown")).toBe(true);
     expect(
-      getMarkdownRequestSource("/docs/core", "text/html,application/xhtml+xml"),
-    ).toBeNull();
-    expect(
-      getMarkdownRequestSource("/docs/payments/llms.txt", "text/markdown"),
-    ).toBeNull();
+      isMarkdownRequest("/docs/core", "text/html,application/xhtml+xml"),
+    ).toBe(false);
+    expect(isMarkdownRequest("/docs/payments/llms.txt", "text/markdown")).toBe(
+      false,
+    );
   });
 
-  it("fires docs_markdown_requested for a .md request without blocking it", async () => {
-    const event = fakeEvent();
-    const res = handleDocsRequest(request("/fr/docs/core/accounts.md"), event);
-
-    // Rewritten to the Markdown route.
+  it("rewrites a .md request to the Markdown route", () => {
+    const res = handleDocsRequest(request("/fr/docs/core/accounts.md"));
     expect(res?.headers.get("x-middleware-rewrite")).toBe(
       "https://solana.com/api/markdown/fr/docs/core/accounts",
     );
-    expect(event.waited).toHaveLength(1);
-    await Promise.all(event.waited);
-
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    const [url, init] = fetchMock.mock.calls[0] as unknown as [
-      string,
-      RequestInit,
-    ];
-    expect(url).toBe("https://us.i.posthog.com/capture/");
-    expect(JSON.parse(String(init.body))).toEqual({
-      api_key: "phc_test",
-      event: DOCS_MARKDOWN_EVENT,
-      properties: {
-        distinct_id: DOCS_MARKDOWN_DISTINCT_ID,
-        route: "/docs/core/accounts",
-        source: "md-extension",
-        locale: "fr",
-        $current_url: "https://solana.com/docs/core/accounts",
-        $process_person_profile: false,
-      },
-    });
   });
 
-  it("fires for Accept: text/markdown", async () => {
-    const event = fakeEvent();
-    handleDocsRequest(
+  it("rewrites Accept: text/markdown to the Markdown route", () => {
+    const res = handleDocsRequest(
       request("/developers/cookbook/wallets/create-keypair", {
         accept: "text/markdown",
       }),
-      event,
     );
-    await Promise.all(event.waited);
-    const body = JSON.parse(
-      String(
-        (fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].body,
-      ),
+    expect(res?.headers.get("x-middleware-rewrite")).toBe(
+      "https://solana.com/api/markdown/developers/cookbook/wallets/create-keypair",
     );
-    expect(body.properties).toMatchObject({
-      route: "/developers/cookbook/wallets/create-keypair",
-      source: "accept-header",
-    });
-    expect(body.properties.locale).toBeUndefined();
-  });
-
-  it("does not fire for HTML page views or for non-canonical URLs", () => {
-    const event = fakeEvent();
-    handleDocsRequest(request("/docs/core"), event);
-    handleDocsRequest(request("/Docs/Core.md"), event);
-    expect(event.waited).toHaveLength(0);
-  });
-
-  it("is a no-op without a PostHog key and never throws", async () => {
-    vi.stubEnv("NEXT_PUBLIC_POSTHOG_KEY", "");
-    await trackMarkdownRequest({ route: "/docs", source: "md-extension" });
-    expect(fetchMock).not.toHaveBeenCalled();
-
-    vi.stubEnv("NEXT_PUBLIC_POSTHOG_KEY", "phc_test");
-    fetchMock.mockRejectedValueOnce(new Error("network down"));
-    await expect(
-      trackMarkdownRequest({ route: "/docs", source: "md-extension" }),
-    ).resolves.toBeUndefined();
   });
 
   it("is wired into the default middleware export", async () => {
-    const event = fakeEvent();
-    const res = await middleware(
-      request("/docs/core.md"),
-      event as unknown as Parameters<typeof middleware>[1],
-    );
+    const res = await middleware(request("/docs/core.md"));
     expect(res.headers.get("x-middleware-rewrite")).toBe(
       "https://solana.com/api/markdown/docs/core",
     );
-    expect(event.waited).toHaveLength(1);
   });
 });
 
@@ -346,10 +249,7 @@ describe("middleware matcher", () => {
 describe("docs locale cookie", () => {
   const spanish = { cookie: "SOLANA_LOCALE=es", "accept-language": "es" };
   const run = (path: string, headers: Record<string, string> = {}) =>
-    middleware(
-      request(path, headers),
-      fakeEvent() as unknown as Parameters<typeof middleware>[1],
-    );
+    middleware(request(path, headers));
 
   it("serves English docs URLs in English despite a Spanish cookie", async () => {
     for (const path of ["/developers/docs", "/developers/docs/core/accounts"]) {
@@ -387,11 +287,7 @@ describe("docs locale cookie", () => {
 });
 
 describe("docs locale alternates", () => {
-  const run = (path: string) =>
-    middleware(
-      request(path),
-      fakeEvent() as unknown as Parameters<typeof middleware>[1],
-    );
+  const run = (path: string) => middleware(request(path));
 
   it("does not advertise Greek on docs pages, which have no Greek", async () => {
     for (const path of [

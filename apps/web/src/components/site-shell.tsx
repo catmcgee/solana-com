@@ -5,7 +5,6 @@ import type { AbstractIntlMessages } from "next-intl";
 import { NextIntlClientProvider } from "next-intl";
 import CookieConsent from "@/components/CookieConsent/CookieConsent";
 import GTMTrackingSnippet from "@/components/GTMTrackingSnippet";
-import { PostHogProvider } from "@@/src/app/components/posthog/PostHogProvider";
 import { config } from "@@/src/config";
 import { defaultLocale } from "@workspace/i18n/config";
 import { getLangDir } from "rtl-detect";
@@ -56,45 +55,43 @@ export function SiteShell({
       <body suppressHydrationWarning>
         <GoogleTagManagerNoScript containerId={googleTagManagerID} />
         <NextIntlClientProvider messages={messages} locale={locale}>
-          <PostHogProvider>
-            <ThemeProvider>
-              <GTMTrackingSnippet />
-              <SitewideTopAlert />
-              <CookieConsent />
-              {header}
-              {children}
-              {footer}
-              <PodcastPlayer />
-              {inkeep ? <InkeepMount /> : <DocsSearch locale={docsLocale} />}
-              <AskAi chat={inkeep} />
-              <Script
-                id="signals-script"
-                strategy="afterInteractive"
-                dangerouslySetInnerHTML={{
-                  __html: `
-                    (function() {
-                      if (typeof window === 'undefined') return;
-                      if (typeof window.signals !== 'undefined') return;
-                      var script = document.createElement('script');
-                      script.src = 'https://cdn.cr-relay.com/v1/site/d7901f15-da9a-4a7a-bf5e-679354ce2f55/signals.js';
-                      script.async = true;
-                      window.signals = Object.assign(
-                        [],
-                        ['page', 'identify', 'form'].reduce(function (acc, method){
-                          acc[method] = function () {
-                            signals.push([method, arguments]);
-                            return signals;
-                          };
-                        return acc;
-                        }, {})
-                      );
-                      document.head.appendChild(script);
-                    })();
-                  `,
-                }}
-              />
-            </ThemeProvider>
-          </PostHogProvider>
+          <ThemeProvider>
+            <GTMTrackingSnippet />
+            <SitewideTopAlert />
+            <CookieConsent />
+            {header}
+            {children}
+            {footer}
+            <PodcastPlayer />
+            {inkeep ? <InkeepMount /> : <DocsSearch locale={docsLocale} />}
+            <AskAi chat={inkeep} />
+            <Script
+              id="signals-script"
+              strategy="afterInteractive"
+              dangerouslySetInnerHTML={{
+                __html: `
+                  (function() {
+                    if (typeof window === 'undefined') return;
+                    if (typeof window.signals !== 'undefined') return;
+                    var script = document.createElement('script');
+                    script.src = 'https://cdn.cr-relay.com/v1/site/d7901f15-da9a-4a7a-bf5e-679354ce2f55/signals.js';
+                    script.async = true;
+                    window.signals = Object.assign(
+                      [],
+                      ['page', 'identify', 'form'].reduce(function (acc, method){
+                        acc[method] = function () {
+                          signals.push([method, arguments]);
+                          return signals;
+                        };
+                      return acc;
+                      }, {})
+                    );
+                    document.head.appendChild(script);
+                  })();
+                `,
+              }}
+            />
+          </ThemeProvider>
         </NextIntlClientProvider>
       </body>
     </html>

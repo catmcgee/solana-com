@@ -278,11 +278,10 @@ Theme rules:
   and `html[data-theme-preference]` before paint. Without JS neither is set; the
   theme must read in that case too.
 
-Consent and analytics: GTM and PostHog are configured in apps/web
-(`src/components/GTMTrackingSnippet.tsx`,
-`src/app/components/posthog/PostHogProvider.tsx`) and follow the solana.com
-cookie consent banner (`CookieConsent`), the same as every other solana.com
-page. GTM loads on production deployments only.
+Consent and analytics: GTM is configured in apps/web
+(`src/components/GTMTrackingSnippet.tsx`) and follows the solana.com cookie
+consent banner (`CookieConsent`), the same as every other solana.com page. GTM
+loads on production deployments only.
 
 ## Integration pipeline (WP12)
 
@@ -592,7 +591,6 @@ The Fumadocs app was deleted in WP1. Anything not moved into `data/` or
 
 ```bash
 git show 023c6d918:apps/docs/src/app/llms.txt/route.ts        # llms.txt header (WP9)
-git show 023c6d918:apps/docs/src/lib/posthog/server.ts        # markdown analytics (WP9)
 git show 023c6d918:apps/docs/src/lib/remark-example-output.mjs   # WP5
 git show 023c6d918:apps/docs/src/lib/remark-web3js-specifier.mjs # WP2
 git show 023c6d918:apps/docs/src/lib/developer-media.ts       # WP10

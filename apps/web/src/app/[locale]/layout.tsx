@@ -7,6 +7,7 @@ import { Header, Footer } from "@solana-com/ui-chrome";
 import { ChromeWrapper } from "@/components/ChromeWrapper";
 import "@/app/globals.css";
 import { SiteShell } from "@/components/site-shell";
+import { PostHogProvider } from "@@/src/app/components/posthog/PostHogProvider";
 
 type Props = {
   children: React.ReactNode;
@@ -36,7 +37,7 @@ export default async function RootLayout({ children, params }: Props) {
         </ChromeWrapper>
       }
     >
-      {children}
+      <PostHogProvider>{children}</PostHogProvider>
     </SiteShell>
   );
 }

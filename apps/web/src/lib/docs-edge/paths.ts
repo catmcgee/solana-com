@@ -120,19 +120,15 @@ export function canonicalDocsPath(pathname: string): string | null {
   return canonical === pathname ? null : canonical;
 }
 
-export type MarkdownRequestSource = "accept-header" | "md-extension";
-
 /**
- * Classifies a request for the PostHog `docs_markdown_requested` event
- * (ported from the old docs-app middleware). The docs routes answer both
- * forms; the middleware only records them.
+ * Whether a docs request asks for the Markdown twin: a `<page>.md` path or
+ * `Accept: text/markdown` (per-section llms.txt files are routes of their own).
  */
-export function getMarkdownRequestSource(
+export function isMarkdownRequest(
   pathname: string,
   acceptHeader: string | null,
-): MarkdownRequestSource | null {
-  if (pathname.endsWith(".md")) return "md-extension";
-  if (pathname.endsWith("/llms.txt")) return null;
-  if ((acceptHeader ?? "").includes("text/markdown")) return "accept-header";
-  return null;
+): boolean {
+  if (pathname.endsWith(".md")) return true;
+  if (pathname.endsWith("/llms.txt")) return false;
+  return (acceptHeader ?? "").includes("text/markdown");
 }
