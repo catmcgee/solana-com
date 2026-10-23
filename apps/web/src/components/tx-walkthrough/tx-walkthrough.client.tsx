@@ -95,7 +95,7 @@ export function TxWalkthroughClient({
           Settle a trade: {model.cash} USDC for {model.asset} fund shares
         </p>
         <p className="txw-lead">
-          One real transaction, recorded from a test run.
+          One real transaction, run on a local test network.
         </p>
       </header>
 
