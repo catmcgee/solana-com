@@ -6,15 +6,19 @@ import { Icon } from "@/components/tx-walkthrough/tx-walkthrough.client";
 /**
  * <InActionScene kind="checkout" /> and <InActionScene kind="paywall" /> on
  * "Solana in action": one action and its result, in the spirit of
- * payments.org's live demo. Each action sends a real devnet USDC transfer
- * through /api/demo/checkout or /api/demo/paywall-call (server-held test
- * wallets) and links it to Explorer once it's confirmed, with the measured
- * confirmation time. If the route can't send one (no wallets on this
- * deployment, out of test USDC, rate-limited), the scene still plays and
- * says quietly that the Explorer link is unavailable.
+ * payments.org's live demo.
  *
- * Each scene runs once by itself when it scrolls into view, and its button
- * runs it again. Reduced motion drops the animation, not the transaction.
+ * Only a reader's tap sends anything: "Pay 1 USDC", "Pay again", and "Call
+ * again" each send a real devnet USDC transfer through /api/demo/checkout
+ * or /api/demo/paywall-call (server-held test wallets) and link it to
+ * Explorer once it's confirmed, with the measured confirmation time. If the
+ * route can't send one (no wallets on this deployment, out of test USDC,
+ * rate-limited), the scene still plays and says quietly that the Explorer
+ * link is unavailable.
+ *
+ * Scrolling into view never calls a route: the checkout plays a short intro
+ * and waits on "Pay 1 USDC"; the paywall plays a few calls with no Explorer
+ * link. Reduced motion drops the animation, not the transaction.
  */
 export type SceneKind = "checkout" | "paywall";
 
@@ -31,8 +35,9 @@ const PRICE = 0.001;
 const TIMEOUT_MS = 25_000;
 const EXPLORER = "https://explorer.solana.com/tx";
 
-/** A confirmed devnet transfer, or null when none was sent. */
-type Sent = { signature: string; ms: number } | null;
+/** A confirmed devnet transfer, null when the route couldn't send one, or
+ * undefined when nothing was asked of it (auto-play). */
+type Sent = { signature: string; ms: number } | null | undefined;
 
 async function sendTransfer(path: string): Promise<Sent> {
   try {
@@ -59,6 +64,7 @@ function seconds(ms: number) {
 }
 
 function ExplorerLink({ sent }: { sent: Sent }) {
+  if (sent === undefined) return null;
   return sent ? (
     <a
       className="sol-scene-tx"
@@ -134,12 +140,10 @@ function CheckoutScene() {
   const [ref, seen] = useSeen<HTMLDivElement>();
   const [wait, alive] = useWait(reduced);
   const [phase, setPhase] = useState<PayPhase>("idle");
-  const [sent, setSent] = useState<Sent>(null);
+  const [sent, setSent] = useState<Sent>(undefined);
   const [order, setOrder] = useState(1001);
-  const started = useRef(false);
 
   const pay = useCallback(async () => {
-    started.current = true;
     if (phase === "pending") return;
     if (phase === "done") setOrder((n) => n + 1);
     setPhase("pending");
@@ -152,15 +156,6 @@ function CheckoutScene() {
     setPhase("done");
   }, [phase, wait, alive]);
 
-  // Pay once by itself when the scene comes into view.
-  useEffect(() => {
-    if (!seen || started.current) return;
-    const id = setTimeout(() => {
-      if (!started.current) void pay();
-    }, 600);
-    return () => clearTimeout(id);
-  }, [seen, pay]);
-
   const done = phase === "done";
 
   return (
@@ -169,6 +164,7 @@ function CheckoutScene() {
       className="sol-scene not-prose"
       data-kind="checkout"
       data-phase={phase}
+      data-intro={seen ? "" : undefined}
       data-motion={reduced ? "off" : "on"}
     >
       <div className="sol-scene-device">
@@ -240,37 +236,46 @@ function PaywallScene() {
   const [ref, seen] = useSeen<HTMLDivElement>();
   const [wait, alive] = useWait(reduced);
   const [step, setStep] = useState(0);
-  const [sent, setSent] = useState<Sent>(null);
+  const [sent, setSent] = useState<Sent>(undefined);
   const [calls, setCalls] = useState(0);
   const [running, setRunning] = useState(false);
   const [auto, setAuto] = useState(true);
 
-  const call = useCallback(async () => {
-    setRunning(true);
-    setSent(null);
-    setStep(1);
-    await wait(LINE_MS);
-    if (!alive.current) return;
-    setStep(2);
-    const transfer = sendTransfer("/api/demo/paywall-call");
-    await wait(LINE_MS);
-    if (!alive.current) return;
-    setStep(3);
-    const [result] = await Promise.all([transfer, wait(LINE_MS)]);
-    if (!alive.current) return;
-    setSent(result);
-    setStep(4);
-    await wait(LINE_MS);
-    if (!alive.current) return;
-    setStep(5);
-    setCalls((n) => n + 1);
-    setRunning(false);
-  }, [wait, alive]);
+  /** One call; `pay` sends the real transfer (a tap), else it only plays. */
+  const call = useCallback(
+    async (pay: boolean) => {
+      setRunning(true);
+      setSent(undefined);
+      setStep(1);
+      await wait(LINE_MS);
+      if (!alive.current) return;
+      setStep(2);
+      const transfer = pay
+        ? sendTransfer("/api/demo/paywall-call")
+        : Promise.resolve(undefined);
+      await wait(LINE_MS);
+      if (!alive.current) return;
+      setStep(3);
+      const [result] = await Promise.all([transfer, wait(LINE_MS)]);
+      if (!alive.current) return;
+      setSent(result);
+      setStep(4);
+      await wait(LINE_MS);
+      if (!alive.current) return;
+      setStep(5);
+      setCalls((n) => n + 1);
+      setRunning(false);
+    },
+    [wait, alive],
+  );
 
   // A few calls by themselves once the scene is in view.
   useEffect(() => {
     if (!seen || !auto || running || calls >= AUTO_CALLS) return;
-    const id = setTimeout(() => void call(), calls === 0 ? 500 : CALL_GAP_MS);
+    const id = setTimeout(
+      () => void call(false),
+      calls === 0 ? 500 : CALL_GAP_MS,
+    );
     return () => clearTimeout(id);
   }, [seen, auto, running, calls, call]);
 
@@ -344,7 +349,7 @@ function PaywallScene() {
             disabled={running}
             onClick={() => {
               setAuto(false);
-              void call();
+              void call(true);
             }}
           >
             Call again

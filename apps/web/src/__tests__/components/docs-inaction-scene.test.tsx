@@ -27,6 +27,23 @@ function serve(body: unknown, status = 200) {
 
 const flush = (ms: number) => act(() => vi.advanceTimersByTimeAsync(ms));
 
+/** An IntersectionObserver that reports every element in view at once. */
+function inView() {
+  vi.stubGlobal(
+    "IntersectionObserver",
+    class {
+      constructor(private cb: IntersectionObserverCallback) {}
+      observe() {
+        this.cb(
+          [{ isIntersecting: true } as IntersectionObserverEntry],
+          this as unknown as IntersectionObserver,
+        );
+      }
+      disconnect() {}
+    },
+  );
+}
+
 describe("InActionScene", () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => {
@@ -125,6 +142,39 @@ describe("InActionScene", () => {
     await flush(0);
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(screen.getByText("Order #1001 paid")).toBeTruthy();
+  });
+
+  it("scrolling into view never sends: checkout waits on Pay, the paywall plays without links", async () => {
+    const fetch = serve({ signature: SIG, ms: 500 });
+    inView();
+    const { container } = render(
+      <>
+        <InActionScene kind="checkout" />
+        <InActionScene kind="paywall" />
+      </>,
+    );
+    for (let i = 0; i < 30; i++) await flush(500);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Pay 1 USDC" })).toBeTruthy();
+    expect(
+      container
+        .querySelector('[data-kind="checkout"]')!
+        .hasAttribute("data-intro"),
+    ).toBe(true);
+    expect(container.querySelector(".sol-scene-count")!.textContent).toBe(
+      "calls: 3 · spent: $0.003",
+    );
+    expect(screen.queryByText(/Explorer/)).toBeNull();
+
+    // A tap on Call again sends one real transfer.
+    fireEvent.click(screen.getByRole("button", { name: "Call again" }));
+    await flush(3000);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/demo/paywall-call",
+      expect.objectContaining({ method: "POST" }),
+    );
+    expect(screen.getByRole("link", { name: "View on Explorer" })).toBeTruthy();
   });
 
   it("never calls the scenes recorded, replayed, sampled, or simulated", async () => {
