@@ -63,6 +63,10 @@ async function setup(page: Page) {
           "data: [DONE]\n\n",
       });
     }
+    if (url.includes("/search/graphql"))
+      return route.fulfill({
+        json: { data: { search: { searchHits: [], searchQuery: "" } } },
+      });
     return route.fulfill({ json: {} });
   });
   return { errors, chats };
@@ -188,8 +192,9 @@ test.describe("with Inkeep", () => {
   }) => {
     await setup(page);
     await page.goto("/developers/docs?q=accounts");
-    const input = page.getByPlaceholder("Search", { exact: true });
-    await expect(input).toHaveValue("accounts");
+    await expect(page.locator("inkeep-portal input").first()).toHaveValue(
+      "accounts",
+    );
     expect(new URL(page.url()).search).toBe("");
   });
 });

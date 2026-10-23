@@ -33,7 +33,12 @@ const MAX_CODE = 6000;
  * - Ask AI (chat view): the floating pill, Ctrl+/ and a code block's Ask
  *   button, which sends the code as the question (`openAskAi`).
  */
-export default function InkeepSearchAndChat() {
+export default function InkeepSearchAndChat({
+  onReady,
+}: {
+  /** Called once it listens (inkeep-mount.client.tsx replays then). */
+  onReady?: () => void;
+}) {
   const [request, setRequest] = useState<InkeepRequest>();
   const [open, setOpen] = useState(false);
   const opener = useRef<Element | null>(null);
@@ -70,24 +75,29 @@ export default function InkeepSearchAndChat() {
     window.addEventListener("keydown", onKeyDown);
     const handOff = takeSearchHandOff();
     if (handOff !== null) show({ view: "search", query: handOff });
+    onReady?.();
     return () => {
       window.removeEventListener(DOCS_SEARCH_OPEN_EVENT, onSearch);
       window.removeEventListener(DOCS_ASK_CODE_EVENT, onAsk);
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [show]);
+  }, [show, onReady]);
 
   // Closing returns focus to what opened it, unless the reader moved it.
   const wasOpen = useRef(false);
   useEffect(() => {
-    if (wasOpen.current && !open) {
+    const closed = wasOpen.current && !open;
+    wasOpen.current = open;
+    if (!closed) return;
+    // After the modal has unmounted and let go of focus.
+    const timer = setTimeout(() => {
       const active = document.activeElement;
       if (!active || active === document.body)
         (opener.current as HTMLElement | null)?.focus?.({
           preventScroll: true,
         });
-    }
-    wasOpen.current = open;
+    }, 50);
+    return () => clearTimeout(timer);
   }, [open]);
 
   if (!request) return null;

@@ -98,6 +98,16 @@ describe("InkeepSearchAndChat", () => {
     );
   });
 
+  it("replays a request made before it loaded", async () => {
+    const { InkeepMount } =
+      await import("@/components/docs/inkeep-mount.client");
+    render(<InkeepMount />);
+    act(() => openDocsSearch("early"));
+    expect((await screen.findByTestId("inkeep")).textContent).toBe(
+      "seq 1 search open early",
+    );
+  });
+
   it("opens search on arrival with ?q= and removes it from the URL", async () => {
     history.replaceState(null, "", "/developers/docs?q=accounts&x=1");
     render(<InkeepSearchAndChat />);
