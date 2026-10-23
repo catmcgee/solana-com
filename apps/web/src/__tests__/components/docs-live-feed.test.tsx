@@ -8,15 +8,12 @@ import {
 } from "@testing-library/react";
 import { LiveFeed } from "@/components/docs/docs-live-feed.client";
 
-const SIG =
-  "4JZW7fB3h53qP6f66eat4cwDVDFvxwTtKWbV8tfJJHVo4eHzK9riSvetQSwPEtungFxfbWC968JoyDoqRo7XauLZ";
-
 function tip(slot: number) {
   return {
     tip: slot,
     blocks: [
-      { slot: slot - 2, txs: 412, sig: `a${SIG.slice(1)}` },
-      { slot, txs: 386, sig: SIG },
+      { slot: slot - 2, txs: 412 },
+      { slot, txs: 386 },
     ],
     skipped: [slot - 1],
     serverTime: Date.now(),
@@ -43,7 +40,7 @@ function touch(el: Element) {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("docs LiveFeed", () => {
-  it("shows each block as a tile and links its transactions to Explorer", async () => {
+  it("shows each block as a tile, linked to Explorer, and no transaction list", async () => {
     serve(tip(460_172_365));
     render(<LiveFeed />);
 
@@ -57,17 +54,12 @@ describe("docs LiveFeed", () => {
     expect(screen.getByText("412")).toBeTruthy();
     expect(screen.getByText("skipped")).toBeTruthy();
 
-    const tx = await screen.findByRole(
-      "link",
-      { name: "4JZW7f…7XauLZ" },
-      { timeout: 2_000 },
-    );
-    expect(tx.getAttribute("href")).toBe(
-      `https://explorer.solana.com/tx/${SIG}`,
-    );
+    await new Promise((r) => setTimeout(r, 1_200));
+    expect(document.querySelector('a[href*="/tx/"]')).toBeNull();
+    expect(screen.queryByText(/Latest/)).toBeNull();
   });
 
-  it("explains slot, blocks, and transactions, with links to the concepts", async () => {
+  it("explains slot and blocks, with links to the concepts", async () => {
     serve(tip(460_172_365));
     render(<LiveFeed />);
     await screen.findByText("386");
@@ -78,9 +70,8 @@ describe("docs LiveFeed", () => {
     expect(hrefs).toEqual([
       "/developers/docs/references/terminology#slot",
       "/developers/docs/references/terminology#block",
-      "/developers/docs/core/transactions",
     ]);
-    for (const term of ["slot", "Blocks", "transactions"]) {
+    for (const term of ["slot", "Blocks"]) {
       expect(screen.getByText(term, { selector: ".tooltip" }).tabIndex).toBe(0);
     }
   });
@@ -137,22 +128,6 @@ describe("docs LiveFeed", () => {
     fireEvent.click(tile);
     document.removeEventListener("click", record);
     expect(prevented).toEqual([true, false]);
-  });
-
-  it("adds at most one transaction a second, however many blocks arrive", async () => {
-    const slot = 460_172_365;
-    const blocks = Array.from({ length: 12 }, (_, i) => ({
-      slot: slot - 11 + i,
-      txs: 1_000 + i,
-      sig: `${i}${SIG.slice(2)}x`,
-    }));
-    serve({ tip: slot, blocks, skipped: [], serverTime: Date.now() });
-    render(<LiveFeed />);
-    await screen.findByText("1,011");
-
-    await new Promise((r) => setTimeout(r, 1_300));
-    const list = document.querySelector(".sol-live-list")!;
-    expect(list.querySelectorAll("li").length).toBe(1);
   });
 
   it("says the data is unavailable when the route fails", async () => {

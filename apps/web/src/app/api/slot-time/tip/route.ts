@@ -12,10 +12,9 @@ export const runtime = "nodejs";
 
 /**
  * The confirmed tip and the blocks just behind it, light: each block's slot
- * and transaction count, and for the newest few blocks one signature (getBlock
- * with signatures only, about 35 KB a block at 200 ms slots, trimmed here to a
- * few hundred bytes a response). The docs live feed shows 12 block tiles and
- * at most one transaction a second, so the payload carries no more than that.
+ * and transaction count (getBlock with signatures only, about 35 KB a block
+ * at 200 ms slots, trimmed here to a few hundred bytes a response). The docs
+ * live feed shows 12 block tiles, so the payload carries no more than that.
  * The feed polls this about once a second; the one-second CDN and data cache
  * mean every reader shares one sampling round a second, however many are
  * watching. Each round reads only the newest blocks this instance hasn't read
@@ -34,8 +33,6 @@ const BACKOFF_MS = 10_000;
 /** Slots returned per response: the feed's 12 tiles, so a reader who missed
  * a poll can catch up. */
 const RETURN_SLOTS = 12;
-/** The newest slots whose block carries a signature for the transaction list. */
-const SIG_SLOTS = 5;
 const KEEP_SLOTS = 40;
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
 
@@ -52,11 +49,7 @@ async function readSlot(slot: number): Promise<void> {
   try {
     const block = await getBlockSignatures(slot);
     if (!block) return;
-    known.set(slot, {
-      slot,
-      txs: block.signatures.length,
-      sig: block.signatures[0],
-    });
+    known.set(slot, { slot, txs: block.signatures.length });
   } catch (error) {
     const code = error instanceof RpcError ? (error.code ?? 0) : 0;
     if (SKIPPED.includes(code)) known.set(slot, null);
@@ -81,7 +74,7 @@ async function loadTip(): Promise<TipPayload> {
   const skipped: number[] = [];
   for (let s = tip - RETURN_SLOTS + 1; s <= tip; s++) {
     const b = known.get(s);
-    if (b) blocks.push(s > tip - SIG_SLOTS ? b : { slot: b.slot, txs: b.txs });
+    if (b) blocks.push(b);
     else if (b === null) skipped.push(s);
   }
   return { tip, blocks, skipped, serverTime: Date.now() };

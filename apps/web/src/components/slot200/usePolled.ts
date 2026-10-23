@@ -123,8 +123,6 @@ export interface TipBlock {
   slot: number;
   /** Transactions in the block, validator votes included. */
   txs: number;
-  /** Its first transaction signature, sent for the newest few blocks only. */
-  sig?: string;
 }
 
 /** /api/slot-time/tip: the confirmed tip and the blocks just behind it. */

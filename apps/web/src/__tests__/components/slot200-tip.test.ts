@@ -46,11 +46,10 @@ describe("/api/slot-time/tip", () => {
     expect(first.blocks.map((b: { slot: number }) => b.slot)).toEqual([
       95, 96, 97, 99,
     ]);
-    // Every block sends its count; only the newest five slots send one
-    // signature, the most the feed's transaction list can use.
+    // Every block sends its slot and count, and no signatures.
     expect(first.blocks[0]).toEqual({ slot: 95, txs: 3 });
-    expect(first.blocks.at(-1)).toEqual({ slot: 99, txs: 3, sig: "s99a" });
-    expect(JSON.stringify(first)).not.toContain("s99b");
+    expect(first.blocks.at(-1)).toEqual({ slot: 99, txs: 3 });
+    expect(JSON.stringify(first)).not.toContain("s99a");
     expect(first.skipped).toEqual([98]);
     expect(rpc.getBlockSignatures).toHaveBeenCalledTimes(6);
 
@@ -62,10 +61,7 @@ describe("/api/slot-time/tip", () => {
     expect(rpc.getBlockSignatures.mock.calls.map((c) => c[0])).toEqual([
       101, 100, 94, 93, 92, 91,
     ]);
-    expect(second.blocks.at(-1).slot).toBe(101);
-    expect(second.blocks.filter((b: { sig?: string }) => b.sig)).toHaveLength(
-      3,
-    );
+    expect(second.blocks.at(-1)).toEqual({ slot: 101, txs: 3 });
   });
 
   it("never sends the RPC error text, which can carry the RPC URL", async () => {

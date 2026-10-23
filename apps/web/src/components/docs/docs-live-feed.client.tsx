@@ -21,23 +21,21 @@ import concepts from "../../../../docs/concepts/concepts.en.json";
 /**
  * <LiveFeed /> on "Solana in action": mainnet as it runs. Polls
  * /api/slot-time/tip about once a second (CDN-cached for a second, so every
- * reader shares one sampling round): the confirmed tip, every block in the
- * slots just behind it with its transaction count, and one signature from
- * each of the newest blocks.
+ * reader shares one sampling round): the confirmed tip and every block in
+ * the slots just behind it with its transaction count.
  *
  * - The slot counter steps through the slots between two observed tips at
  *   the measured slot time, never past the newest observed tip. As it
- *   passes each block, the block lands as a tile.
- * - The transaction list stays calm: one transaction per block at most,
- *   one new row a second, five rows. Most blocks don't add a row; the tiles
- *   and their counts carry the volume.
+ *   passes each block, the block lands as a tile. The tiles and their
+ *   counts carry the volume; there is no per-transaction list, which could
+ *   only ever show a sliver of them.
  * - Transactions per second: the transactions in the last BLOCK_WINDOW
  *   slots (skipped slots count as empty) over the measured slot time.
  * - The terms (slot, blocks, transactions) explain themselves on hover,
- *   focus, or tap, with the docs' Tooltip. Tiles and transactions open one
- *   shared popup (the tile row clips its overflow) with the definition, a
- *   "Learn more" link, and an Explorer link; the tile or signature itself
- *   also links to Explorer. While a popup is open the feed holds still.
+ *   focus, or tap, with the docs' Tooltip. Tiles open one shared popup (the
+ *   tile row clips its overflow) with the definition, a "Learn more" link,
+ *   and an Explorer link; the tile itself also links to Explorer. While a
+ *   popup is open the feed holds still.
  *
  * Polling and stepping pause while the tab is hidden. With reduced motion,
  * the feed polls every two seconds and redraws in place, with no stepping
@@ -46,11 +44,6 @@ import concepts from "../../../../docs/concepts/concepts.en.json";
 const POLL_MS = 1_000;
 const POLL_REDUCED_MS = 2_000;
 const MAX_TILES = 12;
-const MAX_ROWS = 5;
-/** One new transaction row a second at most. */
-const ROW_MS = 1_000;
-/** Rows waiting to be shown: only the newest, so the list stays current. */
-const QUEUE_MAX = 2;
 const SAMPLE_WINDOW = 20;
 const BLOCK_WINDOW = 20;
 const KEEP_SLOTS = 60;
@@ -79,31 +72,22 @@ const TERMS = {
   },
   transaction: {
     headline: concepts.transaction.name,
-    tip: `${firstSentence(concepts.transaction.short)} This list shows about one a second, taken from the newest blocks.`,
+    tip: `${firstSentence(concepts.transaction.short)} The count includes validator votes.`,
     href: concepts.transaction.href,
   },
 };
 const LEARN_MORE = concepts._ui.learnMore;
 
-interface Row {
-  sig: string;
-  slot: number;
-}
 interface Sample {
   tip: number;
   at: number;
 }
 type Pop =
   | { kind: "block"; slot: number; txs: number }
-  | { kind: "skipped"; slot: number }
-  | { kind: "tx"; slot: number; sig: string };
+  | { kind: "skipped"; slot: number };
 
 function popKey(p: Pop) {
-  return p.kind === "tx" ? p.sig : `${p.kind}-${p.slot}`;
-}
-
-function short(sig: string) {
-  return sig.length > 12 ? `${sig.slice(0, 6)}…${sig.slice(-6)}` : sig;
+  return `${p.kind}-${p.slot}`;
 }
 
 function useReducedMotion() {
@@ -137,13 +121,10 @@ export function LiveFeed() {
     reduced ? POLL_REDUCED_MS : POLL_MS,
   );
   const [shown, setShown] = useState(0);
-  const [rows, setRows] = useState<Row[]>([]);
   const [pop, setPop] = useState<Pop | null>(null);
   const known = useRef(new Map<number, TipBlock | null>());
   const samples = useRef<Sample[]>([]);
   const target = useRef({ from: 0, to: 0, t0: 0, step: 200 });
-  const passed = useRef(0);
-  const queue = useRef<Row[]>([]);
   const hold = useRef(false);
   const root = useRef<HTMLDivElement>(null);
   const popEl = useRef<HTMLSpanElement>(null);
@@ -161,11 +142,7 @@ export function LiveFeed() {
   useEffect(() => {
     if (!data) return;
     const map = known.current;
-    for (const b of data.blocks) {
-      // Older blocks come back without their signature: keep the one we have.
-      const sig = b.sig ?? map.get(b.slot)?.sig;
-      map.set(b.slot, sig ? { ...b, sig } : b);
-    }
+    for (const b of data.blocks) map.set(b.slot, b);
     for (const s of data.skipped) map.set(s, null);
 
     const list = samples.current;
@@ -185,8 +162,6 @@ export function LiveFeed() {
     if (data.tip <= current) return;
     const jump = !!current && data.tip - current > 30;
     const from = reduced || !current || jump ? data.tip : current;
-    // Back from a hidden tab: start the list over from the new tip.
-    if (jump) queue.current = [];
     const gap = Math.max(1, data.tip - from);
     target.current = {
       from,
@@ -213,35 +188,7 @@ export function LiveFeed() {
     return () => clearInterval(id);
   }, [reduced]);
 
-  // Blocks the counter has passed offer their transaction to the list; only
-  // the newest QUEUE_MAX wait, so at most one row a block, never a backlog.
-  useEffect(() => {
-    if (!shown) return;
-    const map = known.current;
-    const start = Math.max(passed.current + 1, shown - BLOCK_WINDOW);
-    for (let s = start; s <= shown; s++) {
-      const sig = map.get(s)?.sig;
-      if (sig) queue.current.push({ sig, slot: s });
-    }
-    queue.current = queue.current.slice(-QUEUE_MAX);
-    passed.current = shown;
-  }, [shown]);
-
-  // One row a second, newest on top; the oldest drops off.
-  useEffect(() => {
-    const id = setInterval(() => {
-      if (document.hidden || hold.current || !queue.current.length) return;
-      const row = queue.current.shift()!;
-      setRows((prev) =>
-        prev.some((r) => r.sig === row.sig)
-          ? prev
-          : [row, ...prev].slice(0, MAX_ROWS),
-      );
-    }, ROW_MS);
-    return () => clearInterval(id);
-  }, []);
-
-  // ---- The shared popup for tiles and transactions.
+  // ---- The shared popup for tiles.
   const cancelClose = useCallback(() => clearTimeout(closeTimer.current), []);
   const close = useCallback(() => {
     cancelClose();
@@ -261,7 +208,7 @@ export function LiveFeed() {
     [cancelClose],
   );
 
-  // Place the popup above its tile or row (below it near the top of the
+  // Place the popup above its tile (below it near the top of the
   // window), inside the feed's edges.
   useLayoutEffect(() => {
     const el = popEl.current;
@@ -300,7 +247,7 @@ export function LiveFeed() {
 
   useEffect(() => cancelClose, [cancelClose]);
 
-  /** Hover, focus, and tap handlers for a tile or row that opens `p`. */
+  /** Hover, focus, and tap handlers for a tile that opens `p`. */
   function trigger(p: Pop) {
     const key = popKey(p);
     const isOpen = !!pop && popKey(pop) === key;
@@ -388,7 +335,11 @@ export function LiveFeed() {
             <>
               {tps ? (
                 <>
-                  <b>{nf.format(tps)}</b> transactions a second ·{" "}
+                  <b>{nf.format(tps)}</b>{" "}
+                  <Tooltip {...TERMS.transaction} cta={LEARN_MORE}>
+                    transactions
+                  </Tooltip>{" "}
+                  a second ·{" "}
                 </>
               ) : null}
               <b>{Math.round(ms)}</b> ms slots
@@ -430,28 +381,6 @@ export function LiveFeed() {
         )}
       </ol>
 
-      <p className="sol-live-h">
-        Latest{" "}
-        <Tooltip {...TERMS.transaction} cta={LEARN_MORE}>
-          transactions
-        </Tooltip>
-      </p>
-      <ol className="sol-live-list">
-        {rows.map((r) => (
-          <li key={r.sig}>
-            <a
-              href={`${EXPLORER}/tx/${r.sig}`}
-              rel="noopener"
-              className="sol-live-sig"
-              {...trigger({ kind: "tx", slot: r.slot, sig: r.sig })}
-            >
-              {short(r.sig)}
-            </a>
-            <span className="sol-live-muted">block {nf.format(r.slot)}</span>
-          </li>
-        ))}
-      </ol>
-
       {pop ? (
         <span
           ref={popEl}
@@ -487,42 +416,19 @@ function PopBody({ pop }: { pop: Pop }) {
       </>
     );
   }
-  if (pop.kind === "block") {
-    return (
-      <>
-        <span className="tooltip-headline">Block {nf.format(pop.slot)}</span>
-        <span className="tooltip-tip">
-          {nf.format(pop.txs)} transactions, validator votes included.{" "}
-          {TERMS.block.tip.split(". ")[0]}.
-        </span>
-        <span className="sol-live-pop-links">
-          <a href={TERMS.block.href} className="tooltip-cta">
-            Learn more about blocks
-          </a>
-          <a
-            href={`${EXPLORER}/block/${pop.slot}`}
-            rel="noopener"
-            className="tooltip-cta"
-          >
-            View in Explorer
-          </a>
-        </span>
-      </>
-    );
-  }
   return (
     <>
-      <span className="tooltip-headline">Transaction {short(pop.sig)}</span>
+      <span className="tooltip-headline">Block {nf.format(pop.slot)}</span>
       <span className="tooltip-tip">
-        {firstSentence(concepts.transaction.short)} This one is in block{" "}
-        {nf.format(pop.slot)}.
+        {nf.format(pop.txs)} transactions, validator votes included.{" "}
+        {TERMS.block.tip.split(". ")[0]}.
       </span>
       <span className="sol-live-pop-links">
-        <a href={TERMS.transaction.href} className="tooltip-cta">
-          Learn more about transactions
+        <a href={TERMS.block.href} className="tooltip-cta">
+          Learn more about blocks
         </a>
         <a
-          href={`${EXPLORER}/tx/${pop.sig}`}
+          href={`${EXPLORER}/block/${pop.slot}`}
           rel="noopener"
           className="tooltip-cta"
         >
