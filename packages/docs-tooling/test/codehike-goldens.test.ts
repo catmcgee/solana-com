@@ -1,7 +1,7 @@
 /**
- * WP3 acceptance: goldens for build-first-program,
- * account-structure and deferred-execution in en, fr and ru, run through
- * every WP3 Code Hike transform via the real MDX codec.
+ * Goldens for build-first-program, account-structure and
+ * deferred-execution in en, fr and ru, run through every Code Hike
+ * transform via the real MDX codec.
  *
  * UPDATE_GOLDENS=1 rewrites out.mdx (review the diff before committing).
  */
@@ -31,7 +31,7 @@ import {
 import { transform as terminal } from "../src/convert/transforms/terminal.ts";
 import type { AstNode } from "../src/types.ts";
 
-export const WP3_TRANSFORMS: Transform[] = [
+const CODEHIKE_TRANSFORMS: Transform[] = [
   notes,
   mentions,
   sideBySide,
@@ -41,10 +41,10 @@ export const WP3_TRANSFORMS: Transform[] = [
   terminal,
 ];
 
-const ROOT = path.join(toolingRoot, "__fixtures__", "goldens-wp3");
+const ROOT = path.join(toolingRoot, "__fixtures__", "codehike-goldens");
 const UPDATE = process.env.UPDATE_GOLDENS === "1";
 
-/** Code Hike syntax WP3 owns; none may survive. */
+/** Code Hike syntax these transforms own; none may survive. */
 const RESIDUAL: Array<[string, RegExp]> = [
   ["<ScrollyCoding", /<ScrollyCoding\b/],
   ["<CodePlaceholder", /<CodePlaceholder\b/],
@@ -100,10 +100,10 @@ function walk(n: AstNode, fn: (n: AstNode, parent: AstNode | null) => void) {
 }
 
 const registry = new TransformRegistry();
-for (const t of WP3_TRANSFORMS) registry.register(t);
+for (const t of CODEHIKE_TRANSFORMS) registry.register(t);
 const goldens = loadGoldens();
 
-describe("WP3 goldens", () => {
+describe("Code Hike goldens", () => {
   it("covers the three anchor pages in en, fr and ru", () => {
     expect(goldens.map((g) => g.name).sort()).toEqual(
       [
@@ -130,7 +130,7 @@ describe("WP3 goldens", () => {
         expect(convertSource(output, g.file, registry).output).toBe(output);
       });
 
-      it("leaves no WP3-owned Code Hike syntax", () => {
+      it("leaves no Code Hike syntax these transforms own", () => {
         const hits = RESIDUAL.filter(([, re]) => re.test(output)).map(
           ([k]) => k,
         );

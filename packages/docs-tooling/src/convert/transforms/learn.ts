@@ -33,7 +33,6 @@ const norm = (s: string) => s.normalize("NFC").replace(/\s+/g, " ").trim();
 export const transform: Transform = {
   name: "learn",
   order: 630,
-  owner: "WP7",
   appliesTo: (src, file) => file.collection === "learn" && /^# /m.test(src),
   run(tree, file) {
     const kids = tree.children!;

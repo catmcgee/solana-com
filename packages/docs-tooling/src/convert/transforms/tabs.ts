@@ -38,14 +38,13 @@ import {
   strAttr,
   unknownAttrs,
   walk,
-} from "./_wp2.ts";
+} from "./_mdx.ts";
 
 const DROPPED = ["items", "groupId", "persist", "updateAnchor", "id"];
 
 export const transform: Transform = {
   name: "tabs",
   order: 230,
-  owner: "WP2",
   appliesTo: (source) => source.includes("<Tab"),
   run(tree, _file, ctx) {
     walk(tree, (n) => {

@@ -44,7 +44,7 @@ import {
   strong,
   text,
   textOf,
-} from "./_wp2.ts";
+} from "./_mdx.ts";
 
 const HTML_ATTR_RENAMES: Readonly<Record<string, string>> = {
   class: "className",
@@ -356,7 +356,6 @@ function normalizeIframe(n: Jsx): boolean {
 export const transform: Transform = {
   name: "html",
   order: 270,
-  owner: "WP2",
   appliesTo: (source) => /<(div|iframe|span)\b/.test(source),
   run(tree, _file, ctx) {
     replaceNodes(tree, (node, parent, ancestors) => {

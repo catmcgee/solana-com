@@ -52,7 +52,6 @@ import { scanExampleBlocks } from "../../examples/mdast.ts";
 export const transform: Transform = {
   name: "codetabs-examples",
   order: 85,
-  owner: "WP5",
   appliesTo: (source) => source.includes("file=packages/docs-examples/"),
   run(tree, file, ctx) {
     const { blocks, problems } = scanExampleBlocks(tree);

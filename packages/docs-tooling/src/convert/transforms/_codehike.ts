@@ -1,34 +1,33 @@
 /**
- * Shared helpers for the WP3 Code Hike transforms (notes, mentions,
+ * Shared helpers for the Code Hike transforms (notes, mentions,
  * side-by-side, scrolly, files, mermaid, terminal). `<DocsDiagram>` is
- * converted by WP2's themed-image.ts (it also checks the asset pair).
+ * converted by themed-image.ts (it also checks the asset pair).
  *
  * Not a transform: files starting with `_` are skipped by discovery.
  *
- * Ordering contract (see each module's `order`): every WP3 transform runs at
- * order 80-88 (notes 80 … terminal 88), BEFORE fences.ts (900). `notes` needs
- * the raw `!tooltip[/re/] name` comment lines, which `fences.ts`
- * deletes. The other WP3 transforms are order-independent with respect to
+ * Ordering contract (see each module's `order`): every Code Hike transform
+ * runs at order 80-88 (notes 80 … terminal 88), BEFORE fences.ts (900).
+ * `notes` needs the raw `!tooltip[/re/] name` comment lines, which
+ * `fences.ts` deletes. The others are order-independent with respect to
  * `fences.ts`: they read fence titles in both the Code Hike form
  * (`lang !! title="X"`) and the converted docs form (`lang X` /
  * `lang title="X Y"`), and they never rewrite annotation lines other than
  * the ones whose semantics they own (`!tooltip`, `!mention`).
  */
 import type { AstNode } from "../../types.ts";
+import { isJsx, textOf, type Jsx } from "./_mdx.ts";
 
-export type Jsx = AstNode & {
-  type: "mdxJsxFlowElement" | "mdxJsxTextElement";
-  name: string | null;
-  attributes: JsxAttr[];
-  children: AstNode[];
-};
-
-export interface JsxAttr {
-  type: "mdxJsxAttribute" | "mdxJsxExpressionAttribute";
-  name?: string;
-  value?: string | null | { type: string; value: string };
-  [key: string]: unknown;
-}
+export {
+  attr,
+  exprAttr,
+  flow,
+  hasAttr,
+  isJsx,
+  textOf,
+  walk,
+  type Jsx,
+  type JsxAttr,
+} from "./_mdx.ts";
 
 export type Code = AstNode & {
   type: "code";
@@ -36,13 +35,6 @@ export type Code = AstNode & {
   meta?: string | null;
   value: string;
 };
-
-export function isJsx(n: AstNode | undefined, name?: string): n is Jsx {
-  if (!n) return false;
-  if (n.type !== "mdxJsxFlowElement" && n.type !== "mdxJsxTextElement")
-    return false;
-  return name === undefined || n.name === name;
-}
 
 export function isCode(n: AstNode | undefined): n is Code {
   return n?.type === "code";
@@ -57,54 +49,6 @@ export function getAttr(n: Jsx, name: string): string | undefined {
   if (a.value === null || a.value === undefined) return "";
   if (typeof a.value === "string") return a.value;
   return a.value.value;
-}
-
-export function hasAttr(n: Jsx, name: string): boolean {
-  return (n.attributes ?? []).some(
-    (x) => x.type === "mdxJsxAttribute" && x.name === name,
-  );
-}
-
-/** `name="value"` (string), `name` (boolean, value === true). */
-export function attr(name: string, value: string | true): JsxAttr {
-  return {
-    type: "mdxJsxAttribute",
-    name,
-    value: value === true ? null : value,
-  };
-}
-
-/** `name={expression}`. */
-export function exprAttr(name: string, expression: string): JsxAttr {
-  return {
-    type: "mdxJsxAttribute",
-    name,
-    value: { type: "mdxJsxAttributeValueExpression", value: expression },
-  };
-}
-
-export function flow(
-  name: string,
-  attributes: JsxAttr[],
-  children: AstNode[],
-): Jsx {
-  return { type: "mdxJsxFlowElement", name, attributes, children };
-}
-
-/** Plain text of a node (inline code values included). */
-export function textOf(n: AstNode): string {
-  if (typeof n.value === "string" && n.type !== "code") return n.value;
-  return (n.children ?? []).map(textOf).join("");
-}
-
-/** Depth-first visit; `fn` returning "skip" does not descend. */
-export function walk(
-  n: AstNode,
-  fn: (node: AstNode, parent: AstNode | null) => void | "skip",
-  parent: AstNode | null = null,
-) {
-  if (fn(n, parent) === "skip") return;
-  for (const c of [...(n.children ?? [])]) walk(c, fn, n);
 }
 
 /**

@@ -36,7 +36,7 @@ import {
   replaceNodes,
   strAttr,
   text,
-} from "./_wp2.ts";
+} from "./_mdx.ts";
 
 export const YOUTUBE_ALLOW =
   "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";
@@ -120,7 +120,6 @@ function convert(el: Jsx, warn: (m: string) => void): AstNode[] {
 export const transform: Transform = {
   name: "embed",
   order: 260,
-  owner: "WP2",
   appliesTo: (source) => source.includes("<Embed"),
   run(tree, _file, ctx) {
     replaceNodes(tree, (node) => {

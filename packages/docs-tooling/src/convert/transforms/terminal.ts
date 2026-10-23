@@ -25,7 +25,7 @@
  *   fence (`text` keeping its meta when grouped or titled).
  */
 import type { AstNode, Transform } from "../../types.ts";
-import { type Code, isCode, isCodeHikeSlot, isJsx } from "./_wp3.ts";
+import { type Code, isCode, isCodeHikeSlot, isJsx } from "./_codehike.ts";
 
 const GROUPS = new Set([
   "CodeTabs",
@@ -96,7 +96,6 @@ function convertStandalone(n: Code): AstNode[] {
 export const transform: Transform = {
   name: "terminal",
   order: 88,
-  owner: "WP3",
   appliesTo: (source) => /`{3,}terminal\b/.test(source),
   run(tree) {
     const visit = (parent: AstNode) => {

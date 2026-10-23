@@ -150,7 +150,6 @@ function containsPoster(n: AstNode, id: string): boolean {
 export const transform: Transform = {
   name: "video-poster",
   order: 660,
-  owner: "video tutorials (2026-10-16)",
   appliesTo: (src) => src.includes("<iframe") && /youtube/i.test(src),
   run(tree, file, ctx) {
     const played = new Set<string>();

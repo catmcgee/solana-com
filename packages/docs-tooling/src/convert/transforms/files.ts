@@ -8,7 +8,7 @@
  * folders today, so this changes nothing for JS readers.
  */
 import type { AstNode, ConvertContext, Transform } from "../../types.ts";
-import { attr, getAttr, isJsx, type Jsx, walk } from "./_wp3.ts";
+import { attr, getAttr, isJsx, type Jsx, walk } from "./_codehike.ts";
 
 function convertNode(n: AstNode, ctx: Pick<ConvertContext, "warn">): void {
   for (const c of n.children ?? []) convertNode(c, ctx);
@@ -36,7 +36,6 @@ function isBlank(n: AstNode) {
 export const transform: Transform = {
   name: "files",
   order: 84,
-  owner: "WP3",
   appliesTo: (source) => source.includes("<Files"),
   run(tree, _file, ctx) {
     walk(tree, (n) => {

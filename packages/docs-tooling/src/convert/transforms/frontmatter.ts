@@ -72,7 +72,6 @@ const norm = (u: string) => u.replace(/[#?].*$/, "").replace(/\/+$/, "") || "/";
 export const transform: Transform = {
   name: "frontmatter",
   order: 10,
-  owner: "WP2",
   appliesTo: (source) => {
     const fm = /^---\r?\n([\s\S]*?)\r?\n---/.exec(source)?.[1];
     return !!fm && FM_KEYS.test(fm);

@@ -12,7 +12,7 @@
  * apps/docs/snippets/examples, because generated snippets are not converted.
  */
 import type { Transform } from "../../types.ts";
-import { walk } from "./_wp2.ts";
+import { walk } from "./_mdx.ts";
 
 const ALIAS_RE = /@solana\/web3\.js-(?:v3|legacy)(?![\w-])/g;
 
@@ -23,7 +23,6 @@ export function restoreWeb3jsSpecifier(code: string): string {
 export const transform: Transform = {
   name: "web3js-specifier",
   order: 910,
-  owner: "WP2",
   appliesTo: (source) => /@solana\/web3\.js-(?:v3|legacy)/.test(source),
   run(tree) {
     walk(tree, (n) => {

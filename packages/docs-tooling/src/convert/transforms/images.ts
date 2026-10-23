@@ -35,7 +35,7 @@ import {
   isLegacyAssetUrl,
   replaceNodes,
   walk,
-} from "./_wp2.ts";
+} from "./_mdx.ts";
 
 /** Containers whose paragraphs are block-level (a Frame may replace them). */
 const FLOW_PARENTS = new Set([
@@ -55,7 +55,6 @@ const URL_ATTRS: Readonly<Record<string, readonly string[]>> = {
 export const transform: Transform = {
   name: "images",
   order: 290,
-  owner: "WP2",
   appliesTo: (source) =>
     source.includes("![") ||
     source.includes("<img") ||

@@ -24,7 +24,7 @@
  * and inline code values are never changed.
  */
 import type { AstNode, Transform } from "../../types.ts";
-import { text } from "./_wp2.ts";
+import { text } from "./_mdx.ts";
 
 const LANG = /^[a-z][a-z0-9]{0,11}$/;
 /** Languages whose unclosed `_lang`code`` form is still Code Hike syntax. */
@@ -140,7 +140,6 @@ function visit(n: AstNode): void {
 export const transform: Transform = {
   name: "inline-code",
   order: 150,
-  owner: "WP2",
   appliesTo: (source) => /[_*][a-z][a-z0-9]{0,11}`/.test(source),
   run(tree) {
     visit(tree);

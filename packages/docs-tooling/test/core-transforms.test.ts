@@ -1,7 +1,7 @@
 /**
- * Unit tests for the WP2 core transforms beyond the fixture goldens:
+ * Unit tests for the core transforms beyond the fixture goldens:
  * fence meta/annotation semantics, error paths and cross-transform
- * idempotency (all WP2 transforms together, in registry order).
+ * idempotency (all core transforms together, in registry order).
  */
 import { describe, expect, it } from "vitest";
 import { TransformRegistry } from "../src/convert/registry.ts";
@@ -30,7 +30,7 @@ import { transform as web3js } from "../src/convert/transforms/web3js-specifier.
 import {
   parseJsString,
   parseStringArray,
-} from "../src/convert/transforms/_wp2.ts";
+} from "../src/convert/transforms/_mdx.ts";
 import type { Transform } from "../src/types.ts";
 
 const FILE = {
@@ -45,7 +45,7 @@ function run(src: string, ...ts: Transform[]) {
   return convertSource(src, FILE, r);
 }
 
-const WP2 = [
+const CORE = [
   frontmatter,
   inlineCode,
   callout,
@@ -263,7 +263,7 @@ describe("helpers", () => {
   });
 });
 
-describe("all WP2 transforms together", () => {
+describe("all core transforms together", () => {
   const page = [
     "---",
     "title: Install",
@@ -313,7 +313,7 @@ describe("all WP2 transforms together", () => {
   ].join("\n");
 
   it("converts a mixed page and is idempotent", () => {
-    const { output, diagnostics } = run(page, ...WP2);
+    const { output, diagnostics } = run(page, ...CORE);
     expect(diagnostics.filter((d) => d.level === "error")).toEqual([]);
     expect(output).toContain("title: Install the CLI");
     expect(output).toContain("sidebarTitle: Install");
@@ -334,6 +334,6 @@ describe("all WP2 transforms together", () => {
     expect(output).not.toMatch(
       /<Callout|<Cards|<Embed|items=|value=|!!|\/\/ !mark|\$ curl/,
     );
-    expect(run(output, ...WP2).output).toBe(output);
+    expect(run(output, ...CORE).output).toBe(output);
   });
 });

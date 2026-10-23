@@ -41,7 +41,7 @@
  * which treats `CodeGroup` exactly like `CodeTabs`.
  */
 import type { AstNode, Transform } from "../../types.ts";
-import { attr, flow, isBlankText, isJsx, replaceNodes } from "./_wp2.ts";
+import { attr, flow, isBlankText, isJsx, replaceNodes } from "./_mdx.ts";
 import { parseMeta } from "./fences.ts";
 
 const DROPPED = new Set(["storage", "flags", "runner"]);
@@ -54,7 +54,6 @@ function tabTitle(code: AstNode): string {
 export const transform: Transform = {
   name: "codetabs",
   order: 300,
-  owner: "WP12",
   appliesTo: (source) => source.includes("<CodeTabs"),
   run(tree, _file, ctx) {
     replaceNodes(tree, (n) => {

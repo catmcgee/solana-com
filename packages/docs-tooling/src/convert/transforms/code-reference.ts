@@ -31,7 +31,6 @@ import {
 export const transform: Transform = {
   name: "code-reference",
   order: 90,
-  owner: "WP4",
   appliesTo: (src) => src.includes("<CodeReference"),
   run(tree, file, ctx) {
     for (const { node, parent } of findJsx(tree, "CodeReference")) {

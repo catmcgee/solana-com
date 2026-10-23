@@ -44,7 +44,7 @@ import {
   docsSlugger,
   docsSluggerWithRaw,
 } from "../../lib/slugs.ts";
-import { isJsx, strAttr, walk } from "./_wp2.ts";
+import { isJsx, strAttr, walk } from "./_mdx.ts";
 import { docsServes, pageUrl } from "./site-links.ts";
 
 interface Entry {
@@ -167,7 +167,6 @@ function decode(s: string) {
 export const transform: Transform = {
   name: "anchors",
   order: 920,
-  owner: "WP12",
   appliesTo: (source) => source.includes("#"),
   run(tree, file: ConvertFile, ctx) {
     const self = pageUrl(file.path);

@@ -52,7 +52,7 @@ import {
   replaceJsx,
   stripAnnotations,
   walk,
-} from "./_wp3.ts";
+} from "./_codehike.ts";
 
 const TOOLTIP = new Set(["tooltip"]);
 
@@ -212,7 +212,6 @@ export function convertWithNotes(
 export const transform: Transform = {
   name: "notes",
   order: 80,
-  owner: "WP3",
   appliesTo: (source) =>
     source.includes("<WithNotes") || source.includes("!tooltip"),
   run(tree, file, ctx) {

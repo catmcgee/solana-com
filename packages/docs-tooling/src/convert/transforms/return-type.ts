@@ -58,7 +58,6 @@ const isResultHeading = (n: AstNode) =>
 export const transform: Transform = {
   name: "return-type",
   order: 87,
-  owner: "WP4",
   appliesTo: (src) => src.includes("<APIMethod") && src.includes("!!result"),
   run(tree, file, ctx) {
     const depth = sectionDepth(tree);

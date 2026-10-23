@@ -14,7 +14,13 @@
  * implied a WithMentions wrapper in Code Hike).
  */
 import type { AstNode, Transform } from "../../types.ts";
-import { isCode, isJsx, replaceJsx, stripAnnotations, walk } from "./_wp3.ts";
+import {
+  isCode,
+  isJsx,
+  replaceJsx,
+  stripAnnotations,
+  walk,
+} from "./_codehike.ts";
 
 const MENTION = new Set(["mention"]);
 
@@ -42,7 +48,6 @@ function unwrapMentionLinks(n: AstNode): number {
 export const transform: Transform = {
   name: "mentions",
   order: 81,
-  owner: "WP3",
   appliesTo: (source) =>
     source.includes("<WithMentions") ||
     source.includes("mention:") ||

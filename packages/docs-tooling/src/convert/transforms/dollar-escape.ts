@@ -22,7 +22,7 @@
  * fixing); it also covers snippets, which convert does not touch.
  */
 import type { AstNode, Transform } from "../../types.ts";
-import { text } from "./_wp2.ts";
+import { text } from "./_mdx.ts";
 
 type Pos = { start?: { offset?: number }; end?: { offset?: number } };
 const BLOCKS = new Set(["paragraph", "heading", "tableRow"]);
@@ -158,7 +158,6 @@ export function findMathRisks(tree: AstNode, source: string): MathRisk[] {
 export const transform: Transform = {
   name: "dollar-escape",
   order: 950,
-  owner: "WP12",
   appliesTo: (source) => /\$[^]*\$/.test(source),
   run(tree, file) {
     escapeDollars(tree, file.source);

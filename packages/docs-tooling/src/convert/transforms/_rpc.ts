@@ -1,5 +1,5 @@
 /**
- * Shared helpers for the WP4 RPC transforms (`return-type`, `api-method`,
+ * Shared helpers for the RPC transforms (`return-type`, `api-method`,
  * `code-reference`). Not a transform: files starting with `_` are skipped by
  * discovery.
  *

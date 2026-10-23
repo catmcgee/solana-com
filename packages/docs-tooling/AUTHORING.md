@@ -107,7 +107,7 @@ Package scripts (`pnpm --filter @workspace/docs-tooling <script>`):
 | `gen:manifest`, `gen:llms` `[--check]`                                    | `src/manifest/cli.ts`                                                    |
 | `generate` / `generate:check`                                             | every generator, in dependency order                                     |
 
-## Writing a convert transform (WP2+)
+## Writing a convert transform
 
 Transforms are **auto-discovered**: `discoverTransforms()`
 (`src/convert/registry.ts`) imports every `src/convert/transforms/*.ts` and
@@ -124,7 +124,6 @@ import type { Transform } from "../../types.ts";
 export const transform: Transform = {
   name: "callout", // kebab-case, MUST equal the file name
   order: 230, // finite number; lower runs first, ties broken by name
-  owner: "WP2",
   // Optional cheap text pre-check; the file is skipped (not parsed) when
   // no transform applies.
   appliesTo: (source) => source.includes("<Callout"),

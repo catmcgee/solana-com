@@ -36,7 +36,7 @@ import {
   strAttr,
   text,
   walk,
-} from "./_wp2.ts";
+} from "./_mdx.ts";
 
 /** Fumadocs/boxicons component -> lucide icon name. */
 export const ICONS: Readonly<Record<string, string>> = {
@@ -74,7 +74,6 @@ function convertIcon(card: Jsx): string | null | undefined {
 export const transform: Transform = {
   name: "cards",
   order: 220,
-  owner: "WP2",
   appliesTo: (source) => source.includes("<Card"),
   run(tree, _file, ctx) {
     walk(tree, (n) => {

@@ -1,7 +1,7 @@
 /**
- * Shared helpers for the WP2 core transforms (callout, cards, tabs, steps,
- * accordion, images, themed-image, embed, html, frontmatter, fences,
- * inline-code, web3js-specifier).
+ * Shared MDX/JSX node helpers for the core transforms (callout, cards, tabs,
+ * steps, accordion, images, themed-image, embed, html, fences, inline-code,
+ * ...) and, through _codehike.ts, the Code Hike transforms.
  *
  * Not a transform: files starting with `_` are skipped by discovery.
  */

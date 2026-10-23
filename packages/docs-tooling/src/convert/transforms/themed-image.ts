@@ -38,7 +38,7 @@ import {
   isJsx,
   replaceNodes,
   strAttr,
-} from "./_wp2.ts";
+} from "./_mdx.ts";
 
 /** Legacy rule: which markdown images were auto-themed. */
 export function isThemedPath(url: string): boolean {
@@ -89,7 +89,6 @@ export function themedPair(
 export const transform: Transform = {
   name: "themed-image",
   order: 280,
-  owner: "WP2",
   appliesTo: (source) =>
     source.includes("<DocsDiagram") ||
     source.includes("/assets/docs/core/") ||

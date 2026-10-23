@@ -43,7 +43,7 @@ import {
   isJsx,
   replaceNodes,
   textOf,
-} from "./_wp2.ts";
+} from "./_mdx.ts";
 
 /** Markdown-ish inline text for a docs title attribute. */
 export function inlineTitle(nodes: readonly AstNode[]): string {
@@ -107,7 +107,6 @@ function liftTitle(step: Jsx): number | undefined {
 export const transform: Transform = {
   name: "steps",
   order: 240,
-  owner: "WP2",
   appliesTo: (source) => source.includes("<Steps"),
   run(tree, _file, ctx) {
     replaceNodes(tree, (node) => {

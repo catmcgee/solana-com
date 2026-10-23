@@ -18,12 +18,11 @@ import {
   strAttr,
   unknownAttrs,
   walk,
-} from "./_wp2.ts";
+} from "./_mdx.ts";
 
 export const transform: Transform = {
   name: "accordion",
   order: 250,
-  owner: "WP2",
   appliesTo: (source) => source.includes("<Accordion"),
   run(tree, _file, ctx) {
     walk(tree, (n) => {

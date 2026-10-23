@@ -38,7 +38,7 @@ import {
   strong,
   text,
   unknownAttrs,
-} from "./_wp2.ts";
+} from "./_mdx.ts";
 
 export const CALLOUT_TYPES: Readonly<Record<string, string>> = {
   info: "Info",
@@ -66,7 +66,6 @@ function titleNodes(el: Jsx): AstNode[] | undefined {
 export const transform: Transform = {
   name: "callout",
   order: 210,
-  owner: "WP2",
   appliesTo: (source) => source.includes("<Callout"),
   run(tree, _file, ctx) {
     const convert = (el: Jsx): { name: string; title?: AstNode[] } | null => {

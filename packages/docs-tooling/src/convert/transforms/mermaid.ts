@@ -34,7 +34,7 @@
  */
 import { createHash } from "node:crypto";
 import type { AstNode, Transform } from "../../types.ts";
-import { attr, type Code, flow, getAttr, isCode, isJsx } from "./_wp3.ts";
+import { attr, type Code, flow, getAttr, isCode, isJsx } from "./_codehike.ts";
 
 export const FALLBACK_MARK = "mermaid";
 
@@ -159,7 +159,6 @@ function titleOf(meta: string | null | undefined): string | undefined {
 export const transform: Transform = {
   name: "mermaid",
   order: 86,
-  owner: "WP3",
   appliesTo: (source) => source.includes("mermaid"),
   run(tree) {
     const visit = (parent: AstNode) => {

@@ -84,7 +84,6 @@ function embeddedIds(tree: AstNode): string[] {
 export const transform: Transform = {
   name: "bootcamp",
   order: 610,
-  owner: "WP7",
   appliesTo: (_src, file) =>
     file.collection === "bootcamp" && lessonForPath(file.path) !== undefined,
   run(tree, file, ctx) {

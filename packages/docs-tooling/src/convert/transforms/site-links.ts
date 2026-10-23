@@ -28,7 +28,7 @@
 import path from "node:path";
 import type { AstNode, ConvertFile, Transform } from "../../types.ts";
 import { LEGACY_LOCALES } from "../../lib/locales.ts";
-import { walk } from "./_wp2.ts";
+import { walk } from "./_mdx.ts";
 
 const LOCALES = LEGACY_LOCALES.filter((l) => l !== "en");
 const LOCALE_RE = new RegExp(`^/(?:${LOCALES.join("|")})(?=/|$)`);
@@ -94,7 +94,6 @@ function rewriteUrl(url: string, file: ConvertFile): string | undefined {
 export const transform: Transform = {
   name: "site-links",
   order: 650,
-  owner: "WP12",
   appliesTo: (source) => /\]\(|href=|https?:\/\//.test(source),
   run(tree, file, ctx) {
     walk(tree, (n, parent) => {

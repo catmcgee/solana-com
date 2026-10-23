@@ -18,7 +18,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import type { AstNode, Transform } from "../../types.ts";
 import { LEGACY_LOCALES } from "../../lib/locales.ts";
-import { attr, findAttr, isJsx, strAttr, walk } from "./_wp2.ts";
+import { attr, findAttr, isJsx, strAttr, walk } from "./_mdx.ts";
 
 /** Tabs whose cards are marked when they leave the tab. */
 export const JOB_TABS = ["Payments", "Assets", "Markets"] as const;
@@ -89,7 +89,6 @@ export function hrefPage(href: string) {
 export const transform: Transform = {
   name: "cross-tab-cards",
   order: 310,
-  owner: "nav-round",
   appliesTo: (source, file) =>
     file.collection === "docs" && source.includes("<Card"),
   run(tree, file, ctx) {

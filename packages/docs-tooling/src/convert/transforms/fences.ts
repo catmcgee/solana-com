@@ -74,7 +74,7 @@ import {
   paragraph,
   strAttr,
   text,
-} from "./_wp2.ts";
+} from "./_mdx.ts";
 
 type Code = AstNode & {
   type: "code";
@@ -551,7 +551,6 @@ function normalizeFence(node: Code, ctx: ConvertContext): void {
 export const transform: Transform = {
   name: "fences",
   order: 900,
-  owner: "WP2",
   appliesTo: (source) => source.includes("```") || source.includes("~~~"),
   run(tree, _file, ctx) {
     const warned = new Set<AstNode>();

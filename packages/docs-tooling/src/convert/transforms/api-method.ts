@@ -84,7 +84,6 @@ const SURFPOOL_RE = new RegExp(
 export const transform: Transform = {
   name: "api-method",
   order: 89,
-  owner: "WP4",
   appliesTo: (src) => src.includes("<APIMethod") || SURFPOOL_RE.test(src),
   run(tree, file, ctx) {
     const methods = findJsx(tree, "APIMethod");

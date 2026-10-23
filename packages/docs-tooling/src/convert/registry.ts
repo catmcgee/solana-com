@@ -12,7 +12,6 @@
  *   export const transform: Transform = {
  *     name: "<file basename>",  // kebab-case, must equal the file name
  *     order: 230,               // number; lower runs first, ties by name
- *     owner: "WP2",
  *     appliesTo: (source, file) => source.includes("<Callout"), // optional
  *     run(tree, file, ctx) { ... },  // mutate the mdast tree in place
  *   };

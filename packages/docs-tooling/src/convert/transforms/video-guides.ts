@@ -329,7 +329,6 @@ export function convertComponent(
 export const transform: Transform = {
   name: "video-guides",
   order: 620,
-  owner: "WP7",
   appliesTo: (src) => COMPONENTS.some((c) => src.includes(`<${c}`)),
   run(tree, _file, ctx) {
     walk(tree, (n, parent) => {

@@ -58,7 +58,7 @@ import {
   markerHeading,
   replaceJsx,
   walk,
-} from "./_wp3.ts";
+} from "./_codehike.ts";
 
 export const EXPANDABLE_LINES = 40;
 
@@ -177,7 +177,6 @@ export function convertScrolly(
 export const transform: Transform = {
   name: "scrolly",
   order: 83,
-  owner: "WP3",
   appliesTo: (source) => source.includes("<ScrollyCoding"),
   run(tree, file, ctx) {
     replaceJsx(tree, "ScrollyCoding", (el) =>

@@ -1,5 +1,5 @@
 /**
- * WP8b generators: concepts, paths, addresses.
+ * Generators: concepts, paths, addresses.
  * Every test runs against a throwaway docs root in the OS temp dir.
  */
 import {
@@ -162,7 +162,7 @@ describe("seeds and registries", () => {
     expect(a.length).toBeGreaterThan(20);
   });
 
-  it("seed demo steps point at real WP5 recordings that match their labels", () => {
+  it("seed demo steps point at real example recordings that match their labels", () => {
     const problems: Problem[] = [];
     const seedDir = path.join(
       import.meta.dirname,

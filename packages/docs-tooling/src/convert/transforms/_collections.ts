@@ -1,5 +1,5 @@
 /**
- * Shared mdast helpers for the WP7 special-collection transforms
+ * Shared mdast helpers for the special-collection transforms
  * (bootcamp, video-guides, learn). Not a transform: files starting
  * with `_` are skipped by discovery.
  */

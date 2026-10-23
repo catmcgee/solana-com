@@ -25,7 +25,6 @@ export function ledeText(s: string): string {
 export const transform: Transform = {
   name: "dedupe-lede",
   order: 930,
-  owner: "WP13",
   run(tree, file) {
     const description = file.frontmatter.description;
     if (typeof description !== "string" || !description.trim()) return;

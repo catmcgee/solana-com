@@ -16,12 +16,11 @@ import {
   markerHeading,
   replaceJsx,
   walk,
-} from "./_wp3.ts";
+} from "./_codehike.ts";
 
 export const transform: Transform = {
   name: "side-by-side",
   order: 82,
-  owner: "WP3",
   appliesTo: (source) => source.includes("<SideBySide"),
   run(tree, _file, ctx) {
     replaceJsx(tree, "SideBySide", (el) => {

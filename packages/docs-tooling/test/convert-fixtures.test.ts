@@ -16,7 +16,6 @@ import { describeTransformFixtures } from "./fixtures.ts";
 const exampleCalloutRename: Transform = {
   name: "example-callout-rename",
   order: 200,
-  owner: "WP0 (test only)",
   appliesTo: (src) => src.includes("<Callout"),
   run(tree) {
     const visit = (n: AstNode) => {
@@ -41,7 +40,6 @@ describe("TransformRegistry", () => {
   const noop = (name: string, order: number): Transform => ({
     name,
     order,
-    owner: "t",
     run: () => {},
   });
 
@@ -88,7 +86,7 @@ describe("transform auto-discovery", () => {
   const typesUrl = new URL("../src/types.ts", import.meta.url).href;
   const mod = (name: string, order: number | string) =>
     `import type { Transform } from ${JSON.stringify(typesUrl)};\n` +
-    `export const transform: Transform = { name: ${JSON.stringify(name)}, order: ${order}, owner: "test", run() {} };\n`;
+    `export const transform: Transform = { name: ${JSON.stringify(name)}, order: ${order}, run() {} };\n`;
 
   it("registers every transforms/*.ts in order, skipping helpers and tests", async () => {
     writeFileSync(path.join(dir, "zeta.ts"), mod("zeta", 10));

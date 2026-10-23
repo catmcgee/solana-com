@@ -162,8 +162,6 @@ export interface Transform {
   name: string;
   /** Lower runs first. Ties are broken by `name`. */
   order: number;
-  /** Owning work package, for reports. */
-  owner: string;
   /** Text-level pre-check: skip the transform when this returns false. */
   appliesTo?: (source: string, file: ConvertFile) => boolean;
   run: TransformFn;
