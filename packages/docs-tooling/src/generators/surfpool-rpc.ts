@@ -1,5 +1,5 @@
 /**
- * gen:surfpool (WP4, spec §3.1 / §5.2):
+ * gen:surfpool:
  *
  *   tsx src/generators/surfpool-rpc.ts [--check]
  *

@@ -1,5 +1,5 @@
 /**
- * Legacy `<Callout type title>` -> docs callouts (spec §3.1).
+ * Legacy `<Callout type title>` -> docs callouts.
  *
  *   <Callout type="warn" title="Heads up">Body</Callout>
  *

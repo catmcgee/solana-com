@@ -1,5 +1,5 @@
 /**
- * Transform registry for `convert` (spec §3, §4.3).
+ * Transform registry for `convert`.
  *
  * Transforms are AUTO-DISCOVERED: every `src/convert/transforms/<name>.ts`
  * module that exports `transform` is registered. Work packages add a file;
@@ -34,7 +34,7 @@ export const TRANSFORMS_DIR = fileURLToPath(
 
 /**
  * `order` bands (documentation only, not enforced). These describe the
- * registry as integrated (WP12); every order is distinct so the run order
+ * registry as integrated; every order is distinct so the run order
  * never depends on a name tie-break:
  *   0-79    frontmatter (frontmatter 10)
  *   80-99   Code Hike containers and RPC, which must see raw Code Hike

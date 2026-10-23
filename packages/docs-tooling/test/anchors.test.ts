@@ -1,5 +1,5 @@
 /**
- * anchors + site-links (WP12): slug ports and the locale positional mapping
+ * anchors + site-links: slug ports and the locale positional mapping
  * on a real corpus page.
  */
 import { readFileSync } from "node:fs";

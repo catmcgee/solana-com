@@ -60,7 +60,7 @@ export type MoveRule =
   | "META"
   /** Data files relocated into packages/docs-tooling. */
   | "DATA"
-  /** Public assets -> apps/docs/docs-assets (spec §1.4). */
+  /** Public assets -> apps/docs/docs-assets. */
   | "ASSET"
   /** Non-MDX routes (e.g. the /learn landing). */
   | "ROUTE";
@@ -147,7 +147,7 @@ export interface ConvertContext {
 }
 
 /**
- * A transform is a pure, idempotent function over one file's AST (spec §4.3).
+ * A transform is a pure, idempotent function over one file's AST.
  * It mutates `tree` in place. None of its source constructs may appear in its
  * own output, so running convert twice is a byte-identical no-op.
  */

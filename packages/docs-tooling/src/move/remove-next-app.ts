@@ -1,5 +1,5 @@
 /**
- * Remove the Fumadocs Next.js app from apps/docs (spec §1.2).
+ * Remove the Fumadocs Next.js app from apps/docs.
  *
  * Refuses to delete while anything outside apps/docs still references the
  * app's code/config (imports, package dependency, file paths), so nothing

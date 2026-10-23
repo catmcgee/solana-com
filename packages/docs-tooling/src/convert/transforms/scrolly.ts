@@ -41,7 +41,7 @@
  * - Fence meta and annotations (`!!`, `!focus`, `!mark`, …) are untouched:
  *   fences.ts converts them (`!focus(a:b)` -> `focus={a-b}` etc.), before
  *   or after this transform.
- * - The output Step has a `title`, so steps.ts (WP2) must not lift an H3
+ * - The output Step has a `title`, so steps.ts must not lift an H3
  *   from it.
  */
 import type { AstNode, ConvertContext, Transform } from "../../types.ts";

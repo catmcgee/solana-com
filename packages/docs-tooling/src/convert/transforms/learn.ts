@@ -1,5 +1,5 @@
 /**
- * WP7: learn articles (`/learn/<slug>`, every locale).
+ * Learn articles (`/learn/<slug>`, every locale).
  *
  * The legacy learn route rendered the frontmatter title as the page H1 *and*
  * every article also starts with its own `# Title` heading; that route hid

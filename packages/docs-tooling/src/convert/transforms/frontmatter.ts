@@ -5,7 +5,7 @@
  * | ------------------------- | ---------------------------------------------- |
  * | `title` + `h1`            | `title: <h1>` (visible H1, browser title),     |
  * |                           | `sidebarTitle: <title>` (nav label)            |
- * | `seoTitle`                | `"og:title"` and `"twitter:title"` (spec §3.3)  |
+ * | `seoTitle`                | `"og:title"` and `"twitter:title"`  |
  * |                           | = <seoTitle>                                   |
  * | `hideTableOfContents: true` | `mode: "wide"` (`false` is dropped)          |
  * | `hidePageNavigation: true`  | `hideFooterPagination: true`                 |

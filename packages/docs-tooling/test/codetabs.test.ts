@@ -1,5 +1,5 @@
 /**
- * codetabs (WP12): error paths and the full-registry result that the
+ * codetabs: error paths and the full-registry result that the
  * fixture goldens (single transform) cannot show.
  */
 import { describe, expect, it } from "vitest";

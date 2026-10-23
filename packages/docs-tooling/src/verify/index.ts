@@ -1,5 +1,5 @@
 /**
- * `docs-tooling verify` (spec §4.4, WP12): every repo-side check in one
+ * `docs-tooling verify`: every repo-side check in one
  * command. CI runs it on every change to apps/docs/** or
  * packages/docs-tooling/**; the apps/web build then compiles every page.
  *

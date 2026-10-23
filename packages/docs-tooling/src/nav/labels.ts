@@ -1,5 +1,5 @@
 /**
- * Tab and group labels for the locale navigations (spec §2.3 item 3).
+ * Tab and group labels for the locale navigations.
  *
  * en.json holds the English strings (the docs read it directly, so it cannot
  * hold placeholder ids). Each tab/group gets a stable key derived from its

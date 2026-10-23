@@ -1,5 +1,5 @@
 /**
- * WP9 generators. Until they are wired into src/cli.ts, run them with
+ * Manifest generators (package scripts `gen:manifest` and `gen:llms`):
  *   pnpm --filter @workspace/docs-tooling exec tsx src/manifest/cli.ts <cmd> [--check]
  *
  * Commands (run in this order; each reads the previous output):

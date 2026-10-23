@@ -1,5 +1,5 @@
 /**
- * verify-nav (spec §4.4 item 3): exact navigation coverage.
+ * verify-nav: exact navigation coverage.
  *
  * Errors (fail the run):
  * - a nav entry (page, group root, internal tab href) has no file;

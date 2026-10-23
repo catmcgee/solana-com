@@ -1,5 +1,5 @@
 /**
- * Public assets -> apps/docs/docs-assets (spec §1.4).
+ * Public assets -> apps/docs/docs-assets.
  *
  * - Canonical source is the union of apps/docs/public (at LEGACY_REF) and
  *   apps/web/public; apps/docs/public wins on conflict because it carries the

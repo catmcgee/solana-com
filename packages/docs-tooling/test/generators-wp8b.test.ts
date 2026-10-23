@@ -1,5 +1,5 @@
 /**
- * WP8b generators: concepts, paths, addresses (spec §3.4, §4.3).
+ * WP8b generators: concepts, paths, addresses.
  * Every test runs against a throwaway docs root in the OS temp dir.
  */
 import {

@@ -1,6 +1,6 @@
 /**
  * Fumadocs `<Tabs items groupId>` / `<Tab value>` -> docs `<Tabs>` /
- * `<Tab title>` (spec §3.1).
+ * `<Tab title>`.
  *
  *   <Tabs items={['pnpm', 'npm']} groupId="package-manager">
  *   <Tab value="pnpm">…</Tab>

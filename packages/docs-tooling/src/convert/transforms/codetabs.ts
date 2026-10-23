@@ -1,5 +1,5 @@
 /**
- * codetabs (WP12, spec §3.1): Code Hike `<CodeTabs>` that are not example
+ * codetabs: Code Hike `<CodeTabs>` that are not example
  * blocks -> docs `<CodeGroup>`.
  *
  *   <CodeTabs storage="x" flags="r">            <CodeGroup>

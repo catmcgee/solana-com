@@ -1,5 +1,5 @@
 /**
- * gen:paths (WP8b, spec §3.4 item 2 and 6).
+ * gen:paths.
  *
  *   tsx src/generators/paths.ts [--check] [--sync] [--init]
  *

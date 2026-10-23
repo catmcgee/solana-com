@@ -1,6 +1,5 @@
 /**
- * Code fences: Code Hike meta and annotations -> docs code block syntax
- * (spec §3.2).
+ * Code fences: Code Hike meta and annotations -> docs code block syntax.
  *
  * Fence meta
  * - `lang !! title="X"` -> `lang X`; a title with spaces or special

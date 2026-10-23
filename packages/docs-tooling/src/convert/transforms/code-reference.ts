@@ -1,5 +1,5 @@
 /**
- * code-reference (WP4): `<CodeReference>` + `## !reference` (spec §3.1; 30
+ * code-reference: `<CodeReference>` + `## !reference` (spec §3.1; 30
  * blocks in 10 en files: `rpc/json-structures`, `rpc/websocket/*subscribe`).
  *
  *   <CodeReference>

@@ -1,5 +1,5 @@
 /**
- * WP7: inject each bootcamp lesson's video and resources (spec §3.1).
+ * Inject each bootcamp lesson's video and resources.
  *
  * The Fumadocs lesson route rendered a YouTube iframe and "See the code"
  * links from the TypeScript curriculum, not from MDX. The docs render MDX

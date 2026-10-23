@@ -1,5 +1,5 @@
 /**
- * gen:addresses (WP8b, spec §3.4 item 5).
+ * gen:addresses.
  *
  *   tsx src/generators/addresses.ts [--check] [--sync] [--report]
  *

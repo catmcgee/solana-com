@@ -1,5 +1,5 @@
 /**
- * MDX codec stability on real content (spec §4.3).
+ * MDX codec stability on real content.
  *
  * Samples 30 real pages across collections and locales (deterministic: a few
  * Code Hike-heavy anchors, then a hash-ordered round-robin over every

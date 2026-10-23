@@ -1,5 +1,5 @@
 /**
- * gen:manifest (WP9, spec §5.4/§5.11): writes
+ * gen:manifest: writes
  * packages/docs-tooling/generated/pages.json, the index of every published
  * docs page. packages/sitemap, gen:llms and the apps/web per-section
  * llms route read it instead of walking apps/docs themselves.

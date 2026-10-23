@@ -1,5 +1,5 @@
 /**
- * anchors (WP12): in-content `#fragment` links rewritten to the heading ids
+ * anchors: in-content `#fragment` links rewritten to the heading ids
  * the docs generate.
  *
  * Fumadocs gave headings github-slugger ids; the docs use

@@ -1,5 +1,5 @@
 /**
- * site-links (WP12): links that only worked because Fumadocs and apps/web
+ * site-links: links that only worked because Fumadocs and apps/web
  * shared one origin, rewritten so they also resolve when the docs are
  * served on their own (broken-link checks, direct traffic to the docs
  * deployment, and client-side routing).
@@ -10,7 +10,7 @@
  *    collections: `/developers/docs/**`, `/learn/<article>`, `/developers/cookbook/**`,
  *    `/developers/bootcamp/**` and `/docs-assets/**` (each optionally
  *    locale-prefixed); the exact `/learn` and `/developers` landings belong
- *    to apps/web (spec §7.6). On solana.com the absolute link is same-origin.
+ *    to apps/web. On solana.com the absolute link is same-origin.
  * 2. Bare relative page links (`[x](quickstart)`) are resolved the way the
  *    browser resolved them on the legacy URL (no trailing slash), e.g. on
  *    /docs/tools/attestations/overview -> /docs/tools/attestations/quickstart.

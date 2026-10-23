@@ -144,7 +144,7 @@ describe("WP4 helpers", () => {
 
 /**
  * The corpus tests convert the PRE-conversion pages. Since the integration
- * convert run (WP12) the working tree holds converted content, so the source
+ * convert run the working tree holds converted content, so the source
  * is read from git: DOCS_CORPUS_REF (default c06186ae1, the move commit,
  * content in the docs layout but not yet converted).
  */

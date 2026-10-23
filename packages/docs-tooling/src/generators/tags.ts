@@ -1,5 +1,5 @@
 /**
- * WP7: the static `/docs/tags` page, per language (spec §5.3).
+ * The static `/docs/tags` page, per language.
  *
  * The Fumadocs app grouped pages by the opt-in `documentationTags`
  * frontmatter at request time and served `/docs/tags/<tag>` detail pages.
@@ -10,7 +10,7 @@
  *   heading anchor is the tag slug, so `/docs/tags/<tag>` can redirect to
  *   `/docs/tags#<tag>` (apps/web, WP9);
  * - a card per navigation tab ("browse by section"). The tabs come from
- *   `navigation/<lang>.json` (WP6) when it exists, else from the spec §2.2
+ *   `navigation/<lang>.json` when it exists, else from the spec §2.2
  *   tab roots.
  *
  * No page uses `documentationTags` today, so the page is the section index.

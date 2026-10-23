@@ -19,7 +19,7 @@
  * - Markdown images keep their alt text as the caption (as today).
  *   `<DocsDiagram>` had no caption today, so its Frame has none either; the
  *   alt text stays on both images.
- * - URLs are rewritten to `/docs-assets/...` (spec §1.4).
+ * - URLs are rewritten to `/docs-assets/...`.
  * - A missing `-light.svg` sibling (or dark original) under
  *   apps/docs/docs-assets is an error, which leaves the file unconverted.
  * - Without JavaScript the renderer at conversion time always rendered dark mode (setup probe), so

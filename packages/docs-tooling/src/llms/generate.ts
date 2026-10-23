@@ -1,5 +1,5 @@
 /**
- * gen:llms (WP9, spec §5.4). From generated/pages.json it writes:
+ * gen:llms. From generated/pages.json it writes:
  * - apps/docs/llms.txt: the body of /llms.txt (apps/web app/llms.txt; the
  *   agent header in ./header.md plus the English index, every link as `.md`);
  * - packages/docs-tooling/generated/llms-sections/<section>.txt: the scoped

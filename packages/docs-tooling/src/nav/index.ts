@@ -1,5 +1,5 @@
 /**
- * Navigation (WP6). `docs-tooling nav <sub> [flags]`:
+ * Navigation. `docs-tooling nav <sub> [flags]`:
  *
  *   nav compile-legacy [--force]   IA template + legacy meta.json ->
  *                                  navigation/en.json + labels/<loc>.json seeds

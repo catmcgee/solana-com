@@ -1,6 +1,6 @@
 /**
- * api-method (WP4): `<APIMethod>` RPC method pages (spec §3.1, §5.1) and the
- * Surfpool `<*Rpc />` method-list components (spec §3.1, §5.2).
+ * api-method: `<APIMethod>` RPC method pages and the
+ * Surfpool `<*Rpc />` method-list components.
  *
  * 1. `<APIMethod>` (71 en pages, 1,261 files in all locales), after
  *    `return-type` has converted its `### !!result` sections:
@@ -25,7 +25,7 @@
  *    - `!values` -> a `Values: …` line; `!optional` -> not required;
  *      `!hover` lines are removed; `!collapse … collapsed` -> `expandable`.
  *    - No `api:` frontmatter / playground: JSON-RPC positional params do not
- *      fit ParamField bodies (spec §3.1).
+ *      fit ParamField bodies.
  *    - Frontmatter: `hideTableOfContents` / `mode: wide` are removed. A page
  *      with `<RequestExample>` shows the examples in the right column where
  *      the TOC would be (the old two-panel layout); `mode: wide` would instead

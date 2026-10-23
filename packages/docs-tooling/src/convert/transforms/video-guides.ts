@@ -1,5 +1,5 @@
 /**
- * WP7: convert the video-guide components to docs built-ins (spec §3.1).
+ * Convert the video-guide components to docs built-ins.
  * No custom component survives, and everything except the embedded player
  * is in the server HTML, so the pages read fully without JavaScript.
  *

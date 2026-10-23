@@ -1,6 +1,6 @@
 /**
  * Legacy `<Accordions>` / `<Accordion title>` -> docs
- * `<AccordionGroup>` / `<Accordion title>` (spec §3.1). Rename only.
+ * `<AccordionGroup>` / `<Accordion title>`. Rename only.
  *
  * - `Accordions` attributes (`type="single"`, `defaultValue`, …) have no
  *   docs equivalent and are dropped with a warning.

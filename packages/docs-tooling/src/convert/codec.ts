@@ -1,5 +1,5 @@
 /**
- * MDX AST codec for `convert` (spec §4.3).
+ * MDX AST codec for `convert`.
  *
  * parse:     unified + remark-parse + remark-frontmatter(yaml) + remark-gfm +
  *            remark-mdx (remark-mdx is skipped for `.md` files). Frontmatter

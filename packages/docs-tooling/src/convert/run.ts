@@ -1,5 +1,5 @@
 /**
- * `convert [--files <prefix>] [--locale <loc>] [--check]` (spec §4.1).
+ * `convert [--files <prefix>] [--locale <loc>] [--check]`.
  *
  * Converts every content file independently (locales are not projected from
  * English). With `--check`, converts in memory and fails if any file would

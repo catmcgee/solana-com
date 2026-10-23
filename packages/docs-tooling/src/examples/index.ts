@@ -1,5 +1,5 @@
 /**
- * Runnable examples (WP5).
+ * Runnable examples.
  *
  * - `extract-blocks.ts`: legacy `<CodeTabs ... file=...>` blocks -> blocks.json
  *   in packages/docs-examples (pages are rewritten by the

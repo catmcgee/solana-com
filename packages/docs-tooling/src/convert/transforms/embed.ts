@@ -1,6 +1,6 @@
 /**
  * `<Embed url [modal]>` (legacy MarkdownEmbed) -> a static iframe in a
- * `<Frame>` (spec §3.1).
+ * `<Frame>`.
  *
  *   <Embed url="https://youtu.be/Bqs95tFcRIU" />
  *

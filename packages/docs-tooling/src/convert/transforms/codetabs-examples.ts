@@ -1,5 +1,5 @@
 /**
- * codetabs-examples (WP5, spec §3.1): replace legacy example blocks with an
+ * codetabs-examples: replace legacy example blocks with an
  * import of the generated snippet.
  *
  *   <CodeTabs storage="cookbook" flags="r">

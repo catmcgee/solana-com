@@ -631,7 +631,7 @@ export const IA_TEMPLATE: TemplateTab[] = [
     tab: "Hidden",
     hidden: true,
     groups: [
-      // Indexed: the URL stays live (spec §5.3).
+      // Indexed: the URL stays live.
       {
         group: "Documentation tags",
         searchable: true,

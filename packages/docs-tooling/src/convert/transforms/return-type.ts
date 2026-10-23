@@ -1,5 +1,5 @@
 /**
- * return-type (WP4): the `### !!result [Title]` sections of `<APIMethod>`
+ * return-type: the `### !!result [Title]` sections of `<APIMethod>`
  * (spec §3.1, APIMethod row; "return types" of an RPC method).
  *
  * Input, inside `<APIMethod>` (always the last sections of the block):

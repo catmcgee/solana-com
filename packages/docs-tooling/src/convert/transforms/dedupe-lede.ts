@@ -1,5 +1,5 @@
 /**
- * WP13 (integration review): drop a first body paragraph that repeats the
+ * Drop a first body paragraph that repeats the
  * frontmatter `description`.
  *
  * The docs always render `description` as the page lede under the H1. Many

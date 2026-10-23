@@ -10,7 +10,7 @@ import type { UnlistedPage } from "./types.ts";
 
 export const UNLISTED: readonly UnlistedPage[] = [
   // Empty. docs/payments/accept-payments/payment-button (17 stale locale-only
-  // copies, spec R8) was removed at integration (WP12): WP9 ported its
+  // copies, spec R8) was removed at integration: WP9 ported its
   // redirect to apps/web and the files were git rm'd.
 ];
 

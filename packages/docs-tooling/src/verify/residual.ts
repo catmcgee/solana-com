@@ -1,5 +1,5 @@
 /**
- * Residual-syntax scan (spec §4.4.2, WP12): proves no Fumadocs / Code Hike
+ * Residual-syntax scan: proves no Fumadocs / Code Hike
  * construct survived `convert`, and that the content keeps out the raw HTML
  * it has never used (`<details>`, `<noscript>`, `<abbr>`).
  *
@@ -35,7 +35,7 @@ const jsx = (name: string): ResidualPattern => ({
 });
 
 export const PATTERNS: ResidualPattern[] = [
-  // Code Hike containers and Fumadocs components (spec §4.4.2).
+  // Code Hike containers and Fumadocs components.
   ...[
     "CodeTabs",
     "ScrollyCoding",
@@ -58,7 +58,7 @@ export const PATTERNS: ResidualPattern[] = [
     "Mermaid",
     "Terminal",
     "TerminalOutput",
-    // Surfpool RPC components (WP4) and video-guide components (WP7).
+    // Surfpool RPC components and video-guide components.
     "AccountsRpc",
     "AdminRpc",
     "CheatcodesRpc",

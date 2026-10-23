@@ -64,7 +64,7 @@ export const isLink = (e: NavEntry): e is NavLink =>
 
 /**
  * `expand(P)`: replaced by the ordered subtree from the legacy meta.json of
- * folder P (spec §2.2). Pages placed explicitly anywhere else in the template
+ * folder P. Pages placed explicitly anywhere else in the template
  * are skipped, so an expansion never duplicates them.
  */
 export interface ExpandMarker {

@@ -1,5 +1,5 @@
 /**
- * WP3 acceptance (spec §9): goldens for build-first-program,
+ * WP3 acceptance: goldens for build-first-program,
  * account-structure and deferred-execution in en, fr and ru, run through
  * every WP3 Code Hike transform via the real MDX codec.
  *

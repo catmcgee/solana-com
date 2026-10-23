@@ -1,5 +1,5 @@
 /**
- * Legacy `<Steps>` -> docs `<Steps>` / `<Step title>` (spec §3.1).
+ * Legacy `<Steps>` -> docs `<Steps>` / `<Step title>`.
  *
  *   <Steps>
  *   <Step>

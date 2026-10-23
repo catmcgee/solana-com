@@ -7,7 +7,7 @@
  *
  * Ordering contract (see each module's `order`): every WP3 transform runs at
  * order 80-88 (notes 80 … terminal 88), BEFORE fences.ts (900). `notes` needs
- * the raw `!tooltip[/re/] name` comment lines, which `fences.ts` (WP2)
+ * the raw `!tooltip[/re/] name` comment lines, which `fences.ts`
  * deletes. The other WP3 transforms are order-independent with respect to
  * `fences.ts`: they read fence titles in both the Code Hike form
  * (`lang !! title="X"`) and the converted docs form (`lang X` /

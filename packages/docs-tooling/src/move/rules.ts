@@ -40,7 +40,7 @@ export const COLLECTION_DIR: Record<Collection, string> = {
 };
 
 /**
- * R8: locale-only files English deleted long ago (spec §1.3). Listed
+ * R8: locale-only files English deleted long ago. Listed
  * explicitly so the move never deletes an unexpected file; `classify` also
  * reports any locale-only file outside this list.
  */

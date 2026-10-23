@@ -1,5 +1,5 @@
 /**
- * gen:concepts (WP8b, spec §3.4 item 1).
+ * gen:concepts.
  *
  *   tsx src/generators/concepts.ts [--check] [--sync] [--init]
  *

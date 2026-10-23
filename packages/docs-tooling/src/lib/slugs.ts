@@ -1,5 +1,5 @@
 /**
- * Heading slugs, legacy and current (WP12).
+ * Heading slugs, legacy and current.
  *
  * - The legacy docs app gave headings github-slugger ids (`actions.json` ->
  *   `actionsjson`, `Rules - pathPattern` -> `rules---pathpattern`).

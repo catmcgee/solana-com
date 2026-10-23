@@ -1,6 +1,5 @@
 /**
- * Legacy `<Cards>` / `<Card>` -> docs `<Columns cols={2}>` / `<Card>`
- * (spec §3.1).
+ * Legacy `<Cards>` / `<Card>` -> docs `<Columns cols={2}>` / `<Card>`.
  *
  *   <Cards>
  *     <Card title="Accounts" href="/docs/core/accounts" description="How state is stored" icon={<Rocket />} />

@@ -377,7 +377,7 @@ export interface CleanedCode {
 /**
  * Remove Code Hike annotation comment lines (`// !hover x`, `# !mark`, ...).
  * Only own-line annotations exist in the RPC pages; `!collapse … collapsed`
- * becomes the docs `expandable` flag (spec §3.2).
+ * becomes the docs `expandable` flag.
  */
 export function stripAnnotations(value: string, lang: string): CleanedCode {
   const re = annotationRe(lang);

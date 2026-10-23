@@ -465,7 +465,7 @@ export function walkTree(
  * Point snippet imports of one kind (`concepts`, `paths`) at the page's own
  * language when that language's snippet exists, else at English. Locale
  * pages arrive from Lingo with `/snippets/<kind>/en/…`; after a locale's
- * source JSON lands, `--sync` switches them over (spec §6.2).
+ * source JSON lands, `--sync` switches them over.
  */
 export function syncSnippetImports(
   tree: AstNode,
