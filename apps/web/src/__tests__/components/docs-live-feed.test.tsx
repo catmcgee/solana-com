@@ -59,7 +59,7 @@ describe("docs LiveFeed", () => {
     expect(screen.queryByText(/Latest/)).toBeNull();
   });
 
-  it("explains slot and blocks, with links to the concepts", async () => {
+  it("explains mainnet, slot, and blocks, with links to the concepts", async () => {
     serve(tip(460_172_365));
     render(<LiveFeed />);
     await screen.findByText("386");
@@ -68,10 +68,11 @@ describe("docs LiveFeed", () => {
       .getAllByRole("link", { name: "Learn more" })
       .map((a) => a.getAttribute("href"));
     expect(hrefs).toEqual([
+      "/developers/docs/references/clusters",
       "/developers/docs/references/terminology#slot",
       "/developers/docs/references/terminology#block",
     ]);
-    for (const term of ["slot", "Blocks"]) {
+    for (const term of ["Mainnet", "slot", "Blocks"]) {
       expect(screen.getByText(term, { selector: ".tooltip" }).tabIndex).toBe(0);
     }
   });

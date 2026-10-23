@@ -31,7 +31,7 @@ import concepts from "../../../../docs/concepts/concepts.en.json";
  *   only ever show a sliver of them.
  * - Transactions per second: the transactions in the last BLOCK_WINDOW
  *   slots (skipped slots count as empty) over the measured slot time.
- * - The terms (slot, blocks, transactions) explain themselves on hover,
+ * - The terms (mainnet, slot, blocks, transactions) explain themselves on hover,
  *   focus, or tap, with the docs' Tooltip. Tiles open one shared popup (the
  *   tile row clips its overflow) with the definition, a "Learn more" link,
  *   and an Explorer link; the tile itself also links to Explorer. While a
@@ -72,8 +72,13 @@ const TERMS = {
   },
   transaction: {
     headline: concepts.transaction.name,
-    tip: `${firstSentence(concepts.transaction.short)} The count includes validator votes.`,
+    tip: `${firstSentence(concepts.transaction.short)} Validator votes aren't transactions, so they aren't counted.`,
     href: concepts.transaction.href,
+  },
+  mainnet: {
+    headline: "Mainnet",
+    tip: "Mainnet is Solana's main public network, where real value moves.",
+    href: concepts.clusters.href,
   },
 };
 const LEARN_MORE = concepts._ui.learnMore;
@@ -321,7 +326,11 @@ export function LiveFeed() {
           data-stale={failed || undefined}
           data-held={pop ? "" : undefined}
         />
-        <span className="sol-live-title">Mainnet</span>
+        <span className="sol-live-title">
+          <Tooltip {...TERMS.mainnet} cta={LEARN_MORE}>
+            Mainnet
+          </Tooltip>
+        </span>
         <span className="sol-live-slot">
           <Tooltip {...TERMS.slot} cta={LEARN_MORE}>
             slot
@@ -420,8 +429,7 @@ function PopBody({ pop }: { pop: Pop }) {
     <>
       <span className="tooltip-headline">Block {nf.format(pop.slot)}</span>
       <span className="tooltip-tip">
-        {nf.format(pop.txs)} transactions, validator votes included.{" "}
-        {TERMS.block.tip.split(". ")[0]}.
+        {nf.format(pop.txs)} transactions. {TERMS.block.tip.split(". ")[0]}.
       </span>
       <span className="sol-live-pop-links">
         <a href={TERMS.block.href} className="tooltip-cta">
