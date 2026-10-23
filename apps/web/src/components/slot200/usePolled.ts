@@ -123,15 +123,15 @@ export interface TipBlock {
   slot: number;
   /** Transactions in the block, validator votes included. */
   txs: number;
-  /** Its first transaction signatures, in block order. */
-  sigs: string[];
+  /** Its first transaction signature, sent for the newest few blocks only. */
+  sig?: string;
 }
 
 /** /api/slot-time/tip: the confirmed tip and the blocks just behind it. */
 export interface TipPayload {
   /** The confirmed tip when sampled. */
   tip: number;
-  /** Blocks in the last 20 slots that the server has read, oldest first. */
+  /** Blocks in the last 12 slots that the server has read, oldest first. */
   blocks: TipBlock[];
   /** Slots in that window with no block (skipped by their leader). */
   skipped: number[];

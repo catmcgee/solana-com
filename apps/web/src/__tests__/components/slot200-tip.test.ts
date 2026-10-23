@@ -46,11 +46,11 @@ describe("/api/slot-time/tip", () => {
     expect(first.blocks.map((b: { slot: number }) => b.slot)).toEqual([
       95, 96, 97, 99,
     ]);
-    expect(first.blocks[0]).toEqual({
-      slot: 95,
-      txs: 3,
-      sigs: ["s95a", "s95b"],
-    });
+    // Every block sends its count; only the newest five slots send one
+    // signature, the most the feed's transaction list can use.
+    expect(first.blocks[0]).toEqual({ slot: 95, txs: 3 });
+    expect(first.blocks.at(-1)).toEqual({ slot: 99, txs: 3, sig: "s99a" });
+    expect(JSON.stringify(first)).not.toContain("s99b");
     expect(first.skipped).toEqual([98]);
     expect(rpc.getBlockSignatures).toHaveBeenCalledTimes(6);
 
@@ -63,6 +63,18 @@ describe("/api/slot-time/tip", () => {
       101, 100, 94, 93, 92, 91,
     ]);
     expect(second.blocks.at(-1).slot).toBe(101);
+    expect(second.blocks.filter((b: { sig?: string }) => b.sig)).toHaveLength(
+      3,
+    );
+  });
+
+  it("never sends the RPC error text, which can carry the RPC URL", async () => {
+    rpc.getConfirmedSlot.mockRejectedValue(
+      new Error("fetch failed: https://rpc.test/?api-key=secret"),
+    );
+    const { GET } = await import("@/app/api/slot-time/tip/route");
+    const res = await GET();
+    expect(await res.text()).not.toContain("secret");
   });
 
   it("reads one block a round on the public RPC, and keeps going when a read fails", async () => {
