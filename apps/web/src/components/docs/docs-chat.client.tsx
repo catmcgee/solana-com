@@ -1,91 +1,53 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
-import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport } from "ai";
-import {
-  AIChatPanel,
-  AIChatProvider,
-  AIChatSearch,
-  useAIChat,
-} from "@fumadocs/ai-chat";
-import type { DocsChatMessage } from "@/lib/docs/chat";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { DOCS_ASK_CODE_EVENT } from "./docs-components.client";
 
-/**
- * Ask AI on the docs: Fumadocs' AI chat against /api/docs-chat (GLM). The
- * floating Ask AI pill (apps/docs/ask-ai.js) opens it through the
- * `#assistant-entry` button, the docs' assistant hook; a code block's Ask
- * button sends its code. Ctrl+/ toggles it, Escape closes it.
- */
-export function DocsChat({
-  locale,
-  children,
-}: {
-  locale: string;
-  children?: ReactNode;
-}) {
-  const chat = useChat<DocsChatMessage>({
-    id: "docs-ask-ai",
-    throttle: 40,
-    transport: new DefaultChatTransport({
-      api: "/api/docs-chat",
-      body: { locale },
-    }),
-  });
-  return (
-    <AIChatProvider
-      chat={chat}
-      renderPart={(part, live) =>
-        part.type === "tool-search" ? (
-          <AIChatSearch part={part} live={live} />
-        ) : null
-      }
-      suggestions={[
-        "How do I send USDC with @solana/kit?",
-        "What is a program-derived address?",
-        "How do transaction fees work?",
-      ]}
-    >
-      <DocsChatPanel sendCode={(text) => void chat.sendMessage({ text })} />
-      {children}
-    </AIChatProvider>
-  );
-}
+const DocsChatPanel = lazy(() => import("./docs-chat-panel.client"));
 
-function DocsChatPanel({ sendCode }: { sendCode: (text: string) => void }) {
-  const { open, setOpen } = useAIChat();
+/**
+ * Ask AI on the docs. The chat (docs-chat-panel.client.tsx: Fumadocs' AI
+ * chat and the AI SDK) loads the first time it is opened: by the floating
+ * Ask AI pill (apps/docs/ask-ai.js), which clicks `#assistant-entry`, the
+ * docs' assistant hook; by a code block's Ask button; or by Ctrl+/.
+ */
+export function DocsChat({ locale }: { locale: string }) {
+  // undefined: not loaded yet; "": opened; else the code to ask about.
+  const [code, setCode] = useState<string>();
+  const loaded = code !== undefined;
+
   useEffect(() => {
-    const onCode = (event: Event) => {
-      const code = (event as CustomEvent<{ code?: string }>).detail?.code;
-      setOpen(true);
-      if (code)
-        sendCode(
-          `Explain this code from ${document.title}:\n\n\`\`\`\n${code.trim()}\n\`\`\``,
-        );
+    if (loaded) return;
+    const onCode = (event: Event) =>
+      setCode((event as CustomEvent<{ code?: string }>).detail?.code ?? "");
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "/" && (event.metaKey || event.ctrlKey)) {
+        event.preventDefault();
+        setCode("");
+      }
     };
     window.addEventListener(DOCS_ASK_CODE_EVENT, onCode);
-    return () => window.removeEventListener(DOCS_ASK_CODE_EVENT, onCode);
-  }, [setOpen, sendCode]);
-  return (
-    <>
-      {/* The docs' assistant hook: ask-ai.js opens the assistant through it. */}
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener(DOCS_ASK_CODE_EVENT, onCode);
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [loaded]);
+
+  if (!loaded)
+    return (
       <button
         type="button"
         id="assistant-entry"
         className="sr-only"
         tabIndex={-1}
         aria-hidden="true"
-        onClick={() => setOpen(true)}
+        onClick={() => setCode("")}
       />
-      <aside
-        className="docs-chat"
-        data-open={open ? "" : undefined}
-        aria-label="Ask AI"
-        hidden={!open}
-      >
-        <AIChatPanel />
-      </aside>
-    </>
+    );
+  return (
+    <Suspense fallback={null}>
+      <DocsChatPanel locale={locale} code={code} />
+    </Suspense>
   );
 }
