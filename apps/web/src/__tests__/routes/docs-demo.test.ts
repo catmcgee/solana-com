@@ -125,7 +125,16 @@ async function lines(res: Response) {
   return (await res.text())
     .trim()
     .split("\n")
-    .map((l) => JSON.parse(l) as Record<string, unknown>);
+    .map(
+      (l) =>
+        JSON.parse(l) as Partial<{
+          step: string;
+          signature: string;
+          ms: number;
+          mint: string;
+          error: string;
+        }>,
+    );
 }
 
 beforeEach(() => {
@@ -157,7 +166,7 @@ describe("demo routes", () => {
     const [step, body] = await lines(res);
     expect(step).toEqual({ step: "sent" });
     expect(typeof body.signature).toBe("string");
-    expect(body.signature.length).toBeGreaterThan(80);
+    expect(body.signature!.length).toBeGreaterThan(80);
     expect(typeof body.ms).toBe("number");
     expect(Object.keys(body).sort()).toEqual(["ms", "signature"]);
     expect(mocks.createSolanaRpc).toHaveBeenCalledWith(
