@@ -9,7 +9,6 @@ import {
   PATH_UI,
   renderPlaygroundBlock,
   renderStepper,
-  tutorialButton,
   tutorialDir,
   tutorialSource,
   type PathDef,
@@ -137,32 +136,20 @@ describe("Open tutorial in Playground (gen:paths)", () => {
     );
   });
 
-  it("renders the button disabled, without an href", () => {
+  it("renders the block with a plain button for the folder", () => {
+    const src = { lang: "en", ui: PATH_UI, paths: [] };
+    const p = def("prog", "programs");
     const pg = {
       open: "packages/docs-examples/paths/a/b",
-      kind: "ts" as const,
+      kind: "anchor" as const,
     };
-    const btn = tutorialButton(PATH_UI, pg);
-    expect(btn).toBe(
-      '<a className="sol-pg-tut" data-pg-open="packages/docs-examples/paths/a/b" data-pg-kind="ts" data-pg-label="Open tutorial in Playground" data-pg-off="Open tutorial in Playground: not available for this tutorial yet" data-tip="Open tutorial in Playground: not available for this tutorial yet" aria-label="Open tutorial in Playground: not available for this tutorial yet" aria-disabled="true" role="link" tabIndex="0">Open tutorial in Playground</a>',
-    );
-    expect(btn).not.toContain("href");
-    // No folder: no source attributes, still disabled.
-    const none = tutorialButton(PATH_UI, undefined);
-    expect(none).toContain('data-pg-kind="inline"');
-    expect(none).not.toContain("data-pg-open");
-    expect(none).toContain('aria-disabled="true"');
-  });
-
-  it("renders it only in playground.mdx, never in a stepper", () => {
-    const src = { lang: "en", ui: PATH_UI, paths: [] };
-    const p = def("checkout", "payments");
-    const pg = tutorialSource(p);
     for (const n of [0, 1])
       expect(renderStepper("/nonexistent", src, p, n)).not.toContain("sol-pg");
     const block = renderPlaygroundBlock(src, p, pg);
     expect(block).toContain('<div className="sol-pg-tutorial not-prose"');
-    expect(block).toContain(tutorialButton(PATH_UI, pg));
+    expect(block).toContain(
+      '<a className="sol-pg-tut" data-pg-open="packages/docs-examples/paths/a/b">Open tutorial in Playground</a>',
+    );
     expect(block).toContain(PATH_UI.playgroundNote);
   });
 });
@@ -174,7 +161,7 @@ describe("no Playground control outside the tutorial block", () => {
       expect(text, rel).not.toMatch(/sol-pg|data-pg-/);
   });
 
-  it("only playground.mdx of each path has Playground markup", () => {
+  it("client (TypeScript) tutorials get no Playground block", () => {
     const src = { lang: "en", ui: PATH_UI, paths: [] as PathDef[] };
     const p: PathDef = {
       key: "checkout",
@@ -198,6 +185,33 @@ describe("no Playground control outside the tutorial block", () => {
     const withPg = [...files]
       .filter(([, text]) => /sol-pg|data-pg-/.test(text))
       .map(([f]) => path.basename(f));
-    expect(withPg).toEqual(["playground.mdx"]);
+    expect(withPg).toEqual([]);
+  });
+
+  it("program (Anchor/Native) tutorials get one, in playground.mdx", () => {
+    const root = mkdtempSync(path.join(os.tmpdir(), "pg-prog-"));
+    try {
+      const lib = path.join(root, "paths/programs/prog/src/lib.rs");
+      mkdirSync(path.dirname(lib), { recursive: true });
+      writeFileSync(lib, "#[program]\npub mod prog {}");
+      const p: PathDef = {
+        key: "prog",
+        tab: "programs",
+        label: "p",
+        job: "j",
+        name: "n",
+        time: "t",
+        intro: "/developers/docs/programs/prog",
+        steps: [{ href: "/developers/docs/programs/prog/a", title: "A" }],
+      };
+      const src = { lang: "en", ui: PATH_UI, paths: [p] };
+      const files = buildPathOutputs("/nonexistent", [src], [], root);
+      const withPg = [...files]
+        .filter(([, text]) => /sol-pg|data-pg-/.test(text))
+        .map(([f]) => path.basename(f));
+      expect(withPg).toEqual(["playground.mdx"]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });

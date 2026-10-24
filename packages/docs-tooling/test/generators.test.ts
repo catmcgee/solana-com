@@ -277,7 +277,7 @@ describe("Open tutorial in Playground", () => {
   });
   const pg = {
     open: "packages/docs-examples/paths/start/q",
-    kind: "ts" as const,
+    kind: "anchor" as const,
   };
 
   it("is only in playground.mdx, never in the stepper", () => {
@@ -289,11 +289,9 @@ describe("Open tutorial in Playground", () => {
       expect(renderStepper(root, src, p, n)).not.toContain("sol-pg");
     const block = renderPlaygroundBlock(src, p, pg);
     expect(block).toContain(PATH_UI.playgroundNote);
-    expect(block).toContain('data-pg-label="Open tutorial in Playground"');
     expect(block).toContain(
-      'data-tip="Open tutorial in Playground: not available for this tutorial yet"',
+      '<a className="sol-pg-tut" data-pg-open="packages/docs-examples/paths/start/q">Open tutorial in Playground</a>',
     );
-    expect(block).toContain('aria-disabled="true"');
   });
 
   it("has no per-tutorial settings", () => {

@@ -340,7 +340,7 @@ export function layoutKey(
 export function strayAssetsInDocsRoot(
   allow: readonly string[] = [
     "apps/docs/run-examples.js",
-    // "Open tutorial in Playground" block on tutorial intro pages (styles/playground.css).
+    // Playground button on program tutorials (styles/playground.css).
     "apps/docs/playground.js",
     // Live "Try it" on RPC method pages (styles/rpc-try-it.css).
     "apps/docs/rpc-try-it.js",

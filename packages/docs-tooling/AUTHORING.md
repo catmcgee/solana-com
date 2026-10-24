@@ -435,35 +435,31 @@ Release gate: check this before the docs leave the fork.
   run `pnpm --filter @workspace/docs-tooling examples:build`, then
   `import X from "/snippets/examples/<id>.mdx"` and `<X />`. The old
   `file=...#region=` fence syntax is gone.
-- **Open tutorial in Playground.** Each tutorial has exactly one Playground
-  entry point: a block at the top of its intro page. Code blocks (cookbook,
-  reference, tutorial steps), demo terminals, the stepper, and step pages have
-  no Playground control; do not add one. `gen:paths` writes the block as
-  `snippets/paths/<lang>/<key>/playground.mdx`. Import it on the intro page
-  only, right after the first paragraph:
+- **Open tutorial in Playground.** Only program tutorials (Anchor/Native) get a
+  Playground button: the playground's GitHub import only accepts programs
+  ("Could not identify framework" on TS/JS/Rust-client/Python, checked
+  2026-10-16), so client (TypeScript) tutorials have none until it can import
+  them. A program tutorial has exactly one entry point: a block at the top of
+  its intro page. Code blocks (cookbook, reference, tutorial steps), demo
+  terminals, the stepper, and step pages have no Playground control; do not add
+  one. `gen:paths` writes the block as
+  `snippets/paths/<lang>/<key>/playground.mdx` only when the tutorial's example
+  folder (the folder the demo outputs live in, else the single
+  `packages/docs-examples/paths/*/<key>` folder) is a kind in `PLAYGROUND_KINDS`
+  (`src/examples/playground.ts`); import it on the intro page only, right after
+  the first paragraph:
   `import Playground from "/snippets/paths/en/<key>/playground.mdx";` and
-  `<Playground />`. It opens the tutorial's example folder: the folder the demo
-  outputs live in, else the single `packages/docs-examples/paths/*/<key>`
-  folder. Keep a new tutorial's examples in such a folder, named after its key
-  in `paths.en.json` (gen:paths warns when it finds no folder). The wording is
-  shared by every tutorial, in `_ui` (`playground`, `playgroundOff`,
-  `playgroundNote`); there are no per-tutorial overrides. A single-page tutorial
-  writes the same markup by hand at the top of the page (see
-  `programs/build-first-program.mdx`). The button is generated disabled (no
-  href, greyed, tooltip). `playground.js` (styles `styles/playground.css`) turns
-  it into `<origin>/github.com/<source>/<data-pg-open>` when its `data-pg-kind`
-  (`src/examples/playground.ts`) is in `CONFIG.enabledKinds`. `source` is the
-  one owner/repo/ref value in `playground.js` (`CONFIG.source`, currently
+  `<Playground />`. The wording is shared by every tutorial, in `_ui`
+  (`playground`, `playgroundNote`). A single-page tutorial writes the same
+  markup by hand (see `programs/build-first-program.mdx`). `playground.js`
+  (styles `styles/playground.css`) links the button to
+  `<origin>/github.com/<source>/<data-pg-open>`. `source` is the one
+  owner/repo/ref value in `playground.js` (`CONFIG.source`, currently
   `catmcgee/solana-com/tree/docs-redesign`, which becomes
   `solana-foundation/solana-com/tree/main` after the merge). Never prefix
-  `https://`, because the playground router then rejects the URL. The
-  playground's GitHub import only accepts Anchor/Native programs ("Could not
-  identify framework" on TS/JS/Rust-client/Python, checked 2026-10-16), so
-  `CONFIG.enabledKinds` is `anchor`, `native`: the job tutorials (TypeScript)
-  stay greyed with their tooltip, and "Build your first program" (Anchor) is
-  live. Add a kind there when the playground can import it. Linked folders must
-  exist at that ref on GitHub. Each import costs one unauthenticated GitHub API
-  call per folder (60/hour per reader IP).
+  `https://`, because the playground router then rejects the URL. Linked folders
+  must exist at that ref on GitHub. Each import costs one unauthenticated GitHub
+  API call per folder (60/hour per reader IP).
 - **Terminal panels (job paths).** A recorded output with a `<stem>.run.json`
   next to its `<stem>.output.txt` renders as a terminal panel
   (`src/lib/terminal.ts`, styles `apps/docs/styles/demo.css`, behaviour
@@ -499,8 +495,8 @@ Release gate: check this before the docs leave the fork.
 - **Program examples in Playground.** `packages/docs-examples/programs/<name>/`
   holds Anchor workspaces whose files a page shows through `blocks.json` (e.g.
   `programs/build-first-program`, the "Build your first program" page). The
-  page's hand-written `.sol-pg-tut` button opens the program crate and is live
-  once the files are on the `playground.js` source ref.
+  page's hand-written `.sol-pg-tut` button opens the program crate once the
+  files are on the `playground.js` source ref.
 - **Navigation (WP6).** Edit `navigation/en.json` by hand, then `nav:build`. A
   tab can list `pages` directly instead of `groups` (Start here does): its pages
   render as plain sidebar entries with no group header, and a nested group (the

@@ -41,17 +41,15 @@
  * - `card.mdx`: the path card for job pickers and hubs.
  * - `start.mdx`: the same card for the path intro, pointing at step 1
  *   (the mockup's "Start building" block under the flow).
- * - `playground.mdx`: the tutorial's one "Open tutorial in Playground"
- *   block. Import it once, at the top of the intro page (index 0); step
- *   pages, the stepper, and demo terminals have no Playground control. It
- *   opens the tutorial's whole example folder (`tutorialDir`: the folder the
- *   demo outputs live in, else the one
- *   `packages/docs-examples/paths/<domain>/<key>`), with the folder's kind
- *   from examples/playground.ts. It is server-rendered disabled (no href,
- *   greyed, tooltip); apps/docs/playground.js enables it when the kind is in
- *   its `CONFIG.enabledKinds`. A path without an example folder gets the
- *   disabled button with no source, and a warning. The wording is shared by
- *   every tutorial (`_ui.playground`, `playgroundOff`, `playgroundNote`).
+ * - `playground.mdx` (program tutorials only): the tutorial's one "Open
+ *   tutorial in Playground" block. Import it once, at the top of the intro
+ *   page (index 0); step pages, the stepper, and demo terminals have no
+ *   Playground control. It is written only when the tutorial's example
+ *   folder (`tutorialDir`: the folder the demo outputs live in, else the one
+ *   `packages/docs-examples/paths/<domain>/<key>`) is a program the
+ *   playground can import (PLAYGROUND_KINDS in examples/playground.ts:
+ *   Anchor/Native). Client (TypeScript) tutorials get no block. The wording
+ *   is shared by every tutorial (`_ui.playground`, `playgroundNote`).
  * - `demo.mdx` (when `demo` is set): the terminal panel of
  *   src/lib/terminal.ts, all server-rendered: the stage (one row per
  *   `stage` entry, one pill per progress value), the numbered steps with
@@ -87,6 +85,7 @@ import { DEFAULT_LOCALE } from "../lib/locales.ts";
 import {
   folderKind,
   PG_PATH,
+  PLAYGROUND_KINDS,
   type PlaygroundKind,
 } from "../examples/playground.ts";
 import {
@@ -147,7 +146,6 @@ export const PATH_UI = {
   demoCopied: DEFAULT_TERM_LABELS.copied,
   demoOutput: DEFAULT_TERM_LABELS.output,
   playground: "Open tutorial in Playground",
-  playgroundOff: "Not available for this tutorial yet",
   playgroundNote:
     "Playground runs in your browser, with nothing to install. It opens every step of this tutorial in one project, and its built-in AI can explain each step, change the code, and interact with the program.",
 };
@@ -679,47 +677,21 @@ export function tutorialSource(
 }
 
 /**
- * The "Open tutorial in Playground" button, server-rendered DISABLED: no
- * href, greyed, `aria-disabled`, tooltip in `data-tip` (styles/playground.css
- * draws it and the icon). `data-pg-open`/`data-pg-kind` are the folder and
- * its kind; apps/docs/playground.js turns the button into a link when the
- * kind is enabled, using the localized `data-pg-label`/`data-pg-off`.
- * Without JavaScript it stays disabled, so it never links to a folder the
- * playground cannot import.
- */
-export function tutorialButton(ui: PathUi, pg: TutorialSource | undefined) {
-  const label = ui.playground;
-  const off = `${label}: ${ui.playgroundOff.charAt(0).toLowerCase()}${ui.playgroundOff.slice(1)}`;
-  const attrs = [
-    `className="sol-pg-tut"`,
-    ...(pg
-      ? [attr("data-pg-open", pg.open), attr("data-pg-kind", pg.kind)]
-      : [`data-pg-kind="inline"`]),
-    attr("data-pg-label", label),
-    attr("data-pg-off", off),
-    attr("data-tip", off),
-    attr("aria-label", off),
-    `aria-disabled="true"`,
-    `role="link"`,
-    `tabIndex="0"`,
-  ];
-  return `<a ${attrs.join(" ")}>${mdText(label)}</a>`;
-}
-
-/**
  * `playground.mdx`: the tutorial's one "Open tutorial in Playground" block,
- * for the top of its intro page.
+ * for the top of its intro page. styles/playground.css draws the button and
+ * its icon; apps/docs/playground.js links it to the playground's import of
+ * `data-pg-open`.
  */
 export function renderPlaygroundBlock(
   src: PathsSource,
   p: PathDef,
-  pg: TutorialSource | undefined,
+  pg: TutorialSource,
 ) {
   const { ui, lang } = src;
   return `${hdr(lang)}
 <div className="sol-pg-tutorial not-prose" data-path="${p.key}">
 <p className="sol-pg-tutorial-text">${mdText(ui.playgroundNote)}</p>
-${tutorialButton(ui, pg)}
+<a className="sol-pg-tut" ${attr("data-pg-open", pg.open)}>${mdText(ui.playground)}</a>
 </div>
 `;
 }
@@ -918,21 +890,16 @@ export function buildPathOutputs(
     for (const p of src.paths) {
       const dir = path.join(docsRoot, "snippets", "paths", src.lang, p.key);
       const pg = tutorialSource(p, outputsRoot);
-      if (!pg && src === sources[0])
-        problems.push({
-          level: "warn",
-          file: "paths/paths.en.json",
-          message: `${p.key}: no example folder packages/docs-examples/paths/<domain>/${p.key}; "Open tutorial in Playground" is generated without a source`,
-        });
       for (let n = 0; n <= p.steps.length; n++)
         files.set(
           path.join(dir, `stepper-${n}.mdx`),
           renderStepper(docsRoot, src, p, n),
         );
-      files.set(
-        path.join(dir, "playground.mdx"),
-        renderPlaygroundBlock(src, p, pg),
-      );
+      if (pg && PLAYGROUND_KINDS.includes(pg.kind))
+        files.set(
+          path.join(dir, "playground.mdx"),
+          renderPlaygroundBlock(src, p, pg),
+        );
       files.set(path.join(dir, "card.mdx"), renderCard(docsRoot, src, p));
       files.set(
         path.join(dir, "start.mdx"),

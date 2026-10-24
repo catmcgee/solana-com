@@ -1,13 +1,12 @@
 /**
  * The kind of a tutorial's example folder, for "Open tutorial in Playground".
  *
- * Each tutorial has exactly one Playground entry point: the block at the top
- * of its intro page (`playground.mdx`, rendered by generators/paths.ts). Its
- * button carries the folder to import (`data-pg-open`) and the folder's kind
- * (`data-pg-kind`, computed here). apps/docs/playground.js turns it into a
- * link to Solana Playground's GitHub import
- * (`<origin>/github.com/<owner>/<repo>/tree/<ref>/<data-pg-open>`) when the
- * kind is one the playground can import (`CONFIG.enabledKinds` there).
+ * Only program tutorials get a Playground button: gen:paths writes a
+ * tutorial's `playground.mdx` block only when its folder's kind is in
+ * PLAYGROUND_KINDS (Anchor/Native). Client tutorials (TypeScript) get none
+ * until the playground can import them. apps/docs/playground.js points the
+ * button at Solana Playground's GitHub import
+ * (`<origin>/github.com/<owner>/<repo>/tree/<ref>/<data-pg-open>`).
  * Code blocks and demo terminals have no Playground control.
  *
  * The kind mirrors the playground's own import pipeline (verified against the
@@ -20,8 +19,9 @@
  * and finally keeps only `src/**.rs`, `client/**.{js,ts}` and
  * `tests/**.{js,ts}` (Anchor/Native). Anything else fails with "Could not
  * identify framework" / "Could not convert files". So client code (TS, JS,
- * Rust binaries, Python) gets a language kind (`ts`, `js`, `rust`, `py`) that
- * the script leaves disabled until the playground learns to import it.
+ * Rust binaries, Python) gets a language kind (`ts`, `js`, `rust`, `py`),
+ * which has no button; add it to PLAYGROUND_KINDS once the playground can
+ * import it.
  *
  * Pure apart from reading the committed example tree; deterministic.
  */
@@ -38,6 +38,9 @@ export type PlaygroundKind =
   | "rust"
   | "py"
   | "other";
+
+/** Kinds the playground can import: the only ones that get a button. */
+export const PLAYGROUND_KINDS: readonly PlaygroundKind[] = ["anchor", "native"];
 
 /** File types the playground's GitHub import loads (its language list). */
 const PG_EXTENSIONS = new Set([".js", ".json", ".py", ".rs", ".ts"]);
