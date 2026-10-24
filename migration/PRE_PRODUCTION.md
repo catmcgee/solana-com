@@ -12,8 +12,6 @@ search engines without any extra switches. Undo the preview-only bits:
 - [ ] Remove the preview branch from `apps/web/src/app/robots.ts` (it
       disallows every crawler when `VERCEL_ENV === "preview"`). Production
       never matches it, but it is preview-only scaffolding.
-- [ ] Remove `"robots": "noindex, nofollow"` from `seo.metatags` in
-      `apps/docs/docs.json`, so the docs pages are indexed.
 - [ ] Deploy production with `vercel deploy --prod` (not the preview + alias
       flow) and check `/robots.txt` lists the sitemaps again.
 

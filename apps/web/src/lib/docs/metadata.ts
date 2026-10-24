@@ -15,8 +15,10 @@ import { DOCS_LOCALES } from "./locales.mjs";
  *   English and the docs locales (as origin/main did with getAlternates);
  * - og:/twitter: tags (site defaults, then frontmatter `og:*`, `twitter:*`);
  *   the image is our own /opengraph/developers/... route;
- * - robots: docs.json's metatag, or `noindex` from the frontmatter.
- *   Previews also send X-Robots-Tag: noindex (next.config headers).
+ * - robots: `noindex` from the frontmatter, else a `robots` metatag in
+ *   docs.json (none today, so pages are indexed). Previews stay out of
+ *   search engines through X-Robots-Tag: noindex (lib/security-headers.ts)
+ *   and the robots.txt preview branch (app/robots.ts).
  */
 const SITE_NAME = docsConfig.name; // "Solana Developer Docs"
 const META = docsConfig.seo.metatags as Record<string, string>;
