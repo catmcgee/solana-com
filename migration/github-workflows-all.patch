@@ -1,0 +1,586 @@
+diff --git a/.github/workflows/action.yml b/.github/workflows/action.yml
+index 8c7de88..0c6e173 100644
+--- a/.github/workflows/action.yml
++++ b/.github/workflows/action.yml
+@@ -51,7 +51,6 @@ jobs:
+           - solana-com-accelerate
+           - solana-com-breakpoint
+           - solana-com-media
+-          - solana-docs
+           - solana-templates
+     steps:
+       - name: Checkout repository
+@@ -100,6 +99,7 @@ jobs:
+           - "@workspace/sentry"
+           - "@workspace/ui"
+           - "@solana-foundation/fab-menu"
++          - "@workspace/docs-tooling"
+     steps:
+       - name: Checkout repository
+         uses: actions/checkout@v4
+diff --git a/.github/workflows/docs-examples-record.yml b/.github/workflows/docs-examples-record.yml
+new file mode 100644
+index 0000000..5495676
+--- /dev/null
++++ b/.github/workflows/docs-examples-record.yml
+@@ -0,0 +1,83 @@
++name: Docs examples (record outputs)
++
++# Re-runs the path examples against Surfpool with RECORD_OUTPUT=1 and rebuilds
++# the docs snippets. It opens NO pull request (project rule): when the
++# recorded output drifted, the job fails and uploads the refreshed files plus
++# a patch as an artifact; a maintainer reviews and commits them by hand.
++# Compare-mode drift in normal CI is caught by docs-examples.yml.
++on:
++  workflow_dispatch:
++  schedule:
++    - cron: "0 7 * * 1"
++
++permissions:
++  contents: read
++
++env:
++  NODE_OPTIONS: --max-old-space-size=8192
++
++jobs:
++  record:
++    runs-on: ubuntu-latest
++    steps:
++      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
++
++      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
++        with:
++          run_install: false
++
++      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
++        with:
++          node-version-file: .node-version
++          cache: "pnpm"
++
++      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
++        with:
++          python-version: "3.12"
++
++      - name: Install solana-py
++        run: pip install "solana==0.40.1" "solders==0.28.0"
++
++      - name: Install Safe Chain
++        run: |
++          npm install --global @aikidosec/safe-chain
++          safe-chain setup-ci
++
++      - name: Install dependencies
++        run: pnpm install --frozen-lockfile
++
++      # Surfpool runs embedded (@solana/surfpool); the global setup writes
++      # the CLI keypair itself when solana-keygen is absent.
++      - name: Record path example outputs
++        env:
++          RECORD_OUTPUT: "1"
++          PYTHON: python
++        run: pnpm --filter @workspace/docs-examples exec vitest run paths
++
++      - name: Rebuild docs snippets
++        run: pnpm --filter @workspace/docs-tooling examples:build
++
++      - name: Collect drift
++        id: drift
++        run: |
++          git diff --binary -- packages/docs-examples apps/docs/snippets/examples > recorded-output.patch
++          if [ -s recorded-output.patch ]; then
++            echo "changed=true" >> "$GITHUB_OUTPUT"
++            git diff --stat -- packages/docs-examples apps/docs/snippets/examples
++          fi
++
++      - name: Upload refreshed output
++        if: steps.drift.outputs.changed == 'true'
++        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
++        with:
++          name: recorded-output
++          path: |
++            recorded-output.patch
++            packages/docs-examples/**/*.output.txt
++            apps/docs/snippets/examples/**
++
++      - name: Fail on drift
++        if: steps.drift.outputs.changed == 'true'
++        run: |
++          echo "::error::Recorded example output changed. Download the recorded-output artifact, review it and commit it (git apply recorded-output.patch)."
++          exit 1
+diff --git a/.github/workflows/docs-examples.yml b/.github/workflows/docs-examples.yml
+index c7c2b60..882107e 100644
+--- a/.github/workflows/docs-examples.yml
++++ b/.github/workflows/docs-examples.yml
+@@ -2,16 +2,30 @@ name: Docs examples
+ 
+ on:
+   push:
+-    branches: [main]
++    branches: [main, docs-redesign]
+     paths:
+       - "packages/docs-examples/**"
+-      - "apps/docs/content/cookbook/**"
++      - "packages/docs-tooling/src/examples/**"
++      - "packages/docs-tooling/src/convert/transforms/codetabs-examples.ts"
++      - "apps/docs/snippets/examples/**"
++      - "apps/docs/run-examples.js"
++      - "apps/docs/styles/run.css"
++      - "apps/docs/developers/docs/**"
++      - "apps/docs/*/developers/docs/**"
++      - "apps/docs/developers/cookbook/**"
+       - ".github/workflows/docs-examples.yml"
+   pull_request:
+-    branches: [main]
++    branches: [main, docs-redesign]
+     paths:
+       - "packages/docs-examples/**"
+-      - "apps/docs/content/cookbook/**"
++      - "packages/docs-tooling/src/examples/**"
++      - "packages/docs-tooling/src/convert/transforms/codetabs-examples.ts"
++      - "apps/docs/snippets/examples/**"
++      - "apps/docs/run-examples.js"
++      - "apps/docs/styles/run.css"
++      - "apps/docs/developers/docs/**"
++      - "apps/docs/*/developers/docs/**"
++      - "apps/docs/developers/cookbook/**"
+       - ".github/workflows/docs-examples.yml"
+ 
+ permissions:
+@@ -70,6 +84,74 @@ jobs:
+       - name: Lint
+         run: pnpm --filter @workspace/docs-examples lint
+ 
++  examples-snippets-fresh:
++    name: Example snippets are up to date
++    runs-on: ubuntu-latest
++    steps:
++      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
++
++      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
++        with:
++          run_install: false
++
++      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
++        with:
++          node-version-file: .node-version
++          cache: "pnpm"
++
++      - name: Install Safe Chain
++        run: |
++          npm install --global @aikidosec/safe-chain
++          safe-chain setup-ci
++
++      - name: Install dependencies
++        run: pnpm install --frozen-lockfile
++
++      # blocks.json + sources + recorded .output.txt -> apps/docs/snippets/examples.
++      # Fails when a committed snippet is stale, missing or orphaned.
++      - name: examples:build --check
++        run: pnpm --filter @workspace/docs-tooling examples:build --check
++
++      - name: Examples tooling tests
++        run: pnpm --filter @workspace/docs-tooling exec vitest run src/examples
++
++  examples-python:
++    name: Python path examples
++    runs-on: ubuntu-latest
++    steps:
++      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
++
++      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
++        with:
++          run_install: false
++
++      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
++        with:
++          node-version-file: .node-version
++          cache: "pnpm"
++
++      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
++        with:
++          python-version: "3.12"
++
++      - name: Install solana-py
++        run: pip install "solana==0.40.1" "solders==0.28.0"
++
++      - name: Install Safe Chain
++        run: |
++          npm install --global @aikidosec/safe-chain
++          safe-chain setup-ci
++
++      - name: Install dependencies
++        run: pnpm install --frozen-lockfile
++
++      # The checkout path test runs verify_payment.py when solana-py is
++      # importable (it is skipped in examples-ts, which has no Python).
++      - name: Run path examples with Python
++        env:
++          PYTHON: python
++        run: pnpm --filter @workspace/docs-examples exec vitest run paths
++
+   examples-rust:
+     name: Rust examples
+     runs-on: ubuntu-latest
+diff --git a/.github/workflows/docs.yml b/.github/workflows/docs.yml
+new file mode 100644
+index 0000000..36a6165
+--- /dev/null
++++ b/.github/workflows/docs.yml
+@@ -0,0 +1,93 @@
++name: Docs
++
++# Repo-side checks for the developer docs content in apps/docs, which apps/web
++# renders with Fumadocs. `docs-tooling verify` runs every content check
++# (residual syntax, nav coverage, legacy URL parity, frontmatter, assets,
++# generator freshness, convert --check); the apps/web docs tests follow.
++# Report-only: no pull requests are opened.
++
++on:
++  pull_request:
++    branches: [main, docs-redesign]
++    paths:
++      - "apps/docs/**"
++      - "packages/docs-tooling/**"
++      - "apps/web/source.config.ts"
++      - "apps/web/rewrites-redirects.ts"
++      - "apps/web/scripts/copy-docs-static.mjs"
++      - "apps/web/src/app/**/developers/docs/**"
++      - "apps/web/src/components/docs/**"
++      - "apps/web/src/lib/docs/**"
++      - "apps/web/src/lib/docs-edge/**"
++      - "packages/sitemap/**"
++      - "migration/move-map.csv"
++      - ".github/workflows/docs.yml"
++  push:
++    branches: [main, docs-redesign]
++    paths:
++      - "apps/docs/**"
++      - "packages/docs-tooling/**"
++      - "apps/web/source.config.ts"
++      - "apps/web/rewrites-redirects.ts"
++      - "apps/web/src/app/**/developers/docs/**"
++      - "apps/web/src/components/docs/**"
++      - "apps/web/src/lib/docs/**"
++      - "apps/web/src/lib/docs-edge/**"
++      - ".github/workflows/docs.yml"
++
++permissions:
++  contents: read
++
++jobs:
++  docs-tooling:
++    name: Docs tooling
++    runs-on: ubuntu-latest
++    steps:
++      - name: Checkout repository
++        uses: actions/checkout@v4
++        with:
++          # legacy-urls / verify-urls read the pre-migration tree from git.
++          fetch-depth: 0
++
++      - name: Install pnpm
++        uses: pnpm/action-setup@v6
++        with:
++          run_install: false
++
++      - name: Install Node.js
++        uses: actions/setup-node@v4
++        with:
++          node-version-file: .node-version
++          cache: "pnpm"
++
++      - name: Install Safe Chain
++        run: |
++          npm install --global @aikidosec/safe-chain
++          safe-chain setup-ci
++
++      # Also runs apps/web's postinstall (fumadocs-mdx), which generates the
++      # Fumadocs collections from apps/docs.
++      - name: Install dependencies
++        run: pnpm install --frozen-lockfile
++
++      - name: Type check
++        run: pnpm --filter @workspace/docs-tooling check-types
++
++      # Includes test/rpc.test.ts (param counts, leftover RPC syntax,
++      # Surfpool method coverage).
++      - name: Unit and fixture tests
++        run: pnpm --filter @workspace/docs-tooling test
++
++      # residual syntax = 0, nav:verify exact coverage, verify-urls 100%,
++      # frontmatter, assets, every generator --check (generate:check:
++      # examples, surfpool, paths, concepts, addresses, nav:build, tags,
++      # manifest/llms) and convert --check.
++      - name: docs-tooling verify
++        run: pnpm --filter @workspace/docs-tooling verify
++
++      - name:
++          apps/web docs routing (rewrites, redirects, middleware, llms, sitemap)
++        run: pnpm --filter solana-com exec vitest run src/__tests__/routes
++
++      - name: apps/web docs chrome
++        run: pnpm --filter solana-com exec vitest run src/__tests__/developers
+diff --git a/.github/workflows/guides-ci.yml b/.github/workflows/guides-ci.yml
+index 3d94f18..1b38e8d 100644
+--- a/.github/workflows/guides-ci.yml
++++ b/.github/workflows/guides-ci.yml
+@@ -1,8 +1,10 @@
+ name: Guides CI
+ 
+ # Walks through developer guides with an agent that follows the guide exactly
+-# as a reader would, and fails if the guide is broken. On PRs it tests the
+-# guides the PR touches. Once a week it sweeps every guide, and failures
++# as a reader would, and fails if the guide is broken. A guide is an English
++# developer docs page (apps/docs/developers/docs/**/*.mdx) whose frontmatter
++# has `type: tutorial` or `type: guide`. On PRs it tests the guides the PR
++# touches. Once a week it sweeps every guide, and failures
+ # produce an auto-fix PR (opened by the solana-docs-checker GitHub App).
+ #
+ # Required secrets:
+@@ -19,8 +21,8 @@ on:
+     inputs:
+       guides:
+         description: >-
+-          Comma-separated guide paths to test (apps/docs/content/guides/...), or
+-          "all"
++          Comma-separated guide paths to test (apps/docs/developers/docs/...),
++          or "all"
+         required: true
+         default: all
+       open_fix_prs:
+@@ -54,7 +56,7 @@ jobs:
+           INPUT_GUIDES: ${{ inputs.guides }}
+         run: |
+           set -euo pipefail
+-          pathspec=':(glob)apps/docs/content/guides/**/*.mdx'
++          pathspec=':(glob)apps/docs/developers/docs/**/*.mdx'
+ 
+           if [ "$EVENT" = "schedule" ] || { [ "$EVENT" = "workflow_dispatch" ] && [ "$INPUT_GUIDES" = "all" ]; }; then
+             files=$(git ls-files "$pathspec")
+@@ -65,10 +67,17 @@ jobs:
+             files=$(git diff --name-only --diff-filter=d "$base" HEAD -- "$pathspec")
+           fi
+ 
+-          # Keep only files that exist (guards manual dispatch typos)
++          # Keep only files that exist (guards manual dispatch typos) and, for
++          # the sweep and PR modes, only tutorial/guide pages (frontmatter
++          # `type: tutorial` or `type: guide`); reference and conceptual
++          # pages have no steps to follow.
+           existing=""
+           while IFS= read -r f; do
+-            [ -n "$f" ] && [ -f "$f" ] && existing="$existing$f"$'\n'
++            [ -n "$f" ] && [ -f "$f" ] || continue
++            if [ "$EVENT" != "workflow_dispatch" ] || [ "$INPUT_GUIDES" = "all" ]; then
++              awk 'NR==1 && $0!="---"{exit 1} NR>1 && $0=="---"{exit 1} /^type:[[:space:]]*"?(tutorial|guide)"?[[:space:]]*$/{found=1; exit 0} END{exit !found}' "$f" || continue
++            fi
++            existing="$existing$f"$'\n'
+           done <<< "$files"
+ 
+           guides=$(printf '%s' "$existing" | jq -R -s -c 'split("\n") | map(select(length > 0))')
+@@ -224,7 +233,7 @@ jobs:
+           token: ${{ steps.app-token.outputs.token }}
+           branch: guides-autofix/${{ github.run_id }}
+           base: main
+-          add-paths: apps/docs/content/guides/**
++          add-paths: apps/docs/developers/docs/**
+           commit-message: ${{ steps.pr.outputs.title }}
+           title: ${{ steps.pr.outputs.title }}
+           body-path: ${{ runner.temp }}/pr-body.md
+diff --git a/.github/workflows/i18n.yml b/.github/workflows/i18n.yml
+index 011d43a..097f5fa 100644
+--- a/.github/workflows/i18n.yml
++++ b/.github/workflows/i18n.yml
+@@ -7,15 +7,18 @@ on:
+     paths:
+       - ".github/workflows/i18n.yml"
+       - ".lingo/config.json"
++      - "apps/docs/.lingo/config.json"
+       - "scripts/i18n/**"
+       - "packages/i18n/messages/*/en/*.json"
+-      - "apps/docs/content/docs/en/**/*.mdx"
+-      - "apps/docs/content/docs/en/**/meta.json"
+-      - "!apps/docs/content/docs/en/rpc/**"
+-      - "apps/docs/content/learn/en/**/*.mdx"
+-      - "apps/docs/content/learn/en/**/meta.json"
+-      - "apps/docs/content/developers-learn/en/**/*.mdx"
+-      - "apps/docs/content/developers-learn/en/**/meta.json"
++      # Docs Lingo project (apps/docs/.lingo): English sources. Locale
++      # copies live in apps/docs/<locale>/{developers/docs,learn}.
++      - "apps/docs/developers/docs/**/*.mdx"
++      - "!apps/docs/developers/docs/rpc/**"
++      - "!apps/docs/developers/docs/tools/surfpool/rpc/**"
++      - "apps/docs/learn/**/*.mdx"
++      - "apps/docs/navigation/labels/en.json"
++      - "apps/docs/concepts/concepts.en.json"
++      - "apps/docs/paths/paths.en.json"
+   workflow_dispatch:
+ 
+ concurrency:
+@@ -54,6 +57,20 @@ jobs:
+         run: |
+           timeout --verbose --signal=TERM --kill-after=30s \
+             300m node scripts/i18n/run.mjs all
++      # Point the locale navigations at the pages Lingo just wrote (they fall
++      # back to English until then) and refresh
++      # packages/docs-tooling/generated/{untranslated,locale-fallbacks}.json.
++      - name: Install pnpm
++        uses: pnpm/action-setup@v6
++        with:
++          run_install: false
++      - name: Install docs tooling
++        run:
++          pnpm install --frozen-lockfile --filter "@workspace/docs-tooling..."
++      - name: Swap translated pages into the locale navigations
++        run: |
++          pnpm --filter @workspace/docs-tooling nav:swap
++          pnpm --filter @workspace/docs-tooling nav:verify
+       - name: Create signed pull request
+         id: create-pr
+         uses: peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676 # v7
+@@ -70,8 +87,29 @@ jobs:
+           delete-branch: true
+           add-paths: |
+             packages/i18n/messages
+-            apps/docs/content
+             .lingo/lock.json
++            apps/docs/.lingo/lock.json
++            apps/docs/ar
++            apps/docs/de
++            apps/docs/es
++            apps/docs/fi
++            apps/docs/fr
++            apps/docs/id
++            apps/docs/it
++            apps/docs/ja
++            apps/docs/ko
++            apps/docs/nl
++            apps/docs/pl
++            apps/docs/pt
++            apps/docs/ru
++            apps/docs/tr
++            apps/docs/uk
++            apps/docs/vi
++            apps/docs/zh
++            apps/docs/navigation
++            apps/docs/concepts
++            apps/docs/paths
++            packages/docs-tooling/generated
+       - name: Verify pull request commits
+         if:
+           steps.create-pr.outputs.pull-request-operation != 'none' &&
+diff --git a/.github/workflows/surfpool-schema-drift.yml b/.github/workflows/surfpool-schema-drift.yml
+new file mode 100644
+index 0000000..93dfcd4
+--- /dev/null
++++ b/.github/workflows/surfpool-schema-drift.yml
+@@ -0,0 +1,110 @@
++name: Docs — Surfpool schema drift
++
++# Weekly check that the Surfpool RPC reference
++# (apps/docs/snippets/rpc/surfpool/*.mdx, imported by
++# developers/docs/tools/surfpool/rpc/* in every locale) still matches upstream.
++#
++# Upstream: solana-foundation/surfpool-web-ui, apps/docs/src/data/*.json.
++# The local copies in packages/docs-tooling/data/surfpool carry solana.com
++# edits, so the sync is a 3-way merge (base = the upstream commit recorded in
++# data/surfpool/upstream.json) that keeps them, then the snippets are
++# regenerated (src/generators/surfpool-rpc.ts --sync).
++#
++# Report-only: per the migration decisions no pull request is opened and
++# nothing is pushed. When upstream moved, the run fails and uploads
++# surfpool-schema-drift.patch; apply it with `git apply`, or run the same
++# command locally:
++#   pnpm --filter @workspace/docs-tooling exec tsx src/generators/surfpool-rpc.ts --sync --ref main
++#
++# SURFPOOL_SCHEMA_REF is the surfpool-web-ui ref to compare against. It is
++# deliberately not SURFPOOL_REF, which docs-examples.yml uses to pin the
++# surfpool binary from a different repository.
++
++on:
++  schedule:
++    # Mondays at 07:00 UTC (after docs-examples deps drift).
++    - cron: "0 7 * * 1"
++  workflow_dispatch:
++    inputs:
++      ref:
++        description: surfpool-web-ui ref (branch, tag or commit) to sync to
++        required: false
++        default: main
++
++permissions:
++  contents: read
++
++env:
++  SURFPOOL_SCHEMA_REF: ${{ inputs.ref || vars.SURFPOOL_SCHEMA_REF || 'main' }}
++
++jobs:
++  drift:
++    name: Surfpool schema drift
++    runs-on: ubuntu-latest
++    steps:
++      - uses: actions/checkout@v4
++
++      - uses: pnpm/action-setup@v6
++        with:
++          run_install: false
++
++      - uses: actions/setup-node@v4
++        with:
++          node-version-file: .node-version
++          cache: "pnpm"
++
++      # Root install: the generator formats its output with the repo's pinned
++      # oxfmt (the same formatter lint-staged runs on commit).
++      - name: Install deps
++        run: pnpm install --frozen-lockfile
++
++      - name: Committed snippets match committed schemas
++        run:
++          pnpm --filter @workspace/docs-tooling exec tsx
++          src/generators/surfpool-rpc.ts --check
++
++      - name: Merge upstream schemas and regenerate snippets
++        env:
++          GITHUB_TOKEN: ${{ github.token }}
++        run:
++          pnpm --filter @workspace/docs-tooling exec tsx
++          src/generators/surfpool-rpc.ts --sync --ref "$SURFPOOL_SCHEMA_REF"
++
++      - name: Report drift
++        id: drift
++        run: |
++          paths="packages/docs-tooling/data/surfpool apps/docs/snippets/rpc/surfpool"
++          git add --intent-to-add -- $paths
++          if git diff --quiet -- $paths; then
++            echo "No Surfpool schema drift against \`$SURFPOOL_SCHEMA_REF\`." >> "$GITHUB_STEP_SUMMARY"
++            echo "drift=false" >> "$GITHUB_OUTPUT"
++            exit 0
++          fi
++          git diff --binary -- $paths > surfpool-schema-drift.patch
++          {
++            echo "## Surfpool schema drift"
++            echo
++            echo "Upstream \`solana-foundation/surfpool-web-ui@$SURFPOOL_SCHEMA_REF\` changed since the recorded base."
++            echo
++            echo '```'
++            git diff --stat -- $paths
++            echo '```'
++            echo
++            echo "Download the \`surfpool-schema-drift\` artifact and run \`git apply surfpool-schema-drift.patch\`,"
++            echo "or run \`pnpm --filter @workspace/docs-tooling exec tsx src/generators/surfpool-rpc.ts --sync --ref $SURFPOOL_SCHEMA_REF\` locally."
++          } >> "$GITHUB_STEP_SUMMARY"
++          echo "drift=true" >> "$GITHUB_OUTPUT"
++
++      - name: Upload drift patch
++        if: steps.drift.outputs.drift == 'true'
++        uses: actions/upload-artifact@v4
++        with:
++          name: surfpool-schema-drift
++          path: surfpool-schema-drift.patch
++          retention-days: 30
++
++      - name: Fail on drift
++        if: steps.drift.outputs.drift == 'true'
++        run: |
++          echo "::error::Surfpool schemas drifted from upstream; see the job summary."
++          exit 1

@@ -1,0 +1,123 @@
+{
+  "note": "Work that WP0/WP1 left for apps/web (WP9, WP10). Until these land, the URLs below are recorded but not served correctly. `pnpm --filter @workspace/docs-tooling verify-urls` counts them as `redirect-pending` (583 at the time of writing) and lists every file kept at a redirected path. Both numbers must reach 0 before cutover.",
+  "wp9": [
+    {
+      "id": "docs-app-redirects",
+      "spec": "5.8",
+      "what": "Port the 16 redirects from the deleted apps/docs/next.config.ts (saved verbatim in migration/docs-app-redirects.json) into apps/web/rewrites-redirects.ts, for example by adding the 4 source/destination pairs to movedDocsRedirects so withMdVariants and withLocaleRedirects generate the .md and /:locale twins.",
+      "routes": [
+        [
+          "/docs/payments/accept-payments/payment-button",
+          "/docs/tools/commerce-kit/quickstart/payment-button"
+        ],
+        ["/docs/payments/accept-payments/pay-sh", "/docs/payments/pay-sh"],
+        ["/docs/payments/subscriptions/pay-sh", "/docs/payments/pay-sh"],
+        [
+          "/docs/payments/production-readiness",
+          "/docs/tools/production-readiness"
+        ]
+      ],
+      "status": "done (WP9-edge): 4 pairs in movedDocsRedirects in apps/web/rewrites-redirects.ts; .md and /:locale twins generated."
+    },
+    {
+      "id": "rm-stale-payment-button",
+      "spec": "Q1/R8, decisions.md (delete stale locale-only files only when redirect-covered)",
+      "what": "Once docs-app-redirects is in apps/web, git rm these 17 stale locale-only files. Fumadocs never served them, and the old app redirected their URLs. Then change their move-map.csv rows from kept-uncovered to removed-redirect, with redirect=/<loc>/docs/tools/commerce-kit/quickstart/payment-button. verify-urls lists them under 'files kept at a redirected path'.",
+      "files": [
+        "apps/docs/ar/docs/payments/accept-payments/payment-button.mdx",
+        "apps/docs/de/docs/payments/accept-payments/payment-button.mdx",
+        "apps/docs/es/docs/payments/accept-payments/payment-button.mdx",
+        "apps/docs/fi/docs/payments/accept-payments/payment-button.mdx",
+        "apps/docs/fr/docs/payments/accept-payments/payment-button.mdx",
+        "apps/docs/id/docs/payments/accept-payments/payment-button.mdx",
+        "apps/docs/it/docs/payments/accept-payments/payment-button.mdx",
+        "apps/docs/ja/docs/payments/accept-payments/payment-button.mdx",
+        "apps/docs/ko/docs/payments/accept-payments/payment-button.mdx",
+        "apps/docs/nl/docs/payments/accept-payments/payment-button.mdx",
+        "apps/docs/pl/docs/payments/accept-payments/payment-button.mdx",
+        "apps/docs/pt/docs/payments/accept-payments/payment-button.mdx",
+        "apps/docs/ru/docs/payments/accept-payments/payment-button.mdx",
+        "apps/docs/tr/docs/payments/accept-payments/payment-button.mdx",
+        "apps/docs/uk/docs/payments/accept-payments/payment-button.mdx",
+        "apps/docs/vi/docs/payments/accept-payments/payment-button.mdx",
+        "apps/docs/zh/docs/payments/accept-payments/payment-button.mdx"
+      ],
+      "status": "done (WP9-edge): 17 files deleted from the working tree (not yet staged with git rm); move-map rows set to removed-redirect."
+    },
+    {
+      "id": "greek-redirects",
+      "spec": "NOT in spec 5.8; required by decisions.md (Greek dropped)",
+      "what": "Add permanent redirects /el/(docs|learn|developers/cookbook|developers/bootcamp)/:path* and their .md twins -> /<same path without /el>, plus exact /el/docs, /el/learn, /el/developers, /el/developers/cookbook and /el/developers/bootcamp. 566 Greek URLs depend on this: 468 docs, 52 cookbook, 33 bootcamp, 11 learn pages, /el/learn and /el/developers. Put the rule before withLocaleRedirects output, or drop el from its locale pattern, so that /el/docs/<R8 path> does not chain through /el/docs/<new path>. Every Greek row in move-map.csv already records its target in the redirect column.",
+      "status": "done (WP9-edge): one regex redirect placed first in apps/web redirects covers /el/docs, /el/learn, /el/developers and /el/developers/{cookbook,bootcamp,guides,learn} plus .md twins and subpaths. Greek URLs of moved pages take two hops (/el/docs/old -> /docs/old -> /docs/new) to keep the route count under Next's 1,000 warning."
+    },
+    {
+      "id": "developers-learn-to-bootcamp",
+      "spec": "5.8",
+      "what": "/developers/learn/:path* -> /developers/bootcamp/:path* (308), with /:locale and .md twins. This lived only in the deleted apps/docs/src/middleware.ts; no other copy exists.",
+      "status": "done (WP9-edge): rewrites-redirects.ts, with .md and /:locale twins."
+    },
+    {
+      "id": "middleware-normalisation",
+      "spec": "5.8",
+      "what": "For proxied docs paths: redirect to the lowercase path, remove duplicate locale segments (keep the first), and redirect /en/... to /... (308). The deleted docs middleware did all three. The apps/web middleware matcher excludes docs|learn, so its existing lowercase redirect does not run for them.",
+      "status": "done (WP9-edge): handleDocsRequest in apps/web/src/middleware.ts (one 308; mixed-case .md twins included)."
+    },
+    {
+      "id": "markdown",
+      "spec": "5.5",
+      "what": ".md twins and Accept: text/markdown negotiation for /docs, /developers/cookbook, /developers/bootcamp and /learn (old: rewrite to /api/markdown). /api/markdown/* is dropped. Behaviour change: the old route always rendered English (getPage(rest, defaultLocale)), so locale .md twins of locale-only pages returned 404 before.",
+      "status": "done (WP9-edge): apps/web serves .md twins and Accept: text/markdown (src/proxy.ts -> /api/markdown); the docs_markdown_requested analytics event is not carried over."
+    },
+    {
+      "id": "llms",
+      "spec": "5.4",
+      "what": "/llms.txt (custom header, override file), /llms-full.txt (every page as Markdown) and /docs/[section]/llms.txt (apps/web route; the old SECTION_NOTES are in git show 023c6d918:apps/docs/src/app/docs/[section]/llms.txt/route.ts). Today apps/web rewrites /llms.txt and /llms-full.txt to DOCS_APP_URL.",
+      "status": "done: /llms.txt and /llms-full.txt are apps/web routes (app/llms.txt, app/llms-full.txt); /developers/docs/[section]/llms.txt is an apps/web route reading packages/docs-tooling/generated/llms-sections."
+    },
+    {
+      "id": "fallback-and-cookbook-rewrites",
+      "spec": "5.10, 8",
+      "what": "425 /<loc>/docs/* URLs (25 EN-only pages x 17 locales) need the locale-fallback rewrite, and 884 /<loc>/developers/cookbook/* URLs (52 x 17) need the rewrite to the English cookbook. See migration/missing-translations.txt and the cookbook-rewrite rows in migration/verify-urls.tsv.",
+      "status": "done: untranslated locale pages render the English page at the locale URL (Fumadocs fallbackLanguage, apps/web src/lib/docs/source.ts), including the cookbook. turbo.json lists apps/docs as an apps/web build input, so docs-only commits rebuild apps/web."
+    }
+  ],
+  "wp10": [
+    {
+      "id": "developers-landing",
+      "spec": "7",
+      "what": "/developers and /<loc>/developers (18 kept locales) are route-pending in move-map.csv; the docs app served them from src/app/[locale]/developers/page.tsx, which WP1 deleted. /el/developers is covered by greek-redirects."
+    },
+    {
+      "id": "learn-landing",
+      "spec": "7.8",
+      "what": "/learn and /<loc>/learn (18 kept locales) are route-pending."
+    },
+    {
+      "id": "opengraph",
+      "spec": "5.6",
+      "what": "/opengraph/developers/* moves to apps/web (landing only). Other /opengraph/* URLs are dropped and the /opengraph/:path+ rewrite is removed."
+    },
+    {
+      "id": "deleted-assets",
+      "spec": "7 (video guides / landing)",
+      "what": "These were deleted with no copy anywhere in the repo. Only the deleted docs-app src used them. Recover with git show 023c6d918:<path> if needed.",
+      "files": [
+        "apps/docs/public/src/img/video-badge/event-icon.svg",
+        "apps/docs/public/src/img/video-badge/interview-icon.svg",
+        "apps/docs/public/src/img/video-badge/learn-icon.svg",
+        "apps/docs/public/src/img/video-badge/originals-icon.svg",
+        "apps/docs/public/src/img/video-badge/podcast-icon.svg"
+      ]
+    }
+  ],
+  "informational": [
+    {
+      "id": "locale-root",
+      "what": "The docs app's src/app/[locale]/route.ts (/<loc> -> /<loc>/docs) could only be reached on the docs host directly. On solana.com, apps/web serves /<loc> itself, so no action is needed."
+    },
+    {
+      "id": "unserved-learn-markdown",
+      "what": "apps/docs/src/markdown/learn/{blockchain-basics,dao,nfts,payments}.md were deleted (spec 1.2). Nothing served or referenced them at 023c6d918."
+    }
+  ]
+}

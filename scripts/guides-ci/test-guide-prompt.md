@@ -85,7 +85,7 @@ shape:
 
 ```json
 {
-  "guide": "apps/docs/content/guides/.../file.mdx",
+  "guide": "apps/docs/developers/docs/.../file.mdx",
   "status": "pass" | "fail",
   "summary": "One paragraph: what the guide builds and how the walkthrough went.",
   "steps_run": 12,

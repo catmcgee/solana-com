@@ -29,7 +29,7 @@ missing credentials) are not guide defects and need no edit.
    modernize things that aren't broken.
 4. Address `warning` issues only when the fix is trivial and zero-risk (a dead
    link, a typo in a command). Otherwise leave warnings for humans.
-5. Do not touch any file outside `apps/docs/content/guides/` in the repository.
+5. Do not touch any file outside `apps/docs/developers/docs/` in the repository.
    Do not run git commit or git push — committing and opening the PR is handled
    by a later workflow step.
 

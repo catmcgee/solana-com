@@ -4,20 +4,16 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { loadProject } from "./projects.mjs";
 
-const scriptDir = path.dirname(fileURLToPath(import.meta.url));
-const rootDir = path.resolve(scriptDir, "../..");
-const contentDir = path.join(rootDir, "apps/docs/content");
-const config = JSON.parse(
-  fs.readFileSync(path.join(rootDir, ".lingo/config.json"), "utf8"),
-);
-const lockPath = path.join(rootDir, ".lingo/lock.json");
-const lock = fs.existsSync(lockPath)
-  ? JSON.parse(fs.readFileSync(lockPath, "utf8"))
-  : null;
+// Docs Lingo project (projects.mjs): config, lock keys and paths are relative
+// to apps/docs; translated pages live under apps/docs/<locale>/.
+const docs = loadProject("docs");
+const contentDir = docs.rootDir;
+const lockPath = docs.lockPath;
+const lock = docs.lock;
 const targetLocalePattern = new RegExp(
-  `/content/(?:docs|learn|developers-learn)/(${config.targetLocales.join("|")})/`,
+  `^(${docs.config.targetLocales.join("|")})/(?:docs|learn|developers/bootcamp)/`,
 );
 
 let changedFiles = 0;
@@ -25,7 +21,9 @@ let removedBackticks = 0;
 let changedLockEntries = 0;
 
 function isTranslatedDocsFile(filePath) {
-  return targetLocalePattern.test(filePath.replaceAll(path.sep, "/"));
+  return targetLocalePattern.test(
+    path.relative(contentDir, filePath).replaceAll(path.sep, "/"),
+  );
 }
 
 function sanitizeFile(filePath) {
@@ -57,7 +55,7 @@ function sanitizeFile(filePath) {
   changedFiles++;
 
   const relativePath = path
-    .relative(rootDir, filePath)
+    .relative(contentDir, filePath)
     .replaceAll(path.sep, "/");
   const lockEntry = lock?.files?.[relativePath];
   if (!lockEntry) return;
@@ -74,6 +72,7 @@ function visit(directory) {
     const filePath = path.join(directory, entry.name);
 
     if (entry.isDirectory()) {
+      if (entry.name.startsWith(".") || entry.name === "node_modules") continue;
       visit(filePath);
       continue;
     }
@@ -84,7 +83,10 @@ function visit(directory) {
   }
 }
 
-visit(contentDir);
+for (const locale of docs.config.targetLocales) {
+  const localeDir = path.join(contentDir, locale);
+  if (fs.existsSync(localeDir)) visit(localeDir);
+}
 
 if (changedLockEntries > 0) {
   fs.writeFileSync(lockPath, `${JSON.stringify(lock, null, 2)}\n`);
