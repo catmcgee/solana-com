@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { InActionScene } from "@/components/docs/docs-inaction-scene.client";
+import {
+  FullscreenButton,
+  InActionScene,
+} from "@/components/docs/docs-inaction-scene.client";
 
 const SIG =
   "4JZW7fB3h53qP6f66eat4cwDVDFvxwTtKWbV8tfJJHVo4eHzK9riSvetQSwPEtungFxfbWC968JoyDoqRo7XauLZ";
@@ -220,5 +223,34 @@ describe("InActionScene", () => {
     fireEvent.click(screen.getByRole("button", { name: "Create token" }));
     await flush(3000);
     expect(container.textContent).not.toMatch(/record|replay|sample|simulat/i);
+  });
+});
+
+describe("<FullscreenButton>", () => {
+  afterEach(() => document.getElementById("game")?.remove());
+
+  function game(requestFullscreen?: () => Promise<void>) {
+    const el = document.createElement("iframe");
+    el.id = "game";
+    if (requestFullscreen) el.requestFullscreen = requestFullscreen;
+    else Object.defineProperty(el, "requestFullscreen", { value: undefined });
+    document.body.append(el);
+    return el;
+  }
+
+  it("opens its target in the browser's fullscreen", () => {
+    const requestFullscreen = vi.fn(async () => {});
+    game(requestFullscreen);
+    render(<FullscreenButton target="game">Full screen</FullscreenButton>);
+    fireEvent.click(screen.getByRole("button", { name: "Full screen" }));
+    expect(requestFullscreen).toHaveBeenCalledOnce();
+  });
+
+  it("renders nothing where the browser has no fullscreen", () => {
+    game();
+    const { container } = render(
+      <FullscreenButton target="game">Full screen</FullscreenButton>,
+    );
+    expect(container.innerHTML).toBe("");
   });
 });

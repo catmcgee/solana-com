@@ -35,7 +35,7 @@ import { isDocsHref } from "@/lib/docs/docs-href";
 import { TxWalkthrough } from "@/components/tx-walkthrough";
 import { LiveFeed } from "./docs-live-feed.client";
 import { Tooltip } from "./docs-tooltip";
-import { InActionScene } from "./docs-inaction-scene.client";
+import { FullscreenButton, InActionScene } from "./docs-inaction-scene.client";
 
 type P = { children?: ReactNode };
 
@@ -1105,6 +1105,7 @@ export const docsComponents = {
   TxWalkthrough,
   LiveFeed,
   InActionScene,
+  FullscreenButton,
 };
 
 export { text as textContent };

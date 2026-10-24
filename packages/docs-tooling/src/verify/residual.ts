@@ -179,6 +179,7 @@ export const DOCS_COMPONENTS = new Set([
   "Frame",
   "Icon",
   "InActionScene",
+  "FullscreenButton",
   "Info",
   "Latex",
   "LiveFeed",

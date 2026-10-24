@@ -1,6 +1,13 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { Icon } from "@/components/tx-walkthrough/tx-walkthrough.client";
 
 /**
@@ -457,3 +464,43 @@ const CoinIcon = () => (
     <circle cx="12" cy="12" r="4.5" />
   </Icon>
 );
+
+type FullscreenElement = HTMLElement & {
+  webkitRequestFullscreen?: () => void;
+};
+
+/**
+ * <FullscreenButton target="sol-2048">Full screen</FullscreenButton>: opens
+ * the element with that id (the 2048 iframe) in the browser's fullscreen;
+ * Esc leaves it. Renders nothing where the browser can't (iPhone Safari) or
+ * without JavaScript.
+ */
+export function FullscreenButton({
+  target,
+  children,
+}: {
+  target: string;
+  children?: ReactNode;
+}) {
+  const [supported, setSupported] = useState(false);
+  useEffect(() => {
+    const el = document.getElementById(target) as FullscreenElement | null;
+    setSupported(!!(el?.requestFullscreen || el?.webkitRequestFullscreen));
+  }, [target]);
+  if (!supported) return null;
+  const open = () => {
+    const el = document.getElementById(target) as FullscreenElement | null;
+    if (!el) return;
+    if (el.requestFullscreen) void el.requestFullscreen().catch(() => {});
+    else el.webkitRequestFullscreen?.();
+    el.focus();
+  };
+  return (
+    <button type="button" className="sol-inaction-fs" onClick={open}>
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+      </svg>
+      {children}
+    </button>
+  );
+}
