@@ -1,0 +1,309 @@
+---
+title: Time & Sysvars
+description: Clock manipulation and sysvar access in Go
+---
+
+Methods for manipulating time and accessing system variables. Every sysvar
+getter has a matching setter. The types come from the
+[`github.com/gagliardetto/solana-go/sysvar`](https://pkg.go.dev/github.com/gagliardetto/solana-go/sysvar)
+package (imported as `sysvar`), and getters return pointers (or slices) that you
+can modify and pass back to the setter.
+
+## Clock Manipulation
+
+### WarpToSlot
+
+```go
+func (s *LiteSVM) WarpToSlot(slot uint64) error
+```
+
+Advance the internal clock to a specific slot.
+
+```go
+before, err := svm.Clock()
+if err != nil {
+    t.Fatal(err)
+}
+t.Logf("current slot: %d", before.Slot)
+
+if err := svm.WarpToSlot(10_000_000); err != nil {
+    t.Fatal(err)
+}
+
+after, err := svm.Clock()
+if err != nil {
+    t.Fatal(err)
+}
+t.Logf("new slot:     %d", after.Slot)
+```
+
+### Clock
+
+```go
+// sysvar is github.com/gagliardetto/solana-go/sysvar
+type Clock struct {
+    Slot                uint64
+    EpochStartTimestamp int64
+    Epoch               uint64
+    LeaderScheduleEpoch uint64
+    UnixTimestamp       int64
+}
+
+func (s *LiteSVM) Clock() (*sysvar.Clock, error)
+```
+
+Read the Clock sysvar.
+
+```go
+c, err := svm.Clock()
+if err != nil {
+    t.Fatal(err)
+}
+t.Logf("slot=%d epoch=%d unix=%d", c.Slot, c.Epoch, c.UnixTimestamp)
+```
+
+### SetClock
+
+```go
+func (s *LiteSVM) SetClock(c *sysvar.Clock) error
+```
+
+Overwrite the Clock sysvar. Read it, mutate fields, write it back when you need
+control over `Epoch` or `UnixTimestamp` (which `WarpToSlot` does not update).
+
+```go
+c, err := svm.Clock()
+if err != nil {
+    t.Fatal(err)
+}
+c.Slot = 1_000
+c.Epoch = 10
+c.UnixTimestamp = 1_735_689_600
+if err := svm.SetClock(c); err != nil {
+    t.Fatal(err)
+}
+```
+
+<Info>
+  `WarpToSlot` only updates `Slot`. Use `SetClock` when your program reads
+  `Epoch` or `UnixTimestamp` from the Clock sysvar.
+</Info>
+
+## Rent
+
+### Rent / SetRent
+
+```go
+type Rent struct {
+    LamportsPerByte    uint64
+    ExemptionThreshold float64
+    BurnPercent        uint8
+}
+
+func (s *LiteSVM) Rent() (*sysvar.Rent, error)
+func (s *LiteSVM) SetRent(r *sysvar.Rent) error
+```
+
+```go
+r, err := svm.Rent()
+if err != nil {
+    t.Fatal(err)
+}
+t.Logf("lamports/byte: %d", r.LamportsPerByte)
+t.Logf("exemption threshold: %.2f", r.ExemptionThreshold)
+t.Logf("burn percent: %d", r.BurnPercent)
+```
+
+### MinimumBalanceForRentExemption
+
+```go
+func (s *LiteSVM) MinimumBalanceForRentExemption(dataLen int) (uint64, error)
+```
+
+```go
+for _, size := range []int{0, 100, 1024} {
+    min, err := svm.MinimumBalanceForRentExemption(size)
+    if err != nil {
+        t.Fatal(err)
+    }
+    t.Logf("%4d bytes -> %d lamports", size, min)
+}
+```
+
+## Epoch Schedule
+
+```go
+type EpochSchedule struct {
+    SlotsPerEpoch            uint64
+    LeaderScheduleSlotOffset uint64
+    Warmup                   bool
+    FirstNormalEpoch         uint64
+    FirstNormalSlot          uint64
+}
+
+func (s *LiteSVM) EpochSchedule() (*sysvar.EpochSchedule, error)
+func (s *LiteSVM) SetEpochSchedule(e *sysvar.EpochSchedule) error
+```
+
+```go
+es, err := svm.EpochSchedule()
+if err != nil {
+    t.Fatal(err)
+}
+t.Logf("slots per epoch: %d", es.SlotsPerEpoch)
+t.Logf("first normal epoch: %d", es.FirstNormalEpoch)
+t.Logf("first normal slot:  %d", es.FirstNormalSlot)
+```
+
+## Epoch Rewards
+
+```go
+type EpochRewards struct {
+    DistributionStartingBlockHeight uint64
+    NumPartitions                   uint64
+    ParentBlockhash                 solana.Hash
+    TotalPoints                     bin.Uint128 // u128 total_points
+    TotalRewards                    uint64
+    DistributedRewards              uint64
+    Active                          bool
+}
+
+func (s *LiteSVM) EpochRewards() (*sysvar.EpochRewards, error)
+func (s *LiteSVM) SetEpochRewards(e *sysvar.EpochRewards) error
+```
+
+`total_points` is a `u128` on the Solana side and is exposed as a
+`bin.Uint128` (from `github.com/gagliardetto/binary`) with `Lo` and `Hi` halves.
+
+## Slot Information
+
+### LastRestartSlot / SetLastRestartSlot
+
+```go
+type LastRestartSlot struct {
+    LastRestartSlot uint64
+}
+
+func (s *LiteSVM) LastRestartSlot() (*sysvar.LastRestartSlot, error)
+func (s *LiteSVM) SetLastRestartSlot(l *sysvar.LastRestartSlot) error
+```
+
+```go
+last, err := svm.LastRestartSlot()
+if err != nil {
+    t.Fatal(err)
+}
+if err := svm.SetLastRestartSlot(&sysvar.LastRestartSlot{LastRestartSlot: last.LastRestartSlot + 1}); err != nil {
+    t.Fatal(err)
+}
+```
+
+### SlotHashes / SetSlotHashes
+
+```go
+type SlotHash struct {
+    Slot uint64
+    Hash solana.Hash
+}
+
+type SlotHashes []SlotHash
+
+func (s *LiteSVM) SlotHashes() (sysvar.SlotHashes, error)
+func (s *LiteSVM) SetSlotHashes(items sysvar.SlotHashes) error
+```
+
+### SlotHistory
+
+`SlotHistory` is a ~128 KB bitvec. `sysvar.SlotHistory` is a plain Go value, so
+there is nothing to close.
+
+```go
+sh := sysvar.NewSlotHistory()
+
+sh.Add(42)
+
+switch sh.Check(42) {
+case sysvar.SlotHistoryFound:
+    // ...
+case sysvar.SlotHistoryNotFound:
+    // ...
+case sysvar.SlotHistoryTooOld:
+    // ...
+case sysvar.SlotHistoryFuture:
+    // ...
+}
+
+if err := svm.SetSlotHistory(sh); err != nil {
+    t.Fatal(err)
+}
+```
+
+| Method                                           | Description                                |
+| ------------------------------------------------ | ------------------------------------------ |
+| `sysvar.NewSlotHistory() *sysvar.SlotHistory`    | New slot history                           |
+| `sh.Add(slot uint64)`                            | Record a slot                              |
+| `sh.Check(slot uint64) SlotHistoryCheck`         | `Future` / `TooOld` / `Found` / `NotFound` |
+| `sh.Oldest() uint64`                             | Oldest slot tracked                        |
+| `sh.Newest() uint64`                             | Newest slot tracked                        |
+| `sh.NextSlot`                                    | Field: next slot to record                 |
+| `svm.SlotHistory() (*sysvar.SlotHistory, error)` | Read the sysvar                            |
+| `svm.SetSlotHistory(*sysvar.SlotHistory) error`  | Install on the SVM                         |
+
+## Stake History
+
+```go
+type StakeHistoryEntry struct {
+    Effective    uint64
+    Activating   uint64
+    Deactivating uint64
+}
+
+type StakeHistoryItem struct {
+    Epoch uint64
+    Entry StakeHistoryEntry
+}
+
+type StakeHistory []StakeHistoryItem
+
+func (s *LiteSVM) StakeHistory() (sysvar.StakeHistory, error)
+func (s *LiteSVM) SetStakeHistory(items sysvar.StakeHistory) error
+```
+
+## Testing Time-Dependent Logic
+
+Use `WarpToSlot` for plain slot-based advancement, `SetClock` for full control:
+
+```go
+func TestTimeLockedVault(t *testing.T) {
+    svm, err := litesvm.New()
+    if err != nil {
+        t.Fatal(err)
+    }
+    defer svm.Close()
+
+    const unlockSlot = uint64(10_000)
+
+    // Setup: create the time-locked account ...
+
+    // Test 1: Try to withdraw before unlock (should fail)
+    before, err := svm.Clock()
+    if err != nil {
+        t.Fatal(err)
+    }
+    t.Logf("current slot: %d", before.Slot)
+    // ... attempt withdrawal, expect failure ...
+
+    // Warp time forward past unlock slot
+    if err := svm.WarpToSlot(unlockSlot + 1); err != nil {
+        t.Fatal(err)
+    }
+
+    // Test 2: Try to withdraw after unlock (should succeed)
+    after, err := svm.Clock()
+    if err != nil {
+        t.Fatal(err)
+    }
+    t.Logf("new slot: %d", after.Slot)
+    // ... attempt withdrawal, expect success ...
+}
+```

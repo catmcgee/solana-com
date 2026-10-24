@@ -1,0 +1,146 @@
+---
+title: Close Subscription Authority
+sidebarTitle: "Close subscription authority"
+description: Guide for closing a user's Subscription Authority account.
+---
+
+A Subscription Authority is the PDA that the program uses as the SPL Token
+delegate for a user's token account. Close it when the user no longer has active
+fixed delegations, recurring delegations, or subscription delegations for that
+mint.
+
+Closing returns the account's rent to its funder (the user, or whichever payer
+funded it). Close any active delegations first.
+
+Closing does **not** clear the SPL Token delegate approval. Once the PDA is gone
+the approval is inert, but it stays on the token account until revoked — see
+[Revoke The Delegate Approval](#revoke-the-delegate-approval).
+
+## Close The Authority
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```ts
+    import { address, createClient } from '@solana/kit';
+    import { solanaLocalRpc } from '@solana/kit-plugin-rpc';
+    import { signer } from '@solana/kit-plugin-signer';
+    import {
+      findSubscriptionAuthorityPda,
+      subscriptionsProgram,
+    } from '@solana/subscriptions';
+
+    const client = createClient()
+      .use(signer(userSigner))
+      .use(solanaLocalRpc({ rpcUrl: 'http://127.0.0.1:8899' }))
+      .use(subscriptionsProgram());
+
+    const tokenMint = address('TOKEN_MINT_ADDRESS_HERE');
+    const [subscriptionAuthorityPda] = await findSubscriptionAuthorityPda({
+      user: userSigner.address,
+      tokenMint,
+    });
+
+    await client.subscriptions.instructions
+      .closeSubscriptionAuthority({
+        user: userSigner,
+        tokenMint,
+        // Include this only when a sponsor funded the Subscription Authority.
+        receiver: sponsorSigner.address,
+      })
+      .sendTransaction();
+    ```
+
+  </Tab>
+
+  <Tab title="Rust">
+    ```rust
+    use solana_address::{address, Address};
+    use solana_instruction::AccountMeta;
+    use subscriptions::{generated::instructions::*, SUBSCRIPTIONS_ID};
+
+    let user: Address = address!("USER_WALLET_ADDRESS_HERE");
+    let token_mint: Address = address!("TOKEN_MINT_ADDRESS_HERE");
+    let rent_receiver: Address = address!("ACCOUNT_THAT_FUNDED_RENT_HERE");
+
+    let (subscription_authority, _) = Address::find_program_address(
+        &[b"SubscriptionAuthority", user.as_ref(), token_mint.as_ref()],
+        &SUBSCRIPTIONS_ID,
+    );
+
+    let close_ix = CloseSubscriptionAuthorityBuilder::new()
+        .user(user)
+        .subscription_authority(subscription_authority)
+        // Include this only when a sponsor funded the Subscription Authority.
+        .add_remaining_account(AccountMeta::new(rent_receiver, false))
+        .instruction();
+    ```
+
+  </Tab>
+</Tabs>
+
+## Revoke The Delegate Approval
+
+`RevokeSubscriptionAuthority` clears the leftover delegate approval from the
+user's token account. It calls the token program's `Revoke`, signed by the user,
+so it works whether or not the Subscription Authority still exists. Send it
+standalone or alongside `CloseSubscriptionAuthority`.
+
+Pass the token program that owns the mint: `TOKEN_PROGRAM_ADDRESS` for SPL Token
+mints, or `TOKEN_2022_PROGRAM_ADDRESS` (from `@solana-program/token-2022`) for
+Token-2022 mints.
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```ts
+    import { TOKEN_PROGRAM_ADDRESS } from '@solana-program/token';
+
+    await client.subscriptions.instructions
+      .revokeSubscriptionAuthority({
+        user: userSigner,
+        tokenMint,
+        tokenProgram: TOKEN_PROGRAM_ADDRESS,
+      })
+      .sendTransaction();
+    ```
+
+  </Tab>
+
+  <Tab title="Rust">
+    ```rust
+    use solana_address::{address, Address};
+    use subscriptions::{generated::instructions::*, SUBSCRIPTIONS_ID};
+
+    const TOKEN_PROGRAM_ID: Address = address!("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
+
+    let user: Address = address!("USER_WALLET_ADDRESS_HERE");
+    let user_ata: Address = address!("USER_TOKEN_ACCOUNT_ADDRESS_HERE");
+    let token_mint: Address = address!("TOKEN_MINT_ADDRESS_HERE");
+
+    let (subscription_authority, _) = Address::find_program_address(
+        &[b"SubscriptionAuthority", user.as_ref(), token_mint.as_ref()],
+        &SUBSCRIPTIONS_ID,
+    );
+
+    let revoke_ix = RevokeSubscriptionAuthorityBuilder::new()
+        .user(user)
+        .user_ata(user_ata)
+        .token_mint(token_mint)
+        .token_program(TOKEN_PROGRAM_ID)
+        .subscription_authority(subscription_authority)
+        .instruction();
+    ```
+
+  </Tab>
+</Tabs>
+
+## Notes
+
+- The user signs the close transaction.
+- If a sponsor funded the Subscription Authority, pass that sponsor account as
+  `receiver` so rent returns to the recorded payer.
+- Close fixed, recurring, and subscription delegation PDAs before closing the
+  Subscription Authority.
+- If the user creates a new delegation later, initialize a new Subscription
+  Authority for the same mint.
+- Closing does not clear the token delegate approval. Use
+  `RevokeSubscriptionAuthority` to remove it from the user's token account.

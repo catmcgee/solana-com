@@ -1,0 +1,204 @@
+---
+title: Interacting with Solana
+description: Connect to the network and explore blockchain data
+---
+
+This page covers connecting to Solana and the RPC methods payments use, with
+`@solana/kit` and the Solana CLI, plus using an explorer to verify payments and
+debug issues.
+
+## Connecting to Solana
+
+Your code talks to the network through an RPC endpoint.
+
+<Danger>
+  **Do not use public RPC for production**
+
+  The public endpoints (`api.mainnet.solana.com`, `api.devnet.solana.com`) are
+  rate-limited and have no SLA. Use an [RPC provider](/developers/docs/rpc/providers)
+  in production.
+</Danger>
+
+Create an RPC client:
+
+<CodeGroup>
+
+```ts Kit
+import { createSolanaRpc, createSolanaRpcSubscriptions } from "@solana/kit";
+
+const rpc = createSolanaRpc("https://api.mainnet.solana.com");
+const rpcSubscriptions = createSolanaRpcSubscriptions(
+  "wss://api.mainnet.solana.com"
+);
+```
+
+```bash CLI
+solana config set --url https://api.mainnet.solana.com
+solana config get # to verify the connection
+```
+
+</CodeGroup>
+
+<Note>
+  For development, use devnet (`https://api.devnet.solana.com`) or a local
+  validator like [Surfpool](/developers/docs/intro/installation/surfpool-cli-basics).
+</Note>
+
+## Common RPC Methods
+
+These are the [RPC methods](/developers/docs/rpc) payment flows use most.
+
+### Getting Account Info
+
+[`getAccountInfo`](/developers/docs/rpc/http/getaccountinfo) returns any account's SOL
+balance, owner, data, and other metadata. Its `data` field is a
+`[base64String, "base64"]` tuple: convert the string to bytes with
+`getBase64Codec`, then decode them with the account's codec, such as
+`getTokenCodec` for token accounts.
+
+<CodeGroup>
+
+```ts Kit
+const accountInfo = await rpc
+  .getAccountInfo(address("7v45FoihixmfocS3LbANUrEGZQKEJ7QQUg8K9jtZd3St"), {
+    encoding: "base64"
+  })
+  .send();
+
+// `value` is null when the account does not exist
+if (!accountInfo.value) throw new Error("Account not found");
+
+// `data` is a `[base64String, "base64"]` tuple
+const dataBytes = getBase64Codec().encode(accountInfo.value.data[0]);
+const parsedTokenData = getTokenCodec().decode(dataBytes);
+
+console.log(parsedTokenData);
+```
+
+```bash CLI
+solana account 7v45FoihixmfocS3LbANUrEGZQKEJ7QQUg8K9jtZd3St
+```
+
+</CodeGroup>
+
+### Getting Token Balances
+
+[`getTokenAccountBalance`](/developers/docs/rpc/http/gettokenaccountbalance) returns a
+token account's balance:
+
+<CodeGroup>
+
+```ts Kit
+const balance = await rpc.getTokenAccountBalance(tokenAccountAddress).send();
+
+console.log(balance.value.uiAmount); // Human-readable (e.g., 100.50)
+console.log(balance.value.amount); // Base units (e.g., "100500000")
+```
+
+```bash CLI
+spl-token balance --address 7v45FoihixmfocS3LbANUrEGZQKEJ7QQUg8K9jtZd3St
+```
+
+</CodeGroup>
+
+### Building Transactions
+
+Every transaction needs a recent blockhash. Fetch one with
+[`getLatestBlockhash`](/developers/docs/rpc/http/getlatestblockhash):
+
+<CodeGroup>
+
+```ts Kit
+const { value: latestBlockhash } = await rpc.getLatestBlockhash().send();
+```
+
+```bash CLI
+curl https://api.mainnet.solana.com -X POST -H "Content-Type: application/json" -d '
+  {"jsonrpc":"2.0","id":1,"method":"getLatestBlockhash","params":[{"commitment":"finalized"}]}
+'
+```
+
+</CodeGroup>
+
+> A blockhash expires after 150 blocks, about 30 seconds at 200ms slots. Fetch a fresh one immediately before
+> signing and sending.
+
+### Checking Transaction Status
+
+Check that a transaction settled with
+[`getSignatureStatuses`](/developers/docs/rpc/http/getsignaturestatuses):
+
+<CodeGroup>
+
+```ts Kit
+const status = await rpc.getSignatureStatuses([signature]).send();
+
+const result = status.value[0];
+// result.confirmationStatus: "processed" | "confirmed" | "finalized"
+```
+
+```bash CLI
+solana confirm <SIGNATURE>
+# For more details:
+solana confirm <SIGNATURE> -v
+```
+
+</CodeGroup>
+
+### Getting Transaction Details
+
+Fetch a confirmed transaction's details with
+[`getTransaction`](/developers/docs/rpc/http/gettransaction):
+
+<CodeGroup>
+
+```ts Kit
+const transaction = await rpc
+  .getTransaction(signature, {
+    encoding: "json",
+    maxSupportedTransactionVersion: 1
+  })
+  .send();
+```
+
+```bash CLI
+solana transaction-history <ADDRESS> --limit 1 -v
+# Or decode a specific transaction:
+solana confirm <SIGNATURE> -v
+```
+
+</CodeGroup>
+
+### Transaction History
+
+List an address's recent transactions with
+[`getSignaturesForAddress`](/developers/docs/rpc/http/getsignaturesforaddress):
+
+<CodeGroup>
+
+```ts Kit
+const signatures = await rpc
+  .getSignaturesForAddress(walletAddress, { limit: 10 })
+  .send();
+```
+
+```bash CLI
+solana transaction-history <ADDRESS> --limit 10
+```
+
+</CodeGroup>
+
+> For webhooks and real-time payment detection, see
+> [Accept payments](/developers/docs/payments/accept-payments).
+
+## Exploring Public Data
+
+Every transaction, token account, and mint is public. A block explorer, such as
+Solana Explorer, SolanaFM, Solscan, or Orb, lets you verify a payment, inspect
+balances, debug failed transactions, and look up a mint's supply, decimals, and
+authority without writing code. For example:
+
+- [The USDC mint](https://explorer.solana.com/address/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v):
+  supply, holders, and transactions
+- [A USDC transfer](https://explorer.solana.com/tx/3d2mQChCbqM5iogAN5PZw7KGZuVtQq3LbwU8hk55u4iUvYH1XJ7SQVQpWwoZj43MtthBqGBoqGBe9fn4Bo1VznjG):
+  the details of one payment

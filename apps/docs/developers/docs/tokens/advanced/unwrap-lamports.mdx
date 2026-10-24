@@ -1,0 +1,77 @@
+---
+title: Unwrap Lamports
+sidebarTitle: "Unwrap lamports"
+description:
+  Convert wrapped SOL back into lamports, fully or partially, without closing
+  the token account.
+type: reference
+related:
+  - /developers/docs/tokens/advanced/withdraw-excess-lamports
+  - /developers/docs/tokens/advanced/cpi
+---
+
+## What Does Unwrap Lamports Do?
+
+`UnwrapLamports` moves SOL out of a native (wrapped SOL) token account into
+a destination account as lamports. You can unwrap the full balance or a specific
+amount, and the token account stays open.
+
+This is more flexible than closing a wrapped SOL account: a partial unwrap lets
+you withdraw some SOL while keeping the account funded for later use.
+
+### Source Reference
+
+| Item                      | Description                         | Source                                                                                                         |
+| ------------------------- | ----------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `UnwrapLamports`          | The instruction (discriminator 45). | [Source](https://github.com/solana-program/token/blob/main/pinocchio/interface/src/instruction.rs)             |
+| `process_unwrap_lamports` | Processor logic.                    | [Source](https://github.com/solana-program/token/blob/main/pinocchio/program/src/processor/unwrap_lamports.rs) |
+
+## Accounts
+
+| Account       | Description                                                 |
+| ------------- | ----------------------------------------------------------- |
+| `source`      | Writable. The native (wrapped SOL) token account to unwrap. |
+| `destination` | Writable. Receives the unwrapped lamports.                  |
+| `authority`   | The account owner or a delegate (or multisig signers).      |
+
+<Warning>
+
+The source must be a native token account; other token accounts return
+`NonNativeNotSupported`. A delegate can unwrap up to its delegated amount.
+
+</Warning>
+
+## How to Unwrap Lamports
+
+Omit `amount` to unwrap the full balance, or set it to unwrap a specific
+number of lamports. The example uses a configured
+[`@solana/kit`](/developers/docs/clients/official/javascript#solana-kit) client — see
+[Transfer Tokens](/developers/docs/tokens/basics/transfer-tokens) for client setup.
+
+```ts title="Unwrap wrapped SOL (Kit)"
+import { getUnwrapLamportsInstruction } from "@solana-program/token";
+
+// source: the native (wrapped SOL) token account to unwrap.
+// destination: address that receives the unwrapped lamports.
+// authority: a TransactionSigner (the account owner or a delegate).
+
+// Unwrap a specific number of lamports.
+const unwrapSome = getUnwrapLamportsInstruction({
+  source,
+  destination,
+  authority,
+  amount: 500_000_000n
+});
+
+// Or omit `amount` to unwrap the entire balance.
+const unwrapAll = getUnwrapLamportsInstruction({
+  source,
+  destination,
+  authority
+});
+
+// Send whichever instruction you need.
+await client.sendTransaction([unwrapSome]);
+```
+
+For a multisig authority, pass the co-signers with `multiSigners`.

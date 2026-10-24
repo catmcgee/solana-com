@@ -1,0 +1,225 @@
+---
+title: logsSubscribe
+description: Subscribe to transaction log messages that match a log filter.
+type: reference
+---
+
+<Info>
+  **Source**
+
+  [`logs_subscribe`](https://github.com/anza-xyz/agave/blob/v3.1.8/rpc/src/rpc_pubsub.rs#L482)
+</Info>
+
+<RequestExample>
+  ```json WebSocket
+  {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "logsSubscribe",
+    "params": [
+      {
+        "mentions": ["11111111111111111111111111111111"]
+      },
+      {
+        "commitment": "finalized"
+      }
+    ]
+  }
+  ```
+
+  ```ts Kit
+  import { createSolanaRpcSubscriptions } from "@solana/kit";
+
+  const rpc = createSolanaRpcSubscriptions("wss://api.devnet.solana.com");
+
+  const subscription = await rpc
+    .logsNotifications(
+      { mentions: ["11111111111111111111111111111111"] },
+      { commitment: "confirmed" }
+    )
+    .subscribe({ abortSignal: AbortSignal.timeout(50_000) });
+
+  for await (const notification of subscription) {
+    console.log(notification);
+  }
+  ```
+
+  ```ts web3.js
+  import { Connection, PublicKey, clusterApiUrl } from "@solana/web3.js";
+
+  const connection = new Connection(clusterApiUrl("devnet"), "confirmed");
+
+  const subscriptionId = connection.onLogs(
+    new PublicKey("11111111111111111111111111111111"),
+    (logs, context) => {
+      console.log("Logs:", logs);
+      console.log("Context:", context);
+    },
+    "finalized"
+  );
+  ```
+
+  ```rs Rust
+  use anyhow::Result;
+  use futures::StreamExt;
+  use solana_client::{
+      nonblocking::pubsub_client::PubsubClient,
+      rpc_config::{RpcTransactionLogsConfig, RpcTransactionLogsFilter},
+  };
+  use solana_commitment_config::CommitmentConfig;
+
+  #[tokio::main]
+  async fn main() -> Result<()> {
+      let pubsub_client = PubsubClient::new("wss://api.devnet.solana.com/").await?;
+
+      let filter = RpcTransactionLogsFilter::Mentions(vec![
+          "11111111111111111111111111111111".to_string(),
+      ]);
+
+      let config = RpcTransactionLogsConfig {
+          commitment: Some(CommitmentConfig::finalized()),
+      };
+
+      let (mut notifications, unsubscribe) = pubsub_client
+          .logs_subscribe(filter, config)
+          .await?;
+
+      while let Some(notification) = notifications.next().await {
+          println!("{:?}", notification);
+      }
+
+      unsubscribe().await;
+
+      Ok(())
+  }
+  ```
+</RequestExample>
+
+<ResponseExample>
+  ```json Response
+  {
+    "jsonrpc": "2.0",
+    "result": 24040,
+    "id": 1
+  }
+  ```
+</ResponseExample>
+
+### Parameters
+
+<ParamField body="filter" type="string | object" required>
+  Filter describing which transactions should emit log notifications.
+
+  - `all` subscribes to all transactions except simple vote transactions
+  - `allWithVotes` subscribes to all transactions, including simple vote
+    transactions
+  - `{ "mentions": [<pubkey>] }` subscribes to transactions that mention a single
+    base-58 encoded address
+
+  <Warning>
+    The `mentions` filter currently supports exactly one address. Listing more
+    than one returns an `Invalid params` error.
+  </Warning>
+</ParamField>
+
+<ParamField body="config" type="object">
+  Optional configuration object.
+
+  <Expandable title="properties" defaultOpen>
+    <ParamField body="commitment" type="string" default="finalized">
+      Values: `processed`, `confirmed`, `finalized`
+
+      The commitment describes how finalized a block is at that point in time. See
+      [Configuring State Commitment](/developers/docs/rpc#configuring-state-commitment).
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+### Result
+
+<ResponseField name="result" type="integer">
+  Subscription id. Pass this to
+  [logsUnsubscribe](/developers/docs/rpc/websocket/logsunsubscribe).
+</ResponseField>
+
+### Notification format
+
+Notifications are delivered as `logsNotification`.
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "logsNotification",
+  "params": {
+    "result": {
+      "context": {
+        "slot": 3557
+      },
+      "value": {
+        "signature": "67Viive4HpLJRPuYggAu3cbxZeQra5Y58oh4AmGc1YRXgQHevSwFbyxhBeDXw6rTCmUtHyCY7BjeHiHvhC9tud9U",
+        "err": null,
+        "logs": [
+          "Program 11111111111111111111111111111111 invoke [1]",
+          "Program 11111111111111111111111111111111 success"
+        ]
+      }
+    },
+    "subscription": 14
+  }
+}
+```
+
+<ResponseField name="jsonrpc" type="string">
+  Always `"2.0"`.
+</ResponseField>
+
+<ResponseField name="method" type="string">
+  Always `"logsNotification"`.
+</ResponseField>
+
+<ResponseField name="params" type="object">
+  Notification wrapper with the logs payload and the subscription id.
+
+  <Expandable title="properties" defaultOpen>
+    <ResponseField name="result" type="object">
+      Notification result object with `context` and `value`. For PubSub notifications,
+      `context` includes `slot` and omits `apiVersion`.
+
+      <Expandable title="properties">
+        <ResponseField name="context" type="object">
+          Context for the bank slot that produced this notification.
+
+          <Expandable title="properties">
+            <ResponseField name="slot" type="u64">
+              Slot associated with the notification.
+            </ResponseField>
+          </Expandable>
+        </ResponseField>
+
+        <ResponseField name="value" type="object">
+          Logs emitted by the matching transaction.
+
+          <Expandable title="properties">
+            <ResponseField name="signature" type="string">
+              Transaction signature, as a base-58 encoded string.
+            </ResponseField>
+
+            <ResponseField name="err" type="object | null">
+              Transaction error for the matching transaction, or `null` on success. Uses the
+              same structure documented in
+              [Transaction Errors](/developers/docs/rpc/json-structures#transaction-errors).
+            </ResponseField>
+
+            <ResponseField name="logs" type="array[string]">
+              Program log messages emitted during instruction execution.
+            </ResponseField>
+          </Expandable>
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+
+    <ResponseField name="subscription" type="integer">
+      Subscription id that produced this notification.
+    </ResponseField>
+  </Expandable>
+</ResponseField>

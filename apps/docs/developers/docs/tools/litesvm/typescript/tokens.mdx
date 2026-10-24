@@ -1,0 +1,167 @@
+---
+title: Token Testing
+description: Test with SPL tokens using @solana-program/token and LiteSVM
+---
+
+Testing token logic on Solana means setting up mints, token accounts, and
+authorities before you can test the transfer logic you actually care about. The
+`tokenProgram()` plugin from `@solana-program/token` collapses that setup to a
+few method calls — and handles ATA creation automatically.
+
+[View `@solana-program/token` on npm](https://www.npmjs.com/package/@solana-program/token)
+
+## Installation
+
+```bash
+npm install @solana/kit @solana/kit-plugin-litesvm @solana/kit-plugin-signer @solana-program/token
+```
+
+## Create a Mint
+
+```typescript
+import { createClient, generateKeyPairSigner, lamports } from "@solana/kit";
+import { litesvm } from "@solana/kit-plugin-litesvm";
+import { signer } from "@solana/kit-plugin-signer";
+import { tokenProgram } from "@solana-program/token";
+
+const mySigner = await generateKeyPairSigner();
+const client = createClient()
+  .use(signer(mySigner))
+  .use(litesvm())
+  .use(tokenProgram());
+
+client.svm.airdrop(client.payer.address, lamports(10_000_000_000n));
+
+const mintAuthority = await generateKeyPairSigner();
+const newMint = await generateKeyPairSigner();
+
+await client.token.instructions
+  .createMint({
+    newMint,
+    decimals: 9,
+    mintAuthority: mintAuthority.address
+  })
+  .sendTransaction();
+
+// Verify
+const mintAccount = await client.token.accounts.mint.fetch(newMint.address);
+console.log(mintAccount.data.supply); // 0n
+console.log(mintAccount.data.decimals); // 9
+```
+
+## Mint Tokens
+
+`mintToATA` issues tokens to an owner's Associated Token Account. If the ATA
+doesn't exist, it's created in the same transaction.
+
+```typescript
+await client.token.instructions
+  .mintToATA({
+    mint: newMint.address,
+    owner: client.payer.address,
+    mintAuthority,
+    amount: 1_000_000_000_000n, // 1000 tokens (9 decimals)
+    decimals: 9
+  })
+  .sendTransaction();
+```
+
+The `decimals` parameter is a safety check — it must match the mint's decimals
+exactly, or the Token program rejects the transaction with `Custom program error: #18` (`0x12`,
+`MintDecimalsMismatch`). This
+prevents accidentally minting 1000x too many tokens.
+
+## Transfer Tokens
+
+`transferToATA` moves tokens between users. The recipient's ATA is created
+automatically if needed.
+
+```typescript
+const alice = await generateKeyPairSigner();
+const bob = await generateKeyPairSigner();
+
+// Mint to Alice
+await client.token.instructions
+  .mintToATA({
+    mint: newMint.address,
+    owner: alice.address,
+    mintAuthority,
+    amount: 1_000_000_000_000n,
+    decimals: 9
+  })
+  .sendTransaction();
+
+// Transfer 400 tokens from Alice to Bob
+await client.token.instructions
+  .transferToATA({
+    mint: newMint.address,
+    authority: alice,
+    recipient: bob.address,
+    amount: 400_000_000_000n,
+    decimals: 9
+  })
+  .sendTransaction();
+```
+
+The `authority` is the signer who owns the source tokens. The plugin derives
+both source and destination ATAs from their addresses + the mint.
+
+## Verifying Balances
+
+To read back token balances, derive the ATA address with
+`findAssociatedTokenPda` and fetch the decoded account:
+
+```typescript
+import {
+  findAssociatedTokenPda,
+  TOKEN_PROGRAM_ADDRESS
+} from "@solana-program/token";
+
+const [aliceAta] = await findAssociatedTokenPda({
+  owner: alice.address,
+  mint: newMint.address,
+  tokenProgram: TOKEN_PROGRAM_ADDRESS
+});
+
+const aliceAccount = await client.token.accounts.token.fetch(aliceAta);
+console.log(aliceAccount.data.amount); // 600_000_000_000n
+console.log(aliceAccount.data.mint); // newMint.address
+console.log(aliceAccount.data.owner); // alice.address
+```
+
+## Decimals
+
+Token amounts are always in raw units. 1000 tokens with 9 decimals is
+`1_000_000_000_000n`, not `1000n`.
+
+```typescript
+// USDC has 6 decimals
+const oneUSDC = 10n ** 6n; // 1_000_000n
+
+// SOL has 9 decimals
+const oneSOL = 10n ** 9n; // 1_000_000_000n
+```
+
+<Warning>
+  Always use `BigInt` for token amounts. JavaScript's `Number` loses precision
+  above 2^53.
+</Warning>
+
+## Plugin Reference
+
+| Method                                      | Description                                                  |
+| ------------------------------------------- | ------------------------------------------------------------ |
+| `client.token.instructions.createMint()`    | Create a new SPL token mint                                  |
+| `client.token.instructions.mintToATA()`     | Mint tokens to an owner's ATA (creates ATA if needed)        |
+| `client.token.instructions.transferToATA()` | Transfer tokens to a recipient's ATA (creates ATA if needed) |
+| `client.token.accounts.mint.fetch()`        | Fetch and decode a mint account                              |
+| `client.token.accounts.token.fetch()`       | Fetch and decode a token account                             |
+
+## Common Errors
+
+| Error                                                               | Cause                             | Fix                                                    |
+| ------------------------------------------------------------------- | --------------------------------- | ------------------------------------------------------ |
+| `Custom program error: #18` (`0x12`, `MintDecimalsMismatch`)        | `decimals` doesn't match the mint | Use the same decimals value you passed to `createMint` |
+| `Account not found at address: ...`                                 | Account doesn't exist yet         | Ensure the mint is created before fetching or minting  |
+| `Attempt to debit an account but found no record of a prior credit` | The payer has no SOL to pay fees  | Airdrop SOL to the payer first                         |
+| `Custom program error: #4` (`OwnerMismatch`)                       | The signing `authority` is not the owner of the source token account | Pass the real owner as `authority`     |

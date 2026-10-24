@@ -1,0 +1,152 @@
+---
+title: getBlocks
+description: >-
+  Returns confirmed block slots in the inclusive range starting at startSlot and
+  ending at endSlot, if provided.
+type: reference
+---
+
+<Info>
+  **Source**
+
+  [`get_blocks`](https://github.com/anza-xyz/agave/blob/v3.1.8/rpc/src/rpc.rs#L1404)
+</Info>
+
+<RequestExample>
+  ```bash cURL
+  curl https://api.devnet.solana.com -s -X POST \
+    -H "Content-Type: application/json" \
+    -d '
+    {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "getBlocks",
+      "params": [
+        377268280,
+        377268285,
+        {
+          "commitment": "finalized"
+        }
+      ]
+    }
+  '
+  ```
+
+  ```ts Kit
+  import { createSolanaRpc } from "@solana/kit";
+
+  const rpc_url = "https://api.devnet.solana.com";
+  const rpc = createSolanaRpc(rpc_url);
+
+  let startSlot = BigInt(377268280);
+  let endSlot = BigInt(377268285);
+  let blocks = await rpc.getBlocks(startSlot, endSlot).send();
+
+  console.log("Blocks produced:", blocks);
+  ```
+
+  ```ts web3.js
+  import { Connection, clusterApiUrl } from "@solana/web3.js";
+
+  const connection = new Connection(clusterApiUrl("devnet"), "confirmed");
+
+  let startSlot = 377268280;
+  let endSlot = 377268285;
+  let blocks = await connection.getBlocks(startSlot, endSlot);
+
+  console.log("Blocks produced:", blocks);
+  ```
+
+  ```rs Rust
+  use anyhow::Result;
+  use solana_client::nonblocking::rpc_client::RpcClient;
+  use solana_commitment_config::CommitmentConfig;
+
+  #[tokio::main]
+  async fn main() -> Result<()> {
+      let client = RpcClient::new_with_commitment(
+          String::from("https://api.devnet.solana.com"),
+          CommitmentConfig::confirmed(),
+      );
+
+      let start_slot = 377268280;
+      let end_slot = 377268285;
+      let blocks = client.get_blocks(start_slot, Some(end_slot)).await?;
+
+      println!("Blocks produced: {:#?}", blocks);
+
+      Ok(())
+  }
+  ```
+</RequestExample>
+
+<ResponseExample>
+  ```json Response
+  {
+    "jsonrpc": "2.0",
+    "result": [5, 6, 7, 8, 9, 10],
+    "id": 1
+  }
+  ```
+</ResponseExample>
+
+## Parameters
+
+<ParamField body="start slot" type="u64" required>
+  Start slot
+</ParamField>
+
+<ParamField body="end slot" type="u64 | object">
+  Inclusive end slot. For backwards compatibility, this parameter position may
+  also be used for a configuration object.
+
+  - If this parameter is a number, it is the inclusive end slot and must be no
+    more than 500,000 slots higher than `start slot`.
+  - If this parameter is an object, it has the same shape as `config` and the
+    request omits `end slot`.
+
+  When this parameter is an object, it contains:
+
+  | Field            | Type     | Description                                                                                                    |
+  | ---------------- | -------- | -------------------------------------------------------------------------------------------------------------- |
+  | `commitment`     | `string` | Commitment level used to select which slot the node reads from for this request. `processed` is not supported. |
+  | `minContextSlot` | `number` | Minimum slot at which the request may be evaluated.                                                            |
+</ParamField>
+
+<ParamField body="config" type="object">
+  Configuration object. This parameter is only used when `end slot` is provided as
+  a number.
+
+  <Expandable title="properties" defaultOpen>
+    <ParamField body="commitment" type="string" default="finalized">
+      Values: `confirmed`, `finalized`
+
+      Solana RPC uses the following commitment levels:
+
+      | Value       | Description                                                                                                                                                                               |
+      | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+      | `processed` | Return data from the highest slot this node has processed. This is the newest view, but the block can still be skipped.                                                                   |
+      | `confirmed` | Return data from the same slot as `finalized`. Kept for compatibility and planned for removal in a later release.                                                                         |
+      | `finalized` | Return data from the highest slot with a finalization certificate, from votes by 80% of stake in one round or 60% of stake in each of two rounds. This is the strongest commitment level. |
+
+      This method does not accept `processed`.
+    </ParamField>
+
+    <ParamField body="minContextSlot" type="number">
+      The minimum slot that the request can be evaluated at.
+
+      ```json Example
+      { "minContextSlot": 341197000 }
+      ```
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Result
+
+<ResponseField name="result" type="array">
+  An array of u64 integers listing confirmed blocks between `start_slot` and
+  either `end_slot` - if provided, or the highest slot available at the requested
+  commitment, inclusive. Max range allowed is 500,000 slots. If `end_slot` is
+  lower than `start_slot`, the result is an empty array.
+</ResponseField>

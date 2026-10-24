@@ -1,0 +1,165 @@
+---
+title: Kit client
+description:
+  Build a Solana client from Kit plugins for RPC, signing, and sending
+  transactions.
+---
+
+`@solana/kit` ships `createClient`, a small host you extend with plugins. Each
+plugin adds a capability — an RPC connection, a signer, transaction planning —
+and the composed client backs scripts, server routes, and UIs alike.
+
+<Info>
+  Building a React app? The [React guide](/developers/docs/frontend/react-hooks) wraps this
+  same client with `@solana/react` so components read wallet state and RPC data
+  through hooks. Start there and drop back here when you need finer control.
+</Info>
+
+## Install
+
+```bash Terminal
+npm install @solana/kit @solana/kit-plugin-rpc @solana/kit-plugin-signer
+```
+
+Use any package manager. Kit is v7+ and the `@solana/kit-plugin-*` packages are
+0.13+.
+
+## Create a client
+
+Compose plugins with `.use(...)`. Set a signer first, then the RPC connection.
+`solanaDevnetRpc()` adds `client.rpc`, subscriptions, the transaction
+planner/executor, and the `client.sendTransaction` helper — so an app rarely
+needs to wire those pieces itself.
+
+```ts
+import { createClient, generateKeyPairSigner } from "@solana/kit";
+import { solanaDevnetRpc } from "@solana/kit-plugin-rpc";
+import { signer } from "@solana/kit-plugin-signer";
+
+const payer = await generateKeyPairSigner();
+
+const client = createClient().use(signer(payer)).use(solanaDevnetRpc());
+
+const slot = await client.rpc.getSlot().send();
+console.log("current slot", slot);
+```
+
+The `signer` plugin sets both the fee payer and the app identity. The RPC bundle
+requires a payer to be in place first, which is why the order matters.
+
+### Signer variants
+
+`@solana/kit-plugin-signer` exposes three roles so you only grant what a client
+needs:
+
+- `signer(x)` — sets both `client.payer` and `client.identity`.
+- `payer(x)` — fee payer only.
+- `identity(x)` — app authority only.
+
+Each has `*FromFile(path)` (Node), `generated*()`, `generated*WithSol(amount)`,
+and `airdrop*()` variants for tests and scripts.
+
+## Send a transaction
+
+Build instructions with a generated program client, then hand them to
+`client.sendTransaction`. The planner resolves the blockhash, estimates compute,
+signs with the client's payer, and submits.
+
+```ts
+import { getTransferSolInstruction } from "@solana-program/system";
+import { address, lamports } from "@solana/kit";
+
+const transfer = getTransferSolInstruction({
+  source: client.payer,
+  destination: address("GDDMwNyyx8uB6zrqwBFHjLLG3TBYk2F8Az4yrQC5RzMp"), // replace with the recipient
+  amount: lamports(10_000_000n) // 0.01 SOL
+});
+
+const { context } = await client.sendTransaction([transfer]);
+console.log("submitted", context.signature);
+```
+
+`sendTransaction` resolves to a result object; the transaction signature is at
+`result.context.signature`. It asserts the plan fits a single transaction and
+throws otherwise — use `sendTransactions` when a batch may span multiple
+transactions.
+
+## Pick an RPC bundle
+
+`@solana/kit-plugin-rpc` ships cluster presets:
+
+- `solanaDevnetRpc()` — devnet defaults, airdrop enabled (`client.airdrop`).
+- `solanaMainnetRpc({ rpcUrl: "https://..." })` — mainnet; `rpcUrl` is
+  required, and airdrop is a compile-time error.
+- `solanaLocalRpc()` — `http://127.0.0.1:8899` for a local validator.
+- `solanaRpc({ rpcUrl })` — any endpoint.
+
+Only the devnet, testnet, and local presets default their URL; the mainnet
+preset throws if you call it without a config.
+
+```ts
+import { solanaRpc } from "@solana/kit-plugin-rpc";
+
+const client = createClient()
+  .use(signer(payer))
+  .use(solanaRpc({ rpcUrl: "https://your-rpc-provider.example" }));
+```
+
+### Compose granularly
+
+The presets bundle the RPC connection, planner, executor, and send helpers, so
+most apps never need the pieces individually. Drop to the granular plugins only
+to customize one — for example a custom planner or a different subscription
+channel. This path also needs `@solana/kit-plugin-instruction-plan`, which the
+presets otherwise include for you:
+
+```ts
+import {
+  solanaRpcConnection,
+  rpcAirdrop,
+  rpcTransactionPlanner,
+  rpcTransactionPlanExecutor
+} from "@solana/kit-plugin-rpc";
+import { planAndSendTransactions } from "@solana/kit-plugin-instruction-plan";
+
+const client = createClient()
+  .use(signer(payer))
+  .use(solanaRpcConnection({ rpcUrl: "https://api.devnet.solana.com" }))
+  .use(rpcAirdrop())
+  .use(rpcTransactionPlanner())
+  .use(rpcTransactionPlanExecutor())
+  .use(planAndSendTransactions());
+```
+
+## Add program clients
+
+Generated `@solana-program/*` packages expose client plugins so program calls
+hang off the client. Install the program you need and `.use()` its plugin:
+
+```ts
+import { tokenProgram } from "@solana-program/token";
+
+const client = createClient()
+  .use(signer(payer))
+  .use(solanaDevnetRpc())
+  .use(tokenProgram()); // adds client.token
+```
+
+## Signing without a browser wallet
+
+Running headless in an API route, worker, or script? Sign with a backend
+key-management service instead of a raw keypair. See
+[Keychain](/developers/docs/tools/keychain) and
+[Signing in Production](/developers/docs/core/transactions/signing-in-production).
+
+## Common patterns for Solana devs
+
+- **Shared setup**: Build the client once in a core module and import it into
+  scripts, server routes, and your UI.
+- **Server-side reads**: A client with just `signer` + `solanaRpc` (no wallet
+  plugin) reads accounts and simulates transactions from the server.
+- **Local testing**: Swap the RPC bundle for `.use(litesvm())` from
+  `@solana/kit-plugin-litesvm` to run against an in-memory validator (Node
+  only).
+- **Testability**: The composed client is easy to mock — stub RPC responses or
+  signers without a browser wallet present.

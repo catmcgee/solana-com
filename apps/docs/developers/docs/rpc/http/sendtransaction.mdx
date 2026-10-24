@@ -1,0 +1,234 @@
+---
+title: sendTransaction
+description: >-
+  Submits a signed transaction to the cluster and returns its first signature if
+  the RPC accepts it.
+type: reference
+---
+
+<Info>
+  **Source**
+
+  [`send_transaction`](https://github.com/anza-xyz/agave/blob/v3.1.8/rpc/src/rpc.rs#L3796)
+</Info>
+
+This method does not alter the transaction in any way; it relays the transaction
+created by clients to the node as-is.
+
+If the node's rpc service receives the transaction, this method immediately
+succeeds, without waiting for any confirmations. A successful response from this
+method does not guarantee the transaction is processed or confirmed by the
+cluster.
+
+While the rpc service will reasonably retry to submit it, the transaction could
+be rejected if transaction's `recent_blockhash` expires before it lands.
+
+Use [`getSignatureStatuses`](/developers/docs/rpc/http/getsignaturestatuses) to ensure a
+transaction is processed and confirmed.
+
+Before submitting, the following preflight checks are performed:
+
+1. The transaction signatures are verified
+2. The transaction is simulated against the state at the preflight commitment.
+   On failure an error will be returned. Preflight checks may be disabled if
+   desired. It is recommended to specify the same commitment and preflight
+   commitment to avoid confusing behavior.
+
+When preflight simulation fails, the error data uses the same
+[Simulation Results](/developers/docs/rpc/json-structures#simulation-results) structure
+documented for [`simulateTransaction`](/developers/docs/rpc/http/simulatetransaction).
+
+The returned signature is the first signature in the transaction, which is used
+to identify the transaction
+([transaction id](/developers/docs/references/terminology#transaction-id)). This identifier
+can be easily extracted from the transaction data before submission.
+
+<RequestExample>
+  ```bash cURL
+  curl https://api.devnet.solana.com -s -X POST \
+    -H "Content-Type: application/json" \
+    -d '
+    {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "sendTransaction",
+      "params": [
+        "AX9ymHgILTd01GtdBsbQZ9by5D4z4UWh+1Tsh6LDuPHuZk/Z8LrIwoKZRp3le2RTb5lywL1xcJGQ8u3M3U0tyAgBAAEDXCL+JarHftfP5QgsRxpEsr+/YiRWQeCz7PI3jfzeppEvUc61u+TNHri9ChQdLN2evWGx+1O3MwbPFKV5rIqlxAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAvOdVbvGn3R+uBkugNCq8C/Texc7ILBoYjbn4aVQV0OgBAgIAAQwCAAAAQEIPAAAAAAA=",
+        {
+          "encoding": "base64",
+          "skipPreflight": true
+        }
+      ]
+    }
+  '
+  ```
+
+  ```ts Kit
+  import {
+    createSolanaRpc,
+    type Base64EncodedWireTransaction
+  } from "@solana/kit";
+
+  const rpc_url = "https://api.devnet.solana.com";
+  const rpc = createSolanaRpc(rpc_url);
+
+  const base64Tx =
+    "AbC/XNkPUUZ7/51SaG1wbG0ojrWHIGzVL73M8hRnDr73RkBAZc0ZnikluvcCeprAmqHDJrcPxPUbvEJMVBIiVQeAAQABAzfDSQC/GjcggrLsDpYz7jAlT+Gca846HqtFb8UQMM9cCWPIi4AX32PV8HrY7/1WgoRc3IATttceZsUMeQ1qx7UAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIgsVWEgMTiOYp63gTtuYGw+izfm6wKQdivpiXQBpNnYAQICAAEMAgAAAEBCDwAAAAAAAA==";
+
+  const signature = await rpc
+    .sendTransaction(base64Tx as Base64EncodedWireTransaction, {
+      encoding: "base64"
+    })
+    .send();
+
+  console.log(signature);
+  ```
+
+  ```ts web3.js
+  import {
+    Connection,
+    VersionedTransaction,
+    clusterApiUrl
+  } from "@solana/web3.js";
+
+  const connection = new Connection(clusterApiUrl("devnet"), "confirmed");
+
+  const base64Tx =
+    "AbuRLtc5C9bZtAUT4F4Y2H5SRRUK1HwOFZOK3V4qm/78MDJt+M2de/RCCaI3iTyodDepmrkUWbss0XRHS0lk5AOAAQABAzfDSQC/GjcggrLsDpYz7jAlT+Gca846HqtFb8UQMM9cCWPIi4AX32PV8HrY7/1WgoRc3IATttceZsUMeQ1qx7UAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2dTRgcJmzcoGH1R3c2WqtHah2H19KvbC1p6BxLDqfoAQICAAEMAgAAAADKmjsAAAAAAA==";
+
+  let tx = VersionedTransaction.deserialize(Buffer.from(base64Tx, "base64"));
+
+  let sig = await connection.sendTransaction(tx);
+
+  console.log(sig);
+  ```
+
+  ```rs Rust
+  use anyhow::Result;
+  use base64::{Engine as _, engine::general_purpose};
+  use solana_client::{nonblocking::rpc_client::RpcClient, rpc_config::RpcSendTransactionConfig};
+  use solana_commitment_config::{CommitmentConfig, CommitmentLevel};
+  use solana_sdk::transaction::VersionedTransaction;
+  use solana_transaction_status_client_types::UiTransactionEncoding;
+
+  #[tokio::main]
+  async fn main() -> Result<()> {
+      let client = RpcClient::new_with_commitment(
+          String::from("https://api.devnet.solana.com"),
+          CommitmentConfig::confirmed(),
+      );
+
+      let b64_tx = "AbuRLtc5C9bZtAUT4F4Y2H5SRRUK1HwOFZOK3V4qm/78MDJt+M2de/RCCaI3iTyodDepmrkUWbss0XRHS0lk5AOAAQABAzfDSQC/GjcggrLsDpYz7jAlT+Gca846HqtFb8UQMM9cCWPIi4AX32PV8HrY7/1WgoRc3IATttceZsUMeQ1qx7UAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2dTRgcJmzcoGH1R3c2WqtHah2H19KvbC1p6BxLDqfoAQICAAEMAgAAAADKmjsAAAAAAA==";
+      let tx_bytes = general_purpose::STANDARD.decode(b64_tx).unwrap();
+      let tx: VersionedTransaction = bincode::deserialize(&tx_bytes).unwrap();
+
+      let config = RpcSendTransactionConfig {
+          skip_preflight: true,
+          preflight_commitment: CommitmentLevel::Finalized.into(),
+          encoding: UiTransactionEncoding::Base64.into(),
+          max_retries: None,
+          min_context_slot: None,
+      };
+
+      match client.send_transaction_with_config(&tx, config).await {
+          Ok(signature) => println!("Transaction Signature: {}", signature),
+          Err(err) => eprintln!("Error transferring tokens: {}", err),
+      }
+
+      Ok(())
+  }
+  ```
+</RequestExample>
+
+<ResponseExample>
+  ```json Response
+  {
+    "jsonrpc": "2.0",
+    "result": "2id3YC2jK9G5Wo2phDx4gJVAew8DcY5NAojnVuao8rkxwPYPe8cSwE5GzhEgJA2y8fVjDEo6iR6ykBvDxrTQrtpb",
+    "id": 1
+  }
+  ```
+</ResponseExample>
+
+## Parameters
+
+<ParamField body="transaction" type="string" required>
+  Fully-signed Transaction, as encoded string.
+</ParamField>
+
+<ParamField body="config" type="object">
+  Configuration object containing the following fields:
+
+  <Expandable title="properties" defaultOpen>
+    <ParamField body="encoding" type="string" default="base58">
+      Values: `binary`, `base58`, `base64`
+
+      Encoding used for the transaction data.
+
+      | Encoding | Notes                                                                          |
+      | -------- | ------------------------------------------------------------------------------ |
+      | `base64` | Recommended                                                                    |
+      | `base58` | Slow                                                                           |
+      | `binary` | ⚠️ Deprecated. Legacy alias for `base58`, retained for backwards compatibility |
+
+      The default `base58` encoding is capped at 1,232 bytes and cannot carry a
+      [v1 transaction](/developers/docs/core/transactions/versioned-transactions#v1-format)
+      larger than that — use `base64` for transactions over 1,232 bytes.
+    </ParamField>
+
+    <ParamField body="skipPreflight" type="bool" default="false">
+      Values: `true`, `false`
+
+      When `true`, skip the preflight transaction checks. Default: `false`.
+
+      ```json Example
+      { "skipPreflight": true }
+      ```
+    </ParamField>
+
+    <ParamField body="preflightCommitment" type="string" default="finalized">
+      Values: `processed`, `confirmed`, `finalized`
+
+      Commitment level to use for preflight when `skipPreflight` is `false`. Default
+      `finalized`. When `skipPreflight` is `true`, this field is ignored and the RPC
+      node uses `processed` internally.
+
+      Solana RPC uses the following commitment levels:
+
+      | Value       | Description                                                                                                                                                                               |
+      | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+      | `processed` | Return data from the highest slot this node has processed. This is the newest view, but the block can still be skipped.                                                                   |
+      | `confirmed` | Return data from the same slot as `finalized`. Kept for compatibility and planned for removal in a later release.                                                                         |
+      | `finalized` | Return data from the highest slot with a finalization certificate, from votes by 80% of stake in one round or 60% of stake in each of two rounds. This is the strongest commitment level. |
+
+      ```json Example
+      { "preflightCommitment": "confirmed" }
+      ```
+    </ParamField>
+
+    <ParamField body="maxRetries" type="usize">
+      Maximum number of times for the RPC node to retry sending the transaction to the
+      leader. If this parameter not provided, the RPC node will retry the transaction
+      until it is finalized or until the blockhash expires.
+
+      ```json Example
+      { "maxRetries": 5 }
+      ```
+    </ParamField>
+
+    <ParamField body="minContextSlot" type="number">
+      Set the minimum slot at which to perform preflight transaction checks
+
+      ```json Example
+      { "minContextSlot": 341197000 }
+      ```
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Result
+
+<ResponseField name="result" type="string">
+  First Transaction Signature embedded in the transaction, as base-58 encoded
+  string ([transaction id](/developers/docs/references/terminology#transaction-id))
+</ResponseField>
