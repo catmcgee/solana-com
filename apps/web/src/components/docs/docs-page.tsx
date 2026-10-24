@@ -165,11 +165,19 @@ export async function DocsPageView({
           further.
         </p>
       </blockquote>
+      {/* With Ask AI docked (html[data-ask=docked], ask/ask-panel.client.tsx)
+          everything but the header makes room for the panel, and the side
+          column (TOC or API examples) gives way when the text would get
+          narrower than at 1280px: its examples then show inline. The
+          header moves over only as far as its 92rem bar has room, so it
+          lines up with the page without squeezing its tabs (2rem less:
+          the panel's room replaces .docs-body's own end padding). */}
       <div
         data-docs=""
         data-dev-landing="docs"
         data-mode={wide ? "wide" : undefined}
         lang={contentLocale === locale ? undefined : contentLocale}
+        className="xl:[html[data-ask=docked]_&>.dh]:pe-[min(var(--ask-w)_-_2rem,max(0px,100%_-_92rem))] xl:[html[data-ask=docked]_&>:not(.dh)]:pe-[var(--ask-w)]"
       >
         <DocsHeader
           locale={contentLocale}
@@ -190,11 +198,12 @@ export async function DocsPageView({
             <DocsSidebar items={navItems} current={current} label="Pages" />
           ) : null}
           <main id="content-container">
-            <div className="content-row">
+            <div className="content-row @container">
               {wide ? null : (
                 <div
                   id="content-side-layout"
                   data-api-example={api ? "" : undefined}
+                  className="[html[data-ask=docked]_&]:@max-[58rem]:!hidden"
                 >
                   {api ? (
                     examples
@@ -246,7 +255,9 @@ export async function DocsPageView({
                   />
                 </header>
                 {api ? (
-                  <div className="api-examples-inline">{examples}</div>
+                  <div className="api-examples-inline [html[data-ask=docked]_&]:@max-[58rem]:!flex">
+                    {examples}
+                  </div>
                 ) : null}
                 <div
                   id="content"

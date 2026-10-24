@@ -62,7 +62,10 @@ export default async function Page({ params }: Props) {
   });
 
   // The docs chrome replaces the solana.com Header/Footer here
-  // (ChromeWrapper skips them on this route).
+  // (ChromeWrapper skips them on this route). With Ask AI docked
+  // (html[data-ask=docked]) the page makes room for it, and the header as
+  // far as its 92rem bar allows, exactly as on the docs pages (see
+  // DocsPageView), so it holds still across the view transition.
   return (
     <>
       <DocsThemePrepaint />
@@ -71,7 +74,10 @@ export default async function Page({ params }: Props) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(structuredData) }}
       />
-      <div data-dev-landing="docs">
+      <div
+        data-dev-landing="docs"
+        className="xl:[html[data-ask=docked]_&>.dh]:pe-[min(var(--ask-w)_-_2rem,max(0px,100%_-_92rem))] xl:[html[data-ask=docked]_&>:not(.dh)]:pe-[var(--ask-w)]"
+      >
         <DocsHeader locale={locale} />
         <DevelopersHub locale={locale} updates={updates} />
         <DocsFooter locale={locale} />

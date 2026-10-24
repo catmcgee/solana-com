@@ -1,6 +1,8 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { openAskAi } from "@/lib/docs/ask-ai";
 import type { DocsUiStrings } from "@/lib/docs/ui-strings";
 import {
   AnthropicIcon,
@@ -10,12 +12,14 @@ import {
   CopyIcon,
   MarkdownIcon,
   OpenAiIcon,
+  SparkleIcon,
 } from "./docs-ui-icons";
 
 /**
  * Page actions under the page description: "Copy page" (the page's Markdown
- * twin, fetched from `<page>.md`) and a menu with Copy page, View as
- * Markdown, Open in ChatGPT and Open in Claude. Ported from the docs app on
+ * twin, fetched from `<page>.md`) and a menu with Ask AI (the docs' panel,
+ * with this page attached to the question), Copy page, View as Markdown,
+ * Open in ChatGPT and Open in Claude. Ported from the docs app on
  * origin/main (components/page-actions.tsx: copy button + "Open" popover),
  * laid out as the docs show it now (one split button). Without JavaScript
  * the menu still opens (<details>) and its links work.
@@ -45,6 +49,7 @@ export function PageActions({
   markdownUrl: string;
   strings: DocsUiStrings;
 }) {
+  const tc = useTranslations("commands");
   const [copied, markCopied] = useCopied();
   const menu = useRef<HTMLDetailsElement>(null);
 
@@ -104,6 +109,23 @@ export function PageActions({
           <ChevronIcon className="page-action-chevron" />
         </summary>
         <div className="page-action-list" role="menu">
+          <button
+            type="button"
+            role="menuitem"
+            className="page-action-item"
+            onClick={() => {
+              close();
+              openAskAi({ aboutPage: true });
+            }}
+          >
+            <span className="page-action-tile">
+              <SparkleIcon className="page-action-item-icon" />
+            </span>
+            <span className="page-action-text">
+              <span className="page-action-title">{tc("askAI")}</span>
+              <span className="page-action-desc">{strings.askAboutPage}</span>
+            </span>
+          </button>
           <button
             type="button"
             role="menuitem"

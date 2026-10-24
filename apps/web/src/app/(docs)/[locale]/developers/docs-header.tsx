@@ -32,8 +32,10 @@ import {
  * - 1280-1439px: the same, the search an icon button;
  * - 1024-1279px: compact: smaller logo, tighter tabs without icons, search
  *   icon, theme, language code;
- * - < 1024px: logo, search icon and the menu button, which opens the tabs,
- *   the current section's pages (docs pages), the languages and the theme.
+ * - < 1024px: logo, search icon, Ask AI (✨) and the menu button, which
+ *   opens the tabs, the current section's pages (docs pages), the languages
+ *   and the theme. From 1024px Ask AI is the floating launcher instead
+ *   (components/docs/ask).
  * The logo is the home link (/developers). On docs pages the current tab is
  * marked (`activeTab`), and a hidden tab (Bootcamp, Learn) is appended while
  * one of its pages is shown, as before. Tabs and labels come from the docs
@@ -170,6 +172,7 @@ export async function DocsHeader({
     locale,
     namespace: "developers.landing.header",
   });
+  const tc = await getTranslations({ locale, namespace: "commands" });
   const tabs = tabsProp ?? getDocsTabs(locale);
   const docsRoot = localizedHref(locale, "/developers/docs");
   const toggle = { toDark: t("toDark"), toLight: t("toLight") };
@@ -203,6 +206,20 @@ export async function DocsHeader({
           >
             <SearchIcon />
           </a>
+          {/* Opened by the Ask AI root (DOCS_ASK_OPEN_ATTR), so it needs
+              JS. Docs pages move the search icon to the end (docs.css);
+              order-1 keeps this beside it there. */}
+          <button
+            type="button"
+            className="grid size-8 place-items-center rounded-lg text-[var(--sol-muted)] outline-hidden transition-colors duration-150 hover:bg-[var(--sol-soft)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sol-purple)] motion-reduce:transition-none lg:!hidden [[data-docs]_&]:order-1 [html:not([data-dh-js])_&]:!hidden"
+            aria-label={tc("askAI")}
+            title={tc("askAI")}
+            data-docs-ask-open=""
+          >
+            <span aria-hidden="true" className="text-[15px] leading-none">
+              ✨
+            </span>
+          </button>
           <ThemeToggle {...toggle} />
           <LanguageMenu
             locale={locale}

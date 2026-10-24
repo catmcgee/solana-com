@@ -7,8 +7,9 @@ import { notFound } from "next/navigation";
 // Only the Tailwind classes these pages use (not the site's globals.css).
 import "@/app/docs-globals.css";
 import { SiteShell } from "@/components/site-shell";
-import { InkeepChatButton } from "@solana-com/ui-chrome/inkeep-chat-button";
+import { AskAi } from "@/components/docs/ask/ask-ai.client";
 import { DocsInkeep } from "@/components/docs/inkeep.client";
+import { DOCS_ASK_PREPAINT_SCRIPT } from "@/lib/docs/ask/config";
 
 type Props = {
   children: React.ReactNode;
@@ -20,7 +21,9 @@ type Props = {
  * /developers/cookbook, /learn/<article>). They wear the docs header and
  * footer, so the site Header and Footer are left out, and the client gets
  * only the messages its components read (cookie banner, landing calculator,
- * newsletter form, and Ask AI), not the whole site's.
+ * newsletter form, and Ask AI), not the whole site's. Ask AI (the launcher
+ * and its panel) lives here, so a conversation survives moving between
+ * docs pages; Inkeep is the docs search.
  */
 export default async function DocsRootLayout({ children, params }: Props) {
   const { locale = "en" } = await params;
@@ -35,15 +38,22 @@ export default async function DocsRootLayout({ children, params }: Props) {
   const clientMessages: AbstractIntlMessages = {
     "cookie-consent": messages["cookie-consent"],
     commands: messages.commands,
+    docsAsk: messages.docsAsk,
     developers: {
       landing: { calc: landing.calc, newsletter: landing.newsletter },
     },
   };
   return (
     <SiteShell locale={locale} messages={clientMessages}>
+      {/* Before the page: a panel left docked keeps its room from the
+          first paint. */}
+      <script
+        // Static string, no user input.
+        dangerouslySetInnerHTML={{ __html: DOCS_ASK_PREPAINT_SCRIPT }}
+        suppressHydrationWarning
+      />
       {children}
-      {/* Above the docs' sticky table of contents (z-index 21). */}
-      <InkeepChatButton className="z-40" />
+      <AskAi />
       <DocsInkeep />
     </SiteShell>
   );

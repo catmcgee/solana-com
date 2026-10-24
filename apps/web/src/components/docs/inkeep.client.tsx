@@ -4,79 +4,73 @@ import dynamic from "next/dynamic";
 import {
   useCallback,
   useEffect,
-  useRef,
   useState,
+  type ComponentType,
   type RefObject,
 } from "react";
-import type {
-  AIChatFunctions,
-  InkeepEmbeddedSearchAndChatFunctions,
-} from "@inkeep/cxkit-react";
+import type { InkeepModalSearchProps } from "@inkeep/cxkit-react";
 import { useInkeepConfig } from "@solana-com/ui-chrome/inkeep-config";
-import { DOCS_ASK_CODE_EVENT } from "@/lib/docs/ask-ai";
+import { openAskAi } from "@/lib/docs/ask-ai";
 import {
   DOCS_SEARCH_OPEN_EVENT,
   takeSearchHandOff,
 } from "@/lib/docs/search-hand-off";
 
-const InkeepModalSearchAndChat = dynamic(
+/** What Inkeep's search passes when the reader picks "Ask AI". */
+type ToggleView = { view: "search" | "chat"; query?: string };
+
+/**
+ * cxkit's modal search spreads extra props into its search view, which
+ * shows the "Ask AI" toggle and card when it gets `onToggleView`; the
+ * modal's types leave that prop out, hence the cast.
+ */
+type SearchModalProps = InkeepModalSearchProps & {
+  onToggleView?: (toggle: ToggleView) => void;
+};
+
+const InkeepModalSearch = dynamic(
   () =>
-    import("@inkeep/cxkit-react").then((mod) => mod.InkeepModalSearchAndChat),
+    import("@inkeep/cxkit-react").then(
+      (mod) => mod.InkeepModalSearch as ComponentType<SearchModalProps>,
+    ),
   {
     ssr: false,
   },
 );
 
 /**
- * The docs' openers for Inkeep, beside ui-chrome's InkeepChatButton: the
- * docs header's search field (`openDocsSearch`, with what was typed, and
- * `?q=` on arrival) opens the search, and a code block's Ask button
- * (`openAskAi`) asks the chat about its code.
+ * The docs search: Inkeep's search modal, opened by the docs header's
+ * search field (`openDocsSearch`, with what was typed, and `?q=` on
+ * arrival). Its "Ask AI" toggle and card hand the query to the docs' own
+ * Ask AI panel (components/docs/ask), which sends it; Inkeep's chat is not
+ * used.
  */
 export function DocsInkeep() {
   const config = useInkeepConfig();
   const { isOpen, onOpenChange } = config.modalSettings;
-  // Null until the modal loads (cxkit types it as never null).
-  const widget = useRef<InkeepEmbeddedSearchAndChatFunctions>(null!);
-  const [view, setView] = useState<"search" | "chat">("search");
   const [query, setQuery] = useState("");
-  // Sent once the chat has mounted in the open modal.
-  const question = useRef<string | undefined>(undefined);
-  const chatRef = useCallback((chat: AIChatFunctions | null) => {
-    if (!chat || !question.current) return;
-    chat.submitMessage(question.current);
-    question.current = undefined;
-  }, []);
 
   useEffect(() => {
-    const show = (next: "search" | "chat") => {
-      setView(next);
-      widget.current?.setView(next);
-      onOpenChange(true);
-    };
     const search = (text = "") => {
       setQuery(text);
-      show("search");
+      onOpenChange(true);
     };
     const onSearch = (event: Event) =>
       search((event as CustomEvent<{ query?: string }>).detail?.query);
-    const onAsk = (event: Event) => {
-      const code = (event as CustomEvent<{ code?: string }>).detail?.code;
-      // The proxy allows 8,000 characters.
-      question.current = code?.trim()
-        ? `Explain this code from ${document.title}:\n\n\`\`\`\n${code.trim().slice(0, 6000)}\n\`\`\``
-        : undefined;
-      show("chat");
-    };
     window.addEventListener(DOCS_SEARCH_OPEN_EVENT, onSearch);
-    window.addEventListener(DOCS_ASK_CODE_EVENT, onAsk);
     const handOff = takeSearchHandOff();
     if (handOff !== null) search(handOff);
-    return () => {
-      window.removeEventListener(DOCS_SEARCH_OPEN_EVENT, onSearch);
-      window.removeEventListener(DOCS_ASK_CODE_EVENT, onAsk);
-    };
+    return () => window.removeEventListener(DOCS_SEARCH_OPEN_EVENT, onSearch);
   }, [onOpenChange]);
+
+  const onToggleView = useCallback(
+    ({ view, query: asked }: ToggleView) => {
+      if (view !== "chat") return;
+      onOpenChange(false);
+      openAskAi({ question: asked?.trim() || undefined });
+    },
+    [onOpenChange],
+  );
 
   // defaultQuery only applies when the search first mounts, so hand later
   // queries over once it is ready, as ui-chrome's config does for ?search=.
@@ -103,13 +97,11 @@ export function DocsInkeep() {
   }, [isOpen, query, searchFunctions]);
 
   return (
-    <InkeepModalSearchAndChat
-      ref={widget}
-      defaultView={view}
+    <InkeepModalSearch
       baseSettings={config.baseSettings}
       searchSettings={{ ...config.searchSettings, defaultQuery: query }}
-      aiChatSettings={{ ...config.aiChatSettings, chatFunctionsRef: chatRef }}
       modalSettings={{ isOpen, onOpenChange, shortcutKey: null }}
+      onToggleView={onToggleView}
     />
   );
 }

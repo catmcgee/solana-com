@@ -221,7 +221,7 @@ export function CodeExpandFooter({ count }: { count: number }) {
   );
 }
 
-/** "Ask Assistant" next to Copy: hands the block's code to Ask AI. */
+/** "Ask AI about this code" next to Copy: hands the block's code to Ask AI. */
 export function AskCodeButton() {
   const ref = useRef<HTMLButtonElement>(null);
   return (
@@ -229,7 +229,7 @@ export function AskCodeButton() {
       <button
         ref={ref}
         type="button"
-        aria-label="Ask Assistant"
+        aria-label="Ask AI about this code"
         className="code-copy"
         onClick={() => {
           const root =

@@ -1,6 +1,6 @@
 /**
  * Small interface icons of the docs chrome (sidebar chevrons, TOC heading,
- * page actions, callouts). Line icons on an 18 or 24 unit grid; the 24 unit
+ * page actions, callouts, the Ask AI panel). Line icons on an 18 or 24 unit grid; the 24 unit
  * ones are Lucide (ISC).
  */
 import type { ReactNode } from "react";
@@ -155,6 +155,125 @@ export function ArrowUpRightIcon({ className }: { className?: string }) {
     <Lucide className={className}>
       <path d="M7 7h10v10" />
       <path d="M7 17 17 7" />
+    </Lucide>
+  );
+}
+
+/* Ask AI panel controls (components/docs/ask), Lucide drawings. */
+
+export function XIcon({ className }: { className?: string }) {
+  return (
+    <Lucide className={className}>
+      <path d="M18 6 6 18" />
+      <path d="m6 6 12 12" />
+    </Lucide>
+  );
+}
+
+export function Maximize2Icon({ className }: { className?: string }) {
+  return (
+    <Lucide className={className}>
+      <path d="M15 3h6v6" />
+      <path d="m21 3-7 7" />
+      <path d="m3 21 7-7" />
+      <path d="M9 21H3v-6" />
+    </Lucide>
+  );
+}
+
+export function Minimize2Icon({ className }: { className?: string }) {
+  return (
+    <Lucide className={className}>
+      <path d="m14 10 7-7" />
+      <path d="M20 10h-6V4" />
+      <path d="m3 21 7-7" />
+      <path d="M4 14h6v6" />
+    </Lucide>
+  );
+}
+
+export function SquarePenIcon({ className }: { className?: string }) {
+  return (
+    <Lucide className={className}>
+      <path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+      <path d="M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z" />
+    </Lucide>
+  );
+}
+
+export function ArrowUpIcon({ className }: { className?: string }) {
+  return (
+    <Lucide className={className}>
+      <path d="m5 12 7-7 7 7" />
+      <path d="M12 19V5" />
+    </Lucide>
+  );
+}
+
+export function ArrowDownIcon({ className }: { className?: string }) {
+  return (
+    <Lucide className={className}>
+      <path d="M12 5v14" />
+      <path d="m19 12-7 7-7-7" />
+    </Lucide>
+  );
+}
+
+/** Lucide's Square, filled: the Stop button. */
+export function StopIcon({ className }: { className?: string }) {
+  return (
+    <Lucide className={className}>
+      <rect
+        width="18"
+        height="18"
+        x="3"
+        y="3"
+        rx="2"
+        fill="currentColor"
+        stroke="none"
+      />
+    </Lucide>
+  );
+}
+
+export function ThumbsUpIcon({ className }: { className?: string }) {
+  return (
+    <Lucide className={className}>
+      <path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z" />
+      <path d="M7 10v12" />
+    </Lucide>
+  );
+}
+
+export function ThumbsDownIcon({ className }: { className?: string }) {
+  return (
+    <Lucide className={className}>
+      <path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z" />
+      <path d="M17 14V2" />
+    </Lucide>
+  );
+}
+
+export function RotateCcwIcon({ className }: { className?: string }) {
+  return (
+    <Lucide className={className}>
+      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+      <path d="M3 3v5h5" />
+    </Lucide>
+  );
+}
+
+/** Points down; rotated by a class when open or closed. */
+export function ChevronDownIcon({
+  className,
+  size,
+}: {
+  className?: string;
+  size?: number;
+}) {
+  return (
+    <Lucide className={className} size={size}>
+      <path d="m6 9 6 6 6-6" />
     </Lucide>
   );
 }
