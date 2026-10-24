@@ -5,7 +5,8 @@ import {
 } from "@/lib/docs/ask/fixtures/common-visual";
 import { createTokenGenerativeUiFixture } from "@/lib/docs/ask/fixtures/create-token";
 import {
-  introRepeatsSummary,
+  ASK_NODE_ARCHETYPES,
+  ASK_RELATIONSHIP_TONES,
   modelStateAtStep,
   normalizeAskVisual,
   parseEffectText,
@@ -601,31 +602,33 @@ describe("resolveNodeId", () => {
   });
 });
 
-describe("introRepeatsSummary", () => {
-  const intro = {
-    title: "Token lifecycle",
-    body: "Create a token by creating a mint account, then minting supply.",
-    bullets: [],
-  };
-
-  it("is true when the summary already says it", () => {
-    expect(
-      introRepeatsSummary(
-        intro,
-        "To create a token, you start by creating a mint account and then minting supply into a token account.",
-      ),
-    ).toBe(true);
-  });
-
-  it("is false when the intro adds something, or there's no summary", () => {
-    expect(introRepeatsSummary(intro, "Tokens live in accounts.")).toBe(false);
-    expect(introRepeatsSummary(intro, "")).toBe(false);
-    expect(introRepeatsSummary(intro, undefined)).toBe(false);
-  });
-
-  it("treats a lone title as adding nothing to a summary", () => {
-    expect(
-      introRepeatsSummary({ title: "Tokens", bullets: [] }, "Anything at all."),
-    ).toBe(true);
+describe("tones", () => {
+  it("colours each archetype and relationship kind by what it is", () => {
+    const tones = Object.fromEntries(
+      Object.entries(ASK_NODE_ARCHETYPES).map(([key, { tone }]) => [key, tone]),
+    );
+    expect(tones).toEqual({
+      wallet: "green",
+      signer: "green",
+      "mint-account": "purple",
+      "token-account": "green",
+      pda: "purple",
+      program: "blue",
+      instruction: "blue",
+      transaction: "blue",
+      "rpc-node": "amber",
+      validator: "amber",
+    });
+    expect(ASK_RELATIONSHIP_TONES).toEqual({
+      owns: "purple",
+      initializes: "purple",
+      derives: "purple",
+      signs: "green",
+      "mints-to": "green",
+      "transfers-to": "green",
+      invokes: "blue",
+      writes: "blue",
+      reads: "blue",
+    });
   });
 });

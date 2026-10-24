@@ -62,10 +62,12 @@ export type AskRelationshipKind =
 export type AskEffectAction = "reveal" | "update" | "connect" | "close";
 
 /**
- * Purple for definitions and code (mints, programs, PDAs, transactions),
- * green for holders and the network, neutral for instructions.
+ * What kind of thing a part or a link is, as a colour: purple for
+ * definitions (mints, PDAs) and the links that make them, green for holders
+ * and signers and the value they move, blue for code and what it runs,
+ * amber for the network. Neutral when the kind is unknown.
  */
-export type AskNodeTone = "purple" | "green" | "neutral";
+export type AskNodeTone = "purple" | "green" | "blue" | "amber" | "neutral";
 
 export const ASK_NODE_ARCHETYPES: Record<
   AskNodeArchetype,
@@ -76,12 +78,25 @@ export const ASK_NODE_ARCHETYPES: Record<
   "mint-account": { label: "Mint account", tone: "purple" },
   "token-account": { label: "Token account", tone: "green" },
   pda: { label: "PDA", tone: "purple" },
-  program: { label: "Program", tone: "purple" },
-  instruction: { label: "Instruction", tone: "neutral" },
-  transaction: { label: "Transaction", tone: "purple" },
-  "rpc-node": { label: "RPC node", tone: "green" },
-  validator: { label: "Validator", tone: "green" },
+  program: { label: "Program", tone: "blue" },
+  instruction: { label: "Instruction", tone: "blue" },
+  transaction: { label: "Transaction", tone: "blue" },
+  "rpc-node": { label: "RPC node", tone: "amber" },
+  validator: { label: "Validator", tone: "amber" },
 };
+
+export const ASK_RELATIONSHIP_TONES: Record<AskRelationshipKind, AskNodeTone> =
+  {
+    owns: "purple",
+    initializes: "purple",
+    derives: "purple",
+    signs: "green",
+    "mints-to": "green",
+    "transfers-to": "green",
+    invokes: "blue",
+    writes: "blue",
+    reads: "blue",
+  };
 
 export const ASK_RELATIONSHIP_LABELS: Record<AskRelationshipKind, string> = {
   owns: "owns",
@@ -1199,27 +1214,4 @@ export function normalizeAskVisual(ui: AskGenerativeUi): NormalizedVisual {
   }
   if (flowDraft) visual.flow = finishFlow(flowDraft, visual.model);
   return visual;
-}
-
-/** "creating" and "create", "tokens" and "token": close enough to compare. */
-function stems(text: string | null | undefined) {
-  return matchText(text)
-    .split(" ")
-    .filter((word) => word.length > 3)
-    .map((word) => word.replace(/(?:ing|ed|es|s|e)$/, ""));
-}
-
-/**
- * True when the intro adds nothing to the answer's summary: 80% of its
- * longer words are already there (a title alone never adds anything).
- */
-export function introRepeatsSummary(
-  intro: VisualIntro,
-  summary: string | null | undefined,
-): boolean {
-  if (!matchText(summary)) return false;
-  const said = new Set(stems(summary));
-  const words = stems([intro.body, ...intro.bullets].join(" "));
-  const repeated = words.filter((word) => said.has(word)).length;
-  return repeated >= words.length * 0.8;
 }

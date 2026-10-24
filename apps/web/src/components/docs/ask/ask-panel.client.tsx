@@ -8,6 +8,7 @@ import {
 } from "@radix-ui/react-dialog";
 import { useTranslations } from "next-intl";
 import {
+  useEffect,
   useRef,
   useState,
   type KeyboardEvent,
@@ -21,16 +22,17 @@ import { useAskSelector } from "@/lib/docs/ask/use-ask";
 import { AskComposer } from "./ask-composer.client";
 import { AskHeader } from "./ask-header.client";
 import { AskThread } from "./ask-thread.client";
+import { PALETTE } from "./ui";
 
 /** Id of the docked panel (the resize handle controls it). */
 export const ASK_PANEL_ID = "docs-ask-panel";
 
 /**
- * Tokens the docs don't define on every route: answer body text and the
- * code block surfaces (docs.css has them only on docs pages).
+ * Tokens the docs don't define on every route: answer body text (the docs'
+ * prose colour; a touch brighter in dark for 14px text) and the code block
+ * surfaces (docs.css has them only on docs pages). Plus the accent palette.
  */
-const PANEL_TOKENS =
-  "[--ask-body:#3f3f46] dark:[--ask-body:#cfcfd4] [--ask-code-bg:#fafafb] dark:[--ask-code-bg:#111113] [--ask-code-head:#f4f4f5] dark:[--ask-code-head:#151518]";
+const PANEL_TOKENS = `[--ask-body:#434046] dark:[--ask-body:#b4b1b8] [--ask-code-bg:#fafafb] dark:[--ask-code-bg:#111113] [--ask-code-head:#f4f4f5] dark:[--ask-code-head:#151518] ${PALETTE}`;
 
 const ENTER =
   "animate-in fade-in-0 slide-in-from-right-2 duration-150 motion-reduce:animate-none rtl:slide-in-from-left-2";
@@ -71,7 +73,9 @@ function PanelBody({ layout, dialog }: { layout: AskLayout; dialog: boolean }) {
 /**
  * The docked panel's start edge: drag, or arrow keys (Shift for bigger
  * steps, Home/End for the limits); double-click goes back to the default
- * width. Invisible until hovered or focused, then a 2px purple rule.
+ * width. Invisible until hovered (a neutral rule, after a beat, so a pointer
+ * resting there after docking doesn't light it), purple while focused or
+ * dragged.
  */
 function ResizeHandle() {
   const t = useTranslations("docsAsk");
@@ -142,8 +146,8 @@ function ResizeHandle() {
       <span
         aria-hidden="true"
         className={cn(
-          "pointer-events-none absolute inset-y-0 start-0.5 w-0.5 bg-[var(--sol-purple-line)] opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:bg-[var(--sol-purple)] group-focus-visible:opacity-100 motion-reduce:transition-none",
-          dragging && "opacity-100",
+          "pointer-events-none absolute inset-y-0 start-0.5 w-0.5 bg-[var(--sol-line-strong)] opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-hover:delay-150 group-focus-visible:bg-[var(--sol-purple)] group-focus-visible:opacity-100 group-focus-visible:delay-0 motion-reduce:transition-none",
+          dragging && "bg-[var(--sol-purple)] opacity-100 delay-0",
         )}
       />
     </div>
@@ -176,10 +180,30 @@ export function DockedPanel({ animate }: { animate: boolean }) {
 }
 
 /**
- * Overlay (narrower viewports) and full screen: a modal dialog over the
- * page. The overlay slides in from the inline end over a dimmed page (full
- * width below 640px); full screen covers the header too and reads in a
- * centred column. Esc closes the overlay and leaves full screen.
+ * Full screen sits under the docs header, which stays usable (search,
+ * theme, tabs). The page behind the panel can't be seen, so it is made
+ * inert: Tab moves between the header and the panel only.
+ */
+function useInertPage(active: boolean) {
+  useEffect(() => {
+    if (!active) return;
+    const header = document.querySelector("header.dh");
+    const behind = [...(header?.parentElement?.children ?? [])].filter(
+      (element) => element !== header && !element.hasAttribute("inert"),
+    );
+    for (const element of behind) element.setAttribute("inert", "");
+    return () => {
+      for (const element of behind) element.removeAttribute("inert");
+    };
+  }, [active]);
+}
+
+/**
+ * Overlay (narrower viewports) and full screen, as a dialog. The overlay
+ * slides in from the inline end over a dimmed page (full width below
+ * 640px) and is modal; Esc closes it. Full screen fills the window under
+ * the docs header, reads in a centred column and isn't modal, so the
+ * header keeps working; Esc goes back to the previous layout.
  */
 export function ModalPanel({
   layout,
@@ -195,9 +219,11 @@ export function ModalPanel({
   onClosedFocus: () => void;
 }) {
   const fullscreen = layout === "fullscreen";
+  useInertPage(fullscreen);
   return (
     <DialogRoot
       open
+      modal={!fullscreen}
       onOpenChange={(open) => {
         if (!open) askStore.close();
       }}
@@ -225,16 +251,31 @@ export function ModalPanel({
             event.preventDefault();
             onClosedFocus();
           }}
+          // The header (and anything it opens, like search) is outside
+          // the full-screen panel but part of the page: using it keeps the
+          // panel open.
+          onInteractOutside={(event) => {
+            if (fullscreen) event.preventDefault();
+          }}
           onEscapeKeyDown={(event) => {
             if (!fullscreen) return;
             event.preventDefault();
+            // Esc in the header's own menus or the search dialog is theirs.
+            const target = event.target;
+            if (
+              target instanceof Element &&
+              target !== document.body &&
+              !target.closest("[data-ask-panel]")
+            )
+              return;
             askStore.setFullscreen(false);
           }}
           className={cn(
-            "fixed z-[55] outline-hidden",
+            "fixed outline-hidden",
             fullscreen
-              ? "inset-0"
-              : "inset-y-0 end-0 w-[min(28rem,100vw)] border-s border-[var(--sol-line)] shadow-[var(--sol-menu-shadow)] max-sm:inset-0 max-sm:w-full max-sm:border-s-0",
+              ? // Under the docs header (z-40), over the page.
+                "inset-x-0 bottom-0 top-16 z-[35]"
+              : "inset-y-0 end-0 z-[55] w-[min(28rem,100vw)] border-s border-[var(--sol-line)] shadow-[var(--sol-menu-shadow)] max-sm:inset-0 max-sm:w-full max-sm:border-s-0 dark:border-[var(--sol-line-strong)]",
             animate &&
               (fullscreen
                 ? "animate-in fade-in-0 duration-150 motion-reduce:animate-none"

@@ -157,7 +157,12 @@ describe("Ask AI launcher and panel", () => {
   it("is a launcher named exactly “Ask AI” that docks the panel at 1440px", async () => {
     renderAsk();
     const launcher = screen.getByRole("button", { name: "Ask AI" });
-    expect(launcher.textContent).toContain("✨");
+    expect(launcher.textContent).toBe("✨Ask AI");
+    // No kbd hint: the shortcut is only in the tooltip.
+    expect(launcher.querySelector("kbd")).toBeNull();
+    expect(launcher).toHaveAttribute("title", "Ctrl I to open or close");
+    // A floating pill only from 1280px; the header's ✨ covers narrower screens.
+    expect(launcher.parentElement!.className).toContain("max-xl:hidden");
     launcher.focus();
     await act(async () => fireEvent.click(launcher));
 
@@ -175,9 +180,10 @@ describe("Ask AI launcher and panel", () => {
     expect(
       within(panel).queryByRole("button", { name: /Ask about this page/ }),
     ).toBeNull();
+    // Nothing to clear yet.
     expect(
-      within(panel).getByRole("button", { name: "New chat" }),
-    ).toBeDisabled();
+      within(panel).queryByRole("button", { name: "New chat" }),
+    ).toBeNull();
 
     await act(async () =>
       fireEvent.click(within(panel).getByRole("button", { name: "Close" })),
@@ -273,34 +279,37 @@ describe("Ask AI conversation", () => {
     });
     const panel = screen.getByRole("complementary", { name: "Ask AI" });
 
-    // The question, then the answer.
-    const items = within(panel).getAllByRole("listitem");
-    expect(items[0]!.textContent).toBe("You: What is a mint?");
+    // One turn: the question as its heading, then the answer.
+    const turn = within(panel).getAllByRole("listitem")[0]!;
+    expect(within(turn).getByRole("heading", { level: 3 }).textContent).toBe(
+      "You: What is a mint?",
+    );
+    expect(turn.textContent).toContain("A mint account defines a token.");
     expect(chatBodies()[0]).toMatchObject({ message: "What is a mint?" });
 
     // The visual draws through AskVisual.
     expect(within(panel).getByText("Diagram")).toBeInTheDocument();
 
-    // In-depth part folded behind "Show the full answer".
+    // In-depth part folded behind "Full answer".
     expect(within(panel).queryByText(/stores/)).toBeNull();
     await act(async () =>
       fireEvent.click(
-        within(panel).getByRole("button", { name: "Show the full answer" }),
+        within(panel).getByRole("button", { name: "Full answer" }),
       ),
     );
     expect(within(panel).getByText(/mint authority/)).toBeInTheDocument();
     expect(
-      within(panel).getByRole("button", { name: "Show less" }),
+      within(panel).getByRole("button", { name: "Hide full answer" }),
     ).toHaveAttribute("aria-expanded", "true");
 
-    // Sources, normalized to /developers/docs and numbered.
+    // Sources, normalized to /developers/docs.
     const sources = within(panel).getByRole("navigation", { name: "Sources" });
     const source = within(sources).getByRole("link");
     expect(source).toHaveAttribute(
       "href",
       "/developers/docs/tokens/basics/create-mint",
     );
-    expect(source.textContent).toBe("1Mint accountsTokens / Basics");
+    expect(source.textContent).toContain("Mint accounts");
 
     // The follow-up prompt shows once, above its chip.
     expect(
@@ -324,7 +333,8 @@ describe("Ask AI conversation", () => {
     renderAsk();
     await act(async () => askStore.open());
     await ask("What is a mint?");
-    const helpful = await screen.findByRole("button", { name: "Helpful" });
+    const feedback = await screen.findByRole("group", { name: "Helpful?" });
+    const helpful = within(feedback).getByRole("button", { name: "Yes" });
     await act(async () => fireEvent.click(helpful));
     expect(helpful).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByText("Thanks for the feedback.")).toBeInTheDocument();
@@ -344,9 +354,7 @@ describe("Ask AI conversation", () => {
       selector: "p",
     });
     await act(async () =>
-      fireEvent.click(
-        screen.getByRole("button", { name: "Show the full answer" }),
-      ),
+      fireEvent.click(screen.getByRole("button", { name: "Full answer" })),
     );
     await act(async () =>
       fireEvent.click(
@@ -355,7 +363,7 @@ describe("Ask AI conversation", () => {
     );
     const dialog = screen.getByRole("dialog", { name: "Ask AI" });
     expect(
-      within(dialog).getByRole("button", { name: "Show less" }),
+      within(dialog).getByRole("button", { name: "Hide full answer" }),
     ).toHaveAttribute("aria-expanded", "true");
   });
 
@@ -365,7 +373,7 @@ describe("Ask AI conversation", () => {
     await act(async () => askStore.open());
     await ask("What is a mint?");
     await screen.findByRole("button", { name: "Ask again" });
-    expect(screen.queryByRole("button", { name: "Helpful" })).toBeNull();
+    expect(screen.queryByRole("group", { name: "Helpful?" })).toBeNull();
     expect(
       screen.getByRole("button", { name: "Copy answer" }),
     ).toBeInTheDocument();
@@ -395,16 +403,18 @@ describe("Ask AI conversation", () => {
 
   it("shows the error kind and asks again on Try again", async () => {
     chats.push(
-      new Response(JSON.stringify({ error: "rate_limited" }), { status: 429 }),
+      () =>
+        new Response(sse("error", { message: "boom" }), {
+          headers: { "content-type": "text/event-stream" },
+        }),
     );
     chats.push(answer());
     renderAsk();
     await act(async () => askStore.open());
     await ask("What is a mint?");
-    await screen.findByText(
-      "You’ve sent several questions in a row. Wait a minute, then try again.",
-      { selector: "p" },
-    );
+    await screen.findByText("The answer didn’t load.", {
+      selector: "p > bdi",
+    });
     await act(async () =>
       fireEvent.click(screen.getByRole("button", { name: "Try again" })),
     );
@@ -444,11 +454,18 @@ describe("Ask AI conversation", () => {
     await act(async () =>
       fireEvent.click(screen.getByRole("button", { name: "Stop" })),
     );
-    expect(screen.getByText("Stopped", { selector: "p" })).toBeInTheDocument();
+    expect(
+      screen.getByText("Stopped", { selector: "p > bdi" }),
+    ).toBeInTheDocument();
     expect(
       screen.getByText("Rent is a deposit", { selector: "p" }),
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Send" })).toBeInTheDocument();
+    // One line, "Stopped · Ask again"; no actions row for half an answer.
+    expect(screen.getByRole("button", { name: "Ask again" }).tagName).toBe(
+      "BUTTON",
+    );
+    expect(screen.queryByRole("button", { name: "Copy answer" })).toBeNull();
   });
 
   it("asks about a code block from the docs page", async () => {
@@ -462,12 +479,16 @@ describe("Ask AI conversation", () => {
     expect(chatBodies()[0]!.message).toBe(
       "Explain this code from Create a keypair:\n\n```\nconst signer = await generate();\n```",
     );
-    // The question shows its code in a box, not as raw fences.
-    const question = screen.getAllByRole("listitem")[0]!;
-    expect(question.querySelector("pre")!.textContent).toBe(
+    // The question reads as a title, its code in a frame under it, not as
+    // raw fences.
+    const turn = screen.getAllByRole("listitem")[0]!;
+    expect(within(turn).getByRole("heading", { level: 3 }).textContent).toBe(
+      "You: Explain this code from Create a keypair",
+    );
+    expect(turn.querySelector("pre")!.textContent).toBe(
       "const signer = await generate();",
     );
-    expect(question.textContent).not.toContain("```");
+    expect(turn.textContent).not.toContain("```");
   });
 
   it("attaches this page to the question as a removable chip", async () => {
@@ -510,5 +531,260 @@ describe("Ask AI conversation", () => {
       ),
     );
     expect(askStore.getState().pageContext).toBeNull();
+  });
+});
+
+describe("Ask AI sidebar shell", () => {
+  /**
+   * Fakes the thread's scroll box (jsdom has no layout): 3000px of content
+   * in 500px, scrolled to the top until something scrolls it.
+   */
+  function scrolledUp() {
+    const el = document.querySelector<HTMLElement>(
+      "[data-ask-panel] .overflow-y-auto",
+    )!;
+    let top = 0;
+    const scrollTo = (next: number) => {
+      top = Math.min(next, 2500);
+      el.dispatchEvent(new Event("scroll"));
+    };
+    Object.defineProperties(el, {
+      scrollHeight: { value: 3000, configurable: true },
+      clientHeight: { value: 500, configurable: true },
+      scrollTop: {
+        get: () => top,
+        set: (next: number) => scrollTo(next),
+        configurable: true,
+      },
+      scrollTo: {
+        value: (options: ScrollToOptions) => scrollTo(options.top ?? 0),
+        configurable: true,
+      },
+    });
+    fireEvent.scroll(el);
+  }
+
+  it("groups each question with its answer, ruled off from the turn before", async () => {
+    chats.push(answer(), answer({}, "Rent is a deposit."));
+    renderAsk();
+    await act(async () => askStore.open());
+    await ask("What is a mint?");
+    await screen.findByText("A mint account defines a token.", {
+      selector: "p",
+    });
+    await ask("And rent?");
+    await screen.findByText("Rent is a deposit.", { selector: "p" });
+
+    const thread = document.querySelector("[data-ask-panel] ol")!;
+    const turns = [...thread.children];
+    expect(turns).toHaveLength(2);
+    expect(turns[0]!.className).not.toContain("border-t");
+    expect(turns[1]!.className).toContain("border-t");
+    // Questions are headings in their own direction; answers too.
+    const heading = within(turns[1] as HTMLElement).getByRole("heading", {
+      level: 3,
+    });
+    expect(heading).toHaveAttribute("dir", "auto");
+    expect(heading.textContent).toBe("You: And rent?");
+    // The answer takes its text's direction (and says so, for icons that
+    // flip with it): English stays left to right on an Arabic page.
+    const answerRoot = within(turns[1] as HTMLElement)
+      .getByText("Rent is a deposit.")
+      .closest("[data-dir]");
+    expect(answerRoot).toHaveAttribute("dir", "ltr");
+    expect(answerRoot).toHaveAttribute("data-dir", "ltr");
+    // Only the latest answer offers follow-ups; older sources fold away.
+    expect(screen.getAllByRole("button", { name: "TypeScript" })).toHaveLength(
+      1,
+    );
+    expect(
+      within(turns[0] as HTMLElement).getByText("Sources (1)"),
+    ).toBeInTheDocument();
+  });
+
+  it("shows New chat as a labelled button once there is a conversation", async () => {
+    chats.push(answer());
+    renderAsk();
+    await act(async () => askStore.open());
+    const panel = screen.getByRole("complementary", { name: "Ask AI" });
+    expect(
+      within(panel).queryByRole("button", { name: "New chat" }),
+    ).toBeNull();
+    // A phone sheet is already full screen: no Expand there.
+    expect(
+      within(panel).getByRole("button", { name: "Expand to full screen" })
+        .className,
+    ).toContain("max-sm:hidden");
+    await ask("What is a mint?");
+    const newChat = await within(panel).findByRole("button", {
+      name: "New chat",
+    });
+    expect(newChat.textContent).toBe("New chat");
+    await act(async () => fireEvent.click(newChat));
+    expect(askStore.getState().messages).toHaveLength(0);
+    expect(
+      within(panel).queryByRole("button", { name: "New chat" }),
+    ).toBeNull();
+  });
+
+  it("starts with one sentence, this page, unboxed suggestions and the disclaimer last", async () => {
+    const article = document.createElement("div");
+    article.id = "content";
+    article.dataset.pageTitle = "Accounts";
+    article.dataset.pageHref = "/developers/docs/core/accounts";
+    document.body.appendChild(article);
+    renderAsk();
+    await act(async () => askStore.open());
+    const panel = screen.getByRole("complementary", { name: "Ask AI" });
+    expect(within(panel).queryByRole("heading", { level: 3 })).toBeNull();
+    const thisPage = within(panel).getByRole("button", {
+      name: "Ask about this page Accounts",
+    });
+    const suggestion = within(panel).getByRole("button", {
+      name: "How does one program call another?",
+    });
+    // Rows follow the page's direction; the words isolate their own, so an
+    // English question keeps its "?" at the end on an Arabic page.
+    expect(suggestion).not.toHaveAttribute("dir");
+    expect(suggestion.querySelector("bdi")!.textContent).toBe(
+      "How does one program call another?",
+    );
+    const paragraphs = [
+      ...panel.querySelectorAll(".overflow-y-auto > div > div > p"),
+    ];
+    expect(paragraphs[0]!.textContent).toBe(
+      "Answers draw on the Solana docs and link to the pages they use.",
+    );
+    expect(paragraphs.at(-1)!.textContent).toBe(
+      "Answers can be wrong. Check them against the linked pages.",
+    );
+    // The disclaimer is no longer under the composer.
+    expect(
+      within(panel).getAllByText(
+        "Answers can be wrong. Check them against the linked pages.",
+      ),
+    ).toHaveLength(1);
+    await act(async () => fireEvent.click(thisPage));
+    expect(askStore.getState().pageContext?.title).toBe("Accounts");
+  });
+
+  it("shows the asked page above the question", async () => {
+    chats.push(answer());
+    renderAsk();
+    await act(async () =>
+      askStore.open({
+        aboutPage: {
+          title: "Accounts",
+          url: "https://solana.com/developers/docs/core/accounts",
+        },
+      }),
+    );
+    await ask("What is rent?");
+    await screen.findByText("A mint account defines a token.", {
+      selector: "p",
+    });
+    const turn = screen.getAllByRole("listitem")[0]!;
+    const context = turn.querySelector("p")!;
+    expect(context.textContent).toBe("AccountsThis page: Accounts");
+    expect(within(turn).getByRole("heading", { level: 3 }).textContent).toBe(
+      "You: What is rent?",
+    );
+  });
+
+  it("turns the field red and counts characters when the question is too long", async () => {
+    renderAsk();
+    await act(async () => askStore.open());
+    fireEvent.change(composer(), { target: { value: "x".repeat(4100) } });
+    expect(composer()).toHaveAttribute("aria-invalid", "true");
+    expect(composer().parentElement!.className).toContain("var(--sol-red)");
+    expect(screen.getByText("4,100/4,000")).toBeInTheDocument();
+    fireEvent.change(composer(), { target: { value: "Short" } });
+    expect(composer()).not.toHaveAttribute("aria-invalid");
+    expect(screen.queryByText(/\/4,000/)).toBeNull();
+  });
+
+  it("folds an older failed turn to “Didn’t finish.”", async () => {
+    chats.push(
+      () =>
+        new Response(sse("error", { message: "boom" }), {
+          headers: { "content-type": "text/event-stream" },
+        }),
+      answer(),
+    );
+    renderAsk();
+    await act(async () => askStore.open());
+    await ask("First?");
+    await screen.findByRole("button", { name: "Try again" });
+    await ask("Second?");
+    await screen.findByText("A mint account defines a token.", {
+      selector: "p",
+    });
+    const first = screen.getAllByRole("listitem")[0]!;
+    expect(within(first).getByText("Didn’t finish.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
+  });
+
+  it("puts a rate-limited question back in the composer, with no Try again", async () => {
+    chats.push(
+      new Response(JSON.stringify({ error: "rate_limited" }), { status: 429 }),
+    );
+    renderAsk();
+    await act(async () => askStore.open());
+    await ask("What is a mint?");
+    await screen.findByText(
+      "You’ve asked several questions in a row. Wait a minute, then send it again.",
+      { selector: "p > bdi" },
+    );
+    await waitFor(() => expect(composer().value).toBe("What is a mint?"));
+    expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
+  });
+
+  it("offers Jump to latest only while something new is below", async () => {
+    chats.push(answer());
+    const stream = controllable();
+    chats.push(stream.response);
+    renderAsk();
+    await act(async () => askStore.open());
+    await ask("What is a mint?");
+    await screen.findByText("A mint account defines a token.", {
+      selector: "p",
+    });
+    // Reading up a finished answer: nothing new, no pill.
+    await act(async () => scrolledUp());
+    expect(screen.queryByRole("button", { name: "Jump to latest" })).toBeNull();
+
+    // An answer arriving while the reader is up the thread.
+    await ask("And rent?");
+    await act(async () => scrolledUp());
+    await act(async () => stream.send("delta", { text: "Rent is" }));
+    const jump = await screen.findByRole("button", { name: "Jump to latest" });
+    expect(jump.className).toContain("end-4");
+    await act(async () => fireEvent.click(jump));
+    expect(screen.queryByRole("button", { name: "Jump to latest" })).toBeNull();
+  });
+
+  it("goes full screen under the docs header, which stays usable", async () => {
+    const page = document.createElement("div");
+    page.innerHTML =
+      '<header class="dh"><button>Theme</button></header><main id="docs-body"></main><footer></footer>';
+    document.body.appendChild(page);
+    renderAsk();
+    await act(async () => askStore.setFullscreen(true));
+    const dialog = screen.getByRole("dialog", { name: "Ask AI" });
+    expect(dialog.className).toContain("top-16");
+    expect(dialog).not.toHaveAttribute("aria-modal");
+    // The page behind is inert, the header isn't.
+    expect(page.querySelector("main")).toHaveAttribute("inert");
+    expect(page.querySelector("footer")).toHaveAttribute("inert");
+    expect(page.querySelector("header")).not.toHaveAttribute("inert");
+    // Using the header keeps the panel.
+    await act(async () => {
+      fireEvent.pointerDown(page.querySelector("header button")!);
+      fireEvent.focus(page.querySelector("header button")!);
+    });
+    expect(askStore.getState().layout).toBe("fullscreen");
+    await act(async () => fireEvent.keyDown(dialog, { key: "Escape" }));
+    expect(askStore.getState().layout).toBe("docked");
+    expect(page.querySelector("main")).not.toHaveAttribute("inert");
   });
 });

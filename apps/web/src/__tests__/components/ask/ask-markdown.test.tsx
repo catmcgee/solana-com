@@ -79,21 +79,30 @@ describe("AskMarkdown", () => {
     );
     const heading = screen.getByRole("heading", { name: "Overview" });
     expect(heading.tagName).toBe("H3");
-    expect(heading.className).toContain("text-[15px]");
+    // In em, so headings scale with the body and never fall below it.
+    expect(heading.className).toContain("text-[1.0625em]");
+    expect(heading.className).toContain("leading-[1.45]");
     expect(container.querySelector("strong")!.className).toContain(
       "font-semibold",
     );
     expect(container.querySelector("code")!.className).toContain(
       "rounded-[5px]",
     );
-    expect(container.querySelector("ul")!.className).toContain("list-disc");
+    const list = container.querySelector("ul")!;
+    expect(list.className).toContain("list-disc");
+    expect(list.className).toContain("space-y-2");
+    expect(list.querySelector("li")!.className).toContain("leading-[1.6]");
     expect(container.querySelector("blockquote")!.className).toContain(
       "border-s-2",
     );
     // GFM tables work (remark-gfm through fumadocs-core).
     expect(screen.getByRole("table")).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "A" }).className).toContain(
-      "text-[12.5px]",
+      "text-[12px]",
+    );
+    // Code in a cell stays whole; the table scrolls instead.
+    expect(screen.getAllByRole("cell")[0]!.className).toContain(
+      "[&_code]:whitespace-nowrap",
     );
   });
 
@@ -128,18 +137,47 @@ describe("AskMarkdown", () => {
     );
   });
 
+  it("indents ordered lists so two-digit markers stay in the column", () => {
+    const { container } = render(
+      withIntl(<AskMarkdown text={"### Steps\n\n1. one\n2. two"} />),
+    );
+    expect(container.querySelector("ol")!.className).toContain("ps-7");
+    expect(screen.getByRole("heading", { name: "Steps" }).className).toContain(
+      "text-[1em]",
+    );
+  });
+
   it("highlights code only once the answer is complete", () => {
     const text = "```ts\nconst x = 1;\n```";
     const { container, rerender } = render(
       withIntl(<AskMarkdown text={text} streaming />),
     );
     expect(container.querySelector(".shiki")).toBeNull();
-    expect(screen.getByText("ts")).toBeInTheDocument();
     rerender(withIntl(<AskMarkdown text={text} />));
     expect(container.querySelector(".shiki")).toHaveAttribute(
       "data-lang",
       "ts",
     );
+  });
+
+  it("draws untitled code as the docs do: no header, copy floating at the end", async () => {
+    const { container } = render(
+      withIntl(<AskMarkdown text={"```ts\nconst x = 1;\n```"} streaming />),
+    );
+    // No language label or header bar.
+    expect(screen.queryByText("ts")).toBeNull();
+    expect(screen.queryByText("Terminal")).toBeNull();
+    expect(container.querySelector("pre")!.className).toContain("pe-10");
+    const copy = screen.getByRole("button", { name: "Copy code" });
+    expect(copy.closest(".absolute")!.className).toContain("end-0");
+    await act(async () => fireEvent.click(copy));
+    expect(writeText).toHaveBeenLastCalledWith("const x = 1;");
+  });
+
+  it("titles shell blocks Terminal, with a green prompt", () => {
+    render(withIntl(<AskMarkdown text={"```bash\nsolana --version\n```"} />));
+    expect(screen.getByText("Terminal").className).toContain("text-[12px]");
+    expect(screen.getByText("$").className).toContain("text-[#15803d]");
   });
 
   it("renders shell commands as rows; copying never includes the prompt", async () => {
@@ -162,6 +200,9 @@ describe("AskMarkdown", () => {
     );
     const perRow = screen.getAllByRole("button", { name: "Copy command" });
     expect(perRow).toHaveLength(2);
+    // Revealed on the row's hover or focus, not a column of icons.
+    expect(perRow[0]!.closest(".opacity-0")).not.toBeNull();
+    expect(rows[0]!.className).toContain("group/row");
     await act(async () => fireEvent.click(perRow[1]!));
     expect(writeText).toHaveBeenLastCalledWith("spl-token create-account Abc");
     await act(async () =>

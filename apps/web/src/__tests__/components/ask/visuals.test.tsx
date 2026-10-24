@@ -61,8 +61,12 @@ describe("AskVisual markup", () => {
           expect(html).toContain(step.title);
         }
       }
-      // No simulated execution, mascot or decoration.
-      expect(html).not.toMatch(/Execute|Replay|Vector|gradient|glow|shimmer/i);
+      // No simulated execution, mascot or decoration; the Solana gradient
+      // only as the step rail's hairline.
+      expect(html).not.toMatch(/Execute|Replay|Vector|glow|shimmer/i);
+      expect(html.match(/gradient/g)?.length ?? 0).toBe(
+        html.match(/data-rail=""/g)?.length ?? 0,
+      );
     },
   );
 
@@ -114,6 +118,81 @@ describe("AskVisual markup", () => {
     expect(html).toContain("How they connect");
     expect(html).toContain(">signs<");
     expect(html).toContain("Network model");
+  });
+
+  it("tints each card and link by kind, and drops a type the name says", () => {
+    const { container } = renderVisual(
+      ui({
+        type: "concept_model",
+        nodes: [
+          { id: "p", archetype: "program", label: "Token Program" },
+          { id: "s", archetype: "signer", label: "Mint authority" },
+          { id: "r", archetype: "rpc-node", label: "Helius" },
+          { id: "x", label: "Oracle feed", address: "9xQeWvG816bUx9EP" },
+        ],
+        relationships: [
+          { from: "s", to: "p", kind: "signs" },
+          { from: "p", to: "x", kind: "reads" },
+          { from: "x", to: "r", label: "pays" },
+        ],
+      }),
+    );
+    const card = (id: string) =>
+      container.querySelector<HTMLElement>(`[data-node="${id}"]`)!;
+    expect(card("p").className).toContain("[--tone:var(--tone-blue)]");
+    expect(card("s").className).toContain("[--tone:var(--tone-green)]");
+    expect(card("r").className).toContain("[--tone:var(--tone-amber)]");
+    // The tone shows as the docs' chip mark, not a coloured top rule; a
+    // part of no known kind has none.
+    expect(card("p").className).not.toContain("border-t-");
+    expect(card("p").querySelector(".rotate-45")).not.toBeNull();
+    expect(card("x").querySelector(".rotate-45")).toBeNull();
+    expect(within(card("p")).queryByText("program")).toBeNull();
+    expect(within(card("s")).getByText("signer")).toBeInTheDocument();
+    expect(within(card("r")).getByText("RPC node")).toBeInTheDocument();
+    expect(within(card("x")).getByText("address")).toBeInTheDocument();
+    expect(within(card("x")).getByTitle("9xQeWvG816bUx9EP")).toHaveClass(
+      "truncate",
+    );
+    const link = (id: string) =>
+      container.querySelector<HTMLElement>(`[data-relationship="${id}"]`)!;
+    expect(link("s>p").className).toContain("[--tone:var(--tone-green)]");
+    expect(link("p>x").className).toContain("[--tone:var(--tone-blue)]");
+    expect(link("x>r").className).toContain("[--tone:var(--sol-muted)]");
+  });
+
+  it.each([
+    [1, [], []],
+    [2, ["@[22rem]:grid-cols-2"], ["@xl:grid-cols-3"]],
+    [3, ["@xl:grid-cols-3"], ["@[22rem]:grid-cols-2"]],
+    [4, ["@[22rem]:grid-cols-2"], ["@xl:grid-cols-3"]],
+    [6, ["@[22rem]:grid-cols-2", "@xl:grid-cols-3"], []],
+  ])("lays out %i cards without a lone last card", (count, has, hasNot) => {
+    const { container } = renderVisual(
+      ui({
+        type: "concept_model",
+        nodes: Array.from({ length: count }, (_, i) => ({ label: `N${i}` })),
+      }),
+    );
+    const grid = container.querySelector("[data-node]")!.parentElement!;
+    for (const name of has) expect(grid).toHaveClass(name);
+    for (const name of hasNot) expect(grid).not.toHaveClass(name);
+  });
+
+  it("sets the panel's palette again on its root", () => {
+    const html = markup(createTokenGenerativeUiFixture);
+    expect(html).toContain("[--tone-purple:var(--sol-purple-text)]");
+    expect(html).toContain("dark:[--tone-blue:#82aaff]");
+  });
+
+  it("reads in the direction of its own text, not the page's", () => {
+    expect(markup(createTokenGenerativeUiFixture)).toMatch(
+      /data-ask-visual="" data-dir="ltr" dir="ltr"/,
+    );
+    const arabic = markup(
+      ui({ type: "step_flow", title: "إنشاء رمز", steps: [{ title: "ابدأ" }] }),
+    );
+    expect(arabic).toMatch(/data-dir="rtl" dir="rtl"/);
   });
 
   it("ignores the retired heavyweight components", () => {
@@ -204,30 +283,120 @@ describe("AskVisual markup", () => {
   });
 });
 
-describe("intro", () => {
+describe("intro and paragraphs", () => {
   const intro = ui({
     type: "answer_intro",
     title: "Token lifecycle",
     body: "Create a token by creating a mint account, then minting supply.",
   });
 
-  it("shows when it adds to the summary", () => {
-    expect(markup(intro, { summary: "Tokens live in accounts." })).toContain(
-      "Token lifecycle",
-    );
-  });
-
-  it("is left out when it repeats the summary", () => {
-    expect(
-      markup(intro, {
-        summary:
-          "To create a token, create a mint account and then mint supply.",
-      }),
-    ).toBe("");
+  it("shows the intro only when the answer has no summary", () => {
+    expect(markup(intro)).toContain("Token lifecycle");
+    expect(markup(intro, { summary: "Tokens live in accounts." })).toBe("");
   });
 
   it("waits for the stream to finish", () => {
     expect(markup(intro, { streaming: true })).toBe("");
+  });
+
+  it("gives the merged diagram one paragraph, and none under a summary", () => {
+    const modelBody = "The mint is the token definition.";
+    const flowBody = "These commands create the mint";
+    const html = markup(createTokenGenerativeUiFixture);
+    expect(html).toContain(modelBody);
+    expect(html).not.toContain(flowBody);
+    const summarized = markup(createTokenGenerativeUiFixture, {
+      summary: "Create the mint, then a token account, then mint supply.",
+    });
+    expect(summarized).not.toContain(modelBody);
+    expect(summarized).not.toContain(flowBody);
+    expect(summarized).not.toContain("Create a token in three parts");
+  });
+
+  it("keeps a standalone flow's paragraph when there's no summary", () => {
+    const flow = ui({
+      type: "step_flow",
+      body: "Two commands.",
+      steps: [{ title: "Build" }],
+    });
+    expect(markup(flow)).toContain("Two commands.");
+    expect(markup(flow, { summary: "Build it." })).not.toContain(
+      "Two commands.",
+    );
+  });
+});
+
+describe("steps", () => {
+  it("folds the result into the step's paragraph, without labels", () => {
+    renderVisual(createTokenGenerativeUiFixture);
+    expect(
+      screen.getByText(
+        "Use Token-2022 for the new mint. The command returns the mint address used by later steps. Save the mint address from the command output.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Result")).toBeNull();
+    // Step links sit in the meta row without the "Docs" label.
+    expect(
+      screen.getAllByRole("link", { name: "Token quickstart" }).length,
+    ).toBeGreaterThan(0);
+    expect(screen.queryByText("Docs")).toBeNull();
+  });
+
+  it("uses the result as the paragraph when there's no body, once", () => {
+    const html = markup(
+      ui({
+        type: "step_flow",
+        steps: [
+          { title: "One", result: "It works" },
+          { title: "Two", body: "Run it. It works.", result: "It works." },
+        ],
+      }),
+    );
+    expect(html).toContain(">It works<");
+    expect(html).toContain(">Run it. It works.<");
+  });
+
+  it("opens what changes under the meta row, each with its mark", () => {
+    const { container } = renderVisual(createTokenGenerativeUiFixture);
+    const toggles = screen.getAllByRole("button", { name: "What changes" });
+    const toggle = toggles[1]!;
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    const list = container.querySelector(
+      `#${CSS.escape(toggle.getAttribute("aria-controls")!)}`,
+    )!;
+    expect(
+      [...list.querySelectorAll("[data-effect]")].map((item) => [
+        item.getAttribute("data-effect"),
+        item.firstElementChild!.textContent,
+      ]),
+    ).toEqual([
+      ["reveal", "+"],
+      ["connect", "→"],
+    ]);
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("numbers the steps in one purple and runs the rail purple to green", () => {
+    const { container } = renderVisual(createTokenGenerativeUiFixture);
+    const steps = [...container.querySelectorAll<HTMLElement>("ol > li")];
+    // No colour per position: the cards already use the hues for kinds.
+    for (const step of steps) {
+      expect(step.style.getPropertyValue("--step")).toBe("");
+      expect(step.querySelector("span")!.className).toContain(
+        "text-[var(--tone-purple)]",
+      );
+    }
+    expect(
+      steps.map((step) => step.style.getPropertyValue("--rail-from")),
+    ).toEqual([
+      "var(--tone-purple)",
+      expect.stringContaining("color-mix(in oklab, var(--tone-green) 50%"),
+      "var(--tone-green)",
+    ]);
+    expect(container.querySelectorAll("[data-rail]")).toHaveLength(2);
   });
 });
 
@@ -262,6 +431,7 @@ describe("callouts and commands", () => {
       "text-[var(--sol-purple-text)]",
     );
     expect(screen.getByText("Holds it")).toBeInTheDocument();
+    expect(screen.getByText("$")).toHaveClass("text-[#15803d]");
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Copy command" }));
     });
@@ -324,13 +494,17 @@ describe("merged diagram", () => {
     expect(node(container, "mint")).toHaveAttribute("data-touched", "true");
     expect(node(container, "holder-token")).toHaveAttribute("data-touched");
     expect(node(container, "wallet")).not.toHaveAttribute("data-touched");
-    expect(node(container, "wallet")).toHaveClass("opacity-60");
+    expect(node(container, "wallet")).toHaveClass("opacity-70");
     const changed = node(container, "mint").querySelector("[data-changed]");
     expect(changed).toHaveTextContent("100");
+    // Keys on the tint use muted, not dim (AA).
+    expect(node(container, "mint").querySelector("dt")!.className).toContain(
+      "text-[var(--sol-muted)]",
+    );
 
     fireEvent.mouseLeave(step(container, "step-5"));
     expect(container.querySelector("[data-touched]")).toBeNull();
-    expect(node(container, "wallet")).not.toHaveClass("opacity-60");
+    expect(node(container, "wallet")).not.toHaveClass("opacity-70");
   });
 
   it("highlights the relationships a step creates", () => {
@@ -339,9 +513,9 @@ describe("merged diagram", () => {
     const linked = container.querySelector(
       '[data-relationship="wallet>holder-token"]',
     );
-    expect(linked).not.toHaveClass("opacity-60");
+    expect(linked).not.toHaveClass("opacity-70");
     fireEvent.mouseEnter(step(container, "step-3"));
-    expect(linked).toHaveClass("opacity-60");
+    expect(linked).toHaveClass("opacity-70");
   });
 
   it("marks a closed node when the cleanup step is in view", () => {
@@ -350,6 +524,24 @@ describe("merged diagram", () => {
     const holder = node(container, "holder-token");
     expect(holder).toHaveClass("border-dashed");
     expect(within(holder).getByText("Closed")).toBeInTheDocument();
+  });
+
+  it("ignores the mouseenter a tap sends", () => {
+    const { container } = renderVisual(tokenLifecycleGenerativeUiFixture);
+    const target = step(container, "step-5");
+    // jsdom has no PointerEvent: React's pointerenter comes from pointerover.
+    const pointerOver = (pointerType: string) => {
+      const event = new MouseEvent("pointerover", { bubbles: true });
+      Object.defineProperty(event, "pointerType", { value: pointerType });
+      fireEvent(target, event);
+    };
+    pointerOver("touch");
+    fireEvent.mouseEnter(target);
+    expect(container.querySelector("[data-touched]")).toBeNull();
+    // A mouse after the finger hovers again.
+    pointerOver("mouse");
+    fireEvent.mouseEnter(target);
+    expect(node(container, "mint")).toHaveAttribute("data-touched");
   });
 
   it("follows keyboard focus and pins a step on click", () => {
@@ -375,5 +567,43 @@ describe("merged diagram", () => {
     fireEvent.click(title);
     expect(title).toHaveAttribute("aria-pressed", "false");
     expect(container.querySelector("[data-touched]")).toBeNull();
+  });
+});
+
+describe("entrance", () => {
+  it("animates a visual that arrives while its answer streams, once", () => {
+    const visual = structuredClone(createTokenGenerativeUiFixture);
+    const first = render(withIntl(<AskVisual ui={visual} streaming />));
+    const root = first.container.querySelector("[data-ask-visual]")!;
+    expect(root).toHaveClass("motion-safe:animate-in");
+    const cards = first.container.querySelectorAll<HTMLElement>("[data-node]");
+    expect(
+      [...cards].map((card) => card.style.getPropertyValue("--enter-delay")),
+    ).toEqual(["100ms", "150ms"]);
+    const steps = first.container.querySelectorAll<HTMLElement>("ol > li");
+    expect(steps[0]!.style.getPropertyValue("--enter-delay")).toBe("200ms");
+    expect(first.container.querySelector("[data-rail]")).toHaveClass(
+      "motion-safe:starting:scale-y-0",
+    );
+    first.unmount();
+
+    // Re-mounted (full screen, a new layout): drawn as it is.
+    const again = render(withIntl(<AskVisual ui={visual} streaming />));
+    expect(again.container.querySelector("[data-ask-visual]")).not.toHaveClass(
+      "motion-safe:animate-in",
+    );
+    expect(again.container.querySelector("[data-rail]")).not.toHaveClass(
+      "motion-safe:starting:scale-y-0",
+    );
+  });
+
+  it("doesn't animate a finished answer's visual", () => {
+    const { container } = renderVisual(
+      structuredClone(createTokenGenerativeUiFixture),
+    );
+    expect(container.querySelector("[data-ask-visual]")).not.toHaveClass(
+      "motion-safe:animate-in",
+    );
+    expect(container.querySelector("[style*='--enter-delay']")).toBeNull();
   });
 });

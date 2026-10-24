@@ -1,28 +1,32 @@
 "use client";
 
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 import { useLayoutEffect, useRef, useState } from "react";
 import { cn } from "@/app/components/utils";
 import { ASK_MAX_MESSAGE_CHARS } from "@/lib/docs/ask/config";
 import { askStore } from "@/lib/docs/ask/store";
 import { useAskSelector } from "@/lib/docs/ask/use-ask";
 import { ArrowUpIcon, StopIcon, XIcon } from "../docs-ui-icons";
-import { focusRing } from "./ui";
+import { FileTextIcon } from "./ask-sources.client";
+import { focusRing, mono } from "./ui";
 
 /** How the root finds (and focuses) the composer's field. */
 export const COMPOSER_SELECTOR = "[data-ask-composer]";
 
-/** 1 to 8 lines of 24px, plus the field's top padding. */
-const MAX_HEIGHT = 8 * 24 + 10;
+/** 1 to 8 lines of 20px, plus the field's vertical padding. */
+const MAX_HEIGHT = 8 * 20 + 12;
 
 /**
- * The question field, a copy of the docs header's search field: an optional
- * "This page: …" chip, an autosizing textarea (Enter sends, Shift+Enter
- * adds a line) and Send, which turns into Stop while an answer streams.
- * The draft lives in the store, so it survives switching to full screen.
+ * The question field, one row like the docs header's search field: an
+ * autosizing textarea (Enter sends, Shift+Enter adds a line) with Send
+ * beside it, which turns into Stop while an answer streams. An attached
+ * page sits in a chip above the field. Too long a question turns the ring
+ * red and shows the count. The draft lives in the store, so it survives
+ * switching to full screen.
  */
 export function AskComposer({ fullscreen }: { fullscreen: boolean }) {
   const t = useTranslations("docsAsk");
+  const format = useFormatter();
   const draft = useAskSelector((s) => s.composerDraft);
   const busy = useAskSelector((s) => s.busy);
   const pageContext = useAskSelector((s) => s.pageContext);
@@ -48,20 +52,24 @@ export function AskComposer({ fullscreen }: { fullscreen: boolean }) {
   };
 
   const canSend = draft.trim().length > 0 && !tooLong;
+  const placeholder = empty ? t("placeholder") : t("placeholderFollowUp");
 
   return (
-    <div
-      className={cn(
-        "shrink-0 p-3",
-        fullscreen
-          ? "mx-auto w-full max-w-[46rem] px-6 pb-6 pt-2"
-          : "border-t border-[var(--sol-line)]",
-      )}
-    >
-      <div className="rounded-xl bg-[var(--sol-field)] shadow-[inset_0_0_0_1px_var(--sol-field-line)] transition-shadow duration-150 focus-within:shadow-[inset_0_0_0_1px_var(--sol-purple),0_0_0_3px_var(--sol-purple-soft)] hover:shadow-[inset_0_0_0_1px_var(--sol-field-line-hover)] motion-reduce:transition-none">
+    // The rule spans the panel (in full screen too, like the header's), so
+    // the thread's last line never runs straight into the field.
+    <div className="shrink-0 border-t border-[var(--sol-line)]">
+      <div
+        className={cn(
+          "pt-3",
+          fullscreen
+            ? "mx-auto w-full max-w-[46rem] px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))]"
+            : "px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))]",
+        )}
+      >
         {pageContext ? (
-          <div className="flex px-2.5 pt-2.5">
-            <span className="inline-flex min-w-0 items-center gap-1 rounded-md border border-[var(--sol-line)] bg-[var(--sol-page)] py-0.5 pe-1 ps-2 text-[12px] leading-5 text-[var(--sol-muted)]">
+          <div className="mb-2 flex">
+            <span className="inline-flex min-w-0 items-center gap-1.5 rounded-md border border-[var(--sol-line)] bg-[var(--sol-page)] py-0.5 pe-1 ps-1.5 text-[12px] leading-5 text-[var(--sol-muted)]">
+              <FileTextIcon className="size-3.5 shrink-0 text-[var(--sol-dim)]" />
               <span className="min-w-0 truncate">
                 {t("pageContext", { title: pageContext.title })}
               </span>
@@ -83,36 +91,43 @@ export function AskComposer({ fullscreen }: { fullscreen: boolean }) {
             </span>
           </div>
         ) : null}
-        <textarea
-          ref={field}
-          data-ask-composer=""
-          dir="auto"
-          rows={1}
-          value={draft}
-          aria-label={empty ? t("placeholder") : t("placeholderFollowUp")}
-          placeholder={empty ? t("placeholder") : t("placeholderFollowUp")}
-          aria-invalid={tooLong || undefined}
-          enterKeyHint="send"
-          onChange={(event) => {
-            setRejected(false);
-            askStore.setComposerDraft(event.target.value);
-          }}
-          onKeyDown={(event) => {
-            if (
-              event.key === "Enter" &&
-              !event.shiftKey &&
-              !event.nativeEvent.isComposing
-            ) {
-              event.preventDefault();
-              submit();
-            }
-          }}
+        <div
           className={cn(
-            "m-0 block h-[var(--ask-field-h,auto)] max-h-[202px] w-full resize-none overflow-y-auto border-0 bg-transparent px-3 pt-2.5 text-[14px] leading-6 text-[var(--sol-text)] outline-hidden placeholder:text-[var(--sol-dim)] max-sm:text-[16px]",
-            fullscreen && "text-[15px]",
+            "flex items-end gap-1.5 rounded-[10px] bg-[var(--sol-field)] p-1 ps-3 transition-shadow duration-150 motion-reduce:transition-none",
+            tooLong
+              ? "shadow-[inset_0_0_0_1px_var(--sol-red),0_0_0_3px_rgb(180_35_24/0.12)] dark:shadow-[inset_0_0_0_1px_var(--sol-red),0_0_0_3px_rgb(248_113_113/0.16)]"
+              : "shadow-[inset_0_0_0_1px_var(--sol-field-line)] focus-within:shadow-[inset_0_0_0_1px_var(--sol-purple),0_0_0_3px_var(--sol-purple-soft)] hover:shadow-[inset_0_0_0_1px_var(--sol-field-line-hover)] hover:focus-within:shadow-[inset_0_0_0_1px_var(--sol-purple),0_0_0_3px_var(--sol-purple-soft)]",
           )}
-        />
-        <div className="flex items-center justify-end gap-2 px-2 pb-2">
+        >
+          <textarea
+            ref={field}
+            data-ask-composer=""
+            dir="auto"
+            rows={1}
+            value={draft}
+            aria-label={placeholder}
+            placeholder={placeholder}
+            aria-invalid={tooLong || undefined}
+            enterKeyHint="send"
+            onChange={(event) => {
+              setRejected(false);
+              askStore.setComposerDraft(event.target.value);
+            }}
+            onKeyDown={(event) => {
+              if (
+                event.key === "Enter" &&
+                !event.shiftKey &&
+                !event.nativeEvent.isComposing
+              ) {
+                event.preventDefault();
+                submit();
+              }
+            }}
+            className={cn(
+              "m-0 h-[var(--ask-field-h,auto)] max-h-[172px] min-h-8 min-w-0 flex-1 resize-none overflow-y-auto border-0 bg-transparent px-0 py-1.5 text-[14px] leading-5 text-[var(--sol-text)] outline-hidden placeholder:text-[var(--sol-dim)] max-sm:text-[16px]",
+              fullscreen && "text-[15px] leading-6",
+            )}
+          />
           {busy ? (
             <button
               type="button"
@@ -120,7 +135,9 @@ export function AskComposer({ fullscreen }: { fullscreen: boolean }) {
               title={t("stop")}
               onClick={() => askStore.stop()}
               className={cn(
-                "grid size-7 place-items-center rounded-lg bg-[var(--sol-text)] text-[var(--sol-page)] transition-opacity duration-150 hover:opacity-80 motion-reduce:transition-none [&_svg]:size-3",
+                // The docs' icon button, not a black square: the loudest
+                // control while an answer streams shouldn't be Stop.
+                "grid size-8 shrink-0 place-items-center rounded-lg bg-[var(--sol-soft)] text-[var(--sol-text)] shadow-[inset_0_0_0_1px_var(--sol-line-strong)] transition-colors duration-150 hover:bg-[var(--sol-line)] motion-reduce:transition-none [&_svg]:size-2.5",
                 focusRing,
               )}
             >
@@ -134,7 +151,7 @@ export function AskComposer({ fullscreen }: { fullscreen: boolean }) {
               disabled={!canSend}
               onClick={submit}
               className={cn(
-                "grid size-7 place-items-center rounded-lg transition-colors duration-150 motion-reduce:transition-none [&_svg]:size-4",
+                "grid size-8 shrink-0 place-items-center rounded-lg transition-colors duration-150 motion-reduce:transition-none [&_svg]:size-4",
                 canSend
                   ? "bg-[var(--sol-cta)] text-[var(--sol-cta-text)] hover:bg-[var(--sol-cta-hover)]"
                   : "cursor-default bg-[var(--sol-soft)] text-[var(--sol-dim)]",
@@ -145,18 +162,26 @@ export function AskComposer({ fullscreen }: { fullscreen: boolean }) {
             </button>
           )}
         </div>
+        {tooLong ? (
+          <div className="mt-2 flex items-baseline justify-between gap-3">
+            <p
+              role="alert"
+              className="m-0 text-[12px] leading-4 text-[var(--sol-red)]"
+            >
+              {t("errors.tooLong")}
+            </p>
+            <span
+              className={cn(
+                mono,
+                "shrink-0 text-[11px] leading-4 tabular-nums text-[var(--sol-red)]",
+              )}
+            >
+              {format.number(draft.length)}/
+              {format.number(ASK_MAX_MESSAGE_CHARS)}
+            </span>
+          </div>
+        ) : null}
       </div>
-      {tooLong ? (
-        <p
-          role="alert"
-          className="m-0 mt-2 text-[12px] leading-4 text-[var(--sol-red)]"
-        >
-          {t("errors.tooLong")}
-        </p>
-      ) : null}
-      <p className="m-0 mt-2 text-center text-[11.5px] leading-4 text-[var(--sol-dim)]">
-        {t("disclaimer")}
-      </p>
     </div>
   );
 }

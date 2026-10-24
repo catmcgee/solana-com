@@ -22,8 +22,9 @@ export function CopyButton({ text, label }: { text: string; label: string }) {
           focusRing,
         )}
       >
+        {/* The docs' copied check: purple, and it pops in. */}
         {copied ? (
-          <CheckIcon className="size-3.5" />
+          <CheckIcon className="size-3.5 text-[var(--sol-purple)] animate-in zoom-in-50 duration-150 motion-reduce:animate-none" />
         ) : (
           <CopyIcon className="size-4" />
         )}
@@ -65,8 +66,9 @@ export function CommandText({ command }: { command: string }) {
 }
 
 /**
- * One shell command with a `$` prompt (not selected or copied) and a copy
- * button; multi-line code drops the prompt and scrolls instead of wrapping.
+ * One shell command with a green `$` prompt, as the docs' terminals (not
+ * selected or copied), and a copy button; multi-line code drops the prompt
+ * and scrolls instead of wrapping.
  * `row` sits in a list frame, `boxed` stands alone in a step, `compact`
  * goes in the setup checklist.
  */
@@ -81,7 +83,7 @@ export function CommandRow({
 }) {
   const t = useTranslations("docsAsk");
   const multiline = command.includes("\n");
-  const size = variant === "compact" ? "text-[12px]" : "text-[12.5px]";
+  const size = variant === "compact" ? "text-[12px]" : "text-[13px]";
   // Commands read left to right on right-to-left pages too, as in the docs.
   return (
     <div
@@ -101,7 +103,7 @@ export function CommandRow({
           className={cn(
             mono,
             size,
-            "select-none leading-[26px] text-[var(--sol-dim)]",
+            "select-none leading-[26px] text-[#15803d] dark:text-[#4ade80]",
           )}
         >
           $

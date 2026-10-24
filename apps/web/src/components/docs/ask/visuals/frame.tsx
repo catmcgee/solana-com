@@ -9,14 +9,10 @@ import { cn } from "@/app/components/utils";
 import { ArrowUpRightIcon } from "../../docs-ui-icons";
 import { DocsLink } from "../../docs-link";
 import type { VisualLink } from "@/lib/docs/ask/generative-ui/schema";
-import { focusRing, mono } from "../ui";
+import { focusRing, mono, signatureLabel } from "../ui";
 import { DisclosureIcon } from "./icons";
 
-export { focusRing, mono };
-
-/** The docs' signature label (sidebar sections, "On this page"). */
-export const signatureLabel =
-  "font-[family-name:var(--sol-font-mono)] text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--sol-dim)]";
+export { focusRing, mono, signatureLabel };
 
 export const bodyText = "text-[var(--ask-body,var(--sol-muted))]";
 
@@ -69,12 +65,12 @@ export function Disclosure({
     <details className={cn("group/disclosure", className)}>
       <summary
         className={cn(
-          "inline-flex cursor-pointer list-none items-center gap-1.5 rounded-md text-[12.5px] text-[var(--sol-muted)] transition-colors duration-150 hover:text-[var(--sol-text)] motion-reduce:transition-none [&::-webkit-details-marker]:hidden",
+          "inline-flex cursor-pointer list-none items-center gap-1.5 rounded-md text-[12px] text-[var(--sol-muted)] transition-colors duration-150 hover:text-[var(--sol-text)] motion-reduce:transition-none [&::-webkit-details-marker]:hidden",
           focusRing,
           summaryClassName,
         )}
       >
-        <DisclosureIcon className="shrink-0 -rotate-90 text-[var(--sol-dim)] transition-[rotate] duration-150 group-open/disclosure:!rotate-0 motion-reduce:transition-none rtl:rotate-90" />
+        <DisclosureIcon className="shrink-0 -rotate-90 text-[var(--sol-dim)] transition-[rotate] duration-150 group-open/disclosure:!rotate-0 motion-reduce:transition-none group-data-[dir=rtl]/visual:rotate-90" />
         {summary}
       </summary>
       {children}
@@ -100,7 +96,7 @@ export function VisualLinkItem({ link }: { link: VisualLink }) {
         className={cn(linkStyle, focusRing, "rounded-sm")}
       >
         {link.title}
-        <ArrowUpRightIcon className="ms-0.5 inline size-3 align-[-1px] rtl:-scale-x-100" />
+        <ArrowUpRightIcon className="ms-0.5 inline size-3 align-[-1px] group-data-[dir=rtl]/visual:-scale-x-100" />
       </a>
     );
   }
@@ -115,28 +111,50 @@ export function VisualLinkItem({ link }: { link: VisualLink }) {
   );
 }
 
-/** "DOCS  Token quickstart · Create token account". */
+/**
+ * Docs links in a row: "DOCS  Token quickstart  Create token account" in a
+ * frame's footer, or bare (no `label`) in a step's meta row.
+ */
 export function VisualLinks({
   label,
   links,
   className,
 }: {
-  label: string;
+  label?: string;
   links: VisualLink[];
   className?: string;
 }) {
   if (links.length === 0) return null;
+  const items = links.map((link) => (
+    <VisualLinkItem key={link.href} link={link} />
+  ));
+  if (!label) return <>{items}</>;
   return (
     <div
       className={cn(
-        "flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[12.5px]",
+        "flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[12px]",
         className,
       )}
     >
       <span className={signatureLabel}>{label}</span>
-      {links.map((link) => (
-        <VisualLinkItem key={link.href} link={link} />
-      ))}
+      {items}
     </div>
+  );
+}
+
+/**
+ * The frame's one paragraph (the model's or the flow's), shown only when
+ * the answer has no summary to say it already.
+ */
+export function FrameProse({ text }: { text: string }) {
+  return (
+    <p
+      className={cn(
+        bodyText,
+        "m-0 border-b border-[var(--sol-line)] px-3.5 py-2.5 text-[13px] leading-[1.6]",
+      )}
+    >
+      {text}
+    </p>
   );
 }

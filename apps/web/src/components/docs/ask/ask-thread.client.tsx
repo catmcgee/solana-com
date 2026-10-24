@@ -4,21 +4,58 @@ import { useTranslations } from "next-intl";
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type MouseEvent,
 } from "react";
 import { cn } from "@/app/components/utils";
 import { splitAnswerSections } from "@/lib/docs/ask/protocol";
-import type { AskAssistantMessage } from "@/lib/docs/ask/store";
+import type {
+  AskAssistantMessage,
+  AskMessage,
+  AskUserMessage,
+} from "@/lib/docs/ask/store";
 import { useAskSelector } from "@/lib/docs/ask/use-ask";
 import { ArrowDownIcon } from "../docs-ui-icons";
 import { AskEmpty } from "./ask-empty.client";
-import { AssistantMessage, UserMessage } from "./ask-message.client";
+import { AskTurn } from "./ask-message.client";
 import { focusRing, visuallyHidden } from "./ui";
 
 /** Within this many px of the end counts as "at the bottom". */
 const STICK_THRESHOLD = 80;
+
+type Turn = {
+  key: string;
+  question?: AskUserMessage;
+  answer?: AskAssistantMessage;
+};
+
+/** Questions with their answers, one list item each. */
+function toTurns(messages: AskMessage[]): Turn[] {
+  const turns: Turn[] = [];
+  for (const message of messages) {
+    const current = turns.at(-1);
+    if (message.role === "user") {
+      turns.push({ key: message.id, question: message });
+    } else if (current?.question && !current.answer) {
+      current.answer = message;
+    } else {
+      turns.push({ key: message.id, answer: message });
+    }
+  }
+  return turns;
+}
+
+/**
+ * Something the reader hasn't seen yet: a new turn, or the latest answer's
+ * text, visual, sources or state changing.
+ */
+function progress(messages: AskMessage[]): string {
+  const last = messages.at(-1);
+  if (last?.role !== "assistant") return String(messages.length);
+  return `${messages.length}:${last.state}:${last.text.length}:${last.ui ? 1 : 0}:${last.citations.length}`;
+}
 
 /** Markdown as one line of plain text, for the live region. */
 function plainText(markdown: string): string {
@@ -65,22 +102,33 @@ function useAnnouncement(last: AskAssistantMessage | undefined): string {
 }
 
 /**
- * The conversation, scrolled to the end as answers arrive while the
- * reader is at the bottom; once they scroll up it stays put and a "↓"
- * button jumps back. Messages are a list; a polite live region announces
- * status changes and finished answers.
+ * The conversation as a list of turns (question as heading, then its
+ * answer), scrolled to the end as answers arrive while the reader is at the
+ * bottom. Once they scroll up it stays put; a labelled "Jump to latest"
+ * pill appears at the inline end only while something new is arriving or
+ * has arrived below. A polite live region announces status changes and
+ * finished answers.
  */
 export function AskThread({ fullscreen }: { fullscreen: boolean }) {
   const messages = useAskSelector((s) => s.messages);
+  const busy = useAskSelector((s) => s.busy);
   const scroller = useRef<HTMLDivElement>(null);
   const content = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
   const [away, setAway] = useState(false);
+  const [unseen, setUnseen] = useState(false);
 
+  const turns = useMemo(() => toTurns(messages), [messages]);
   const last = messages.at(-1);
   const lastAssistant = last?.role === "assistant" ? last : undefined;
   const announcement = useAnnouncement(lastAssistant);
   const t = useTranslations("docsAsk");
+
+  // What was already there when the thread mounted (a restored
+  // conversation, or the switch to full screen) appears without motion.
+  const initial = useRef<Set<string> | null>(null);
+  initial.current ??= new Set(messages.map((message) => message.id));
+  const isNew = (id?: string) => !!id && !initial.current?.has(id);
 
   const toBottom = useCallback((smooth = false) => {
     const el = scroller.current;
@@ -101,6 +149,7 @@ export function AskThread({ fullscreen }: { fullscreen: boolean }) {
     const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
     stick.current = distance < STICK_THRESHOLD;
     setAway(!stick.current);
+    if (stick.current) setUnseen(false);
   }, []);
 
   // A new question always brings the end into view.
@@ -109,6 +158,15 @@ export function AskThread({ fullscreen }: { fullscreen: boolean }) {
     stick.current = true;
     toBottom();
   }, [count, toBottom]);
+
+  // New content while the reader is up the thread: offer the way down.
+  const step = progress(messages);
+  const seenStep = useRef(step);
+  useEffect(() => {
+    if (step === seenStep.current) return;
+    seenStep.current = step;
+    if (!stick.current) setUnseen(true);
+  }, [step]);
 
   // Growth (text, a visual, sources) follows the end while the reader is
   // there. Opening a disclosure is reading, not waiting: it stops following.
@@ -127,6 +185,8 @@ export function AskThread({ fullscreen }: { fullscreen: boolean }) {
       stick.current = false;
   };
 
+  const showJump = away && messages.length > 0 && (busy || unseen);
+
   return (
     <div className="relative min-h-0 flex-1">
       <div
@@ -134,49 +194,57 @@ export function AskThread({ fullscreen }: { fullscreen: boolean }) {
         onScroll={onScroll}
         className="h-full overflow-y-auto overscroll-contain"
       >
+        {/* pb-12 keeps the end clear of the Jump to latest pill. */}
         <div
           ref={content}
           onClickCapture={onToggle}
           className={cn(
-            fullscreen ? "mx-auto w-full max-w-[46rem] px-6 py-8" : "px-5 py-5",
+            fullscreen
+              ? "mx-auto w-full max-w-[46rem] px-6 pb-12 pt-8"
+              : "px-4 pb-12 pt-5",
           )}
         >
           {messages.length === 0 ? (
             <AskEmpty />
           ) : (
-            <ol className="m-0 list-none space-y-8 p-0">
-              {messages.map((message) => (
-                <li key={message.id}>
-                  {message.role === "user" ? (
-                    <UserMessage message={message} fullscreen={fullscreen} />
-                  ) : (
-                    <AssistantMessage
-                      message={message}
-                      latest={message === last}
-                      fullscreen={fullscreen}
-                    />
+            <ol className="m-0 list-none p-0">
+              {turns.map((turn, index) => (
+                <li
+                  key={turn.key}
+                  className={cn(
+                    "group/turn",
+                    index > 0 && "mt-8 border-t border-[var(--sol-line)] pt-6",
                   )}
+                >
+                  <AskTurn
+                    question={turn.question}
+                    answer={turn.answer}
+                    latest={index === turns.length - 1}
+                    fullscreen={fullscreen}
+                    enterQuestion={isNew(turn.question?.id)}
+                    enterAnswer={isNew(turn.answer?.id)}
+                  />
                 </li>
               ))}
             </ol>
           )}
         </div>
       </div>
-      {away && messages.length > 0 ? (
+      {showJump ? (
         <button
           type="button"
-          aria-label={t("jumpToLatest")}
-          title={t("jumpToLatest")}
           onClick={() => {
             stick.current = true;
+            setUnseen(false);
             toBottom(true);
           }}
           className={cn(
-            "absolute inset-x-0 bottom-3 mx-auto grid size-8 place-items-center rounded-full border border-[var(--sol-line-strong)] bg-[var(--sol-page)] text-[var(--sol-muted)] shadow-[var(--sol-menu-shadow)] transition-colors duration-150 hover:bg-[var(--sol-soft)] hover:text-[var(--sol-text)] motion-reduce:transition-none",
+            "absolute bottom-3 end-4 inline-flex h-7 items-center gap-1 rounded-full border border-[var(--sol-line-strong)] bg-[var(--sol-page)] pe-2.5 ps-2 text-[12px] leading-4 text-[var(--sol-muted)] shadow-[var(--sol-menu-shadow)] transition-colors duration-150 animate-in fade-in-0 slide-in-from-bottom-1 hover:bg-[var(--sol-soft)] hover:text-[var(--sol-text)] motion-reduce:animate-none motion-reduce:transition-none [&_svg]:size-3",
             focusRing,
           )}
         >
           <ArrowDownIcon />
+          {t("jumpToLatest")}
         </button>
       ) : null}
       <div aria-live="polite" className={visuallyHidden}>

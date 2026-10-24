@@ -6,6 +6,8 @@ import { useTranslations } from "next-intl";
 import {
   Component,
   Suspense,
+  useId,
+  useState,
   type ComponentProps,
   type ReactNode,
 } from "react";
@@ -15,9 +17,9 @@ import { isDocsHref } from "@/lib/docs/docs-href";
 import { currentLocale } from "@/lib/docs/ask/page-context";
 import { normalizeDocsHref } from "@/lib/docs/ask/protocol";
 import { DocsLink } from "../docs-link";
-import { ArrowUpRightIcon } from "../docs-ui-icons";
+import { ArrowUpRightIcon, CaretIcon } from "../docs-ui-icons";
 import { CommandText, CopyButton } from "./visuals/command-row.client";
-import { focusRing, mono } from "./ui";
+import { focusRing, mono, spinner } from "./ui";
 
 /**
  * An answer's Markdown with every element styled explicitly: the panel sits
@@ -32,16 +34,29 @@ import { focusRing, mono } from "./ui";
 const linkClass =
   "rounded-sm text-[var(--sol-link)] underline decoration-[var(--sol-link-underline)] decoration-1 underline-offset-[3px] transition-colors duration-150 hover:text-[var(--sol-link-hover)] hover:decoration-current motion-reduce:transition-none";
 
+// In em, so headings scale with the body (14px docked, 15.5px full screen)
+// and never come out smaller than it.
 const headingClass =
-  "mb-2 mt-6 font-medium leading-6 tracking-[-0.01em] text-[var(--sol-text)] first:mt-0";
+  "mb-1.5 mt-5 font-medium leading-[1.45] tracking-[-0.01em] text-[var(--sol-text)] first:mt-0";
+// Not `cn`: tailwind-merge would drop the leading for the font size.
+const majorHeading = `${headingClass} text-[1.0625em]`;
+const minorHeading = `${headingClass} text-[1em]`;
+
+/** Items further apart than wrapped lines, so a list reads as items. */
+const listClass =
+  "my-3 space-y-2 marker:text-[var(--sol-dim)] first:mt-0 last:mb-0";
 
 // Off docs pages the site's reboot gives `code` its own font: inherit ours.
+// `pe-10` keeps the last characters clear of the floating copy button.
 const preClass = cn(
   mono,
-  "m-0 overflow-x-auto px-4 py-3 text-[12.5px] leading-[1.7] [&_code]:[font-family:inherit]",
+  "m-0 overflow-x-auto py-3 pe-10 ps-4 text-[13px] leading-[1.7] [&_code]:[font-family:inherit]",
   focusRing,
   "focus-visible:-outline-offset-2",
 );
+
+/** The docs terminals' green prompt (demo.css `.sol-term`). */
+const promptClass = "text-[#15803d] dark:text-[#4ade80]";
 
 /** The docs' code themes (lib/docs/code-options.mjs). */
 const SHIKI_OPTIONS = {
@@ -174,31 +189,51 @@ function PlainCode({ code }: { code: string }) {
   );
 }
 
+const frameClass =
+  "relative my-4 overflow-hidden rounded-xl border border-[var(--sol-line)] bg-[var(--ask-code-bg)] first:mt-0 last:mb-0";
+
+/**
+ * An untitled block, as the docs draw one: no header, the copy button
+ * floating at the top end, with the code fading out under it (the docs'
+ * `.code-block-fade-overlay`).
+ */
 function CodeFrame({
-  language,
   copyText,
   copyLabel,
   children,
 }: {
-  language: string | null;
   copyText: string;
   copyLabel: string;
   children: ReactNode;
 }) {
   // Code stays left to right on right-to-left pages, as in the docs.
   return (
-    <div
-      dir="ltr"
-      className="my-4 overflow-hidden rounded-xl border border-[var(--sol-line)] bg-[var(--ask-code-bg)] first:mt-0 last:mb-0"
-    >
-      <div className="flex h-9 items-center justify-between border-b border-[var(--sol-line)] bg-[var(--ask-code-head)] pe-1.5 ps-3">
-        <span
-          className={cn(
-            mono,
-            "text-[11px] lowercase leading-4 text-[var(--sol-dim)]",
-          )}
-        >
-          {language}
+    <div dir="ltr" className={frameClass}>
+      {children}
+      <div className="absolute end-0 top-0 bg-[linear-gradient(to_right,transparent,var(--ask-code-bg)_1rem)] pb-0.5 pe-2 ps-4 pt-2.5">
+        <CopyButton text={copyText} label={copyLabel} />
+      </div>
+    </div>
+  );
+}
+
+/** A titled block, as the docs' "Terminal" ones: sans title, copy all. */
+function TerminalFrame({
+  title,
+  copyText,
+  copyLabel,
+  children,
+}: {
+  title: string;
+  copyText: string;
+  copyLabel: string;
+  children: ReactNode;
+}) {
+  return (
+    <div dir="ltr" className={frameClass}>
+      <div className="flex h-9 items-center justify-between border-b border-[var(--sol-line)] bg-[var(--ask-code-head)] pe-1.5 ps-3.5">
+        <span className="text-[12px] font-medium leading-4 text-[var(--sol-muted)]">
+          {title}
         </span>
         <CopyButton text={copyText} label={copyLabel} />
       </div>
@@ -222,25 +257,25 @@ export function AskCodeBlock({
     const lines = parseShellLines(code);
     const commands = lines.filter((line) => line.kind === "command");
     return (
-      <CodeFrame
-        language={language ?? "shell"}
+      <TerminalFrame
+        title={t("terminal")}
         copyText={commands.map((line) => line.text).join("\n")}
         copyLabel={t("copyCode")}
       >
-        <ul className="m-0 list-none py-2 pe-1.5 ps-4">
+        <ul className="m-0 list-none py-2 pe-1.5 ps-3.5">
           {lines.map((line, index) => (
             <li
               key={index}
               className={cn(
                 mono,
-                "flex items-start gap-2 text-[12.5px] leading-5",
+                "group/row flex items-start gap-2 text-[13px] leading-5",
               )}
             >
               {line.kind === "command" ? (
                 <>
                   <span
                     aria-hidden="true"
-                    className="select-none py-[3px] text-[var(--sol-dim)]"
+                    className={cn("select-none py-[3px]", promptClass)}
                   >
                     $
                   </span>
@@ -252,8 +287,12 @@ export function AskCodeBlock({
                   >
                     <CommandText command={line.text} />
                   </code>
+                  {/* One copy per command would stack a column of icons:
+                      it shows on the row's hover or focus (always on touch). */}
                   {commands.length > 1 ? (
-                    <CopyButton text={line.text} label={t("copyCommand")} />
+                    <span className="opacity-0 transition-opacity duration-150 group-focus-within/row:opacity-100 group-hover/row:opacity-100 motion-reduce:transition-none [@media(hover:none)]:opacity-100">
+                      <CopyButton text={line.text} label={t("copyCommand")} />
+                    </span>
                   ) : null}
                 </>
               ) : (
@@ -269,12 +308,12 @@ export function AskCodeBlock({
             </li>
           ))}
         </ul>
-      </CodeFrame>
+      </TerminalFrame>
     );
   }
   const plain = <PlainCode code={code} />;
   return (
-    <CodeFrame language={language} copyText={code} copyLabel={t("copyCode")}>
+    <CodeFrame copyText={code} copyLabel={t("copyCode")}>
       {highlight ? (
         <div className="dark:[&_.shiki]:!text-[var(--shiki-dark)] dark:[&_.shiki_span]:!text-[var(--shiki-dark)]">
           <HighlightBoundary fallback={plain}>
@@ -304,7 +343,7 @@ function AskLink({ href, children }: ComponentProps<"a">) {
     return (
       <a href={target} target="_blank" rel="noreferrer" className={linkClass}>
         {children}
-        <ArrowUpRightIcon className="ms-0.5 inline size-3 align-[-1px] rtl:-scale-x-100" />
+        <ArrowUpRightIcon className="ms-0.5 inline size-3 align-[-1px] group-data-[dir=rtl]/answer:-scale-x-100" />
       </a>
     );
   }
@@ -320,39 +359,27 @@ function components(highlight: boolean): Components {
     p: ({ children }) => (
       <p className="my-3 first:mt-0 last:mb-0">{children}</p>
     ),
-    h1: ({ children }) => (
-      <h3 className={cn(headingClass, "text-[15px]")}>{children}</h3>
-    ),
-    h2: ({ children }) => (
-      <h3 className={cn(headingClass, "text-[15px]")}>{children}</h3>
-    ),
-    h3: ({ children }) => (
-      <h4 className={cn(headingClass, "text-[14px]")}>{children}</h4>
-    ),
-    h4: ({ children }) => (
-      <h4 className={cn(headingClass, "text-[14px]")}>{children}</h4>
-    ),
-    h5: ({ children }) => (
-      <h4 className={cn(headingClass, "text-[14px]")}>{children}</h4>
-    ),
-    h6: ({ children }) => (
-      <h4 className={cn(headingClass, "text-[14px]")}>{children}</h4>
-    ),
+    // The panel title is the page's heading: answers start one level down.
+    h1: ({ children }) => <h3 className={majorHeading}>{children}</h3>,
+    h2: ({ children }) => <h3 className={majorHeading}>{children}</h3>,
+    h3: ({ children }) => <h4 className={minorHeading}>{children}</h4>,
+    h4: ({ children }) => <h4 className={minorHeading}>{children}</h4>,
+    h5: ({ children }) => <h4 className={minorHeading}>{children}</h4>,
+    h6: ({ children }) => <h4 className={minorHeading}>{children}</h4>,
     ul: ({ children }) => (
-      <ul className="my-3 list-disc space-y-1 ps-5 marker:text-[var(--sol-dim)] first:mt-0 last:mb-0">
-        {children}
-      </ul>
+      <ul className={cn(listClass, "list-disc ps-5")}>{children}</ul>
     ),
+    // The docs prose indent (1.75rem): tabular "1. " markers at 15.5px
+    // would hang outside a narrower one.
     ol: ({ children, start }) => (
-      <ol
-        start={start}
-        className="my-3 list-decimal space-y-1 ps-5 marker:text-[var(--sol-dim)] first:mt-0 last:mb-0"
-      >
+      <ol start={start} className={cn(listClass, "list-decimal ps-7")}>
         {children}
       </ol>
     ),
     li: ({ children }) => (
-      <li className="ps-1 [&>ol]:my-1 [&>p]:my-1 [&>ul]:my-1">{children}</li>
+      <li className="ps-1 leading-[1.6] [&>ol]:my-2 [&>p]:my-1 [&>ul]:my-2">
+        {children}
+      </li>
     ),
     a: AskLink,
     strong: ({ children }) => (
@@ -394,12 +421,14 @@ function components(highlight: boolean): Components {
       </div>
     ),
     th: ({ children }) => (
-      <th className="bg-[var(--sol-surface-2)] px-3 py-2 text-start text-[12.5px] font-medium leading-5 text-[var(--sol-muted)]">
+      <th className="bg-[var(--sol-surface-2)] px-3 py-2 text-start text-[12px] font-medium leading-5 text-[var(--sol-muted)]">
         {children}
       </th>
     ),
+    // Code in a cell stays whole ("invoke_signed", not "invoke_signe/d"):
+    // the table's wrapper scrolls instead.
     td: ({ children }) => (
-      <td className="border-t border-[var(--sol-line)] px-3 py-2 align-top text-[13px] leading-5">
+      <td className="border-t border-[var(--sol-line)] px-3 py-2 align-top text-[13px] leading-5 [&_code]:whitespace-nowrap [&_code]:[overflow-wrap:normal]">
         {children}
       </td>
     ),
@@ -426,5 +455,86 @@ export function AskMarkdown({
     >
       {text}
     </Markdown>
+  );
+}
+
+/**
+ * Answers whose full text the reader opened. Switching between docked and
+ * full screen remounts the thread, and full screen is where a long answer
+ * gets read, so this outlives the component.
+ */
+const openAnswers = new Set<string>();
+
+/**
+ * "Full answer": the agent's in-depth section folded under a docs accordion
+ * row (caret at the start, hairline box), the text under the row, fading in
+ * when the reader opens it.
+ */
+export function AskFullAnswer({
+  messageId,
+  text,
+  streaming,
+  partial = false,
+}: {
+  messageId: string;
+  /** The in-depth Markdown (`splitAnswerSections(...).inDepth`). */
+  text: string;
+  /** Still arriving: a spinner on the closed row, code stays plain. */
+  streaming: boolean;
+  /** Stopped or failed before the end: not called "Full answer". */
+  partial?: boolean;
+}) {
+  const t = useTranslations("docsAsk");
+  const [open, setOpen] = useState(() => openAnswers.has(messageId));
+  // Fade in only when the reader opens it, not when a remount restores it.
+  const [opened, setOpened] = useState(false);
+  const id = useId();
+  const toggle = () => {
+    if (open) openAnswers.delete(messageId);
+    else openAnswers.add(messageId);
+    setOpened(!open);
+    setOpen(!open);
+  };
+  return (
+    <div className="mt-4">
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={open ? id : undefined}
+        onClick={toggle}
+        className={cn(
+          "flex w-full items-center gap-2.5 rounded-xl border border-[var(--sol-line)] px-3.5 py-2.5 text-start text-[14px] font-medium leading-5 text-[var(--sol-text)] transition-colors duration-150 hover:bg-[var(--sol-soft)] motion-reduce:transition-none",
+          focusRing,
+        )}
+      >
+        <CaretIcon
+          className={cn(
+            "size-3 shrink-0 text-[var(--sol-muted)] transition-[rotate] duration-200 motion-reduce:transition-none",
+            // As the docs' accordion: closed points right in any direction.
+            !open && "-rotate-90",
+          )}
+        />
+        <span className="min-w-0 flex-1">
+          {partial
+            ? t(open ? "hidePartialAnswer" : "showPartialAnswer")
+            : t(open ? "showLess" : "showFullAnswer")}
+        </span>
+        {streaming && !open ? (
+          <span aria-hidden="true" className={spinner} />
+        ) : null}
+      </button>
+      {open ? (
+        <div
+          id={id}
+          className={cn(
+            "mt-3",
+            opened &&
+              "animate-in fade-in-0 duration-200 motion-reduce:animate-none",
+          )}
+        >
+          <AskMarkdown text={text} streaming={streaming} />
+        </div>
+      ) : null}
+    </div>
   );
 }

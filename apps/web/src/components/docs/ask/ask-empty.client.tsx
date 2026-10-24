@@ -2,7 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { usePathname } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState } from "react";
 import { cn } from "@/app/components/utils";
 import { askStore } from "@/lib/docs/ask/store";
 import { useAskSelector } from "@/lib/docs/ask/use-ask";
@@ -10,39 +10,28 @@ import {
   readPageContext,
   type AskPageContext,
 } from "@/lib/docs/ask/page-context";
-import { ArrowUpRightIcon } from "../docs-ui-icons";
-import { focusRing, signatureLabel } from "./ui";
-
-const SUGGESTIONS = ["token", "pda", "fees", "cpi"] as const;
-
-function SuggestionRow({
-  onClick,
-  children,
-}: {
-  onClick: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <li>
-      <button
-        type="button"
-        onClick={onClick}
-        className={cn(
-          "group flex w-full items-center gap-3 rounded-xl border border-[var(--sol-line)] px-3.5 py-2.5 text-start text-[13.5px] leading-5 text-[var(--sol-muted)] transition-colors duration-150 hover:border-[var(--sol-purple-line)] hover:bg-[var(--sol-purple-soft)] hover:text-[var(--sol-purple-text)] motion-reduce:transition-none",
-          focusRing,
-        )}
-      >
-        <span className="min-w-0 flex-1">{children}</span>
-        <ArrowUpRightIcon className="size-3.5 shrink-0 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100 motion-reduce:transition-none rtl:-scale-x-100" />
-      </button>
-    </li>
-  );
-}
+import { FileTextIcon } from "./ask-sources.client";
+import { focusRing, iconTile, signatureLabel } from "./ui";
 
 /**
- * The empty thread: what the panel answers from, and questions to start
- * with. On a docs page the first row attaches that page to the composer
- * (and goes once it is attached).
+ * Each suggestion marked in the tone its subject has in the diagrams:
+ * minting green, deriving purple, invoking blue, validators amber.
+ */
+const SUGGESTIONS = [
+  { key: "token", mark: "bg-[var(--tone-green)]" },
+  { key: "pda", mark: "bg-[var(--tone-purple)]" },
+  { key: "fees", mark: "bg-[var(--tone-amber)]" },
+  { key: "cpi", mark: "bg-[var(--tone-blue)]" },
+] as const;
+
+/** Unboxed rows, as the docs sidebar's links; negative margins hang the hover fill. */
+const rowClass =
+  "-mx-2 flex w-[calc(100%+1rem)] items-center rounded-lg px-2 text-start transition-colors duration-150 hover:bg-[var(--sol-soft)] motion-reduce:transition-none";
+
+/**
+ * The empty thread: one line on what the panel answers from, "Ask about
+ * this page" (a docs page only, until it is attached) as a page-actions
+ * row, questions to start with, and the disclaimer last.
  */
 export function AskEmpty() {
   const t = useTranslations("docsAsk");
@@ -55,34 +44,62 @@ export function AskEmpty() {
   const attached = useAskSelector((s) => s.pageContext?.url ?? null);
 
   return (
-    <div className="pt-2">
-      <h3 className="m-0 text-[15px] font-medium leading-6 tracking-[-0.01em] text-[var(--sol-text)]">
-        {t("emptyTitle")}
-      </h3>
-      <p className="m-0 mt-1 text-[13.5px] leading-[1.55] text-[var(--sol-muted)]">
-        {t("emptyBody")}
+    <div>
+      {/* Rows follow the page's direction; <bdi> keeps an untranslated
+          (English) sentence's full stop at its end on an Arabic page. */}
+      <p className="m-0 text-[14px] leading-[1.55] text-[var(--sol-muted)]">
+        <bdi>{t("emptyBody")}</bdi>
       </p>
-      <p className={cn(signatureLabel, "m-0 mt-6")}>{t("suggestionsLabel")}</p>
-      <ul className="m-0 mt-2.5 list-none space-y-2 p-0">
-        {page && page.url !== attached ? (
-          <SuggestionRow onClick={() => askStore.attachCurrentPage()}>
-            {t("askAboutPage")}
-            <span className="mt-0.5 block truncate text-[12.5px] text-[var(--sol-dim)]">
+      {page && page.url !== attached ? (
+        <button
+          type="button"
+          onClick={() => askStore.attachCurrentPage()}
+          className={cn(rowClass, "mt-5 gap-3 py-1.5", focusRing)}
+        >
+          <span aria-hidden="true" className={cn(iconTile, "size-7")}>
+            <FileTextIcon className="size-4" />
+          </span>
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span className="text-[14px] font-medium leading-5 text-[var(--sol-text)]">
+              <bdi>{t("askAboutPage")}</bdi>
+            </span>
+            <span className="truncate text-[12px] leading-4 text-[var(--sol-dim)]">
               {page.title}
             </span>
-          </SuggestionRow>
-        ) : null}
-        {SUGGESTIONS.map((key) => (
-          <SuggestionRow
-            key={key}
-            onClick={() =>
-              askStore.send(t(`suggestions.${key}`), { pageContext: null })
-            }
-          >
-            {t(`suggestions.${key}`)}
-          </SuggestionRow>
+          </span>
+        </button>
+      ) : null}
+      <p className={cn(signatureLabel, "m-0 mt-6")}>{t("suggestionsLabel")}</p>
+      <ul className="m-0 mt-1.5 list-none p-0">
+        {SUGGESTIONS.map(({ key, mark }) => (
+          <li key={key}>
+            <button
+              type="button"
+              onClick={() =>
+                askStore.send(t(`suggestions.${key}`), { pageContext: null })
+              }
+              className={cn(
+                rowClass,
+                "gap-2.5 py-1.5 text-[14px] leading-6 text-[var(--sol-muted)] hover:text-[var(--sol-text)]",
+                focusRing,
+              )}
+            >
+              {/* The docs' concept-chip mark, as on the diagram cards. */}
+              <span
+                aria-hidden="true"
+                className={cn(
+                  "mx-px size-[5px] shrink-0 rotate-45 rounded-[1px]",
+                  mark,
+                )}
+              />
+              <bdi className="min-w-0">{t(`suggestions.${key}`)}</bdi>
+            </button>
+          </li>
         ))}
       </ul>
+      <p className="m-0 mt-6 text-[12px] leading-[1.5] text-[var(--sol-dim)]">
+        <bdi>{t("disclaimer")}</bdi>
+      </p>
     </div>
   );
 }

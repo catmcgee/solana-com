@@ -16,7 +16,7 @@ export function VisualCalloutBlock({ callout }: { callout: VisualCallout }) {
       role="note"
       aria-label={t(warning ? "warning" : "note")}
       className={cn(
-        "my-4 flex gap-2.5 rounded-xl border px-3.5 py-3 text-[13.5px] leading-[1.6] first:mt-0 last:mb-0",
+        "my-4 flex gap-2.5 rounded-xl border px-3.5 py-3 text-[14px] leading-[1.6] first:mt-0 last:mb-0",
         warning
           ? "border-yellow-200 bg-yellow-50 dark:border-yellow-900 dark:bg-yellow-600/20"
           : "border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-600/20",
