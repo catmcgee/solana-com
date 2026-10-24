@@ -29,8 +29,10 @@ vi.mock("@/lib/docs/search", () => ({
   },
 }));
 vi.mock("@/lib/docs/page-data", () => ({
+  // As the real one: a malformed %-escape throws URIError.
   resolveDocsPage: vi.fn((locale: string, slugs: string[]) =>
-    slugs.join("/") === "developers/docs/core/pda/pda-derivation"
+    slugs.map((slug) => decodeURIComponent(slug)).join("/") ===
+    "developers/docs/core/pda/pda-derivation"
       ? {
           locale,
           page: {
@@ -243,6 +245,14 @@ describe("mock agent", () => {
     );
   });
 
+  it("answers without the page when page_url has a malformed escape", async () => {
+    const result = await mockChat({
+      message: "What is a PDA?",
+      page_url: "/developers/docs/%E0%A4%A",
+    });
+    expect(result).toMatchObject({ status: 200, outcome: "done" });
+  });
+
   it("supports the review triggers", async () => {
     expect((await mockChat({ message: "mock:429 hi" })).status).toBe(429);
     expect((await mockChat({ message: "mock:503 hi" })).status).toBe(503);
@@ -364,6 +374,32 @@ describe("agent proxy", () => {
       session_token: "t",
       message: "hi",
     });
+  });
+
+  it("forwards chat bodies without the client's history", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response(null, { status: 204 }));
+    const body = {
+      session_token: "t",
+      conversation_id: "12",
+      message: "And in Rust?",
+      page_url: "/developers/docs/core/pda",
+      history: [{ role: "assistant", content: "A PDA is…" }],
+    };
+    await POST(post("chat", body), context("chat"));
+    const { history: _history, ...forwarded } = body;
+    expect(JSON.parse(String(fetchMock.mock.calls[0]![1]?.body))).toEqual(
+      forwarded,
+    );
+
+    await POST(
+      post("feedback", { run_id: 1, rating: "up" }),
+      context("feedback"),
+    );
+    expect(String(fetchMock.mock.calls[1]![1]?.body)).toBe(
+      JSON.stringify({ run_id: 1, rating: "up" }),
+    );
   });
 
   it("passes agent errors through for the client to map", async () => {

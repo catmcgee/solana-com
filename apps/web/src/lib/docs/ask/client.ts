@@ -11,8 +11,9 @@
  * (401, 403, 419 or `{error: "invalid_session"}`) is cleared and retried
  * once, for chat and feedback; failures map to an AskErrorKind the panel
  * has a message for; the page a question is about is sent as
- * `page_url` / `page_title`; and the answer cache only stores real,
- * first-turn answers.
+ * `page_url` / `page_title`; recent turns are sent as `history` for
+ * backends without conversation memory; and the answer cache only stores
+ * real, first-turn answers.
  */
 import {
   answerCacheKey,
@@ -32,6 +33,7 @@ import {
   type AskDonePayload,
   type AskErrorKind,
   type AskGenerativeUi,
+  type AskHistoryTurn,
 } from "./protocol";
 import { consumeAskStream, type AskStreamHandlers } from "./sse";
 
@@ -197,6 +199,8 @@ export type AskChatRequest = {
   conversationId: string | null;
   /** The page the question is about, sent as page_url / page_title. */
   page?: AskPageContext | null;
+  /** Earlier turns of this conversation, already capped (see store.ts). */
+  history?: AskHistoryTurn[];
   /** Reader's locale, for the cache key and docs link prefixes. */
   locale?: string | null;
   signal: AbortSignal;
@@ -219,7 +223,7 @@ export async function streamChat(
   request: AskChatRequest,
   handlers: AskChatHandlers,
 ): Promise<void> {
-  const { message, conversationId, page, locale, signal } = request;
+  const { message, conversationId, page, history, locale, signal } = request;
   const startedAt = nowMs();
   const cacheKey =
     request.cache && conversationId === null
@@ -324,6 +328,7 @@ export async function streamChat(
         message,
         page_url: page?.url,
         page_title: page?.title,
+        history: history?.length ? history : undefined,
       }),
       signal,
     });

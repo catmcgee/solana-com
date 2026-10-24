@@ -45,6 +45,12 @@ export type AskDonePayload = {
   codeFollowups: CodeFollowups | null;
 };
 
+/**
+ * A finished earlier turn, sent as `history` (capability "history") for
+ * backends that keep no conversation memory; the agent proxy drops it.
+ */
+export type AskHistoryTurn = { role: "user" | "assistant"; content: string };
+
 /** Why an answer failed; each has a `docsAsk.errors.<kind>` string. */
 export type AskErrorKind =
   | "generic"

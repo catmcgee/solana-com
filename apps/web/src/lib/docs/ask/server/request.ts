@@ -21,6 +21,13 @@ export const SSE_HEADERS = {
   "X-Accel-Buffering": "no",
 } as const;
 
+const encoder = new TextEncoder();
+
+/** One server-sent event in the format the client parses (lib/docs/ask/sse.ts). */
+export function sseEvent(event: string, data: unknown): Uint8Array {
+  return encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+}
+
 /** JSON error in the shape the client maps: `{ error: "<code>", message? }`. */
 export function askError(
   status: number,

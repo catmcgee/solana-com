@@ -29,6 +29,8 @@ initBotId({
     // The devnet transactions behind the demos on "Solana in action".
     { path: "/api/demo/checkout", method: "POST" },
     { path: "/api/demo/create-token", method: "POST" },
+    // Ask AI questions: the Nous review backend refuses them without BotId.
+    { path: "/api/ask/chat", method: "POST" },
   ],
 });
 

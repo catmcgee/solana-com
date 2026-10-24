@@ -1,5 +1,6 @@
 import "server-only";
 
+import { isRecord } from "../protocol";
 import {
   NO_STORE_HEADERS,
   askError,
@@ -13,7 +14,8 @@ import {
  * apps/docs/src/lib/ask-agent-proxy.ts, hardened with the Inkeep proxy's
  * checks: same-origin browser requests only, a 64 KB body cap, a 30 s limit
  * for the agent's response headers (the stream itself runs until it ends
- * or the reader leaves), and a fixed set of paths. There is no default
+ * or the reader leaves), and a fixed set of paths. Bodies are forwarded as
+ * sent, without the client's `history`. There is no default
  * agent URL: without `ASK_AGENT_URL` and `ASK_SOLANA_PROXY_SECRET` every
  * request gets 503 `ask_not_configured`. Env is read per request.
  */
@@ -153,6 +155,12 @@ export async function proxyAskRequest(
     const read = await readJsonBody(request);
     if (!read.ok) return read.response;
     body = read.text;
+    // `history` is for the stateless review backends. The agent keeps its
+    // own conversation memory and its chat contract has no such field.
+    if (isRecord(read.value) && "history" in read.value) {
+      const { history: _history, ...rest } = read.value;
+      body = JSON.stringify(rest);
+    }
   }
   const bodyReadMs = nowMs() - startedAt;
 
@@ -189,7 +197,8 @@ export async function proxyAskRequest(
   } catch (error) {
     abort.cleanup();
     if (abort.timedOut()) {
-      return askError(504, "ask_timeout", "Ask AI took too long to respond.");
+      // Not "too long": the client maps that wording to tooLong.
+      return askError(504, "ask_timeout", "Ask AI timed out.");
     }
     if (request.signal.aborted) return new Response(null, { status: 499 });
     console.error("[ask/proxy] upstream request failed:", error);

@@ -1,13 +1,13 @@
 import { proxyAskRequest } from "@/lib/docs/ask/server/agent-proxy";
-import {
-  isAskMockEnabled,
-  mockAskRequest,
-} from "@/lib/docs/ask/server/mock-agent";
+import { askBackend } from "@/lib/docs/ask/server/backend";
+import { mockAskRequest } from "@/lib/docs/ask/server/mock-agent";
+import { nousAskRequest } from "@/lib/docs/ask/server/nous-agent";
 
 /**
  * The docs assistant's API (/api/ask/session, chat, feedback, search,
- * runs/:id). Served by the review mock when ASK_SOLANA_MOCK=1 outside
- * production, else proxied to the docs agent (lib/docs/ask/server).
+ * runs/:id). Proxied to the docs agent, or, outside production, answered by
+ * the Nous-backed review backend or the canned mock (ASK_SOLANA_BACKEND;
+ * see lib/docs/ask/server/backend.ts).
  */
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,9 +20,14 @@ async function handle(
   { params }: { params: Promise<{ path: string[] }> },
 ): Promise<Response> {
   const { path } = await params;
-  return isAskMockEnabled()
-    ? mockAskRequest(request, path)
-    : proxyAskRequest(request, path);
+  switch (askBackend()) {
+    case "mock":
+      return mockAskRequest(request, path);
+    case "nous":
+      return nousAskRequest(request, path);
+    default:
+      return proxyAskRequest(request, path);
+  }
 }
 
 export const GET = handle;

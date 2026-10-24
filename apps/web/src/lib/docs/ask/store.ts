@@ -25,6 +25,7 @@ import {
 import { streamChat, sendFeedback, warmAskSession } from "./client";
 import {
   ASK_DOCK_MIN_VIEWPORT,
+  ASK_HISTORY_LIMITS,
   ASK_MAX_CODE_CHARS,
   ASK_MAX_MESSAGE_CHARS,
   ASK_MAX_STORED_MESSAGES,
@@ -49,6 +50,7 @@ import {
   type AskCitation,
   type AskErrorKind,
   type AskGenerativeUi,
+  type AskHistoryTurn,
   type AskStatus,
   type CodeFollowups,
 } from "./protocol";
@@ -484,11 +486,44 @@ function wireMessage(text: string, pageContext: AskPageContext | null): string {
   return pageContext ? `${prompts.aboutPage(pageContext)}\n\n${text}` : text;
 }
 
+function clip(text: string, max: number): string {
+  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+}
+
+/**
+ * The conversation's last finished turns (question and answer pairs), cut
+ * to ASK_HISTORY_LIMITS, for backends that keep no memory between turns.
+ */
+function recentHistory(messages: AskMessage[]): AskHistoryTurn[] {
+  const turns: AskHistoryTurn[] = [];
+  messages.forEach((user, index) => {
+    const answer = messages[index + 1];
+    if (user.role !== "user" || answer?.role !== "assistant") return;
+    if (answer.state !== "done" && answer.state !== "stopped") return;
+    if (!answer.text.trim()) return;
+    turns.push(
+      {
+        role: "user",
+        content: clip(
+          wireMessage(user.text, user.pageContext ?? null),
+          ASK_HISTORY_LIMITS.userChars,
+        ),
+      },
+      {
+        role: "assistant",
+        content: clip(answer.text, ASK_HISTORY_LIMITS.assistantChars),
+      },
+    );
+  });
+  return turns.slice(-ASK_HISTORY_LIMITS.turns);
+}
+
 function startTurn(
   text: string,
   pageContext: AskPageContext | null,
   options: { retry?: boolean } = {},
 ) {
+  const history = recentHistory(core.messages);
   const user: AskUserMessage = {
     id: newId(),
     role: "user",
@@ -521,6 +556,7 @@ function startTurn(
       message: wireMessage(text, pageContext),
       conversationId: core.conversationId,
       page: pageContext,
+      history,
       locale: currentLocale(),
       signal: abort.signal,
       cache: firstTurn && !options.retry,

@@ -22,7 +22,17 @@ export const ASK_MAX_STORED_MESSAGES = 40;
 
 /** Sent as `x-ask-client-capabilities` on every chat request. */
 export const ASK_CLIENT_CAPABILITIES =
-  "early-status,ui-done,deferred-generative-ui,fast-path,code-followups,page-context";
+  "early-status,ui-done,deferred-generative-ui,fast-path,code-followups,page-context,history";
+
+/**
+ * Earlier turns sent with a follow-up (`history`): the last `turns`
+ * messages, each cut to its role's limit. The server caps them again.
+ */
+export const ASK_HISTORY_LIMITS = {
+  turns: 6,
+  userChars: 1_000,
+  assistantChars: 1_500,
+} as const;
 
 export const ASK_STORAGE_KEYS = {
   /** localStorage: anonymous session token (Bri's key, so existing sessions carry over). */

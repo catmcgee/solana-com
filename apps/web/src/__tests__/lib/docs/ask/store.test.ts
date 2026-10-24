@@ -325,6 +325,44 @@ describe("conversation", () => {
     });
   });
 
+  it("sends the last finished turns, cut to size, as history", async () => {
+    chatQueue.push(
+      finished("A".repeat(2_000)),
+      finished("Second answer."),
+      finished("Third answer."),
+    );
+    askStore.send("Q".repeat(1_200));
+    await vi.waitFor(() => expect(askStore.getState().busy).toBe(false));
+    askStore.send("Second?");
+    await vi.waitFor(() => expect(askStore.getState().busy).toBe(false));
+    askStore.send("Third?");
+    await vi.waitFor(() => expect(askStore.getState().busy).toBe(false));
+
+    const [first, second, third] = chatBodies();
+    expect(first).not.toHaveProperty("history");
+    expect(second!.history).toEqual([
+      { role: "user", content: `${"Q".repeat(999)}…` },
+      { role: "assistant", content: `${"A".repeat(1_499)}…` },
+    ]);
+    expect(third!.history).toEqual([
+      ...(second!.history as unknown[]),
+      { role: "user", content: "Second?" },
+      { role: "assistant", content: "Second answer." },
+    ]);
+  });
+
+  it("leaves failed and empty answers out of the history", async () => {
+    chatQueue.push(
+      Response.json({ error: "rate_limited" }, { status: 429 }),
+      finished("Answer."),
+    );
+    askStore.send("First?");
+    await vi.waitFor(() => expect(lastAssistant().state).toBe("error"));
+    askStore.send("Second?");
+    await vi.waitFor(() => expect(askStore.getState().busy).toBe(false));
+    expect(chatBodies()[1]).not.toHaveProperty("history");
+  });
+
   it("queues a question that arrives while an answer streams", async () => {
     const first = controllableStream();
     chatQueue.push(first.response, finished("Second answer."));

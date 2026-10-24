@@ -3,7 +3,11 @@ import "server-only";
 import { defaultLocale } from "@workspace/i18n/config";
 import { pageMarkdown } from "@/lib/docs/llms";
 import { DOCS_LOCALES } from "@/lib/docs/locales.mjs";
-import { breadcrumbs, resolveDocsPage } from "@/lib/docs/page-data";
+import {
+  breadcrumbs,
+  resolveDocsPage,
+  type ResolvedDocsPage,
+} from "@/lib/docs/page-data";
 import { docsSearchServer } from "@/lib/docs/search";
 import { ASK_MAX_MESSAGE_CHARS } from "../config";
 import { isRecord, toId } from "../protocol";
@@ -20,13 +24,14 @@ import {
   SSE_HEADERS,
   askError,
   readJsonBody,
+  sseEvent,
 } from "./request";
 
 /**
  * A stand-in for the docs agent, so the panel can be reviewed end to end
  * (the real client, SSE parser and store) without the agent or its secret.
- * On only when ASK_SOLANA_MOCK=1 and never on a production deployment;
- * checked per request.
+ * Selected by ./backend.ts (never on a production deployment); the Nous
+ * backend also hands it questions that contain a `mock:` trigger.
  *
  * - POST session  → `{ session_token: "mock-…" }`
  * - POST chat     → SSE: status, ~25 ms text deltas, ui_status/ui_done when
@@ -41,13 +46,6 @@ import {
  * (session refused), `mock:truncate` (stream ends without done),
  * `mock:slow` (10× slower). Over 4,000 characters gets 413.
  */
-export function isAskMockEnabled(): boolean {
-  return (
-    process.env.ASK_SOLANA_MOCK === "1" &&
-    process.env.VERCEL_ENV !== "production"
-  );
-}
-
 const MAX_TURNS = 20;
 const MAX_REMEMBERED = 200;
 const DELAY_MS = { search: 450, delta: 25, visual: 700, settle: 120 };
@@ -68,12 +66,6 @@ function remember<T>(map: Map<string, T>, key: string, value: T) {
   map.delete(key);
   map.set(key, value);
   if (map.size > MAX_REMEMBERED) map.delete(map.keys().next().value as string);
-}
-
-const encoder = new TextEncoder();
-
-function sseEvent(event: string, data: unknown): Uint8Array {
-  return encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
 }
 
 /** Word-aligned chunks of about 24 characters, like a model's deltas. */
@@ -153,7 +145,13 @@ async function resolvePage(pageUrl: unknown): Promise<MockPage | null> {
     ? segments[0]!
     : defaultLocale;
   const slugs = locale === defaultLocale ? segments : segments.slice(1);
-  const resolved = resolveDocsPage(locale, slugs);
+  let resolved: ResolvedDocsPage | null;
+  try {
+    resolved = resolveDocsPage(locale, slugs);
+  } catch {
+    // A malformed %-escape (URIError from decodeURIComponent).
+    return null;
+  }
   if (!resolved) return null;
   const data = resolved.page.data as { title?: string; description?: string };
   let headings: string[] = [];
@@ -190,16 +188,27 @@ function questionText(message: string, pageUrl: unknown): string {
   return text.replace(/[ \t]+/g, " ").trim();
 }
 
+type MockOptions = {
+  /** Speeds up (0) or slows down the stream; tests use 0. */
+  delayScale?: number;
+  /** Session tokens to accept besides the mock's own `mock-…` ones. */
+  acceptSession?: (token: string) => boolean;
+};
+
 async function mockChat(
   request: Request,
-  delayScale: number,
+  options: MockOptions,
 ): Promise<Response> {
+  const delayScale = options.delayScale ?? 1;
   const read = await readJsonBody(request);
   if (!read.ok) return read.response;
   const body = isRecord(read.value) ? read.value : {};
 
   const token = body.session_token;
-  if (typeof token !== "string" || !token.startsWith("mock-")) {
+  if (
+    typeof token !== "string" ||
+    !(token.startsWith("mock-") || options.acceptSession?.(token))
+  ) {
     return askError(
       401,
       "invalid_session",
@@ -363,14 +372,11 @@ async function mockSearch(request: Request): Promise<Response> {
   );
 }
 
-/**
- * Answers one /api/ask request. `delayScale` speeds up (0) or slows down
- * the stream; tests use 0.
- */
+/** Answers one /api/ask request. */
 export async function mockAskRequest(
   request: Request,
   path: string[],
-  options: { delayScale?: number } = {},
+  options: MockOptions = {},
 ): Promise<Response> {
   const method = askRouteMethod(path);
   if (!method) return askError(404, "not_found");
@@ -385,7 +391,7 @@ export async function mockAskRequest(
         { headers: NO_STORE_HEADERS },
       );
     case "chat":
-      return mockChat(request, options.delayScale ?? 1);
+      return mockChat(request, options);
     case "feedback": {
       const read = await readJsonBody(request);
       if (!read.ok) return read.response;

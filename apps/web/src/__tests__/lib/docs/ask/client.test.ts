@@ -182,7 +182,7 @@ describe("streamChat", () => {
     const headers = init?.headers as Record<string, string>;
     expect(headers.accept).toContain("text/event-stream");
     expect(headers["x-ask-client-capabilities"]).toBe(
-      "early-status,ui-done,deferred-generative-ui,fast-path,code-followups,page-context",
+      "early-status,ui-done,deferred-generative-ui,fast-path,code-followups,page-context,history",
     );
     expect(chatBodies(fetchMock)[0]).toEqual({
       session_token: "token-1",
@@ -201,6 +201,25 @@ describe("streamChat", () => {
         "done",
       ]),
     );
+  });
+
+  it("sends earlier turns as history, and none on a first question", async () => {
+    const fetchMock = stubFetch([
+      sse(['event: delta\ndata: {"text":"A."}', DONE]),
+      sse(['event: delta\ndata: {"text":"B."}', DONE]),
+    ]);
+    const history = [
+      { role: "user" as const, content: "What is a PDA?" },
+      {
+        role: "assistant" as const,
+        content: "### Summary response\nAn address.",
+      },
+    ];
+    await ask(collect().handlers, { conversationId: "7", history });
+    await ask(collect().handlers, { history: [] });
+    const [followUp, first] = chatBodies(fetchMock);
+    expect(followUp).toMatchObject({ conversation_id: "7", history });
+    expect(first).not.toHaveProperty("history");
   });
 
   it("keeps numeric run and conversation ids", async () => {
