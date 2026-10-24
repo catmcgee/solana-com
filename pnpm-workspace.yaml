@@ -18,15 +18,16 @@ catalog:
   date-fns: ^4.1.0
   lodash: ^4.17.23
   motion: ^12.23.28
-  next: 15.5.24
-  next-intl: 4.13.4
-  react: 19.2.6
-  react-dom: 19.2.6
+  next: 16.4.2
+  next-intl: 4.14.9
+  react: 19.2.8
+  react-dom: 19.2.8
   vitest: 4.1.8
 
 # Class merging must follow the Tailwind generation that authored the classes.
-# Shared UI packages remain on the v4 merger to preserve their existing output
-# while the workspace contains both Tailwind 3 and Tailwind 4 applications.
+# Shared UI packages use the v4 merger. apps/web runs Tailwind 4 but keeps its
+# Tailwind 3 class names (see apps/web/src/app/globals.css), so it keeps the
+# v3 merger.
 catalogs:
   tailwind3:
     tailwind-merge: ^2.6.1
@@ -54,9 +55,9 @@ overrides:
   # fix is still inside the package-age quarantine window. Use the compatible
   # minimatch 9 release already present in the workspace instead.
   "glob@9.3.5>minimatch": 9.0.7
-  # Next.js 15 still requests Sharp 0.34, so force its optional dependency onto
-  # the current patched release containing the updated libvips binaries
-  # (GHSA-wq5f-xc86-pv6w).
+  # Keep every Sharp consumer on the current patched release containing the
+  # updated libvips binaries (GHSA-wq5f-xc86-pv6w). Next.js 16 already
+  # requests ^0.35.5; the override covers older transitive requests.
   "sharp@<0.35.5": 0.35.5
   # get-uri (via @databricks/sql > proxy-agent) still requests basic-ftp 5,
   # but GHSA-c475-qrg2-pj4r is fixed only in 6.2.1. The 6.x major only changes
@@ -73,6 +74,22 @@ overrides:
   # package onto the single kit the workspace installs.
   "@metaplex-foundation/mpl-token-metadata-kit>@solana/kit": ^8.4.0
   "@metaplex-foundation/mpl-token-metadata-kit>@solana/program-client-core": ^8.4.0
+  # The tokenization tutorials use the Mosaic SDK and the Token ACL clients,
+  # which declare @solana/kit ^6 as a regular dependency. Resolve them onto the
+  # workspace's single kit 8 for the same reason as the Metaplex client above.
+  "@solana/mosaic-sdk>@solana/kit": ^8.4.0
+  "@solana/token-acl-sdk>@solana/kit": ^8.4.0
+  "@solana/token-acl-gate-sdk>@solana/kit": ^8.4.0
+  # The Mosaic SDK also depends on @solana/sysvars ^6 (for one address
+  # constant), which pnpm would then hand to @solana-program/token-2022 0.19 as
+  # its peer. Keep the workspace on kit 8's sysvars.
+  "@solana/mosaic-sdk>@solana/sysvars": ^8.4.0
+  # @solana/token-acl-sdk 0.4.0 pins @solana-program/token-2022 0.12.0, which
+  # imports getMinimumBalanceForRentExemption from @solana/kit, an export kit 8
+  # no longer has, so the module fails to load. Resolve it onto the cookbook's
+  # token-2022, which exports everything the Token ACL client imports; the
+  # tokenization tutorials tell readers to do the same.
+  "@solana/token-acl-sdk>@solana-program/token-2022": ^0.19.0
 
 auditConfig:
   ignoreGhsas:
@@ -109,6 +126,20 @@ allowBuilds:
 # Allow the newly published security patches through the workspace's package
 # age policy while they age normally for future installs.
 minimumReleaseAgeExclude:
+  # Next.js 16.4.1 fixes GHSA-673q-mjm6-r5xr, GHSA-2464-fhr4-w9xw and
+  # GHSA-p3m5-59mp-jv5r; 16.4.2 is the current patch release on top of it.
+  - next@16.4.2
+  - "@next/env@16.4.2"
+  - "@next/swc-darwin-arm64@16.4.2"
+  - "@next/swc-darwin-x64@16.4.2"
+  - "@next/swc-linux-arm64-gnu@16.4.2"
+  - "@next/swc-linux-arm64-musl@16.4.2"
+  - "@next/swc-linux-x64-gnu@16.4.2"
+  - "@next/swc-linux-x64-musl@16.4.2"
+  - "@next/swc-win32-arm64-msvc@16.4.2"
+  - "@next/swc-win32-x64-msvc@16.4.2"
+  - "@next/bundle-analyzer@16.4.2"
+  - "@next/mdx@16.4.2"
   - jsondiffpatch@0.7.6
   - browserslist@4.28.7
   - fast-uri@3.1.7

@@ -50,8 +50,6 @@ dev target="":
 
 web: (dev "web")
 
-docs: (dev "docs")
-
 media: (dev "media")
 
 templates: (dev "templates")

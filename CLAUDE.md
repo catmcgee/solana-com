@@ -10,7 +10,7 @@ solana-com/
 ├── apps/
 │   ├── accelerate/   # Solana Accelerate conference - port 3004
 │   ├── web/          # Main website (solana.com) - port 3000
-│   ├── docs/         # Developer documentation - port 3003
+│   ├── docs/         # Developer docs content (rendered by apps/web)
 │   ├── media/        # Blog & news (Keystatic) - port 3002
 │   ├── templates/    # Code templates showcase - port 3001
 │   └── breakpoint/   # Breakpoint event microsite - port 3005
@@ -54,7 +54,7 @@ pnpm dev
 
 # Development (specific app)
 pnpm dev --filter solana-com              # Main website
-pnpm dev --filter solana-docs             # Documentation
+pnpm dev:docs                             # Documentation (apps/web, port 3000)
 pnpm dev --filter solana-com-media        # Blog/Media
 pnpm dev --filter solana-templates        # Templates
 pnpm dev --filter solana-com-accelerate   # Accelerate conference
@@ -109,12 +109,12 @@ locale path segment.
 
 Key environment variables (defined in `turbo.json`):
 
+- `INKEEP_API_KEY` - Inkeep search and Ask AI (server-only, apps/web)
 - `KEYSTATIC_GITHUB_CLIENT_ID` / `KEYSTATIC_GITHUB_CLIENT_SECRET` /
   `KEYSTATIC_SECRET` - Keystatic for media app
 - `SENTRY_AUTH_TOKEN` - Error tracking
 - `SIMPLECAST_API_KEY` / `SIMPLECAST_PODCAST_ID` - Podcast integration
 - `YOUTUBE_API_KEY` / `YOUTUBE_CHANNEL_ID` - YouTube integration
-- `INKEEP_API_KEY` - AI chat assistant
 
 ## Git Hooks (Husky)
 
@@ -158,7 +158,8 @@ Each app has its own CLAUDE.md with app-specific details:
 
 - `apps/accelerate/CLAUDE.md` - Accelerate conference site
 - `apps/web/CLAUDE.md` - Main website
-- `apps/docs/CLAUDE.md` - Documentation site
+- `packages/docs-tooling/AUTHORING.md` - Documentation site (apps/docs content,
+  rendered by apps/web with Fumadocs)
 - `apps/media/CLAUDE.md` - Blog/Media site
 - `apps/templates/CLAUDE.md` - Templates showcase
 - `apps/breakpoint/CLAUDE.md` - Breakpoint event site

@@ -50,8 +50,8 @@ CURATED_SECTIONS = {
         ("Metaplex Metadata", "docs/tokens/metaplex", "Add and read metadata for Solana tokens"),
     ],
     "Tokenization": [
-        ("Asset Issuance & Tokenization", "docs/tokenization", "Issue and operate tokenized assets on Solana"),
-        ("Tokenization Quickstart", "docs/tokenization/quickstart", "Launch a compliance-ready Token-2022 mint"),
+        ("Assets & tokenization", "docs/assets", "Issue and operate tokenized assets on Solana"),
+        ("Issue a tokenized asset", "docs/assets/issue-asset", "Launch a compliance-ready Token-2022 mint"),
         ("Token ACL", "docs/tokenization/token-acl", "Build permissioned tokens with allow and block lists"),
         ("Delivery vs Payment using delegation", "docs/tokenization/dvp", "Settle tokenized assets and payments atomically through delegated authority"),
         ("NAV Strikes", "docs/tokenization/nav-strikes", "Implement subscriptions and redemptions for tokenized funds"),
@@ -87,7 +87,7 @@ CURATED_SECTIONS = {
     ],
     "Payments": [
         ("Payments Overview", "docs/payments", "Build payment systems with instant settlement"),
-        ("Payments Quickstart", "docs/payments/quickstart", "Build a first stablecoin payment flow"),
+        ("Build a checkout", "docs/payments/checkout", "Build a first stablecoin payment flow"),
         ("How Payments Work", "docs/payments/how-payments-work", "Core concepts for Solana payments"),
         ("Interacting with Solana", "docs/payments/interacting-with-solana", "Send and confirm payments through Solana"),
         ("Send Payments", "docs/payments/send-payments", "Send stablecoin payments with memos and batching"),
