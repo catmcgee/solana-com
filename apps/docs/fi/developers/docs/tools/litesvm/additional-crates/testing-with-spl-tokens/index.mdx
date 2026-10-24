@@ -1,0 +1,211 @@
+---
+title: Pika-aloitus
+description: Opi käyttämään litesvm-token-pakettia SPL-tokenien testaamiseen
+---
+
+[Näytä `litesvm-token` crates.io-palvelussa](https://crates.io/crates/litesvm-token)
+
+## Asennus
+
+Varmista, että sinulla on kaikki tarvittavat riippuvuudet:
+
+```bash
+cargo add --dev litesvm litesvm-token solana-sdk@4 spl-token spl-associated-token-account
+cargo add --dev solana-system-interface --features bincode
+```
+
+## SPL-tokenien perusteet
+
+Solanassa token account -tilin luominen on kaksivaiheinen prosessi.
+
+<Steps>
+<Step title="Luo `Mint Account`">
+- Ei sisällä token-saldoa
+- Sisältää kaikki tokenin yleiset tiedot, kuten kokonaistarjonnan, desimaalit, hallintaoikeuden jne.
+- Yhtä tokenia kohden on yksi mint account
+- Omistaja on Token Program (TokenKeg tai Token 2022)
+</Step>
+
+<Step title="Luo `Token Account`">
+- Tallentaa saldon tietylle SPL-tokenille
+- Sisältää mint account -tiedon määrittääkseen, mikä SPL-token on tässä tilissä
+- Yhdelle mint account -tilille voi olla useita token account -tilejä
+- Omistaja on se, jolla on hallintaoikeus tilin sisällä oleviin tokeneihin
+</Step>
+</Steps>
+
+## Token Account -tilityypit
+
+### Tavallinen Token Account
+
+Token account tallentaa saldosi tietylle SPL-tokenille:
+
+```rust
+// Can create token accounts at ANY address
+let token_account = Keypair::new();  // Random address
+let create_ix = system_instruction::create_account(
+    &payer.pubkey(),
+    &token_account.pubkey(),  // Any address you want
+    rent,
+    165,  // Token account size
+    &spl_token::id(),
+);
+let init_ix = spl_token::instruction::initialize_account(
+    &spl_token::id(),
+    &token_account.pubkey(),
+    &mint,
+    &owner.pubkey(),
+)?;
+```
+
+<Columns cols={2}>
+  <Card title="Edut" icon="check">
+    - Voidaan luoda useita tilejä samalle mint/owner-yhdistelmälle
+    - Joustava – voidaan käyttää mitä tahansa osoitetta
+  </Card>
+
+  <Card title="Haitat" icon="x">
+    - Ei deterministinen – osoitteet on seurattava manuaalisesti
+    - Vastaanottajan on kerrottava, mille tilille lähetät
+    - Aiheuttaa sekaannusta useiden tilien kanssa
+  </Card>
+</Columns>
+
+<Info>
+  **Milloin käyttää:** Väliaikaiset/escrow-tilit, ohjelman omistamat tilit
+  mukautetulla logiikalla, kun tarvitset useita tilejä samalle tokenille,
+  edistyneet DeFi-strategiat.
+</Info>
+
+### Associated Token Account (ATA)
+
+ATA on token account deterministisessä PDA-osoitteessa:
+
+```rust
+// ATA address is ALWAYS the same for owner + mint
+let ata = get_associated_token_address(&owner.pubkey(), &mint);
+// Address derived from: [owner_pubkey, token_program_id, mint]
+```
+
+Kuinka ATA-osoite johdetaan:
+
+```rust
+// ATA is a PDA owned by the Associated Token Program
+let (ata, bump) = Pubkey::find_program_address(
+    &[
+        owner.as_ref(),
+        spl_token::id().as_ref(),
+        mint.as_ref(),
+    ],
+    &spl_associated_token_account::id(),  // ATA program
+);
+```
+
+<Columns cols={2}>
+  <Card title="Edut" icon="check">
+    - Yksi kanoninen tili per omistaja/mint-pari
+    - Deterministinen – kuka tahansa voi laskea osoitteen
+    - Yksinkertaistaa maksuja – tarvitaan vain lompakko-osoite ja mint
+    - Vakiokäytäntö kaikissa Solana-sovelluksissa
+  </Card>
+
+  <Card title="Haitat" icon="x">
+    - Voi olla vain YKSI ATA per omistaja/mint (suunnitelmallisesti)
+  </Card>
+</Columns>
+
+<Info>
+  **Suositellaan useimmissa tapauksissa:** Lompakkosovellukset,
+  DeFi-protokollat, NFT-omistukset, maksujärjestelmät ja kaikki käyttäjille
+  näkyvät token-siirrot.
+</Info>
+
+## Nopea esimerkki
+
+Tässä on täydellinen esimerkki token mintin luomisesta ja tokenien luomisesta:
+
+```rust
+use litesvm::LiteSVM;
+use litesvm_token::{
+    get_spl_account,
+    spl_token::{native_mint::DECIMALS, state::Account as TokenAccount},
+    CreateAccount, CreateMint, MintTo, Transfer,
+};
+use solana_sdk::{
+    native_token::LAMPORTS_PER_SOL,
+    signature::{Keypair, Signer},
+};
+
+#[test]
+fn test_create_and_mint_tokens() {
+    let mut svm = LiteSVM::new();
+
+    // Create payer account and fund it
+    let payer = Keypair::new();
+    svm.airdrop(&payer.pubkey(), 10 * LAMPORTS_PER_SOL).unwrap();
+
+    // Create a new SPL token mint with the payer as the mint authority
+    let mint = CreateMint::new(&mut svm, &payer)
+        .authority(&payer.pubkey())
+        .decimals(DECIMALS)
+        .send()
+        .unwrap();
+
+    // Create a token account for the payer
+    let token_account = CreateAccount::new(&mut svm, &payer, &mint)
+        .owner(&payer.pubkey())
+        .send()
+        .unwrap();
+
+    // Mint tokens into the payer's token account
+    MintTo::new(&mut svm, &payer, &mint, &token_account, 1000)
+        .owner(&payer)
+        .send()
+        .unwrap();
+
+    // Verify balance
+    let token_account: TokenAccount = get_spl_account(&svm, &token_account).unwrap();
+    let account_balance = token_account.amount;
+    assert_eq!(account_balance, 1000)
+}
+```
+
+## Keskeiset käsitteet
+
+### Tokenin desimaalit
+
+Useimmat tokenit käyttävät desimaaleja murto-osien esittämiseen:
+
+```rust
+// SOL has 9 decimals
+let one_sol = 10_u64.pow(9);  // 1_000_000_000 lamports
+
+// USDC has 6 decimals
+let one_usdc = 10_u64.pow(6); // 1_000_000 micro-USDC
+
+// Always account for decimals in calculations
+let amount_tokens = 100;
+let amount_raw = amount_tokens * 10_u64.pow(decimals as u32);
+```
+
+### Tilien väliset suhteet
+
+Tilien välisten suhteiden ymmärtäminen on oleellista:
+
+- **Mint Account**: Määrittelee tokenin (tarjonta, desimaalit, valtuudet)
+- **Token account**: Säilyttää tokeneita tietylle omistajalle
+- **Associated token account**: Deterministinen token account
+  omistaja+mint-parille
+- **Mint Authority**: Voi luoda uusia tokeneita
+- **Freeze Authority**: Voi jäädyttää token accounteja (valinnainen)
+
+## Vianmääritys
+
+### Yleiset virheet
+
+| Virhe                       | Syy                                                                | Ratkaisu                                         |
+| --------------------------- | ------------------------------------------------------------------ | ------------------------------------------------ |
+| `AccountNotFound`           | Yritetään käyttää tiliä, jota ei ole olemassa                      | Varmista, että tili on luotu ennen käyttöä       |
+| `AccountAlreadyInitialized` | Yritetään alustaa jo alustettu tili                                | Tarkista, onko tili olemassa ennen luomista      |
+| `InsufficientFunds`         | Ei riittävästi lamporteja rent-maksua tai tokeneita siirtoa varten | Varmista riittävä rahoitus/luonti                |
+| `OwnerMismatch`             | Tili on väärän ohjelman omistama                                   | Tarkista oikea ohjelmatunnus luomisen yhteydessä |

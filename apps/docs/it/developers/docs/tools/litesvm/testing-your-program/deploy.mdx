@@ -1,0 +1,307 @@
+---
+title: Distribuzione dei Programmi
+description: Scopri come distribuire programmi in un'istanza di test LiteSVM
+---
+
+## Per Iniziare
+
+```rust
+let mut svm = LiteSVM::new();
+```
+
+Questo crea l'istanza di test litesvm di base, che include tutte le funzionalità
+di runtime abilitate, sysvars predefinite, precompilazioni, programmi spl,
+sigverify e tutti i programmi integrati come il System Program.
+
+Per interagire con qualsiasi altro programma nei tuoi test, devi distribuire
+quel programma nel tuo ambiente di test.
+
+1. Compila e distribuisci il programma che vuoi testare
+
+2. Individua tutti i programmi a cui il programma precedente effettua chiamate
+   CPI e distribuisci anche quelli
+
+<Info>
+  **Esempio:** Se il tuo programma utilizza feed di dati di Pyth, dovrai avere
+  il programma Pyth distribuito nella tua istanza di test.
+</Info>
+
+## Distribuzione Base dei Programmi
+
+### Metodo 1: Distribuzione da Byte
+
+Distribuisci i programmi direttamente da array di byte per un'esecuzione dei
+test più rapida:
+
+```rust
+use litesvm::LiteSVM;
+use solana_sdk::signature::{read_keypair_file, Signer};
+
+let mut svm = LiteSVM::new();
+
+// Read the program's keypair to get correct ID
+let program_keypair = read_keypair_file("target/deploy/my_program-keypair.json")
+    .expect("Program keypair file not found");
+let program_id = program_keypair.pubkey();
+
+// Include bytes at compile time
+let program_bytes = include_bytes!("../target/deploy/my_program.so");
+
+// Deploy from bytes
+svm.add_program(program_id, program_bytes)
+    .expect("Failed to deploy program");
+
+// Verify deployment
+assert!(svm.get_account(&program_id).is_some(), "Program account not created");
+assert!(svm.get_account(&program_id).unwrap().executable, "Program not executable");
+```
+
+`include_bytes!` incorpora il binario direttamente nell'eseguibile di test al
+momento della compilazione, eliminando le operazioni di I/O durante l'esecuzione
+dei test.
+
+<Columns cols={2}>
+  <Card title="Vantaggi" icon="check">
+    - Più veloce a runtime (nessuna lettura da disco)
+    - Binario di test autonomo
+    - Funziona anche se il file .so viene eliminato dopo la compilazione
+  </Card>
+
+  <Card title="Svantaggi" icon="x">
+    - Dimensione del binario di test maggiore
+    - È necessario ricompilare i test quando il file .so cambia
+  </Card>
+</Columns>
+
+### Metodo 2: Deploy da File (.so)
+
+Carica i programmi dal file system quando cambiano frequentemente:
+
+```rust
+use litesvm::LiteSVM;
+use solana_sdk::signature::{read_keypair_file, Signer};
+
+let mut svm = LiteSVM::new();
+
+// Read keypair for correct program ID
+let program_keypair = read_keypair_file("target/deploy/program-keypair.json").unwrap();
+let program_id = program_keypair.pubkey();
+
+// Deploy from file
+svm.add_program_from_file(program_id, "target/deploy/program.so")
+    .expect("Failed to deploy program from file");
+
+// Always verify
+assert!(svm.get_account(&program_id).unwrap().executable);
+```
+
+<Columns cols={2}>
+  <Card title="Vantaggi" icon="check">
+    - Binario di test più leggero
+    - Rileva le modifiche ai file .so senza ricompilare i test
+    - Maggiore flessibilità per le pipeline CI/CD
+  </Card>
+
+  <Card title="Svantaggi" icon="x">
+    - Più lento (I/O su disco a runtime)
+    - Richiede che il file .so esista al momento dell'esecuzione del test
+    - Il percorso del file deve essere corretto rispetto alla directory di esecuzione del test
+  </Card>
+</Columns>
+
+## Recupero di Programmi da Mainnet/Devnet
+
+Quando hai bisogno di un programma di cui non disponi del codice sorgente,
+utilizza la Solana CLI per esportare i programmi dai cluster attivi e
+utilizzarli nei test:
+
+```bash
+# Dump a program from mainnet
+solana program dump gSbePebfvPy7tRqimPoVecS2UsBvYv46ynrzWocc92s pyth.so --url mainnet-beta
+
+# Dump from devnet
+solana program dump YourProgramID program.so --url devnet
+```
+
+Quindi caricalo nei tuoi test:
+
+```rust
+use solana_sdk::pubkey;
+
+svm.add_program_from_file(
+    pubkey!("gSbePebfvPy7tRqimPoVecS2UsBvYv46ynrzWocc92s"),
+    "pyth.so"
+).unwrap();
+```
+
+## Best Practice
+
+### 1. Scegli il Metodo di Deploy Corretto
+
+- **Usa `add_program()`** quando:
+  - I programmi sono incorporati nel binario di test in fase di compilazione
+  - Vuoi un'esecuzione dei test più rapida (nessun I/O a runtime)
+  - I test devono essere autonomi
+
+- **Usa `add_program_from_file()`** quando:
+  - I programmi vengono compilati separatamente (es. recuperati da devnet)
+  - Il programma cambia frequentemente durante lo sviluppo (è possibile
+    rieseguire i test senza ricompilare)
+  - Hai ambienti CI/CD in cui i file .so sono artefatti
+
+### Comprendere i keypair dei programmi
+
+Quando compili un programma Solana:
+
+1. **Anchor** crea `target/deploy/program-keypair.json`
+2. Le build **native** creano un file keypair insieme al file `.so`
+3. L'**indirizzo on-chain** del programma è la chiave pubblica di questo
+   keypair, nota anche come ID del programma.
+4. Per i **PDA**, `find_program_address()` richiede l'ID del programma come seed
+5. Per i **CPI**, l'ID del programma viene utilizzato per richiamare altri
+   programmi
+
+## Problemi comuni e soluzioni
+
+### Errori silenziosi durante il deployment
+
+**Problema**: Il programma sembra essere distribuito ma le transazioni
+falliscono con "InvalidProgramForExecution".
+
+**Causa**: L'ID del programma non corrisponde al keypair.
+
+**Soluzione**:
+
+```rust
+// Always use the keypair-derived ID
+let keypair = read_keypair_file("target/deploy/program-keypair.json").unwrap();
+let program_id = keypair.pubkey();
+
+svm.add_program(program_id, &program_bytes).unwrap();
+
+// Verify with detailed checks
+let account = svm.get_account(&program_id)
+    .expect("Program account doesn't exist");
+
+assert!(account.executable, "Program not executable");
+// LiteSVM deploys programs through the upgradeable loader
+// (add it with `cargo add --dev solana-sdk-ids`)
+assert_eq!(
+    account.owner,
+    solana_sdk_ids::bpf_loader_upgradeable::id(),
+    "Wrong owner"
+);
+assert!(!account.data.is_empty(), "Program data is empty");
+
+println!("✅ Program verified at {}", program_id);
+```
+
+### Errore: programma non trovato
+
+**Errore**: `TransactionError::InvalidProgramForExecution`
+
+**Cause comuni**:
+
+1. Programma non distribuito
+2. ID del programma errato utilizzato nell'istruzione
+3. ID del programma non corrispondente al keypair
+
+**Passaggi di debug**:
+
+```rust
+// Step 1: Check if program exists
+if let Some(account) = svm.get_account(&program_id) {
+    println!("Program exists");
+    println!("  Executable: {}", account.executable);
+    println!("  Owner: {}", account.owner);
+    println!("  Data length: {}", account.data.len());
+} else {
+    println!("Program does not exist at {}", program_id);
+}
+
+// Step 2: Verify the ID matches keypair
+let expected_keypair = read_keypair_file("target/deploy/program-keypair.json").unwrap();
+let expected_id = expected_keypair.pubkey();
+
+if program_id != expected_id {
+    println!("  ID mismatch!");
+    println!("  Used: {}", program_id);
+    println!("  Expected: {}", expected_id);
+}
+
+// Step 3: Check instruction program ID
+println!("Instruction program_id: {}", instruction.program_id);
+assert_eq!(instruction.program_id, program_id, "Instruction uses wrong program ID");
+```
+
+### CPI verso programmi non distribuiti
+
+**Problema**: Il tuo programma effettua una chiamata CPI a un programma non
+distribuito.
+
+**Soluzione**: Distribuisci tutti i programmi dipendenti:
+
+```rust
+use solana_sdk::pubkey;
+
+// Find all dependency programs and make sure they are deployed
+svm.add_program_from_file(
+    pubkey!("gSbePebfvPy7tRqimPoVecS2UsBvYv46ynrzWocc92s"),
+    "pyth.so"
+).unwrap();
+
+```
+
+Se hai bisogno di recuperare il programma da un cluster, consulta
+[questa sezione](#recupero-di-programmi-da-mainnet/devnet).
+
+### lamport insufficienti per il deployment
+
+**Nota**: LiteSVM gestisce automaticamente il saldo esente da rent per i
+programmi.
+
+```rust
+// No need to manually fund - LiteSVM handles this
+svm.add_program(program_id, &program_bytes).unwrap();
+
+// But you can check the rent if needed
+let program_len = program_bytes.len();
+let required_lamports = svm.minimum_balance_for_rent_exemption(program_len);
+println!("Program requires {} lamports for rent exemption", required_lamports);
+```
+
+## Checklist di verifica del deployment
+
+<Steps>
+<Step title="Leggi il keypair del programma">
+```rust
+let keypair = read_keypair_file("target/deploy/program-keypair.json").unwrap();
+let program_id = keypair.pubkey();
+```
+
+</Step>
+
+<Step title="Distribuisci con ID corrispondente">
+```rust
+svm.add_program(program_id, &program_bytes).unwrap();
+```
+
+</Step>
+
+<Step title="Verifica il deployment">
+```rust
+assert!(svm.get_account(&program_id).unwrap().executable);
+```
+
+</Step>
+
+<Step>
+Distribuisci all'istanza di test litesvm tutti i programmi richiamati dal tuo programma tramite CPI
+
+</Step>
+</Steps>
+
+## Passi successivi
+
+Nella prossima sezione, impareremo come eseguire le istruzioni del programma e
+gestire pattern di transazione complessi.

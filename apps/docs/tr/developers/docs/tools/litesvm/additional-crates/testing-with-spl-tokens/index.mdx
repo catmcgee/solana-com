@@ -1,0 +1,212 @@
+---
+title: Hızlı Başlangıç
+description:
+  SPL token'larıyla test yapmak için litesvm-token crate'ini nasıl
+  kullanacağınızı öğrenin
+---
+
+[crates.io'da `litesvm-token`'ı görüntüle](https://crates.io/crates/litesvm-token)
+
+## Kurulum
+
+Gerekli tüm bağımlılıklara sahip olduğunuzdan emin olun:
+
+```bash
+cargo add --dev litesvm litesvm-token solana-sdk@4 spl-token spl-associated-token-account
+cargo add --dev solana-system-interface --features bincode
+```
+
+## SPL Token Temelleri
+
+Solana'da bir token account oluşturmak iki adımlı bir süreçtir.
+
+<Steps>
+<Step title="Bir `Mint Account` oluşturun">
+- Token bakiyesi yoktur 
+- Token'ın toplam arz, ondalık basamaklar, yetki vb. gibi tüm küresel bilgilerini tutar
+- Her token için bir mint account bulunur
+- Sahibi Token Program'dır (TokenKeg veya Token 2022)
+</Step>
+
+<Step title="Bir `Token Account` oluşturun">
+- Belirli bir SPL token'ının bakiyesini depolar 
+- Bu hesaptaki SPL token'ını tanımlamak için mint account'u tutar 
+- Bir mint account için birden fazla token account olabilir 
+- Sahip, bu hesaptaki token'lar üzerinde kontrol sahibi olan kişidir 
+</Step>
+</Steps>
+
+## Token Account Türleri
+
+### Normal Token Account
+
+Bir token account, belirli bir SPL token için bakiyenizi depolar:
+
+```rust
+// Can create token accounts at ANY address
+let token_account = Keypair::new();  // Random address
+let create_ix = system_instruction::create_account(
+    &payer.pubkey(),
+    &token_account.pubkey(),  // Any address you want
+    rent,
+    165,  // Token account size
+    &spl_token::id(),
+);
+let init_ix = spl_token::instruction::initialize_account(
+    &spl_token::id(),
+    &token_account.pubkey(),
+    &mint,
+    &owner.pubkey(),
+)?;
+```
+
+<Columns cols={2}>
+  <Card title="Avantajlar" icon="check">
+    - Aynı mint/sahip için birden fazla hesap oluşturulabilir
+    - Esnek - herhangi bir adres kullanılabilir
+  </Card>
+
+  <Card title="Dezavantajlar" icon="x">
+    - Deterministik değil - adreslerin manuel olarak takip edilmesi gerekir
+    - Alıcının gönderim yapılacak hesabı bildirmesi gerekir
+    - Birden fazla hesapla karışıklığa yol açar
+  </Card>
+</Columns>
+
+<Info>
+  **Ne zaman kullanılır:** Geçici/emanet hesaplar, özel mantığa sahip programa
+  ait hesaplar, aynı token için birden fazla hesaba ihtiyaç duyulduğunda,
+  gelişmiş DeFi stratejileri.
+</Info>
+
+### Associated Token Account (ATA)
+
+ATA, deterministik bir PDA adresindeki token account'tur:
+
+```rust
+// ATA address is ALWAYS the same for owner + mint
+let ata = get_associated_token_address(&owner.pubkey(), &mint);
+// Address derived from: [owner_pubkey, token_program_id, mint]
+```
+
+ATA adresinin türetilme şekli:
+
+```rust
+// ATA is a PDA owned by the Associated Token Program
+let (ata, bump) = Pubkey::find_program_address(
+    &[
+        owner.as_ref(),
+        spl_token::id().as_ref(),
+        mint.as_ref(),
+    ],
+    &spl_associated_token_account::id(),  // ATA program
+);
+```
+
+<Columns cols={2}>
+  <Card title="Avantajlar" icon="check">
+    - Sahip/mint çifti başına tek bir standart hesap
+    - Deterministik - herkes adresi hesaplayabilir
+    - Ödemeleri basitleştirir - yalnızca cüzdan adresi ve mint yeterlidir
+    - Tüm Solana uygulamalarında geçerli standart kural
+  </Card>
+
+  <Card title="Dezavantajlar" icon="x">
+    - Sahip/mint başına yalnızca BİR ATA olabilir (tasarım gereği)
+  </Card>
+</Columns>
+
+<Info>
+  **Çoğu durum için önerilir:** Cüzdan uygulamaları, DeFi protokolleri, NFT
+  varlıkları, ödeme sistemleri ve kullanıcıya yönelik tüm token transferleri.
+</Info>
+
+## Hızlı Örnek
+
+İşte bir token mint oluşturma ve token basma işleminin tam örneği:
+
+```rust
+use litesvm::LiteSVM;
+use litesvm_token::{
+    get_spl_account,
+    spl_token::{native_mint::DECIMALS, state::Account as TokenAccount},
+    CreateAccount, CreateMint, MintTo, Transfer,
+};
+use solana_sdk::{
+    native_token::LAMPORTS_PER_SOL,
+    signature::{Keypair, Signer},
+};
+
+#[test]
+fn test_create_and_mint_tokens() {
+    let mut svm = LiteSVM::new();
+
+    // Create payer account and fund it
+    let payer = Keypair::new();
+    svm.airdrop(&payer.pubkey(), 10 * LAMPORTS_PER_SOL).unwrap();
+
+    // Create a new SPL token mint with the payer as the mint authority
+    let mint = CreateMint::new(&mut svm, &payer)
+        .authority(&payer.pubkey())
+        .decimals(DECIMALS)
+        .send()
+        .unwrap();
+
+    // Create a token account for the payer
+    let token_account = CreateAccount::new(&mut svm, &payer, &mint)
+        .owner(&payer.pubkey())
+        .send()
+        .unwrap();
+
+    // Mint tokens into the payer's token account
+    MintTo::new(&mut svm, &payer, &mint, &token_account, 1000)
+        .owner(&payer)
+        .send()
+        .unwrap();
+
+    // Verify balance
+    let token_account: TokenAccount = get_spl_account(&svm, &token_account).unwrap();
+    let account_balance = token_account.amount;
+    assert_eq!(account_balance, 1000)
+}
+```
+
+## Temel Kavramlar
+
+### Token Ondalık Basamakları
+
+Çoğu token, kesirli miktarları temsil etmek için ondalık basamaklar kullanır:
+
+```rust
+// SOL has 9 decimals
+let one_sol = 10_u64.pow(9);  // 1_000_000_000 lamports
+
+// USDC has 6 decimals
+let one_usdc = 10_u64.pow(6); // 1_000_000 micro-USDC
+
+// Always account for decimals in calculations
+let amount_tokens = 100;
+let amount_raw = amount_tokens * 10_u64.pow(decimals as u32);
+```
+
+### Hesap İlişkileri
+
+Hesaplar arasındaki ilişkileri anlamak kritik öneme sahiptir:
+
+- **Mint Hesabı**: Token'ı tanımlar (arz, ondalık basamaklar, yetkiler)
+- **Token account**: Belirli bir sahibin token'larını tutar
+- **Associated token account**: Bir sahip+mint çifti için deterministik token
+  account
+- **Mint Yetkisi**: Yeni token oluşturabilir
+- **Dondurma Yetkisi**: Token hesaplarını dondurabilir (isteğe bağlı)
+
+## Sorun Giderme
+
+### Yaygın Hatalar
+
+| Hata                        | Neden                                                       | Çözüm                                                      |
+| --------------------------- | ----------------------------------------------------------- | ---------------------------------------------------------- |
+| `AccountNotFound`           | Var olmayan bir hesap kullanılmaya çalışılıyor              | Hesabın kullanılmadan önce oluşturulduğundan emin olun     |
+| `AccountAlreadyInitialized` | Zaten başlatılmış bir hesabı yeniden başlatmaya çalışılıyor | Oluşturmadan önce hesabın var olup olmadığını kontrol edin |
+| `InsufficientFunds`         | rent veya token transferi için yeterli lamport yok          | Yeterli finansman/basım sağlayın                           |
+| `OwnerMismatch`             | Hesap yanlış programa ait                                   | Oluştururken doğru program kimliğini doğrulayın            |

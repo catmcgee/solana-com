@@ -1,0 +1,135 @@
+---
+title: Método RPC signatureSubscribe
+sidebarTitle: signatureSubscribe
+---
+
+Inscreva-se para receber uma notificação quando a transação com a assinatura
+fornecida atingir o nível de confirmação especificado.
+
+<Warning>
+  Esta é uma inscrição para uma única notificação. É automaticamente cancelada
+  pelo servidor assim que a notificação, `signatureNotification`, é enviada pelo
+  RPC.
+</Warning>
+
+<RequestExample>
+  ```json WebSocket
+  {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "signatureSubscribe",
+    "params": [
+      "2EBVM6cB8vAAD93Ktr6Vd8p67XPbQzCJX47MpReuiCXJAtcjaxpvWpcg9Ege1Nr5Tk3a2GFrByT7WPBjdsTycY9b",
+      {
+        "commitment": "finalized",
+        "enableReceivedNotification": false
+      }
+    ]
+  }
+  ```
+</RequestExample>
+
+<ResponseExample>
+  ```json Response
+  {
+    "jsonrpc": "2.0",
+    "result": 0,
+    "id": 1
+  }
+  ```
+</ResponseExample>
+
+### Parameters
+
+<ParamField body="0" type="string" required>
+  assinatura da transação, como string codificada em base-58
+
+  <Info>
+    A assinatura da transação deve ser a primeira assinatura da transação (veja
+    [id da transação](/developers/docs/references/terminology#transaction-id) para mais
+    detalhes).
+  </Info>
+</ParamField>
+
+<ParamField body="1" type="object">
+  Objeto de configuração contendo os seguintes campos:
+
+  <Expandable title="properties" defaultOpen>
+    <ParamField body="commitment" type="string">
+      O commitment descreve quão finalizado está um bloco naquele momento. Veja
+      [Configurando State Commitment](/developers/docs/rpc#configuring-state-commitment).
+    </ParamField>
+
+    <ParamField body="enableReceivedNotification" type="boolean">
+      Se deve ou não inscrever-se para notificações quando as assinaturas são
+      recebidas pelo RPC, além de quando são processadas.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+### Result
+
+<ResponseField name="result" type="integer">
+  id de inscrição (necessário para cancelar a inscrição)
+</ResponseField>
+
+#### Formato de notificação:
+
+A notificação será um objeto JSON RpcResponse com valor contendo um objeto com:
+
+- `slot: <u64>` - O slot correspondente.
+- `value: <object|string>` - um valor de notificação de
+  [`RpcSignatureResult`](https://github.com/solana-labs/solana/blob/6d28fd455b07e3557fc6c0c3ddf3ba03e3fe8482/rpc-client-api/src/response.rs#L265-L268),
+  resultando em:
+  - quando `enableReceivedNotification` é `true` e a assinatura é recebida: a
+    string literal
+    [`"receivedSignature"`](https://github.com/solana-labs/solana/blob/6d28fd455b07e3557fc6c0c3ddf3ba03e3fe8482/rpc-client-api/src/response.rs#L286-L288),
+    ou
+  - quando a assinatura é processada: `err: <object|null>`:
+    - `null` se a transação foi processada com sucesso no nível de confirmação
+      especificado, ou
+    - um
+      [`TransactionError`](https://github.com/solana-labs/solana/blob/6d28fd455b07e3557fc6c0c3ddf3ba03e3fe8482/sdk/src/transaction/error.rs#L15-L164),
+      se a transação falhou
+
+#### Exemplos de respostas:
+
+A seguir está um exemplo de resposta de uma notificação de uma transação
+**processada** com sucesso:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "signatureNotification",
+  "params": {
+    "result": {
+      "context": {
+        "slot": 5207624
+      },
+      "value": {
+        "err": null
+      }
+    },
+    "subscription": 24006
+  }
+}
+```
+
+A seguir está um exemplo de resposta de uma notificação de uma assinatura de
+transação **recebida** com sucesso:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "signatureNotification",
+  "params": {
+    "result": {
+      "context": {
+        "slot": 5207624
+      },
+      "value": "receivedSignature"
+    },
+    "subscription": 24006
+  }
+}
+```

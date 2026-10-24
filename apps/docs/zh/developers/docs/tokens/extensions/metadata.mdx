@@ -1,0 +1,1140 @@
+---
+title: 元数据指针与代币元数据
+description:
+  创建一个使用 MetadataPointer 和 TokenMetadata 扩展将元数据直接存储在铸币账户上的铸币，然后通过 token-metadata 接口更新、移除和锁定该元数据。
+type: tutorial
+prerequisites:
+  - /developers/docs/tokens/basics/create-mint
+related:
+  - /developers/docs/tokens/metaplex
+  - /developers/docs/tokens/basics/mint-tokens
+  - /developers/docs/tokens/extensions
+---
+
+## 什么是元数据指针和代币元数据扩展？
+
+Token Extensions Program 的 `MetadataPointer` 铸币扩展在铸币上存储两个字段：
+
+- 可以更新指针的权限
+- 存储代币元数据的账户地址
+
+该指针可以引用任何实现了
+[token-metadata 接口](https://github.com/solana-program/token-metadata/tree/main/interface)的程序所拥有的账户。
+
+Token Extensions Program 还通过 `TokenMetadata`
+铸币扩展直接实现了相同的接口。使用 `TokenMetadata`，铸币会将代币的
+`name`、`symbol`、`uri`、`update_authority`
+以及自定义元数据直接存储在铸币账户本身上。
+
+<Info>
+  **链下元数据 URI**
+
+  `uri` 字段指向链下 JSON
+  元数据。请参见[链下元数据格式](/developers/docs/tokens/metaplex#off-chain-metadata-format)。
+</Info>
+
+这两个扩展解决不同的问题：
+
+- `MetadataPointer` 指定存储元数据的账户。
+- `TokenMetadata` 将元数据直接存储在铸币账户上。
+
+<Info>
+  **可变长度扩展**
+
+  `TokenMetadata` 是一个可变长度的 TLV 扩展。
+`InitializeTokenMetadata`、`UpdateField` 和 `RemoveKey`
+  可以调整铸币账户数据的大小，但它们不会转移额外的 lamport。 铸币账户需要足够的
+  lamport
+  来保持存储的元数据免于租金。如果元数据稍后增长，需要在调整大小的指令之前向铸币账户转移额外的
+  lamport。
+</Info>
+
+## 如何在铸币账户上存储代币元数据
+
+要在铸币账户上存储元数据：
+
+1. 计算铸币账户大小以及铸币、扩展和元数据所需的租金。
+2. 使用 `CreateAccount` 创建铸币账户，初始化 `MetadataPointer`，并使用
+   `InitializeMint` 初始化铸币。
+3. 在铸币账户上初始化 `TokenMetadata`，然后使用 `UpdateField`
+   添加或更新元数据。
+4. 使用 `RemoveKey`、`UpdateAuthority` 和 `Emit`
+   来删除自定义元数据、更改或清除更新权限，或在交易返回数据中返回当前元数据。
+
+<Steps>
+  <Step title="计算账户大小">
+    计算基础铸币加上 `MetadataPointer` 扩展的铸币账户大小。这是在
+    `CreateAccount` 中使用的大小。
+
+    ```ts 示例 focus={14-17,19}
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+
+    const metadataPointerExtension = extension("MetadataPointer", {
+      authority: client.payer.address,
+      metadataAddress: mint.address
+    });
+
+    const mintSpace = BigInt(getMintSize([metadataPointerExtension]));
+    ```
+  </Step>
+
+  <Step title="计算租金">
+    在 `TokenMetadata` 存储到铸币账户后，使用所需的最大大小计算租金。
+
+    ```ts 示例 focus={21-36}
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+
+    const metadataPointerExtension = extension("MetadataPointer", {
+      authority: client.payer.address,
+      metadataAddress: mint.address
+    });
+
+    const mintSpace = BigInt(getMintSize([metadataPointerExtension]));
+
+    const maxTokenMetadataExtension = extension("TokenMetadata", {
+      updateAuthority: client.payer.address,
+      mint: mint.address,
+      name: "Example Token v2",
+      symbol: "EXMPL",
+      uri: "https://example.com/token.json",
+      additionalMetadata: new Map([
+        ["description", "Metadata stored on mint account"]
+      ])
+    });
+    const maxMintSpace = BigInt(
+      getMintSize([metadataPointerExtension, maxTokenMetadataExtension])
+    );
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(maxMintSpace)
+      .send();
+    ```
+  </Step>
+
+  <Step title="创建铸币账户">
+    使用计算出的空间和 lamport 创建铸币账户。
+
+    ```ts 示例 focus={38-46} expandable
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+
+    const metadataPointerExtension = extension("MetadataPointer", {
+      authority: client.payer.address,
+      metadataAddress: mint.address
+    });
+
+    const mintSpace = BigInt(getMintSize([metadataPointerExtension]));
+
+    const maxTokenMetadataExtension = extension("TokenMetadata", {
+      updateAuthority: client.payer.address,
+      mint: mint.address,
+      name: "Example Token v2",
+      symbol: "EXMPL",
+      uri: "https://example.com/token.json",
+      additionalMetadata: new Map([
+        ["description", "Metadata stored on mint account"]
+      ])
+    });
+    const maxMintSpace = BigInt(
+      getMintSize([metadataPointerExtension, maxTokenMetadataExtension])
+    );
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(maxMintSpace)
+      .send();
+
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      })
+    ]);
+    ```
+  </Step>
+
+  <Step title="初始化元数据指针">
+    初始化 `MetadataPointer` 并将其元数据地址设置为铸币地址。
+
+    ```ts 示例 focus={46-50} expandable
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+
+    const metadataPointerExtension = extension("MetadataPointer", {
+      authority: client.payer.address,
+      metadataAddress: mint.address
+    });
+
+    const mintSpace = BigInt(getMintSize([metadataPointerExtension]));
+
+    const maxTokenMetadataExtension = extension("TokenMetadata", {
+      updateAuthority: client.payer.address,
+      mint: mint.address,
+      name: "Example Token v2",
+      symbol: "EXMPL",
+      uri: "https://example.com/token.json",
+      additionalMetadata: new Map([
+        ["description", "Metadata stored on mint account"]
+      ])
+    });
+    const maxMintSpace = BigInt(
+      getMintSize([metadataPointerExtension, maxTokenMetadataExtension])
+    );
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(maxMintSpace)
+      .send();
+
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializeMetadataPointerInstruction({
+        mint: mint.address,
+        authority: client.payer.address,
+        metadataAddress: mint.address
+      })
+    ]);
+    ```
+  </Step>
+
+  <Step title="初始化铸币">
+    在同一交易中使用 `InitializeMint` 初始化铸币。
+
+    ```ts 示例 focus={51-56} expandable
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+
+    const metadataPointerExtension = extension("MetadataPointer", {
+      authority: client.payer.address,
+      metadataAddress: mint.address
+    });
+
+    const mintSpace = BigInt(getMintSize([metadataPointerExtension]));
+
+    const maxTokenMetadataExtension = extension("TokenMetadata", {
+      updateAuthority: client.payer.address,
+      mint: mint.address,
+      name: "Example Token v2",
+      symbol: "EXMPL",
+      uri: "https://example.com/token.json",
+      additionalMetadata: new Map([
+        ["description", "Metadata stored on mint account"]
+      ])
+    });
+    const maxMintSpace = BigInt(
+      getMintSize([metadataPointerExtension, maxTokenMetadataExtension])
+    );
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(maxMintSpace)
+      .send();
+
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializeMetadataPointerInstruction({
+        mint: mint.address,
+        authority: client.payer.address,
+        metadataAddress: mint.address
+      }),
+      getInitializeMintInstruction({
+        mint: mint.address,
+        decimals: 0,
+        mintAuthority: client.payer.address,
+        freezeAuthority: client.payer.address
+      })
+    ]);
+    ```
+  </Step>
+
+  <Step title="初始化和更新元数据">
+    在铸币账户上初始化 `TokenMetadata`。使用 `UpdateField`
+    添加自定义元数据；如果该字段不存在，`UpdateField` 会添加它。
+
+    ```ts 示例 focus={57-72} expandable
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+
+    const metadataPointerExtension = extension("MetadataPointer", {
+      authority: client.payer.address,
+      metadataAddress: mint.address
+    });
+
+    const mintSpace = BigInt(getMintSize([metadataPointerExtension]));
+
+    const maxTokenMetadataExtension = extension("TokenMetadata", {
+      updateAuthority: client.payer.address,
+      mint: mint.address,
+      name: "Example Token v2",
+      symbol: "EXMPL",
+      uri: "https://example.com/token.json",
+      additionalMetadata: new Map([
+        ["description", "Metadata stored on mint account"]
+      ])
+    });
+    const maxMintSpace = BigInt(
+      getMintSize([metadataPointerExtension, maxTokenMetadataExtension])
+    );
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(maxMintSpace)
+      .send();
+
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer,
+        newAccount: mint,
+        lamports: mintRent,
+        space: mintSpace,
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS
+      }),
+      getInitializeMetadataPointerInstruction({
+        mint: mint.address,
+        authority: client.payer.address,
+        metadataAddress: mint.address
+      }),
+      getInitializeMintInstruction({
+        mint: mint.address,
+        decimals: 0,
+        mintAuthority: client.payer.address,
+        freezeAuthority: client.payer.address
+      }),
+      getInitializeTokenMetadataInstruction({
+        metadata: mint.address,
+        updateAuthority: client.payer.address,
+        mint: mint.address,
+        mintAuthority: client.payer,
+        name: "Example Token",
+        symbol: "EXMPL",
+        uri: "https://example.com/token.json"
+      }),
+      getUpdateTokenMetadataFieldInstruction({
+        metadata: mint.address,
+        updateAuthority: client.payer,
+        field: tokenMetadataField("Key", ["description"]),
+        value: "Metadata stored on mint account"
+      })
+    ]);
+    ```
+  </Step>
+
+  <Step title="更新、删除或发出元数据">
+    铸币初始化后，使用 `UpdateField` 更新元数据，使用
+    `UpdateMetadataPointer` 更新元数据指针，使用 `RemoveKey`
+    删除自定义元数据，使用 `UpdateAuthority` 清除更新权限，并使用 `Emit`
+    返回当前元数据。
+
+    ```ts 示例 focus={74-99} expandable
+    const client = await createClient()
+      .use(generatedPayer())
+      .use(
+        solanaRpc({
+          rpcUrl: "http://localhost:8899",
+          rpcSubscriptionsUrl: "ws://localhost:8900"
+        })
+      )
+      .use(rpcAirdrop())
+      .use(airdropPayer(lamports(1_000_000_000n)));
+
+    const mint = await generateKeyPairSigner();
+
+    const metadataPointerExtension = extension("MetadataPointer", {
+      authority: client.payer.address,
+      metadataAddress: mint.address
+    });
+
+    const mintSpace = BigInt(getMintSize([metadataPointerExtension]));
+
+    const maxTokenMetadataExtension = extension("TokenMetadata", {
+      updateAuthority: client.payer.address,
+      mint: mint.address,
+      name: "Example Token v2",
+      symbol: "EXMPL",
+      uri: "https://example.com/token.json",
+      additionalMetadata: new Map([
+        ["description", "Metadata stored on mint account"]
+      ])
+    });
+    const maxMintSpace = BigInt(
+      getMintSize([metadataPointerExtension, maxTokenMetadataExtension])
+    );
+    const mintRent = await client.rpc
+      .getMinimumBalanceForRentExemption(maxMintSpace)
+      .send();
+
+    await client.sendTransaction([
+      getCreateAccountInstruction({
+        payer: client.payer, // Account funding account creation.
+        newAccount: mint, // New mint account to create.
+        lamports: mintRent, // Lamports funding the mint account rent.
+        space: mintSpace, // Account size in bytes for the mint plus MetadataPointer.
+        programAddress: TOKEN_2022_PROGRAM_ADDRESS // Program that owns the mint account.
+      }),
+      getInitializeMetadataPointerInstruction({
+        mint: mint.address, // Mint account that stores the MetadataPointer extension.
+        authority: client.payer.address, // Authority allowed to update the metadata pointer later.
+        metadataAddress: mint.address // Account address that stores the metadata.
+      }),
+      getInitializeMintInstruction({
+        mint: mint.address, // Mint account to initialize.
+        decimals: 0, // Number of decimals for the token.
+        mintAuthority: client.payer.address, // Authority allowed to mint new tokens.
+        freezeAuthority: client.payer.address // Authority allowed to freeze token accounts.
+      }),
+      getInitializeTokenMetadataInstruction({
+        metadata: mint.address, // Mint account that stores the metadata.
+        updateAuthority: client.payer.address, // Authority allowed to update metadata later.
+        mint: mint.address, // Mint that the metadata describes.
+        mintAuthority: client.payer, // Signer authorizing metadata initialization for the mint.
+        name: "Example Token", // Token name stored in metadata.
+        symbol: "EXMPL", // Token symbol stored in metadata.
+        uri: "https://example.com/token.json" // URI pointing to off-chain JSON metadata.
+      }),
+      getUpdateTokenMetadataFieldInstruction({
+        metadata: mint.address, // Mint account that stores the metadata.
+        updateAuthority: client.payer, // Signer authorized to update metadata fields.
+        field: tokenMetadataField("Key", ["description"]), // Custom metadata field to add.
+        value: "Metadata stored on mint account" // Value stored for the custom metadata field.
+      })
+    ]);
+
+    await client.sendTransaction([
+      getUpdateTokenMetadataFieldInstruction({
+        metadata: mint.address,
+        updateAuthority: client.payer,
+        field: tokenMetadataField("Name"),
+        value: "Example Token v2"
+      }),
+      getUpdateMetadataPointerInstruction({
+        mint: mint.address,
+        metadataPointerAuthority: client.payer,
+        metadataAddress: mint.address
+      }),
+      getRemoveTokenMetadataKeyInstruction({
+        metadata: mint.address,
+        updateAuthority: client.payer,
+        key: "description"
+      }),
+      getUpdateTokenMetadataUpdateAuthorityInstruction({
+        metadata: mint.address,
+        updateAuthority: client.payer,
+        newUpdateAuthority: null
+      }),
+      getEmitTokenMetadataInstruction({
+        metadata: mint.address
+      })
+    ]);
+    ```
+  </Step>
+</Steps>
+
+<Info>
+  **指令顺序**
+
+  `MetadataPointerInstruction::Initialize` 必须在 `InitializeMint`
+  之前执行。`CreateAccount`、 `MetadataPointerInstruction::Initialize`
+  和 `InitializeMint` 必须 包含在同一个交易中。
+</Info>
+
+### 源代码参考
+
+#### 元数据指针
+
+| 项目                                       | 描述                               | 源代码                                                                                                                                        |
+| ---------------------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `MetadataPointer`                        | 存储元数据指针权限和元数据账户地址的铸币扩展。          | [源代码](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/metadata_pointer/mod.rs#L12-L22)         |
+| `MetadataPointerInstruction::Initialize` | 在 `InitializeMint` 之前初始化元数据指针扩展。 | [源代码](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/metadata_pointer/instruction.rs#L22-L38) |
+| `MetadataPointerInstruction::Update`     | 更新铸币的元数据指针扩展中存储的元数据地址。           | [源代码](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/interface/src/extension/metadata_pointer/instruction.rs#L39-L55) |
+| `process_initialize` (`MetadataPointer`) | 元数据指针处理器逻辑，初始化时至少需要一个权限或元数据地址。   | [源代码](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/extension/metadata_pointer/processor.rs#L25-L48)     |
+| `process_update` (`MetadataPointer`)     | 验证元数据指针权限，然后重写铸币中存储的元数据地址。       | [源代码](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/extension/metadata_pointer/processor.rs#L51-L77)     |
+
+#### 代币元数据
+
+| 项目                                          | 描述                                                        | 源代码                                                                                                                                    |
+| ------------------------------------------- | --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `TokenMetadata`                             | 存储在 TLV 条目中的可变长度代币元数据接口状态。                                | [源代码](https://github.com/solana-program/token-metadata/blob/interface%40v1.0.0/interface/src/state.rs#L18-L38)                         |
+| `Field`                                     | 由 `UpdateField` 使用的字段枚举，用于定位 `name`、`symbol`、`uri` 或自定义键。 | [源代码](https://github.com/solana-program/token-metadata/blob/interface%40v1.0.0/interface/src/state.rs#L109-L122)                       |
+| `TokenMetadataInstruction::Initialize`      | 初始化代币元数据账户的基本 `name`、`symbol` 和 `uri` 字段。                 | [源代码](https://github.com/solana-program/token-metadata/blob/interface%40v1.0.0/interface/src/instruction.rs#L81-L95)                   |
+| `TokenMetadataInstruction::UpdateField`     | 在代币元数据上添加或更新基本字段或自定义元数据字段。                                | [源代码](https://github.com/solana-program/token-metadata/blob/interface%40v1.0.0/interface/src/instruction.rs#L97-L117)                  |
+| `TokenMetadataInstruction::RemoveKey`       | 删除自定义元数据键。无法使用此指令删除基本字段。                                  | [源代码](https://github.com/solana-program/token-metadata/blob/interface%40v1.0.0/interface/src/instruction.rs#L119-L134)                 |
+| `TokenMetadataInstruction::UpdateAuthority` | 轮换元数据更新权限，或完全清除它以使元数据不可变。                                 | [源代码](https://github.com/solana-program/token-metadata/blob/interface%40v1.0.0/interface/src/instruction.rs#L136-L144)                 |
+| `TokenMetadataInstruction::Emit`            | 通过交易返回数据返回序列化的元数据，可选择指定字节范围。                              | [源代码](https://github.com/solana-program/token-metadata/blob/interface%40v1.0.0/interface/src/instruction.rs#L146-L159)                 |
+| `process_initialize` (`TokenMetadata`)      | 代币元数据处理器逻辑，要求元数据账户必须是铸币本身，且铸币必须具有 `MetadataPointer`。      | [源代码](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/extension/token_metadata/processor.rs#L43-L101)  |
+| `process_update_field`                      | 在字段更新后重新分配并重写可变长度的 `TokenMetadata` TLV 条目。                | [源代码](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/extension/token_metadata/processor.rs#L104-L132) |
+| `process_remove_key`                        | 验证更新权限，删除自定义元数据键，并重写 TLV 条目。                              | [源代码](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/extension/token_metadata/processor.rs#L135-L159) |
+| `process_update_authority`                  | 验证当前更新权限，然后就地轮换或清除元数据权限。                                  | [源代码](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/extension/token_metadata/processor.rs#L162-L187) |
+| `process_emit`                              | 从铸币中读取序列化的 `TokenMetadata`，并将请求的片段写入返回数据。                 | [源代码](https://github.com/solana-program/token-2022/blob/program%40v10.0.0/program/src/extension/token_metadata/processor.rs#L190-L203) |
+
+### Typescript
+
+下面的 `Kit` 示例直接使用生成的指令。使用 `@solana/web3.js`、`@solana/spl-token` 和 `@solana/spl-token-metadata` 的旧版示例仅供参考。旧版示例将 `maxSupportedTransactionVersion` 上限设为 `0`，因为 web3.js v1 无法反序列化 [v1 交易](/developers/docs/core/transactions/versioned-transactions#v1-message-format)。
+
+#### Kit
+
+```ts Instructions highlight={66-98,117-140}
+import {
+  lamports,
+  createClient,
+  generateKeyPairSigner,
+  unwrapOption
+} from "@solana/kit";
+import { solanaRpc, rpcAirdrop } from "@solana/kit-plugin-rpc";
+import { generatedPayer, airdropPayer } from "@solana/kit-plugin-signer";
+import { unpack as unpackTokenMetadata } from "@solana/spl-token-metadata";
+import { getCreateAccountInstruction } from "@solana-program/system";
+import {
+  extension,
+  fetchMint,
+  getEmitTokenMetadataInstruction,
+  getInitializeMetadataPointerInstruction,
+  getInitializeMintInstruction,
+  getInitializeTokenMetadataInstruction,
+  getMintSize,
+  getRemoveTokenMetadataKeyInstruction,
+  getUpdateMetadataPointerInstruction,
+  getUpdateTokenMetadataFieldInstruction,
+  getUpdateTokenMetadataUpdateAuthorityInstruction,
+  isExtension,
+  tokenMetadataField,
+  TOKEN_2022_PROGRAM_ADDRESS
+} from "@solana-program/token-2022";
+
+const client = await createClient()
+  .use(generatedPayer())
+  .use(
+    solanaRpc({
+      rpcUrl: "http://localhost:8899",
+      rpcSubscriptionsUrl: "ws://localhost:8900"
+    })
+  )
+  .use(rpcAirdrop())
+  .use(airdropPayer(lamports(1_000_000_000n)));
+
+const mint = await generateKeyPairSigner();
+
+const metadataPointerExtension = extension("MetadataPointer", {
+  authority: client.payer.address,
+  metadataAddress: mint.address
+});
+
+const mintSpace = BigInt(getMintSize([metadataPointerExtension]));
+
+const maxTokenMetadataExtension = extension("TokenMetadata", {
+  updateAuthority: client.payer.address,
+  mint: mint.address,
+  name: "Example Token v2",
+  symbol: "EXMPL",
+  uri: "https://example.com/token.json",
+  additionalMetadata: new Map([
+    ["description", "Metadata stored on mint account"]
+  ])
+});
+const maxMintSpace = BigInt(
+  getMintSize([metadataPointerExtension, maxTokenMetadataExtension])
+);
+const mintRent = await client.rpc
+  .getMinimumBalanceForRentExemption(maxMintSpace)
+  .send();
+
+await client.sendTransaction([
+  getCreateAccountInstruction({
+    payer: client.payer, // Account funding account creation.
+    newAccount: mint, // New mint account to create.
+    lamports: mintRent, // Lamports funding the mint account rent.
+    space: mintSpace, // Account size in bytes for the mint plus MetadataPointer.
+    programAddress: TOKEN_2022_PROGRAM_ADDRESS // Program that owns the mint account.
+  }),
+  getInitializeMetadataPointerInstruction({
+    mint: mint.address, // Mint account that stores the MetadataPointer extension.
+    authority: client.payer.address, // Authority allowed to update the metadata pointer later.
+    metadataAddress: mint.address // Account address that stores the metadata.
+  }),
+  getInitializeMintInstruction({
+    mint: mint.address, // Mint account to initialize.
+    decimals: 0, // Number of decimals for the token.
+    mintAuthority: client.payer.address, // Authority allowed to mint new tokens.
+    freezeAuthority: client.payer.address // Authority allowed to freeze token accounts.
+  }),
+  getInitializeTokenMetadataInstruction({
+    metadata: mint.address, // Mint account that stores the metadata.
+    updateAuthority: client.payer.address, // Authority allowed to update metadata later.
+    mint: mint.address, // Mint that the metadata describes.
+    mintAuthority: client.payer, // Signer authorizing metadata initialization for the mint.
+    name: "Example Token", // Token name stored in metadata.
+    symbol: "EXMPL", // Token symbol stored in metadata.
+    uri: "https://example.com/token.json" // URI pointing to off-chain JSON metadata.
+  }),
+  getUpdateTokenMetadataFieldInstruction({
+    metadata: mint.address, // Mint account that stores the metadata.
+    updateAuthority: client.payer, // Signer authorized to update metadata fields.
+    field: tokenMetadataField("Key", ["description"]), // Custom metadata field to add.
+    value: "Metadata stored on mint account" // Value stored for the custom metadata field.
+  })
+]);
+
+const initialMintAccount = await fetchMint(client.rpc, mint.address);
+const initialExtensions =
+  unwrapOption(initialMintAccount.data.extensions) ?? [];
+const initialTokenMetadata = initialExtensions.find((item) =>
+  isExtension("TokenMetadata", item)
+);
+
+console.dir(
+  {
+    mint: mint.address,
+    tokenMetadata: initialTokenMetadata
+  },
+  { depth: null }
+);
+
+const updateMetadataTransaction = await client.sendTransaction([
+  getUpdateTokenMetadataFieldInstruction({
+    metadata: mint.address, // Mint account that stores the metadata.
+    updateAuthority: client.payer, // Signer authorized to update metadata fields.
+    field: tokenMetadataField("Name"), // Base metadata field to update.
+    value: "Example Token v2" // Updated value for the token name.
+  }),
+  getUpdateMetadataPointerInstruction({
+    mint: mint.address, // Mint account that stores the MetadataPointer extension.
+    metadataPointerAuthority: client.payer, // Signer authorized to update the metadata pointer.
+    metadataAddress: mint.address // Account address that stores the metadata.
+  }),
+  getRemoveTokenMetadataKeyInstruction({
+    metadata: mint.address, // Mint account that stores the metadata.
+    updateAuthority: client.payer, // Signer authorized to remove custom metadata.
+    key: "description" // Custom metadata key to remove.
+  }),
+  getUpdateTokenMetadataUpdateAuthorityInstruction({
+    metadata: mint.address, // Mint account that stores the metadata.
+    updateAuthority: client.payer, // Current signer authorized to change the update authority.
+    newUpdateAuthority: null // Clear the update authority so metadata can no longer be changed.
+  }),
+  getEmitTokenMetadataInstruction({
+    metadata: mint.address // Mint account that stores the metadata to emit.
+  })
+]);
+
+const updateMetadataResult = await client.rpc
+  .getTransaction(updateMetadataTransaction.context.signature, {
+    encoding: "json",
+    maxSupportedTransactionVersion: 1
+  })
+  .send();
+const emittedDataBase64 = updateMetadataResult?.meta?.returnData?.data?.[0];
+if (!emittedDataBase64) {
+  throw new Error("Expected token metadata return data");
+}
+const emittedTokenMetadata = unpackTokenMetadata(
+  Buffer.from(emittedDataBase64, "base64")
+);
+
+const mintAccount = await fetchMint(client.rpc, mint.address);
+const extensions = unwrapOption(mintAccount.data.extensions) ?? [];
+const metadataPointer = extensions.find((item) =>
+  isExtension("MetadataPointer", item)
+);
+const tokenMetadata = extensions.find((item) =>
+  isExtension("TokenMetadata", item)
+);
+
+console.dir(
+  {
+    mint: mint.address,
+    metadataPointer,
+    tokenMetadata,
+    emittedTokenMetadata
+  },
+  { depth: null }
+);
+```
+
+#### Web3.js
+
+```ts Instructions highlight={67-103,130-160}
+import {
+  Connection,
+  Keypair,
+  LAMPORTS_PER_SOL,
+  sendAndConfirmTransaction,
+  SystemProgram,
+  Transaction
+} from "@solana/web3.js";
+import {
+  createInitializeMetadataPointerInstruction,
+  createInitializeMintInstruction,
+  createUpdateMetadataPointerInstruction,
+  ExtensionType,
+  getMetadataPointerState,
+  getMint,
+  getMintLen,
+  getTokenMetadata,
+  LENGTH_SIZE,
+  TOKEN_2022_PROGRAM_ID,
+  TYPE_SIZE
+} from "@solana/spl-token";
+import {
+  createInitializeInstruction,
+  createEmitInstruction,
+  createRemoveKeyInstruction,
+  unpack as unpackTokenMetadata,
+  createUpdateAuthorityInstruction,
+  createUpdateFieldInstruction,
+  pack,
+  type TokenMetadata
+} from "@solana/spl-token-metadata";
+
+const connection = new Connection("http://localhost:8899", "confirmed");
+const latestBlockhash = await connection.getLatestBlockhash();
+
+const feePayer = Keypair.generate();
+const mint = Keypair.generate();
+
+const airdropSignature = await connection.requestAirdrop(
+  feePayer.publicKey,
+  LAMPORTS_PER_SOL
+);
+await connection.confirmTransaction({
+  blockhash: latestBlockhash.blockhash,
+  lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
+  signature: airdropSignature
+});
+
+const maxMetadata: TokenMetadata = {
+  updateAuthority: feePayer.publicKey,
+  mint: mint.publicKey,
+  name: "Example Token v2",
+  symbol: "EXMPL",
+  uri: "https://example.com/token.json",
+  additionalMetadata: [["description", "Metadata stored on mint account"]]
+};
+
+const mintSpace = getMintLen([ExtensionType.MetadataPointer]);
+const metadataSpace = TYPE_SIZE + LENGTH_SIZE + pack(maxMetadata).length;
+const mintRent = await connection.getMinimumBalanceForRentExemption(
+  mintSpace + metadataSpace
+);
+
+await sendAndConfirmTransaction(
+  connection,
+  new Transaction().add(
+    SystemProgram.createAccount({
+      fromPubkey: feePayer.publicKey, // Account funding account creation.
+      newAccountPubkey: mint.publicKey, // New mint account to create.
+      lamports: mintRent, // Lamports funding the mint account rent.
+      space: mintSpace, // Account size in bytes for the mint plus MetadataPointer.
+      programId: TOKEN_2022_PROGRAM_ID // Program that owns the mint account.
+    }),
+    createInitializeMetadataPointerInstruction(
+      mint.publicKey, // Mint account that stores the MetadataPointer extension.
+      feePayer.publicKey, // Authority allowed to update the metadata pointer later.
+      mint.publicKey, // Account address that stores the metadata.
+      TOKEN_2022_PROGRAM_ID // Program that owns the mint account.
+    ),
+    createInitializeMintInstruction(
+      mint.publicKey, // Mint account to initialize.
+      0, // Number of decimals for the token.
+      feePayer.publicKey, // Authority allowed to mint new tokens.
+      feePayer.publicKey, // Authority allowed to freeze token accounts.
+      TOKEN_2022_PROGRAM_ID // Program that owns the mint account.
+    ),
+    createInitializeInstruction({
+      programId: TOKEN_2022_PROGRAM_ID, // Program that owns the mint and metadata.
+      metadata: mint.publicKey, // Mint account that stores the metadata.
+      updateAuthority: feePayer.publicKey, // Authority allowed to update metadata later.
+      mint: mint.publicKey, // Mint that the metadata describes.
+      mintAuthority: feePayer.publicKey, // Signer authorizing metadata initialization for the mint.
+      name: "Example Token", // Token name stored in metadata.
+      symbol: "EXMPL", // Token symbol stored in metadata.
+      uri: "https://example.com/token.json" // URI pointing to off-chain JSON metadata.
+    }),
+    createUpdateFieldInstruction({
+      programId: TOKEN_2022_PROGRAM_ID, // Program that owns the metadata.
+      metadata: mint.publicKey, // Mint account that stores the metadata.
+      updateAuthority: feePayer.publicKey, // Authority allowed to update metadata fields.
+      field: "description", // Custom metadata field to add.
+      value: "Metadata stored on mint account" // Value stored for the custom metadata field.
+    })
+  ),
+  [feePayer, mint],
+  { commitment: "confirmed" }
+);
+
+const initialTokenMetadata = await getTokenMetadata(
+  connection,
+  mint.publicKey,
+  "confirmed",
+  TOKEN_2022_PROGRAM_ID
+);
+
+console.log(
+  JSON.stringify(
+    {
+      mint: mint.publicKey,
+      tokenMetadata: initialTokenMetadata
+    },
+    null,
+    2
+  )
+);
+
+const updateMetadataSignature = await sendAndConfirmTransaction(
+  connection,
+  new Transaction().add(
+    createUpdateFieldInstruction({
+      programId: TOKEN_2022_PROGRAM_ID, // Program that owns the metadata.
+      metadata: mint.publicKey, // Mint account that stores the metadata.
+      updateAuthority: feePayer.publicKey, // Authority allowed to update metadata fields.
+      field: "name", // Base metadata field to update.
+      value: "Example Token v2" // Updated value for the token name.
+    }),
+    createUpdateMetadataPointerInstruction(
+      mint.publicKey, // Mint account that stores the MetadataPointer extension.
+      feePayer.publicKey, // Authority allowed to update the metadata pointer.
+      mint.publicKey, // Account address that stores the metadata.
+      [], // Additional signer accounts required by the instruction.
+      TOKEN_2022_PROGRAM_ID // Program that owns the mint account.
+    ),
+    createRemoveKeyInstruction({
+      programId: TOKEN_2022_PROGRAM_ID, // Program that owns the metadata.
+      metadata: mint.publicKey, // Mint account that stores the metadata.
+      updateAuthority: feePayer.publicKey, // Authority allowed to remove custom metadata.
+      key: "description", // Custom metadata key to remove.
+      idempotent: false // Fail if the custom metadata key does not exist.
+    }),
+    createUpdateAuthorityInstruction({
+      programId: TOKEN_2022_PROGRAM_ID, // Program that owns the metadata.
+      metadata: mint.publicKey, // Mint account that stores the metadata.
+      oldAuthority: feePayer.publicKey, // Current authority allowed to change the update authority.
+      newAuthority: null // Clear the update authority so metadata can no longer be changed.
+    }),
+    createEmitInstruction({
+      programId: TOKEN_2022_PROGRAM_ID, // Program that owns the metadata.
+      metadata: mint.publicKey // Mint account that stores the metadata to emit.
+    })
+  ),
+  [feePayer],
+  { commitment: "confirmed" }
+);
+
+const updateMetadataTransaction = (await connection.getTransaction(
+  updateMetadataSignature,
+  {
+    maxSupportedTransactionVersion: 0
+  }
+)) as any;
+const emittedDataBase64 =
+  updateMetadataTransaction?.meta?.returnData?.data?.[0];
+if (!emittedDataBase64) {
+  throw new Error("Expected token metadata return data");
+}
+const emittedTokenMetadata = unpackTokenMetadata(
+  Buffer.from(emittedDataBase64, "base64")
+);
+
+const mintAccount = await getMint(
+  connection,
+  mint.publicKey,
+  "confirmed",
+  TOKEN_2022_PROGRAM_ID
+);
+const metadataPointer = getMetadataPointerState(mintAccount);
+const tokenMetadata = await getTokenMetadata(
+  connection,
+  mint.publicKey,
+  "confirmed",
+  TOKEN_2022_PROGRAM_ID
+);
+
+console.log(
+  JSON.stringify(
+    {
+      mint: mint.publicKey,
+      metadataPointer,
+      tokenMetadata,
+      emittedTokenMetadata
+    },
+    null,
+    2
+  )
+);
+```
+
+### Rust
+
+```rust Rust highlight={79-115,134-166}
+use anyhow::{anyhow, Result};
+use base64::prelude::{Engine as _, BASE64_STANDARD};
+use solana_client::nonblocking::rpc_client::RpcClient;
+use solana_client::rpc_config::RpcTransactionConfig;
+use solana_commitment_config::CommitmentConfig;
+use solana_sdk::{
+    pubkey::Pubkey,
+    signature::{Keypair, Signer},
+    transaction::Transaction,
+};
+use solana_transaction_status_client_types::UiTransactionEncoding;
+use solana_system_interface::instruction::create_account;
+use spl_token_2022_interface::{
+    extension::{
+        metadata_pointer::{
+            instruction::{
+                initialize as initialize_metadata_pointer,
+                update as update_metadata_pointer,
+            },
+            MetadataPointer,
+        },
+        BaseStateWithExtensions, ExtensionType, StateWithExtensions,
+    },
+    instruction::initialize_mint,
+    state::Mint,
+    ID as TOKEN_2022_PROGRAM_ID,
+};
+use spl_token_metadata_interface::{
+    borsh::BorshDeserialize,
+    instruction::{
+        emit as emit_token_metadata, initialize as initialize_token_metadata,
+        remove_key as remove_token_metadata_key,
+        update_authority as update_token_metadata_authority,
+        update_field as update_token_metadata_field,
+    },
+    state::{Field, TokenMetadata},
+};
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    let client = RpcClient::new_with_commitment(
+        String::from("http://localhost:8899"),
+        CommitmentConfig::confirmed(),
+    );
+
+    let fee_payer = Keypair::new();
+
+    let airdrop_signature = client
+        .request_airdrop(&fee_payer.pubkey(), 1_000_000_000)
+        .await?;
+    loop {
+        let confirmed = client.confirm_transaction(&airdrop_signature).await?;
+        if confirmed {
+            break;
+        }
+    }
+
+    let mint = Keypair::new();
+    let max_token_metadata = TokenMetadata {
+        update_authority: Some(fee_payer.pubkey()).try_into()?,
+        mint: mint.pubkey(),
+        name: "Example Token v2".to_string(),
+        symbol: "EXMPL".to_string(),
+        uri: "https://example.com/token.json".to_string(),
+        additional_metadata: vec![(
+            "description".to_string(),
+            "Metadata stored on mint account".to_string(),
+        )],
+    };
+
+    let mint_space =
+        ExtensionType::try_calculate_account_len::<Mint>(&[ExtensionType::MetadataPointer])?;
+    let mint_rent = client
+        .get_minimum_balance_for_rent_exemption(mint_space + max_token_metadata.tlv_size_of()?)
+        .await?;
+
+    let create_mint_transaction = Transaction::new_signed_with_payer(
+        &[
+            create_account(
+                &fee_payer.pubkey(), // Account funding account creation.
+                &mint.pubkey(), // New mint account to create.
+                mint_rent, // Lamports funding the mint account rent.
+                mint_space as u64, // Account size in bytes for the mint plus MetadataPointer.
+                &TOKEN_2022_PROGRAM_ID, // Program that owns the mint account.
+            ),
+            initialize_metadata_pointer(
+                &TOKEN_2022_PROGRAM_ID, // Program that owns the mint account.
+                &mint.pubkey(), // Mint account that stores the MetadataPointer extension.
+                Some(fee_payer.pubkey()), // Authority allowed to update the metadata pointer later.
+                Some(mint.pubkey()), // Account address that stores the metadata.
+            )?,
+            initialize_mint(
+                &TOKEN_2022_PROGRAM_ID, // Program that owns the mint account.
+                &mint.pubkey(), // Mint account to initialize.
+                &fee_payer.pubkey(), // Authority allowed to mint new tokens.
+                Some(&fee_payer.pubkey()), // Authority allowed to freeze token accounts.
+                0, // Number of decimals for the token.
+            )?,
+            initialize_token_metadata(
+                &TOKEN_2022_PROGRAM_ID, // Program that owns the mint and metadata.
+                &mint.pubkey(), // Mint account that stores the metadata.
+                &fee_payer.pubkey(), // Authority allowed to update metadata later.
+                &mint.pubkey(), // Mint that the metadata describes.
+                &fee_payer.pubkey(), // Signer authorizing metadata initialization for the mint.
+                "Example Token".to_string(), // Token name stored in metadata.
+                "EXMPL".to_string(), // Token symbol stored in metadata.
+                "https://example.com/token.json".to_string(), // URI pointing to off-chain JSON metadata.
+            ),
+            update_token_metadata_field(
+                &TOKEN_2022_PROGRAM_ID, // Program that owns the metadata.
+                &mint.pubkey(), // Mint account that stores the metadata.
+                &fee_payer.pubkey(), // Authority allowed to update metadata fields.
+                Field::Key("description".to_string()), // Custom metadata field to add.
+                "Metadata stored on mint account".to_string(), // Value stored for the custom metadata field.
+            ),
+        ],
+        Some(&fee_payer.pubkey()),
+        &[&fee_payer, &mint],
+        client.get_latest_blockhash().await?,
+    );
+    client
+        .send_and_confirm_transaction(&create_mint_transaction)
+        .await?;
+
+    let initial_mint_account = client.get_account(&mint.pubkey()).await?;
+    let initial_mint_state = StateWithExtensions::<Mint>::unpack(&initial_mint_account.data)?;
+    let initial_token_metadata = initial_mint_state.get_variable_len_extension::<TokenMetadata>()?;
+
+    println!("Mint: {}", mint.pubkey());
+    println!("Token Metadata: {:#?}", initial_token_metadata);
+
+    let update_metadata_transaction = Transaction::new_signed_with_payer(
+        &[
+            update_token_metadata_field(
+                &TOKEN_2022_PROGRAM_ID, // Program that owns the metadata.
+                &mint.pubkey(), // Mint account that stores the metadata.
+                &fee_payer.pubkey(), // Authority allowed to update metadata fields.
+                Field::Name, // Base metadata field to update.
+                "Example Token v2".to_string(), // Updated value for the token name.
+            ),
+            update_metadata_pointer(
+                &TOKEN_2022_PROGRAM_ID, // Program that owns the mint account.
+                &mint.pubkey(), // Mint account that stores the MetadataPointer extension.
+                &fee_payer.pubkey(), // Authority allowed to update the metadata pointer.
+                &[], // Additional signer accounts required by the instruction.
+                Some(mint.pubkey()), // Account address that stores the metadata.
+            )?,
+            remove_token_metadata_key(
+                &TOKEN_2022_PROGRAM_ID, // Program that owns the metadata.
+                &mint.pubkey(), // Mint account that stores the metadata.
+                &fee_payer.pubkey(), // Authority allowed to remove custom metadata.
+                "description".to_string(), // Custom metadata key to remove.
+                false, // Fail if the custom metadata key does not exist.
+            ),
+            update_token_metadata_authority(
+                &TOKEN_2022_PROGRAM_ID, // Program that owns the metadata.
+                &mint.pubkey(), // Mint account that stores the metadata.
+                &fee_payer.pubkey(), // Current authority allowed to change the update authority.
+                None::<Pubkey>.try_into()?, // Clear the update authority so metadata can no longer be changed.
+            ),
+            emit_token_metadata(
+                &TOKEN_2022_PROGRAM_ID, // Program that owns the metadata.
+                &mint.pubkey(), // Mint account that stores the metadata to emit.
+                None, // Start offset for the emitted metadata slice.
+                None, // End offset for the emitted metadata slice.
+            ),
+        ],
+        Some(&fee_payer.pubkey()),
+        &[&fee_payer],
+        client.get_latest_blockhash().await?,
+    );
+    let update_metadata_signature = client
+        .send_and_confirm_transaction(&update_metadata_transaction)
+        .await?;
+
+    let update_metadata_result = client
+        .get_transaction_with_config(
+            &update_metadata_signature,
+            RpcTransactionConfig {
+                encoding: Some(UiTransactionEncoding::Json),
+                commitment: Some(CommitmentConfig::confirmed()),
+                max_supported_transaction_version: Some(0),
+            },
+        )
+        .await?;
+    let emitted_data = BASE64_STANDARD.decode(
+        update_metadata_result
+        .transaction
+        .meta
+        .and_then(|meta| meta.return_data.map(|return_data| return_data.data.0))
+        .ok_or_else(|| anyhow!("Expected token metadata return data"))?,
+    )?;
+    let emitted_token_metadata = TokenMetadata::try_from_slice(&emitted_data)?;
+
+    let mint_account = client.get_account(&mint.pubkey()).await?;
+    let mint_state = StateWithExtensions::<Mint>::unpack(&mint_account.data)?;
+    let metadata_pointer = mint_state.get_extension::<MetadataPointer>()?;
+    let token_metadata = mint_state.get_variable_len_extension::<TokenMetadata>()?;
+
+    println!("Mint: {}", mint.pubkey());
+    println!("Metadata Pointer: {:#?}", metadata_pointer);
+    println!("Token Metadata: {:#?}", token_metadata);
+    println!("Emitted Token Metadata: {:#?}", emitted_token_metadata);
+
+    Ok(())
+}
+```

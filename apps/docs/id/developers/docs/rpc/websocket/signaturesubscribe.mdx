@@ -1,0 +1,136 @@
+---
+title: Metode RPC signatureSubscribe
+sidebarTitle: signatureSubscribe
+---
+
+Berlangganan untuk menerima notifikasi ketika transaksi dengan tanda tangan yang
+diberikan mencapai tingkat komitmen yang ditentukan.
+
+<Warning>
+  Ini adalah langganan untuk satu notifikasi. Langganan ini secara otomatis
+  dibatalkan oleh server setelah notifikasi, `signatureNotification`, dikirim
+  oleh RPC.
+</Warning>
+
+<RequestExample>
+  ```json WebSocket
+  {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "signatureSubscribe",
+    "params": [
+      "2EBVM6cB8vAAD93Ktr6Vd8p67XPbQzCJX47MpReuiCXJAtcjaxpvWpcg9Ege1Nr5Tk3a2GFrByT7WPBjdsTycY9b",
+      {
+        "commitment": "finalized",
+        "enableReceivedNotification": false
+      }
+    ]
+  }
+  ```
+</RequestExample>
+
+<ResponseExample>
+  ```json Response
+  {
+    "jsonrpc": "2.0",
+    "result": 0,
+    "id": 1
+  }
+  ```
+</ResponseExample>
+
+### Parameters
+
+<ParamField body="0" type="string" required>
+  tanda tangan transaksi, sebagai string yang dikodekan base-58
+
+  <Info>
+    Tanda tangan transaksi harus merupakan tanda tangan pertama dari transaksi
+    (lihat [id transaksi](/developers/docs/references/terminology#transaction-id) untuk
+    detail lebih lanjut).
+  </Info>
+</ParamField>
+
+<ParamField body="1" type="object">
+  Objek konfigurasi yang berisi bidang-bidang berikut:
+
+  <Expandable title="properties" defaultOpen>
+    <ParamField body="commitment" type="string">
+      Komitmen menjelaskan seberapa final suatu blok pada titik waktu tersebut. Lihat
+      [Mengonfigurasi Komitmen Status](/developers/docs/rpc#configuring-state-commitment).
+    </ParamField>
+
+    <ParamField body="enableReceivedNotification" type="boolean">
+      Apakah akan berlangganan notifikasi ketika tanda tangan diterima oleh RPC,
+      selain ketika tanda tangan diproses.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+### Result
+
+<ResponseField name="result" type="integer">
+  id langganan (diperlukan untuk berhenti berlangganan)
+</ResponseField>
+
+#### Format Notifikasi:
+
+Notifikasi akan berupa objek JSON RpcResponse dengan nilai yang berisi objek
+dengan:
+
+- `slot: <u64>` - Slot yang sesuai.
+- `value: <object|string>` - nilai notifikasi dari
+  [`RpcSignatureResult`](https://github.com/solana-labs/solana/blob/6d28fd455b07e3557fc6c0c3ddf3ba03e3fe8482/rpc-client-api/src/response.rs#L265-L268),
+  yang menghasilkan salah satu dari:
+  - ketika `enableReceivedNotification` adalah `true` dan tanda tangan diterima:
+    string literal
+    [`"receivedSignature"`](https://github.com/solana-labs/solana/blob/6d28fd455b07e3557fc6c0c3ddf3ba03e3fe8482/rpc-client-api/src/response.rs#L286-L288),
+    atau
+  - ketika tanda tangan diproses: `err: <object|null>`:
+    - `null` jika transaksi berhasil diproses pada tingkat komitmen yang
+      ditentukan, atau
+    - sebuah
+      [`TransactionError`](https://github.com/solana-labs/solana/blob/6d28fd455b07e3557fc6c0c3ddf3ba03e3fe8482/sdk/src/transaction/error.rs#L15-L164),
+      jika transaksi gagal
+
+#### Contoh respons:
+
+Berikut adalah contoh respons notifikasi dari transaksi yang berhasil
+**diproses**:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "signatureNotification",
+  "params": {
+    "result": {
+      "context": {
+        "slot": 5207624
+      },
+      "value": {
+        "err": null
+      }
+    },
+    "subscription": 24006
+  }
+}
+```
+
+Berikut adalah contoh respons notifikasi dari tanda tangan transaksi yang
+berhasil **diterima**:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "signatureNotification",
+  "params": {
+    "result": {
+      "context": {
+        "slot": 5207624
+      },
+      "value": "receivedSignature"
+    },
+    "subscription": 24006
+  }
+}
+```

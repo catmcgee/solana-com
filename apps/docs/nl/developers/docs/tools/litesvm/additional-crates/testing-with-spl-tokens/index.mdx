@@ -1,0 +1,212 @@
+---
+title: Snelstart
+description:
+  Leer hoe je de litesvm-token crate gebruikt voor het testen met SPL-tokens
+---
+
+[Bekijk `litesvm-token` op crates.io](https://crates.io/crates/litesvm-token)
+
+## Installatie
+
+Zorg ervoor dat je alle benodigde afhankelijkheden hebt:
+
+```bash
+cargo add --dev litesvm litesvm-token solana-sdk@4 spl-token spl-associated-token-account
+cargo add --dev solana-system-interface --features bincode
+```
+
+## SPL Token-basisprincipes
+
+In Solana is het aanmaken van een token account een proces in twee stappen.
+
+<Steps>
+<Step title="Maak een `Mint Account` aan">
+- Heeft geen tokensaldo 
+- Bevat alle globale informatie van de token, zoals de totale voorraad, decimalen, autoriteit, enz.
+- Er is één mint account per token
+- De eigenaar is het Token Program (TokenKeg of Token 2022)
+</Step>
+
+<Step title="Maak een `Token Account` aan">
+- Slaat het saldo op voor een specifieke SPL-token 
+- Bevat het mint account om te definiëren welke SPL-token zich in dit account bevindt 
+- Er kunnen meerdere token accounts zijn voor één mint account 
+- De eigenaar is degene die controle heeft over de tokens in dit account 
+</Step>
+</Steps>
+
+## Soorten token accounts
+
+### Gewoon token account
+
+Een token account slaat je saldo op voor een specifieke SPL-token:
+
+```rust
+// Can create token accounts at ANY address
+let token_account = Keypair::new();  // Random address
+let create_ix = system_instruction::create_account(
+    &payer.pubkey(),
+    &token_account.pubkey(),  // Any address you want
+    rent,
+    165,  // Token account size
+    &spl_token::id(),
+);
+let init_ix = spl_token::instruction::initialize_account(
+    &spl_token::id(),
+    &token_account.pubkey(),
+    &mint,
+    &owner.pubkey(),
+)?;
+```
+
+<Columns cols={2}>
+  <Card title="Voordelen" icon="check">
+    - Meerdere accounts aanmaken voor dezelfde mint/eigenaar is mogelijk
+    - Flexibel - elk adres kan worden gebruikt
+  </Card>
+
+  <Card title="Nadelen" icon="x">
+    - Niet deterministisch - adressen moeten handmatig bijgehouden worden
+    - Ontvanger moet aangeven naar welk account verzonden moet worden
+    - Zorgt voor verwarring bij meerdere accounts
+  </Card>
+</Columns>
+
+<Info>
+  **Wanneer te gebruiken:** Tijdelijke/escrow-accounts,
+  programma-eigendomsaccounts met aangepaste logica, wanneer je meerdere
+  accounts nodig hebt voor hetzelfde token, geavanceerde DeFi-strategieën.
+</Info>
+
+### Associated Token Account (ATA)
+
+Een ATA is een token account op een deterministisch PDA-adres:
+
+```rust
+// ATA address is ALWAYS the same for owner + mint
+let ata = get_associated_token_address(&owner.pubkey(), &mint);
+// Address derived from: [owner_pubkey, token_program_id, mint]
+```
+
+Hoe het ATA-adres wordt afgeleid:
+
+```rust
+// ATA is a PDA owned by the Associated Token Program
+let (ata, bump) = Pubkey::find_program_address(
+    &[
+        owner.as_ref(),
+        spl_token::id().as_ref(),
+        mint.as_ref(),
+    ],
+    &spl_associated_token_account::id(),  // ATA program
+);
+```
+
+<Columns cols={2}>
+  <Card title="Voordelen" icon="check">
+    - Één canoniek account per eigenaar/mint-combinatie
+    - Deterministisch - iedereen kan het adres berekenen
+    - Vereenvoudigt betalingen - alleen een wallet-adres en mint nodig
+    - Standaardconventie in alle Solana-applicaties
+  </Card>
+
+  <Card title="Nadelen" icon="x">
+    - Er kan slechts ÉÉN ATA per eigenaar/mint-combinatie zijn (by design)
+  </Card>
+</Columns>
+
+<Info>
+  **Aanbevolen voor de meeste gevallen:** Wallet-applicaties, DeFi-protocollen,
+  NFT-bezit, betalingssystemen en alle gebruikersgerichte token-overdrachten.
+</Info>
+
+## Snel voorbeeld
+
+Hier is een volledig voorbeeld van het aanmaken van een token mint en het minten
+van tokens:
+
+```rust
+use litesvm::LiteSVM;
+use litesvm_token::{
+    get_spl_account,
+    spl_token::{native_mint::DECIMALS, state::Account as TokenAccount},
+    CreateAccount, CreateMint, MintTo, Transfer,
+};
+use solana_sdk::{
+    native_token::LAMPORTS_PER_SOL,
+    signature::{Keypair, Signer},
+};
+
+#[test]
+fn test_create_and_mint_tokens() {
+    let mut svm = LiteSVM::new();
+
+    // Create payer account and fund it
+    let payer = Keypair::new();
+    svm.airdrop(&payer.pubkey(), 10 * LAMPORTS_PER_SOL).unwrap();
+
+    // Create a new SPL token mint with the payer as the mint authority
+    let mint = CreateMint::new(&mut svm, &payer)
+        .authority(&payer.pubkey())
+        .decimals(DECIMALS)
+        .send()
+        .unwrap();
+
+    // Create a token account for the payer
+    let token_account = CreateAccount::new(&mut svm, &payer, &mint)
+        .owner(&payer.pubkey())
+        .send()
+        .unwrap();
+
+    // Mint tokens into the payer's token account
+    MintTo::new(&mut svm, &payer, &mint, &token_account, 1000)
+        .owner(&payer)
+        .send()
+        .unwrap();
+
+    // Verify balance
+    let token_account: TokenAccount = get_spl_account(&svm, &token_account).unwrap();
+    let account_balance = token_account.amount;
+    assert_eq!(account_balance, 1000)
+}
+```
+
+## Kernconcepten
+
+### Token-decimalen
+
+De meeste tokens gebruiken decimalen om fractionele bedragen weer te geven:
+
+```rust
+// SOL has 9 decimals
+let one_sol = 10_u64.pow(9);  // 1_000_000_000 lamports
+
+// USDC has 6 decimals
+let one_usdc = 10_u64.pow(6); // 1_000_000 micro-USDC
+
+// Always account for decimals in calculations
+let amount_tokens = 100;
+let amount_raw = amount_tokens * 10_u64.pow(decimals as u32);
+```
+
+### Accountrelaties
+
+Het begrijpen van de relaties tussen accounts is essentieel:
+
+- **Mint Account**: Definieert de token (aanbod, decimalen, bevoegdheden)
+- **Token account**: Bewaart tokens voor een specifieke eigenaar
+- **Associated token account**: Deterministisch token account voor een
+  eigenaar+mint-paar
+- **Mint Authority**: Kan nieuwe tokens aanmaken
+- **Freeze Authority**: Kan token accounts bevriezen (optioneel)
+
+## Probleemoplossing
+
+### Veelvoorkomende fouten
+
+| Fout                        | Oorzaak                                                          | Oplossing                                       |
+| --------------------------- | ---------------------------------------------------------------- | ----------------------------------------------- |
+| `AccountNotFound`           | Proberen een account te gebruiken dat niet bestaat               | Zorg dat het account is aangemaakt vóór gebruik |
+| `AccountAlreadyInitialized` | Proberen een al geïnitialiseerd account opnieuw te initialiseren | Controleer of het account bestaat vóór aanmaak  |
+| `InsufficientFunds`         | Onvoldoende lamports voor rent of tokens voor overdracht         | Zorg voor voldoende financiering/minting        |
+| `OwnerMismatch`             | Account eigendom van verkeerd programma                          | Verifieer het juiste programma-ID bij aanmaak   |

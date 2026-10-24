@@ -1,0 +1,204 @@
+---
+title: Início Rápido
+description:
+  Aprenda a usar o crate litesvm-loader para testar a implantação de programas
+  atualizáveis
+---
+
+[Ver `litesvm-loader` no crates.io](https://crates.io/crates/litesvm-loader)
+
+## Instalação
+
+Certifique-se de que tem todas as dependências necessárias:
+
+```bash
+cargo add --dev litesvm litesvm-loader solana-keypair solana-signer
+```
+
+Se o seu teste invocar diretamente o programa implantado, adicione também os
+crates de instrução e transação do Solana utilizados pelo seu teste:
+
+```bash
+cargo add --dev solana-instruction solana-message solana-transaction
+```
+
+## O que é o litesvm-loader?
+
+O crate `litesvm-loader` fornece utilitários para implantar programas através do
+BPF upgradeable loader dentro do LiteSVM. Utilize-o quando o seu teste
+necessitar de program accounts pertencentes ao loader, program data accounts, ou
+comportamento de autoridade de atualização, em vez de inserir diretamente um
+programa com `svm.add_program(...)`.
+
+<Steps>
+<Step title="Implantação Atualizável">
+- Cria a conta buffer do loader
+- Escreve os bytes do programa em blocos
+- Implanta o program account final com o BPF upgradeable loader
+- Utiliza o keypair do programa fornecido como ID do programa
+</Step>
+
+<Step>
+  **Gestão de Autoridade de Atualização** - Altera a autoridade de atualização
+  de um programa já implantado - Suporta a atribuição de uma nova autoridade -
+  Suporta passar `None` para tornar o programa imutável
+</Step>
+
+  <Step>
+    **Estado Real do Loader** - Exercita o mesmo modelo de conta do loader que o
+    seu programa vê on-chain - Permite que os testes inspecionem program
+    accounts e program data accounts - Ajuda a detetar erros ocultados pela
+    inserção direta de programas
+  </Step>
+</Steps>
+
+<Info>
+  Para a maioria dos testes, `svm.add_program(program_id, program_bytes)` ainda
+  é a forma mais rápida e simples de carregar um programa. Use `litesvm-loader`
+  quando o layout da loader account ou a autoridade de atualização faz parte do
+  que você precisa testar.
+</Info>
+
+## Exemplo Rápido
+
+Aqui está um exemplo completo que implanta um programa através do loader
+atualizável e depois alterna sua autoridade:
+
+```rust
+use litesvm::LiteSVM;
+use litesvm_loader::{deploy_upgradeable_program, set_upgrade_authority};
+use solana_keypair::Keypair;
+use solana_signer::Signer;
+
+#[test]
+fn test_upgradeable_deployment() {
+    let mut svm = LiteSVM::new();
+
+    let payer = Keypair::new();
+    svm.airdrop(&payer.pubkey(), 10_000_000_000).unwrap();
+
+    // Use the keypair that should own the program ID.
+    // For Anchor programs, this is usually target/deploy/<program>-keypair.json.
+    let program = Keypair::new();
+    let program_bytes = include_bytes!("../target/deploy/my_program.so");
+
+    deploy_upgradeable_program(&mut svm, &payer, &program, program_bytes).unwrap();
+
+    let program_account = svm.get_account(&program.pubkey()).unwrap();
+    assert!(program_account.executable);
+
+    let new_authority = Keypair::new();
+    set_upgrade_authority(
+        &mut svm,
+        &payer,
+        &program.pubkey(),
+        &payer,
+        Some(&new_authority.pubkey()),
+    )
+    .unwrap();
+}
+```
+
+## Escolhendo o keypair do Programa
+
+`deploy_upgradeable_program` usa o argumento `program_kp` como o endereço do
+programa. Se o seu programa declara um ID fixo, carregue o keypair de
+implantação gerado em vez de criar um keypair aleatório:
+
+```rust
+use solana_keypair::read_keypair_file;
+
+let program = read_keypair_file("target/deploy/my_program-keypair.json").unwrap();
+deploy_upgradeable_program(&mut svm, &payer, &program, program_bytes).unwrap();
+```
+
+## Invocando o Programa Implantado
+
+Após a implantação, chame o programa da mesma forma que chamaria qualquer
+programa carregado pelo LiteSVM. Construa uma instrução para o seu programa,
+assine a transação e envie-a pela mesma instância `LiteSVM`:
+
+```rust
+use solana_instruction::Instruction;
+use solana_message::Message;
+use solana_transaction::Transaction;
+
+let instruction = Instruction::new_with_bytes(
+    program.pubkey(),
+    &[],  // instruction data for your program
+    vec![], // account metas for your program
+);
+
+let message = Message::new(&[instruction], Some(&payer.pubkey()));
+let tx = Transaction::new(&[&payer], message, svm.latest_blockhash());
+
+svm.send_transaction(tx).unwrap();
+```
+
+## Componentes Principais
+
+### deploy_upgradeable_program
+
+| Argumento       | Descrição                                                                   |
+| --------------- | --------------------------------------------------------------------------- |
+| `svm`           | Instância mutável de `LiteSVM` que recebe o programa implantado             |
+| `payer_kp`      | Pagador de taxas e autoridade inicial de atualização                        |
+| `program_kp`    | keypair cuja chave pública se torna o ID do programa                        |
+| `program_bytes` | Bytes do programa SBF compilado, geralmente obtidos de `target/deploy/*.so` |
+
+`deploy_upgradeable_program` cria um buffer do loader, grava os bytes do
+programa em blocos de 512 bytes e implanta o programa com espaço para futuras
+atualizações.
+
+### set_upgrade_authority
+
+| Argumento                   | Descrição                                                              |
+| --------------------------- | ---------------------------------------------------------------------- |
+| `svm`                       | Instância mutável de `LiteSVM` contendo o programa implantado          |
+| `from_keypair`              | Pagador de taxas e autoridade de assinatura da transação               |
+| `program_address`           | ID do programa cuja autoridade deve ser alterada                       |
+| `current_authority_keypair` | keypair da autoridade de atualização atual                             |
+| `new_authority_address`     | Novo endereço de autoridade, ou `None` para tornar o programa imutável |
+
+<Warning>
+  Na implementação atual do helper, a transação gerada é assinada por
+  `from_keypair`. Passe a autoridade atual como `from_keypair`, ou mantenha o
+  pagador e a autoridade atual iguais, ao alterar a autoridade de atualização.
+</Warning>
+
+## Fluxos de Trabalho Comuns
+
+### Implantar com o ID de programa declarado
+
+```rust
+use solana_keypair::read_keypair_file;
+
+let program = read_keypair_file("target/deploy/my_program-keypair.json").unwrap();
+let program_bytes = include_bytes!("../target/deploy/my_program.so");
+
+deploy_upgradeable_program(&mut svm, &payer, &program, program_bytes).unwrap();
+```
+
+### Tornar um programa imutável
+
+```rust
+set_upgrade_authority(
+    &mut svm,
+    &payer,
+    &program.pubkey(),
+    &payer,
+    None,
+)
+.unwrap();
+```
+
+## Solução de Problemas
+
+### Erros Comuns
+
+| Erro                                                               | Causa                                                                                | Solução                                                                                                             |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| `ProgramAccountNotFound` ou falhas de instrução contra o ID errado | A implantação usou um `Keypair` aleatório enquanto o programa espera um ID declarado | Leia `target/deploy/<program>-keypair.json` e passe esse keypair para `deploy_upgradeable_program`                  |
+| `InsufficientFunds`                                                | O pagador não tem lamports suficientes para o buffer do loader e os program accounts | Faça airdrop de mais lamports antes da implantação                                                                  |
+| `MissingRequiredSignature` ao alterar a autoridade                 | A autoridade atual não assinou a transação                                           | Passe a autoridade atual como `from_keypair`, ou mantenha o pagador e a autoridade atual como o mesmo keypair       |
+| A implantação do programa está mais lenta do que o esperado        | A implantação do loader grava bytes por meio de instruções reais do loader           | Use `svm.add_program(...)` quando não precisar do estado do loader ou do comportamento de autoridade de atualização |

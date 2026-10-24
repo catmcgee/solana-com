@@ -1,0 +1,176 @@
+---
+title: Schnellstart
+description:
+  Erfahren Sie, wie Sie das litesvm-utils-Crate für optimiertes
+  Solana-Programm-Testing verwenden
+---
+
+[`litesvm-utils` auf crates.io ansehen](https://crates.io/crates/litesvm-utils)
+
+## Installation
+
+Stellen Sie sicher, dass alle erforderlichen Abhängigkeiten vorhanden sind:
+
+```bash
+cargo add --dev litesvm-utils solana-sdk@3 spl-token
+cargo add --dev solana-system-interface@2 --features bincode
+```
+
+## Was ist litesvm-utils?
+
+Das `litesvm-utils`-Crate stellt grundlegende Hilfs-Traits und Dienstprogramme
+bereit, die das Testen von Solana-Programmen vereinfachen. Es reduziert gängigen
+Test-Boilerplate von 30+ Zeilen auf minimalen, lesbaren Code durch ergonomische
+APIs.
+
+<Steps>
+<Step title="TestHelpers Trait">
+- Finanzierte Konten mit einem einzigen Methodenaufruf erstellen
+- Token-Mints und token account einfach einrichten
+- PDAs ohne Boilerplate ableiten
+- Slots für zeitbasiertes Testen verwalten
+</Step>
+
+<Step>
+  **AssertionHelpers Trait** – Konten-Zustände prüfen (vorhanden, geschlossen,
+  Eigentümer) – Token-Guthaben und Mint-Vorräte verifizieren – SOL-Guthaben
+  prüfen – Datenlängen von Konten validieren
+</Step>
+
+<Step>
+  **TransactionHelpers Trait** – Anweisungen mit umfangreichem Ergebnis-Handling
+  ausführen – Transaktionserfolg oder -fehler bestätigen – Auf spezifische
+  Fehlercodes prüfen – Transaktionslogs und Compute-Einheiten untersuchen
+</Step>
+
+<Step title="LiteSVMBuilder">
+- Fluent-Builder-Muster für die Einrichtung der Testumgebung
+- Programme mit Method-Chaining deployen
+- Praktische statische Factory-Methoden
+</Step>
+</Steps>
+
+## Schnellbeispiel
+
+Hier ist ein vollständiges Beispiel, das die Leistungsfähigkeit von
+litesvm-utils zeigt:
+
+```rust
+use litesvm_utils::{AssertionHelpers, LiteSVM, Signer, TestHelpers, TransactionHelpers};
+use solana_sdk::native_token::LAMPORTS_PER_SOL;
+use solana_system_interface::instruction as system_instruction;
+
+#[test]
+fn test_with_utils() {
+    let mut svm = LiteSVM::new();
+
+    // Create funded accounts in one line
+    let alice = svm.create_funded_account(10 * LAMPORTS_PER_SOL).unwrap();
+    let bob = svm.create_funded_account(0).unwrap();
+
+    // Create a token mint easily
+    let mint = svm.create_token_mint(&alice, 9).unwrap();
+
+    // Create an associated token account (returns Pubkey)
+    let alice_ata = svm.create_associated_token_account(&mint.pubkey(), &alice).unwrap();
+
+    // Mint tokens
+    svm.mint_to(&mint.pubkey(), &alice_ata, &alice, 1000).unwrap();
+
+    // Assert balances
+    svm.assert_token_balance(&alice_ata, 1000);
+
+    // Execute a SOL transfer with rich result handling
+    let transfer_ix = system_instruction::transfer(
+        &alice.pubkey(),
+        &bob.pubkey(),
+        LAMPORTS_PER_SOL,
+    );
+
+    let result = svm.send_instruction(transfer_ix, &[&alice]).unwrap();
+    result.assert_success();
+
+    // Verify the transfer
+    svm.assert_sol_balance(&bob.pubkey(), LAMPORTS_PER_SOL);
+
+    // Bob now has SOL, so he can pay for his own associated token account
+    let bob_ata = svm.create_associated_token_account(&mint.pubkey(), &bob).unwrap();
+    svm.assert_token_balance(&bob_ata, 0);
+}
+```
+
+## Hauptvorteile
+
+### Vor litesvm-utils
+
+```rust
+// Creating a funded account manually
+let keypair = Keypair::new();
+let airdrop_tx = Transaction::new_signed_with_payer(
+    &[system_instruction::transfer(
+        &payer.pubkey(),
+        &keypair.pubkey(),
+        lamports,
+    )],
+    Some(&payer.pubkey()),
+    &[&payer],
+    svm.latest_blockhash(),
+);
+svm.send_transaction(airdrop_tx).unwrap();
+```
+
+### Nach litesvm-utils
+
+```rust
+// One line to create a funded account
+let keypair = svm.create_funded_account(lamports).unwrap();
+```
+
+## Trait-Übersicht
+
+### TestHelpers
+
+| Method                                         | Returns                | Description                                     |
+| ---------------------------------------------- | ---------------------- | ----------------------------------------------- |
+| `create_funded_account(lamports)`              | `Result<Keypair>`      | Erstellt ein keypair und finanziert es          |
+| `create_funded_accounts(count, lamports)`      | `Result<Vec<Keypair>>` | Erstellt mehrere finanzierte keypairs           |
+| `create_token_mint(authority, decimals)`       | `Result<Keypair>`      | Erstellt einen SPL-Token-Mint                   |
+| `create_token_account(mint, owner)`            | `Result<Keypair>`      | Erstellt ein reguläres token account            |
+| `create_associated_token_account(mint, owner)` | `Result<Pubkey>`       | Erstellt eine ATA und gibt deren Adresse zurück |
+| `mint_to(mint, account, authority, amount)`    | `Result<()>`           | Prägt Token in ein Konten                       |
+| `derive_pda(seeds, program_id)`                | `(Pubkey, u8)`         | Leitet eine PDA mit bump seed ab                |
+| `get_pda(seeds, program_id)`                   | `Pubkey`               | Gibt nur die PDA-Adresse zurück                 |
+| `get_pda_with_bump(seeds, program_id)`         | `(Pubkey, u8)`         | Alias für `derive_pda`                          |
+| `get_current_slot()`                           | `u64`                  | Gibt den aktuellen slot zurück                  |
+| `advance_slot(slots)`                          | `()`                   | Rückt die Zeit um N slots vor                   |
+
+### AssertionHelpers
+
+| Method                                  | Description                                                         |
+| --------------------------------------- | ------------------------------------------------------------------- |
+| `assert_account_exists(pubkey)`         | Löst einen Fehler aus, wenn Konten nicht existiert                  |
+| `assert_account_closed(pubkey)`         | Löst einen Fehler aus, wenn Konten existiert und Daten/Lamports hat |
+| `assert_token_balance(account, amount)` | Überprüft das Token-Guthaben                                        |
+| `assert_sol_balance(pubkey, lamports)`  | Überprüft das SOL-Guthaben                                          |
+| `assert_mint_supply(mint, supply)`      | Überprüft die Gesamtversorgung des Mints                            |
+| `assert_account_owner(pubkey, owner)`   | Überprüft den Konten-Eigentümer                                     |
+| `assert_account_data_len(pubkey, len)`  | Überprüft die Datenlänge                                            |
+
+### TransactionHelpers
+
+| Method                            | Returns                                       | Description                                     |
+| --------------------------------- | --------------------------------------------- | ----------------------------------------------- |
+| `send_instruction(ix, signers)`   | `Result<TransactionResult, TransactionError>` | Sendet eine einzelne Anweisung                  |
+| `send_instructions(ixs, signers)` | `Result<TransactionResult, TransactionError>` | Sendet mehrere Anweisungen in einer Transaktion |
+| `send_transaction_result(tx)`     | `Result<TransactionResult, TransactionError>` | Sendet eine rohe `Transaction`                  |
+
+## Fehlerbehebung
+
+### Häufige Fehler
+
+| Fehler              | Ursache                                                       | Lösung                                   |
+| ------------------- | ------------------------------------------------------------- | ---------------------------------------- |
+| `AccountNotFound`   | Versuch, Konten zu verwenden, die nicht existieren            | Zuerst `create_funded_account` verwenden |
+| `InsufficientFunds` | Nicht genügend lamports für die Transaktion                   | Anfänglichen Finanzierungsbetrag erhöhen |
+| `OwnerMismatch`     | Konten gehört dem falschen Programm                           | Korrekte Programm-ID überprüfen          |
+| `AssertionFailed`   | Guthaben oder Zustand stimmt nicht mit dem Erwarteten überein | Testlogik überprüfen                     |

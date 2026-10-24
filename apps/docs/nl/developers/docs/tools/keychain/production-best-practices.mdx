@@ -1,0 +1,57 @@
+---
+title: Best practices voor productie
+description:
+  Beheer Keychain-ondertekeningsbackends veilig in productie — scheiding van taken, sleutelrotatie, minimale toegangsrechten, beschikbaarheid, transportbeveiliging, monitoring en audit.
+related:
+  - /developers/docs/tools/keychain/choosing-a-backend
+  - /developers/docs/tools/production-readiness
+---
+
+Keychain abstraheert de ondertekeningsbackend, maar het beheren van een ondertekenaar in productie blijft
+jouw verantwoordelijkheid. Deze praktijken zijn van toepassing op alle backends; zie
+[Een backend kiezen](/developers/docs/tools/keychain/choosing-a-backend) voor de selectie ervan.
+
+## Scheid hot- en cold-ondertekenaars
+
+Gebruik een operationele ondertekenaar met laag saldo ("hot") voor frequente, geautomatiseerde
+transacties, en een aparte ondertekenaar met hoge waarde ("cold") voor treasury-bewegingen.
+Onderbouw de cold-ondertekenaar met MPC-bewaring of een cloud-HSM en vereis goedkeuringsbeleid
+voordat deze ondertekent. Omdat de interface identiek is, kan elke rol een andere backend gebruiken
+zonder de aanroeplocaties te wijzigen.
+
+## Roteer sleutels weloverwogen
+
+Op Solana _is_ de ondertekeningssleutel het accountadres, dus het roteren van een sleutel levert een
+nieuw adres op. Plan rotatie als een migratie: voorzie een nieuwe sleutel, wijs de relevante
+bevoegdheden opnieuw toe (of verplaats fondsen) naar het nieuwe adres, en pensioneer daarna de oude.
+Gebruik afzonderlijke sleutels per omgeving zodat devnet-sleutels nooit opnieuw worden gebruikt op
+mainnet.
+
+## Verleen minimale toegangsrechten
+
+Beperk de inloggegevens van elke backend tot het minimum dat nodig is om te ondertekenen. Voor AWS KMS
+is dat `kms:Sign` en `kms:DescribeKey` op de specifieke sleutel; geef de voorkeur aan IAM-rollen
+boven statische inloggegevens. Pas hetzelfde principe toe op Vault-beleid en beheerde
+wallet-API-sleutels.
+
+## Plan voor beschikbaarheid
+
+Externe backends zijn afhankelijk van een netwerkservice. Roep `isAvailable()` aan voordat u op een
+ondertekenaar vertrouwt, pas nieuwe pogingen toe met backoff bij tijdelijke fouten, en definieer een
+terugvalpad voor storingen. Keychain dwingt HTTPS af voor externe backends en
+past een standaard time-out voor verzoeken toe.
+
+## Bescherm geheimen en transport
+
+- Alle externe backends communiceren via HTTPS; niet-HTTPS-eindpunten worden geweigerd.
+- Verstrek API-sleutels, tokens en inloggegevens vanuit een geheimenbeheerder of omgevingsvariabelen —
+  codeer ze nooit hard of leg ze vast in versiebeheer.
+- Keychain zuivert foutreacties om te voorkomen dat geheimen in logs terechtkomen; houd
+  uw eigen logging vrij van onbewerkte inloggegevens en sleutelmateriaal.
+
+## Monitor en controleer ondertekening
+
+Volg het slagingspercentage, de latentie en het aantal mislukkingen van ondertekening, en stel waarschuwingen in voor pieken —
+zie de statistieken in
+[Productiegereedheid](/developers/docs/tools/production-readiness#monitoring). Schakel auditlogs aan de providerzijde in (KMS, Vault of bewaarder) en vergelijk deze met
+de transacties die uw applicatie indient.

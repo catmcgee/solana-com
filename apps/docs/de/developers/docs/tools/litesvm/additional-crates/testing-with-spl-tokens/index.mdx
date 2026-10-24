@@ -1,0 +1,213 @@
+---
+title: Schnellstart
+description:
+  Erfahren Sie, wie Sie die litesvm-token-Crate für Tests mit SPL-Tokens
+  verwenden
+---
+
+[`litesvm-token` auf crates.io ansehen](https://crates.io/crates/litesvm-token)
+
+## Installation
+
+Stellen Sie sicher, dass alle erforderlichen Abhängigkeiten vorhanden sind:
+
+```bash
+cargo add --dev litesvm litesvm-token solana-sdk@4 spl-token spl-associated-token-account
+cargo add --dev solana-system-interface --features bincode
+```
+
+## SPL-Token-Grundlagen
+
+In Solana ist das Erstellen eines token account ein zweistufiger Prozess.
+
+<Steps>
+<Step title="Erstellen eines `Mint Account`">
+- Hat kein Token-Guthaben 
+- Enthält alle globalen Informationen des Tokens, wie Gesamtangebot, Dezimalstellen, Autorität usw.
+- Es gibt ein mint account pro Token
+- Der Eigentümer ist das Token Program (TokenKeg oder Token 2022)
+</Step>
+
+<Step title="Erstellen eines `Token Account`">
+- Speichert das Guthaben für ein bestimmtes SPL-Token 
+- Enthält das mint account, um zu definieren, welches SPL-Token sich in diesem Konten befindet 
+- Es kann mehrere token accounts für ein mint account geben 
+- Der Eigentümer ist derjenige, der die Kontrolle über die Token in diesem Konten hat 
+</Step>
+</Steps>
+
+## Arten von Token-Konten
+
+### Reguläres token account
+
+Ein token account speichert Ihr Guthaben für ein bestimmtes SPL-Token:
+
+```rust
+// Can create token accounts at ANY address
+let token_account = Keypair::new();  // Random address
+let create_ix = system_instruction::create_account(
+    &payer.pubkey(),
+    &token_account.pubkey(),  // Any address you want
+    rent,
+    165,  // Token account size
+    &spl_token::id(),
+);
+let init_ix = spl_token::instruction::initialize_account(
+    &spl_token::id(),
+    &token_account.pubkey(),
+    &mint,
+    &owner.pubkey(),
+)?;
+```
+
+<Columns cols={2}>
+  <Card title="Vorteile" icon="check">
+    - Mehrere Konten für dasselbe Mint/Eigentümer-Paar erstellbar
+    - Flexibel – jede beliebige Adresse verwendbar
+  </Card>
+
+  <Card title="Nachteile" icon="x">
+    - Nicht deterministisch – Adressen müssen manuell verfolgt werden
+    - Der Empfänger muss mitteilen, an welches Konten gesendet werden soll
+    - Verursacht Verwirrung bei mehreren Konten
+  </Card>
+</Columns>
+
+<Info>
+  **Wann verwenden:** Temporäre/Treuhand-Konten, programmeigene Konten mit
+  benutzerdefinierter Logik, wenn mehrere Konten für denselben token account
+  benötigt werden, fortgeschrittene DeFi-Strategien.
+</Info>
+
+### Associated Token Account (ATA)
+
+Ein ATA ist ein token account an einer deterministischen PDA-Adresse:
+
+```rust
+// ATA address is ALWAYS the same for owner + mint
+let ata = get_associated_token_address(&owner.pubkey(), &mint);
+// Address derived from: [owner_pubkey, token_program_id, mint]
+```
+
+So wird die ATA-Adresse abgeleitet:
+
+```rust
+// ATA is a PDA owned by the Associated Token Program
+let (ata, bump) = Pubkey::find_program_address(
+    &[
+        owner.as_ref(),
+        spl_token::id().as_ref(),
+        mint.as_ref(),
+    ],
+    &spl_associated_token_account::id(),  // ATA program
+);
+```
+
+<Columns cols={2}>
+  <Card title="Vorteile" icon="check">
+    - Ein kanonisches Konten pro Inhaber/Mint-Paar
+    - Deterministisch – jeder kann die Adresse berechnen
+    - Vereinfacht Zahlungen – nur Wallet-Adresse und Mint erforderlich
+    - Standardkonvention in allen Solana-Apps
+  </Card>
+
+  <Card title="Nachteile" icon="x">
+    - Es kann nur EINEN ATA pro Inhaber/Mint geben (by design)
+  </Card>
+</Columns>
+
+<Info>
+  **Empfohlen für die meisten Fälle:** Wallet-Anwendungen, DeFi-Protokolle,
+  NFT-Bestände, Zahlungssysteme und alle benutzerorientierten Token-Transfers.
+</Info>
+
+## Schnellbeispiel
+
+Hier ist ein vollständiges Beispiel zum Erstellen einer Token-Mint und zum
+Prägen von Tokens:
+
+```rust
+use litesvm::LiteSVM;
+use litesvm_token::{
+    get_spl_account,
+    spl_token::{native_mint::DECIMALS, state::Account as TokenAccount},
+    CreateAccount, CreateMint, MintTo, Transfer,
+};
+use solana_sdk::{
+    native_token::LAMPORTS_PER_SOL,
+    signature::{Keypair, Signer},
+};
+
+#[test]
+fn test_create_and_mint_tokens() {
+    let mut svm = LiteSVM::new();
+
+    // Create payer account and fund it
+    let payer = Keypair::new();
+    svm.airdrop(&payer.pubkey(), 10 * LAMPORTS_PER_SOL).unwrap();
+
+    // Create a new SPL token mint with the payer as the mint authority
+    let mint = CreateMint::new(&mut svm, &payer)
+        .authority(&payer.pubkey())
+        .decimals(DECIMALS)
+        .send()
+        .unwrap();
+
+    // Create a token account for the payer
+    let token_account = CreateAccount::new(&mut svm, &payer, &mint)
+        .owner(&payer.pubkey())
+        .send()
+        .unwrap();
+
+    // Mint tokens into the payer's token account
+    MintTo::new(&mut svm, &payer, &mint, &token_account, 1000)
+        .owner(&payer)
+        .send()
+        .unwrap();
+
+    // Verify balance
+    let token_account: TokenAccount = get_spl_account(&svm, &token_account).unwrap();
+    let account_balance = token_account.amount;
+    assert_eq!(account_balance, 1000)
+}
+```
+
+## Schlüsselkonzepte
+
+### Token-Dezimalstellen
+
+Die meisten Tokens verwenden Dezimalstellen, um Bruchbeträge darzustellen:
+
+```rust
+// SOL has 9 decimals
+let one_sol = 10_u64.pow(9);  // 1_000_000_000 lamports
+
+// USDC has 6 decimals
+let one_usdc = 10_u64.pow(6); // 1_000_000 micro-USDC
+
+// Always account for decimals in calculations
+let amount_tokens = 100;
+let amount_raw = amount_tokens * 10_u64.pow(decimals as u32);
+```
+
+### Konten-Beziehungen
+
+Das Verständnis der Beziehungen zwischen Konten ist entscheidend:
+
+- **Mint-Konten**: Definiert den Token (Angebot, Dezimalstellen, Autoritäten)
+- **token account**: Hält Tokens für einen bestimmten Eigentümer
+- **associated token account**: Deterministisches token account für ein
+  Eigentümer+Mint-Paar
+- **Mint-Autorität**: Kann neue Tokens erstellen
+- **Freeze-Autorität**: Kann token accounts einfrieren (optional)
+
+## Fehlerbehebung
+
+### Häufige Fehler
+
+| Fehler                      | Ursache                                                       | Lösung                                                           |
+| --------------------------- | ------------------------------------------------------------- | ---------------------------------------------------------------- |
+| `AccountNotFound`           | Versuch, ein Konten zu verwenden, das nicht existiert         | Sicherstellen, dass das Konten vor der Verwendung erstellt wurde |
+| `AccountAlreadyInitialized` | Versuch, ein bereits initialisiertes Konten zu initialisieren | Prüfen, ob das Konten vor dem Erstellen bereits existiert        |
+| `InsufficientFunds`         | Nicht genug lamports für rent oder Tokens für den Transfer    | Ausreichende Finanzierung/Prägung sicherstellen                  |
+| `OwnerMismatch`             | Konten gehört dem falschen Programm                           | Korrekte Programm-ID beim Erstellen überprüfen                   |

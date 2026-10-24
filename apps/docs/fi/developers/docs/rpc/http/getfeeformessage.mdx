@@ -1,0 +1,134 @@
+---
+title: getFeeForMessage RPC-menetelmä
+sidebarTitle: getFeeForMessage
+---
+
+Hae verkkomaksu, jonka verkko veloittaa tietylle viestille
+
+<Warning>
+  **Versiorajoitus**
+
+  Tämä menetelmä on saatavilla vain `solana-core` v1.9 tai uudemmassa versiossa.
+  Käytä [getFees](/developers/docs/rpc/deprecated/getfees) -menetelmää `solana-core` v1.8
+  ja vanhemmissa versioissa.
+</Warning>
+
+<RequestExample>
+  ```bash cURL
+  curl https://api.devnet.solana.com -s -X POST \
+    -H "Content-Type: application/json" \
+    -d '
+    {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "getFeeForMessage",
+      "params": [
+        "AQABAgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEBAQAA",
+        {
+          "commitment": "processed"
+        }
+      ]
+    }
+  '
+  ```
+
+  ```ts Kit
+  import {
+    createSolanaRpc,
+    getBase64Encoder,
+    type TransactionMessageBytesBase64
+  } from "@solana/kit";
+
+  const rpc_url = "https://api.devnet.solana.com";
+  const rpc = createSolanaRpc(rpc_url);
+
+  let message =
+    "AQABAgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEBAQAA";
+
+  let fee = await rpc
+    .getFeeForMessage(message as TransactionMessageBytesBase64)
+    .send();
+
+  console.log(fee);
+  ```
+
+  ```ts web3.js
+  import { Connection, Message, clusterApiUrl } from "@solana/web3.js";
+
+  const connection = new Connection(clusterApiUrl("devnet"), "confirmed");
+
+  let b64Message =
+    "AQABAgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEBAQAA";
+  let message = Message.from(Buffer.from(b64Message, "base64"));
+
+  let fee = await connection.getFeeForMessage(message);
+
+  console.log(fee);
+  ```
+
+  ```rs Rust
+  use anyhow::Result;
+  use base64::{Engine as _, engine::general_purpose};
+
+  use solana_client::nonblocking::rpc_client::RpcClient;
+  use solana_sdk::{commitment_config::CommitmentConfig, message::Message};
+
+  #[tokio::main]
+  async fn main() -> Result<()> {
+      let client = RpcClient::new_with_commitment(
+          String::from("https://api.devnet.solana.com"),
+          CommitmentConfig::confirmed(),
+      );
+
+      let base_64_message = "AQABAgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEBAQAA";
+      let bytes = general_purpose::STANDARD.decode(base_64_message).unwrap();
+      let message: Message = bincode::deserialize(&bytes).unwrap();
+
+      let fee = client.get_fee_for_message(&message).await?;
+
+      println!("{:#?}", fee);
+
+      Ok(())
+  }
+  ```
+</RequestExample>
+
+<ResponseExample>
+  ```json Response
+  {
+    "jsonrpc": "2.0",
+    "result": {
+      "context": { "slot": 5068 },
+      "value": 5000
+    },
+    "id": 1
+  }
+  ```
+</ResponseExample>
+
+## Parameters
+
+<ParamField body="message" type="string" required>
+  Base-64-koodattu viesti
+</ParamField>
+
+<ParamField body="1" type="object">
+  Määritysobjekti.
+
+  <Expandable title="properties" defaultOpen>
+    <ParamField body="commitment" type="string">
+      Commitment kuvaa kuinka viimeistelty lohko on tietyllä ajanhetkellä. Katso
+      [Tilan sitoutumisen määrittäminen](/developers/docs/rpc#configuring-state-commitment).
+    </ParamField>
+
+    <ParamField body="minContextSlot" type="number">
+      Pienin slot, jossa pyyntö voidaan arvioida.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Result
+
+<ResponseField name="result" type="u64 | null">
+  Määritettyyn lohkotiivisteeseen liittyvä maksu
+</ResponseField>

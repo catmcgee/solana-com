@@ -1,0 +1,212 @@
+---
+title: Mulai Cepat
+description:
+  Pelajari cara menggunakan crate litesvm-token untuk pengujian dengan token SPL
+---
+
+[Lihat `litesvm-token` di crates.io](https://crates.io/crates/litesvm-token)
+
+## Instalasi
+
+Pastikan Anda memiliki semua dependensi yang diperlukan:
+
+```bash
+cargo add --dev litesvm litesvm-token solana-sdk@4 spl-token spl-associated-token-account
+cargo add --dev solana-system-interface --features bincode
+```
+
+## Dasar-Dasar Token SPL
+
+Di Solana, membuat token account adalah proses dua langkah.
+
+<Steps>
+<Step title="Buat `Mint Account`">
+- Tidak memiliki saldo token
+- Menyimpan semua informasi global token, seperti total pasokan, desimal, otoritas, dll.
+- Terdapat satu mint account per token
+- Pemiliknya adalah Token Program (TokenKeg atau Token 2022)
+</Step>
+
+<Step title="Buat `Token Account`">
+- Menyimpan saldo untuk token SPL tertentu
+- Menyimpan mint account untuk menentukan token SPL mana yang ada di akun ini
+- Dapat ada beberapa token account untuk satu mint account
+- Pemilik adalah pihak yang memiliki kendali atas token di dalam akun ini
+</Step>
+</Steps>
+
+## Jenis-Jenis Token Account
+
+### Token Account Reguler
+
+Sebuah token account menyimpan saldo Anda untuk token SPL tertentu:
+
+```rust
+// Can create token accounts at ANY address
+let token_account = Keypair::new();  // Random address
+let create_ix = system_instruction::create_account(
+    &payer.pubkey(),
+    &token_account.pubkey(),  // Any address you want
+    rent,
+    165,  // Token account size
+    &spl_token::id(),
+);
+let init_ix = spl_token::instruction::initialize_account(
+    &spl_token::id(),
+    &token_account.pubkey(),
+    &mint,
+    &owner.pubkey(),
+)?;
+```
+
+<Columns cols={2}>
+  <Card title="Kelebihan" icon="check">
+    - Dapat membuat beberapa akun untuk mint/pemilik yang sama
+    - Fleksibel - dapat menggunakan alamat apa pun
+  </Card>
+
+  <Card title="Kekurangan" icon="x">
+    - Tidak deterministik - perlu melacak alamat secara manual
+    - Penerima harus memberi tahu akun mana yang akan dituju
+    - Menimbulkan kebingungan dengan banyak akun
+  </Card>
+</Columns>
+
+<Info>
+  **Kapan digunakan:** Akun sementara/escrow, akun milik program dengan logika
+  kustom, saat Anda membutuhkan beberapa akun untuk token yang sama, strategi
+  DeFi tingkat lanjut.
+</Info>
+
+### Associated Token Account (ATA)
+
+ATA adalah token account pada alamat PDA yang deterministik:
+
+```rust
+// ATA address is ALWAYS the same for owner + mint
+let ata = get_associated_token_address(&owner.pubkey(), &mint);
+// Address derived from: [owner_pubkey, token_program_id, mint]
+```
+
+Cara alamat ATA diturunkan:
+
+```rust
+// ATA is a PDA owned by the Associated Token Program
+let (ata, bump) = Pubkey::find_program_address(
+    &[
+        owner.as_ref(),
+        spl_token::id().as_ref(),
+        mint.as_ref(),
+    ],
+    &spl_associated_token_account::id(),  // ATA program
+);
+```
+
+<Columns cols={2}>
+  <Card title="Kelebihan" icon="check">
+    - Satu akun kanonik per pasangan pemilik/mint
+    - Deterministik - siapa pun dapat menghitung alamatnya
+    - Menyederhanakan pembayaran - cukup butuh alamat dompet + mint
+    - Konvensi standar di semua aplikasi Solana
+  </Card>
+
+  <Card title="Kekurangan" icon="x">
+    - Hanya dapat memiliki SATU ATA per pasangan pemilik/mint (sesuai desain)
+  </Card>
+</Columns>
+
+<Info>
+  **Direkomendasikan untuk sebagian besar kasus:** Aplikasi dompet, protokol
+  DeFi, kepemilikan NFT, sistem pembayaran, dan transfer token yang berhadapan
+  langsung dengan pengguna.
+</Info>
+
+## Contoh Cepat
+
+Berikut adalah contoh lengkap pembuatan token mint dan pencetakan token:
+
+```rust
+use litesvm::LiteSVM;
+use litesvm_token::{
+    get_spl_account,
+    spl_token::{native_mint::DECIMALS, state::Account as TokenAccount},
+    CreateAccount, CreateMint, MintTo, Transfer,
+};
+use solana_sdk::{
+    native_token::LAMPORTS_PER_SOL,
+    signature::{Keypair, Signer},
+};
+
+#[test]
+fn test_create_and_mint_tokens() {
+    let mut svm = LiteSVM::new();
+
+    // Create payer account and fund it
+    let payer = Keypair::new();
+    svm.airdrop(&payer.pubkey(), 10 * LAMPORTS_PER_SOL).unwrap();
+
+    // Create a new SPL token mint with the payer as the mint authority
+    let mint = CreateMint::new(&mut svm, &payer)
+        .authority(&payer.pubkey())
+        .decimals(DECIMALS)
+        .send()
+        .unwrap();
+
+    // Create a token account for the payer
+    let token_account = CreateAccount::new(&mut svm, &payer, &mint)
+        .owner(&payer.pubkey())
+        .send()
+        .unwrap();
+
+    // Mint tokens into the payer's token account
+    MintTo::new(&mut svm, &payer, &mint, &token_account, 1000)
+        .owner(&payer)
+        .send()
+        .unwrap();
+
+    // Verify balance
+    let token_account: TokenAccount = get_spl_account(&svm, &token_account).unwrap();
+    let account_balance = token_account.amount;
+    assert_eq!(account_balance, 1000)
+}
+```
+
+## Konsep Utama
+
+### Desimal Token
+
+Sebagian besar token menggunakan desimal untuk merepresentasikan jumlah pecahan:
+
+```rust
+// SOL has 9 decimals
+let one_sol = 10_u64.pow(9);  // 1_000_000_000 lamports
+
+// USDC has 6 decimals
+let one_usdc = 10_u64.pow(6); // 1_000_000 micro-USDC
+
+// Always account for decimals in calculations
+let amount_tokens = 100;
+let amount_raw = amount_tokens * 10_u64.pow(decimals as u32);
+```
+
+### Hubungan Antar Akun
+
+Memahami hubungan antar akun sangatlah penting:
+
+- **Mint Account**: Mendefinisikan token (pasokan, desimal, otoritas)
+- **Token account**: Menyimpan token untuk pemilik tertentu
+- **Associated token account**: token account deterministik untuk pasangan
+  pemilik+mint
+- **Mint Authority**: Dapat membuat token baru
+- **Freeze Authority**: Dapat membekukan token account (opsional)
+
+## Pemecahan Masalah
+
+### Kesalahan Umum
+
+| Kesalahan                   | Penyebab                                                 | Solusi                                        |
+| --------------------------- | -------------------------------------------------------- | --------------------------------------------- |
+| `AccountNotFound`           | Mencoba menggunakan akun yang tidak ada                  | Pastikan akun dibuat sebelum digunakan        |
+| `AccountAlreadyInitialized` | Mencoba menginisialisasi akun yang sudah diinisialisasi  | Periksa apakah akun sudah ada sebelum membuat |
+| `InsufficientFunds`         | Tidak cukup lamport untuk rent atau token untuk transfer | Pastikan pendanaan/pencetakan yang memadai    |
+| `OwnerMismatch`             | Akun dimiliki oleh program yang salah                    | Verifikasi ID program yang benar saat membuat |

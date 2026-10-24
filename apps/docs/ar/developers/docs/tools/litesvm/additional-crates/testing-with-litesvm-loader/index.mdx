@@ -1,0 +1,196 @@
+---
+title: البداية السريعة
+description:
+  تعلّم كيفية استخدام حزمة litesvm-loader لاختبار نشر البرامج القابلة للترقية
+---
+
+[عرض `litesvm-loader` على crates.io](https://crates.io/crates/litesvm-loader)
+
+## التثبيت
+
+تأكد من توفر جميع التبعيات المطلوبة:
+
+```bash
+cargo add --dev litesvm litesvm-loader solana-keypair solana-signer
+```
+
+إذا كان اختبارك يستدعي البرنامج المنشور مباشرةً، أضف أيضاً حزم تعليمات ومعاملات
+سولانا المستخدمة في اختبارك:
+
+```bash
+cargo add --dev solana-instruction solana-message solana-transaction
+```
+
+## ما هو litesvm-loader؟
+
+توفر حزمة `litesvm-loader` مساعدين لنشر البرامج عبر محمّل BPF القابل للترقية
+داخل LiteSVM. استخدمها عندما يحتاج اختبارك إلى program account مملوكة للمحمّل،
+أو programdata account، أو سلوك سلطة الترقية، بدلاً من إدراج البرنامج مباشرةً
+باستخدام `svm.add_program(...)`.
+
+<Steps>
+<Step title="النشر القابل للترقية">
+- ينشئ حساب المخزن المؤقت للمحمّل
+- يكتب بيانات البرنامج على دفعات
+- ينشر program account النهائي باستخدام محمّل BPF القابل للترقية
+- يستخدم keypair البرنامج المقدَّم كمعرّف للبرنامج
+</Step>
+
+<Step>
+  **إدارة سلطة الترقية** - تغيير سلطة الترقية لبرنامج منشور مسبقاً - تدعم تعيين
+  سلطة جديدة - تدعم تمرير `None` لجعل البرنامج غير قابل للتعديل
+</Step>
+
+  <Step>
+    **حالة المحمّل الفعلية** - تُشغّل نموذج حساب المحمّل ذاته الذي يراه برنامجك
+    على الشبكة - تتيح للاختبارات فحص program account وprogramdata account -
+    تساعد في اكتشاف الأخطاء المخفية عند إدراج البرنامج مباشرةً
+  </Step>
+</Steps>
+
+<Info>
+  في معظم الاختبارات، لا يزال `svm.add_program(program_id, program_bytes)` هو
+  الطريقة الأسرع والأبسط لتحميل البرنامج. استخدم `litesvm-loader` عندما يكون
+  تخطيط حساب المحمّل أو صلاحية الترقية جزءًا مما تحتاج إلى اختباره.
+</Info>
+
+## مثال سريع
+
+إليك مثال كامل يقوم بنشر برنامج عبر المحمّل القابل للترقية ثم تغيير صلاحيته:
+
+```rust
+use litesvm::LiteSVM;
+use litesvm_loader::{deploy_upgradeable_program, set_upgrade_authority};
+use solana_keypair::Keypair;
+use solana_signer::Signer;
+
+#[test]
+fn test_upgradeable_deployment() {
+    let mut svm = LiteSVM::new();
+
+    let payer = Keypair::new();
+    svm.airdrop(&payer.pubkey(), 10_000_000_000).unwrap();
+
+    // Use the keypair that should own the program ID.
+    // For Anchor programs, this is usually target/deploy/<program>-keypair.json.
+    let program = Keypair::new();
+    let program_bytes = include_bytes!("../target/deploy/my_program.so");
+
+    deploy_upgradeable_program(&mut svm, &payer, &program, program_bytes).unwrap();
+
+    let program_account = svm.get_account(&program.pubkey()).unwrap();
+    assert!(program_account.executable);
+
+    let new_authority = Keypair::new();
+    set_upgrade_authority(
+        &mut svm,
+        &payer,
+        &program.pubkey(),
+        &payer,
+        Some(&new_authority.pubkey()),
+    )
+    .unwrap();
+}
+```
+
+## اختيار keypair البرنامج
+
+يستخدم `deploy_upgradeable_program` وسيطة `program_kp` كعنوان البرنامج. إذا كان
+برنامجك يُعلن عن معرّف ثابت، فقم بتحميل keypair النشر المُولَّد bدلاً من إنشاء
+keypair عشوائي:
+
+```rust
+use solana_keypair::read_keypair_file;
+
+let program = read_keypair_file("target/deploy/my_program-keypair.json").unwrap();
+deploy_upgradeable_program(&mut svm, &payer, &program, program_bytes).unwrap();
+```
+
+## استدعاء البرنامج المنشور
+
+بعد النشر، استدعِ البرنامج بنفس الطريقة التي تستدعي بها أي برنامج محمّل عبر
+LiteSVM. أنشئ تعليمة لبرنامجك، ووقّع المعاملة، وأرسلها عبر نفس نسخة `LiteSVM`:
+
+```rust
+use solana_instruction::Instruction;
+use solana_message::Message;
+use solana_transaction::Transaction;
+
+let instruction = Instruction::new_with_bytes(
+    program.pubkey(),
+    &[],  // instruction data for your program
+    vec![], // account metas for your program
+);
+
+let message = Message::new(&[instruction], Some(&payer.pubkey()));
+let tx = Transaction::new(&[&payer], message, svm.latest_blockhash());
+
+svm.send_transaction(tx).unwrap();
+```
+
+## المكوّنات الرئيسية
+
+### deploy_upgradeable_program
+
+| الوسيطة         | الوصف                                                      |
+| --------------- | ---------------------------------------------------------- |
+| `svm`           | نسخة `LiteSVM` قابلة للتعديل تستقبل البرنامج المنشور       |
+| `payer_kp`      | دافع الرسوم وصلاحية الترقية الأولية                        |
+| `program_kp`    | keypair الذي يصبح مفتاحه العام معرّف البرنامج              |
+| `program_bytes` | بايتات برنامج SBF المُجمَّع، عادةً من `target/deploy/*.so` |
+
+ينشئ `deploy_upgradeable_program` مخزن مؤقت للمحمّل، ويكتب بايتات البرنامج على
+شكل أجزاء بحجم 512 بايت، وينشر البرنامج مع إمكانية الترقية مستقبلاً.
+
+### set_upgrade_authority
+
+| الوسيطة                     | الوصف                                                            |
+| --------------------------- | ---------------------------------------------------------------- |
+| `svm`                       | نسخة `LiteSVM` قابلة للتعديل تحتوي على البرنامج المنشور          |
+| `from_keypair`              | دافع الرسوم وصلاحية التوقيع للمعاملة                             |
+| `program_address`           | معرّف البرنامج الذي يجب تغيير صلاحيته                            |
+| `current_authority_keypair` | keypair صلاحية الترقية الحالية                                   |
+| `new_authority_address`     | عنوان الصلاحية الجديدة، أو `None` لجعل البرنامج غير قابل للتعديل |
+
+<Warning>
+  في التنفيذ الحالي للمساعد، يتم توقيع المعاملة المُنشأة بواسطة `from_keypair`.
+  مرِّر السلطة الحالية بوصفها `from_keypair`، أو اجعل الدافع والسلطة الحالية
+  متطابقَين، عند تغيير سلطة الترقية.
+</Warning>
+
+## سير العمل الشائعة
+
+### النشر باستخدام معرّف البرنامج المُعلَن
+
+```rust
+use solana_keypair::read_keypair_file;
+
+let program = read_keypair_file("target/deploy/my_program-keypair.json").unwrap();
+let program_bytes = include_bytes!("../target/deploy/my_program.so");
+
+deploy_upgradeable_program(&mut svm, &payer, &program, program_bytes).unwrap();
+```
+
+### جعل البرنامج غير قابل للتعديل
+
+```rust
+set_upgrade_authority(
+    &mut svm,
+    &payer,
+    &program.pubkey(),
+    &payer,
+    None,
+)
+.unwrap();
+```
+
+## استكشاف الأخطاء وإصلاحها
+
+### الأخطاء الشائعة
+
+| الخطأ                                                     | السبب                                                                          | الحل                                                                                            |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| `ProgramAccountNotFound` أو فشل التعليمات بسبب معرّف خاطئ | استخدم النشر معرّف `Keypair` عشوائيًا بينما يتوقع البرنامج معرّفًا مُعلَنًا    | اقرأ `target/deploy/<program>-keypair.json` ومرِّر ذلك keypair إلى `deploy_upgradeable_program` |
+| `InsufficientFunds`                                       | لا يملك الدافع ما يكفي من lamport لـ program account الخاص بالمحمِّل والبرنامج | قم بـ Airdrop مزيدًا من lamport قبل النشر                                                       |
+| `MissingRequiredSignature` عند تغيير السلطة               | لم تقم السلطة الحالية بتوقيع المعاملة                                          | مرِّر السلطة الحالية بوصفها `from_keypair`، أو اجعل الدافع والسلطة الحالية نفس keypair          |
+| نشر البرنامج أبطأ من المتوقع                              | يكتب نشر المحمِّل البايتات عبر تعليمات المحمِّل الفعلية                        | استخدم `svm.add_program(...)` عندما لا تحتاج إلى حالة المحمِّل أو سلوك سلطة الترقية             |

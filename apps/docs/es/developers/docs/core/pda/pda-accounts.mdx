@@ -1,0 +1,171 @@
+---
+title: Cuentas PDA
+description:
+  Crea cuentas onchain en direcciones PDA de Solana usando invoke_signed y la
+  restricción init de Anchor. Flujo de verificación de invoke_signed y patrones
+  de creación de PDA en Anchor con ejemplos de código.
+type: tutorial
+prerequisites:
+  - /developers/docs/core/pda
+  - /developers/docs/core/pda/pda-derivation
+  - /developers/docs/core/cpi
+related:
+  - /developers/docs/core/cpi/cpi-with-pda
+  - /developers/docs/core/accounts/account-types
+  - /developers/docs/core/programs/program-deployment
+---
+
+{/* TOC: PDA Signing via invoke_signed, Create a PDA Account */}
+
+<Info>
+  **Resumen**
+
+  Crea cuentas PDA mediante `invoke_signed` con las seeds del PDA. Solo el
+  programa propietario puede firmar por un PDA. La restricción `init` de
+  Anchor automatiza la creación de cuentas PDA.
+</Info>
+
+## Firma de PDA mediante `invoke_signed`
+
+Cuando un programa necesita firmar en nombre de un PDA durante un CPI, utiliza
+`invoke_signed` con las seeds del PDA. El runtime verifica que las seeds
+deriven el PDA esperado usando el **ID del programa que realiza la llamada**,
+asegurando que solo el programa propietario pueda firmar. Para el flujo de
+verificación completo, consulta
+[Firma de PDA](/developers/docs/core/cpi/cpi-cost-model#pda-signing).
+
+## Crear una cuenta PDA
+
+Derivar un PDA y crear una cuenta en un PDA son operaciones separadas. Debes
+crear explícitamente la cuenta después de derivar la dirección.
+
+Para crear una cuenta en un PDA, el programa que deriva invoca la instrucción
+`create_account` del System Program mediante
+[`invoke_signed`](/developers/docs/core/cpi), pasando las seeds del PDA para que el runtime
+pueda verificar la autoridad del programa sobre esa dirección.
+
+El siguiente ejemplo utiliza el
+[framework Anchor](https://www.anchor-lang.com/docs) para crear una nueva cuenta
+con una dirección derivada del programa. El programa incluye una única
+instrucción `initialize` para crear la nueva cuenta, que
+almacenará la dirección del usuario y la
+bump seed utilizada para derivar el PDA.
+
+```rs Program highlight={12,14,27,29,40-41}
+use anchor_lang::prelude::*;
+
+declare_id!("75GJVCJNhaukaa2vCCqhreY31gaphv7XTScBChmr1ueR");
+
+#[program]
+pub mod pda_account {
+    use super::*;
+
+    pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
+        let account_data = &mut ctx.accounts.pda_account;
+        // store the address of the `user`
+        account_data.user = *ctx.accounts.user.key;
+        // store the canonical bump
+        account_data.bump = ctx.bumps.pda_account;
+        Ok(())
+    }
+}
+
+#[derive(Accounts)]
+pub struct Initialize<'info> {
+    #[account(mut)]
+    pub user: Signer<'info>,
+
+    #[account(
+        init,
+        // define the seeds to derive the PDA
+        seeds = [b"data", user.key().as_ref()],
+        // use the canonical bump
+        bump,
+        payer = user,
+        space = 8 + DataAccount::INIT_SPACE // 8 bytes for Anchor account discriminator
+    )]
+    pub pda_account: Account<'info, DataAccount>,
+    pub system_program: Program<'info, System>,
+}
+
+#[account]
+#[derive(InitSpace)]
+pub struct DataAccount {
+    pub user: Pubkey,
+    pub bump: u8,
+}
+```
+
+La restricción `init` indica a Anchor que
+[invoque el System Program](/developers/docs/core/programs/builtin-programs#the-system-program)
+para crear una nueva cuenta usando el PDA como dirección. Las
+seeds utilizadas para crear el PDA son:
+
+- La cadena fija: "data"
+- La dirección de la cuenta de usuario proporcionada en la instrucción
+- El bump seed canónico
+
+En este ejemplo, la restricción bump no tiene un valor asignado, por lo que
+Anchor usará `find_program_address` para derivar la PDA y encontrar el bump.
+
+```rust pda_account
+#[account(
+    init,
+    seeds = [b"data", user.key().as_ref()],
+    bump,
+    payer = user,
+    space = 8 + DataAccount::INIT_SPACE // 8 bytes for Anchor account discriminator
+)]
+pub pda_account: Account<'info, DataAccount>,
+```
+
+El archivo de prueba a continuación contiene una transacción que invoca la
+instrucción `initialize` para crear una nueva cuenta con
+una dirección derivada del programa. El archivo contiene código para
+derivar la PDA.
+
+El ejemplo también muestra cómo obtener la nueva cuenta que se
+creará.
+
+```ts Test
+import * as anchor from "@coral-xyz/anchor";
+import { Program } from "@coral-xyz/anchor";
+import { PdaAccount } from "../target/types/pda_account";
+import { PublicKey } from "@solana/web3.js";
+
+describe("pda-account", () => {
+  const provider = anchor.AnchorProvider.env();
+  anchor.setProvider(provider);
+
+  const program = anchor.workspace.PdaAccount as Program<PdaAccount>;
+  const user = provider.wallet as anchor.Wallet;
+
+  // Derive the PDA address using the seeds specified on the program
+  const [PDA] = PublicKey.findProgramAddressSync(
+    [Buffer.from("data"), user.publicKey.toBuffer()],
+    program.programId
+  );
+
+  it("Is initialized!", async () => {
+    const transactionSignature = await program.methods
+      .initialize()
+      .accounts({
+        user: user.publicKey
+      })
+      .rpc();
+
+    console.log("Transaction Signature:", transactionSignature);
+  });
+
+  it("Fetch Account", async () => {
+    const pdaAccount = await program.account.dataAccount.fetch(PDA);
+    console.log(JSON.stringify(pdaAccount, null, 2));
+  });
+});
+```
+
+<Warning>
+  Si invocas la instrucción `initialize` nuevamente con la misma semilla de
+  dirección `user`, la transacción fallará. Esto sucede porque ya existe una
+  cuenta en la dirección derivada.
+</Warning>

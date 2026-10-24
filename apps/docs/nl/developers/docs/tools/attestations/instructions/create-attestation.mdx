@@ -1,0 +1,74 @@
+---
+title: Attestatie Aanmaken
+description:
+  Maakt een nieuwe attestatie aan onder een specifieke referentie en schema
+---
+
+Maakt een nieuwe attestatie aan onder een specifieke referentie en schema. Deze
+instructie stelt geautoriseerde ondertekenaars in staat om attestaties te maken
+die geverifieerde gegevens bevatten en een gedefinieerde vervaldatum hebben.
+
+## Parameters
+
+| Parameter       | Type                 | Beschrijving                                                              |
+| --------------- | -------------------- | ------------------------------------------------------------------------- |
+| `payer`         | `Signer`             | Het account dat voor de transactie zal betalen                            |
+| `authority`     | `Signer`             | De geautoriseerde ondertekenaar van de referentie                         |
+| `credential`    | `PublicKey \| Pda`   | Het referentie-account gekoppeld aan het schema                           |
+| `schema`        | `PublicKey \| Pda`   | Het schema-account dat de attestatiestructuur definieert                  |
+| `attestation`   | `PublicKey \| Pda`   | Het aan te maken attestatie-account                                       |
+| `systemProgram` | `PublicKey \| Pda`   | Het System Program-account (standaard '11111111111111111111111111111111') |
+| `nonce`         | `Address`            | Een unieke identificatie voor de attestatie                               |
+| `data`          | `ReadonlyUint8Array` | De attestatiegegevens die aan het schema moeten voldoen                   |
+| `expiry`        | `number \| bigint`   | De vervaltijdstempel voor de attestatie                                   |
+
+## Retourneert
+
+Retourneert een `TransactionBuilder` die kan worden gebruikt om de transactie te
+bouwen en te verzenden.
+
+## Voorbeeld
+
+```typescript
+import {
+  deriveAttestationPda,
+  getCreateAttestationInstruction
+} from "sas-lib";
+
+// The attestation account is a PDA derived from the credential, schema and nonce
+const [attestationPda] = await deriveAttestationPda({
+  credential: credentialAddress,
+  schema: schemaAddress,
+  nonce: nonceAddress
+});
+
+const instruction = getCreateAttestationInstruction({
+  payer: payerSigner,
+  authority: authoritySigner,
+  credential: credentialAddress,
+  schema: schemaAddress,
+  attestation: attestationPda,
+  nonce: nonceAddress,
+  data: attestationData,
+  expiry: expiryTimestamp
+});
+
+// Send the instruction with your Kit client
+await client.sendTransaction(instruction);
+```
+
+## Belangrijke Opmerkingen
+
+- Alleen geautoriseerde ondertekenaars van de referentie kunnen attestaties
+  aanmaken
+- De authority moet een ondertekenaar van de transactie zijn
+- De betaler moet een ondertekenaar van de transactie zijn
+- Het attestatie-account moet beschrijfbaar zijn
+- De referentie- en schema-accounts moeten leesbaar zijn
+- Deze operatie vereist het System Program voor rent-vrijstellingsberekeningen
+- Het schema mag niet gepauzeerd zijn
+- De gegevens moeten voldoen aan de structuur en validatieregels van het schema
+- De nonce moet uniek zijn voor elke attestatie
+- De vervaltijdstempel moet in de toekomst liggen
+- De attestatie is ongeldig na de vervaltijdstempel
+- De referentie moet aan het schema gekoppeld zijn

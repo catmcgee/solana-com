@@ -1,0 +1,289 @@
+---
+title: Метод RPC simulateTransaction
+sidebarTitle: simulateTransaction
+---
+
+Симуляция отправки транзакции
+
+<RequestExample>
+  ```bash cURL
+  curl https://api.devnet.solana.com -s -X POST \
+    -H "Content-Type: application/json" \
+    -d '
+    {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "simulateTransaction",
+      "params": [
+        "AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAEEjNmKiZGiOtSZ+g0//wH5kEQo3+UzictY+KlLV8hjXcs44M/Xnr+1SlZsqS6cFMQc46yj9PIsxqkycxJmXT+veJjIvefX4nhY9rY+B5qreeqTHu4mG6Xtxr5udn4MN8PnBt324e51j94YQl285GzN2rYa/E2DuQ0n/r35KNihi/zamQ6EeyeeVDvPVgUO2W3Lgt9hT+CfyqHvIa11egFPCgEDAwIBAAkDZAAAAAAAAAA=",
+        {
+          "commitment": "confirmed",
+          "encoding": "base64",
+          "replaceRecentBlockhash": true
+        }
+      ]
+    }
+  '
+  ```
+
+  ```ts Kit
+  import {
+    createSolanaRpc,
+    type Base64EncodedWireTransaction
+  } from "@solana/kit";
+
+  const rpc_url = "https://api.devnet.solana.com";
+  const rpc = createSolanaRpc(rpc_url);
+
+  const base64Tx: Base64EncodedWireTransaction =
+    "AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAEEjNmKiZGiOtSZ+g0//wH5kEQo3+UzictY+KlLV8hjXcs44M/Xnr+1SlZsqS6cFMQc46yj9PIsxqkycxJmXT+veJjIvefX4nhY9rY+B5qreeqTHu4mG6Xtxr5udn4MN8PnBt324e51j94YQl285GzN2rYa/E2DuQ0n/r35KNihi/zamQ6EeyeeVDvPVgUO2W3Lgt9hT+CfyqHvIa11egFPCgEDAwIBAAkDZAAAAAAAAAA=" as Base64EncodedWireTransaction;
+
+  let simulateTxConfig = {
+    commitment: "finalized",
+    encoding: "base64",
+    replaceRecentBlockhash: true,
+    sigVerify: false,
+    minContextSlot: undefined,
+    innerInstructions: undefined,
+    accounts: undefined
+  };
+
+  let simulateResult = await rpc
+    .simulateTransaction(base64Tx, simulateTxConfig)
+    .send();
+
+  console.log(simulateResult);
+  ```
+
+  ```ts web3.js
+  import {
+    Connection,
+    VersionedTransaction,
+    clusterApiUrl,
+    type SimulateTransactionConfig
+  } from "@solana/web3.js";
+
+  const connection = new Connection(clusterApiUrl("devnet"), "confirmed");
+
+  const base64Tx =
+    "AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAEEjNmKiZGiOtSZ+g0//wH5kEQo3+UzictY+KlLV8hjXcs44M/Xnr+1SlZsqS6cFMQc46yj9PIsxqkycxJmXT+veJjIvefX4nhY9rY+B5qreeqTHu4mG6Xtxr5udn4MN8PnBt324e51j94YQl285GzN2rYa/E2DuQ0n/r35KNihi/zamQ6EeyeeVDvPVgUO2W3Lgt9hT+CfyqHvIa11egFPCgEDAwIBAAkDZAAAAAAAAAA=";
+
+  let tx = VersionedTransaction.deserialize(Buffer.from(base64Tx, "base64"));
+
+  let simulateTxConfig: SimulateTransactionConfig = {
+    commitment: "finalized",
+    replaceRecentBlockhash: true,
+    sigVerify: false,
+    minContextSlot: undefined,
+    innerInstructions: undefined,
+    accounts: undefined
+  };
+
+  let simulateResult = await connection.simulateTransaction(tx, simulateTxConfig);
+
+  console.log(simulateResult);
+  ```
+
+  ```rs Rust
+  use anyhow::Result;
+  use base64::{Engine as _, engine::general_purpose};
+  use solana_client::{nonblocking::rpc_client::RpcClient, rpc_config::RpcSimulateTransactionConfig};
+  use solana_sdk::{commitment_config::CommitmentConfig, transaction::VersionedTransaction};
+  use solana_transaction_status_client_types::UiTransactionEncoding;
+
+  #[tokio::main]
+  async fn main() -> Result<()> {
+      let client = RpcClient::new_with_commitment(
+          String::from("https://api.devnet.solana.com"),
+          CommitmentConfig::confirmed(),
+      );
+
+      let b64_tx = "AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAEEjNmKiZGiOtSZ+g0//wH5kEQo3+UzictY+KlLV8hjXcs44M/Xnr+1SlZsqS6cFMQc46yj9PIsxqkycxJmXT+veJjIvefX4nhY9rY+B5qreeqTHu4mG6Xtxr5udn4MN8PnBt324e51j94YQl285GzN2rYa/E2DuQ0n/r35KNihi/zamQ6EeyeeVDvPVgUO2W3Lgt9hT+CfyqHvIa11egFPCgEDAwIBAAkDZAAAAAAAAAA=";
+      let tx_bytes = general_purpose::STANDARD.decode(b64_tx).unwrap();
+      let tx: VersionedTransaction = bincode::deserialize(&tx_bytes).unwrap();
+
+      let config = RpcSimulateTransactionConfig {
+          commitment: CommitmentConfig::finalized().into(),
+          encoding: UiTransactionEncoding::Base64.into(),
+          replace_recent_blockhash: true,
+          sig_verify: false,
+          min_context_slot: None,
+          inner_instructions: false,
+          accounts: None,
+      };
+
+      let simulate_result = client.simulate_transaction_with_config(&tx, config).await?;
+
+      println!("{:#?}", simulate_result);
+
+      Ok(())
+  }
+  ```
+</RequestExample>
+
+<ResponseExample>
+  ```json Response
+  {
+    "jsonrpc": "2.0",
+    "result": {
+      "context": {
+        "apiVersion": "2.3.3",
+        "slot": 393226680
+      },
+      "value": {
+        "accounts": null,
+        "err": null,
+        "innerInstructions": null,
+        "loadedAccountsDataSize": 413,
+        "logs": [
+          "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb invoke [1]",
+          "Program log: Instruction: Transfer",
+          "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 1714 of 200000 compute units",
+          "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb success"
+        ],
+        "replacementBlockhash": {
+          "blockhash": "6oFLsE7kmgJx9PjR4R63VRNtpAVJ648gCTr3nq5Hihit",
+          "lastValidBlockHeight": 381186895
+        },
+        "returnData": null,
+        "unitsConsumed": 1714
+      }
+    },
+    "id": 1
+  }
+  ```
+</ResponseExample>
+
+## Parameters
+
+<ParamField body="transaction" type="string" required>
+  Транзакция в виде закодированной строки.
+
+  <Info>
+    Транзакция должна содержать действительный blockhash, но её подпись не
+    требуется.
+  </Info>
+</ParamField>
+
+<ParamField body="config" type="object">
+  Объект конфигурации, содержащий следующие поля:
+
+  <Expandable title="properties" defaultOpen>
+    <ParamField body="commitment" type="string">
+      Уровень подтверждения, на котором будет симулироваться транзакция. См. раздел
+      [Настройка подтверждения состояния](/developers/docs/rpc#configuring-state-commitment). По
+      умолчанию `finalized`.
+    </ParamField>
+
+    <ParamField body="encoding" type="string" default="base58">
+      Values: `base58`, `base64`
+
+      Кодировка, используемая для данных транзакции. Значения: `base58` (_медленно_,
+      **УСТАРЕЛО**), или `base64`.
+    </ParamField>
+
+    <ParamField body="replaceRecentBlockhash" type="bool !defaultValue false">
+      Если `true`, то недавний blockhash транзакции будет заменён на самый последний
+      blockhash (конфликтует с `sigVerify`)
+    </ParamField>
+
+    <ParamField body="sigVerify" type="bool !defaultValue false">
+      Если `true`, подписи транзакций будут проверены (конфликтует с
+      `replaceRecentBlockhash`)
+    </ParamField>
+
+    <ParamField body="minContextSlot" type="number">
+      Минимальный слот, на котором запрос может быть оценен
+    </ParamField>
+
+    <ParamField body="innerInstructions" type="bool !defaultValue false">
+      Если `true`, ответ будет включать
+      [внутренние инструкции](/developers/docs/rpc/json-structures#inner-instructions). Эти
+      внутренние инструкции будут `jsonParsed`, где это возможно, в противном случае
+      `json`.
+    </ParamField>
+
+    <ParamField body="accounts" type="object">
+      Объект конфигурации аккаунтов, содержащий следующие поля:
+
+      - `addresses`: Массив аккаунтов для возврата в виде строк, закодированных в
+        base-58
+      - `encoding`: Кодировка для возвращаемых данных аккаунта. Примечание: кодировка
+        `jsonParsed` пытается использовать парсеры состояния, специфичные для
+        программы, чтобы вернуть более читаемые и явные данные состояния аккаунта.
+        Если запрашивается `jsonParsed`, но
+        [парсер не может быть найден](https://github.com/solana-labs/solana/blob/cfd0a00ae2ba85a6d76757df8b4fa38ed242d185/account-decoder/src/parse_account_data.rs#L98-L100),
+        поле возвращается к кодировке `base64`, что можно определить, если
+        возвращаемое поле `accounts.data` имеет тип `string`.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Result
+
+<ResponseField name="result" type="object">
+  Результат будет содержать:
+
+  <Expandable title="properties" defaultOpen>
+    <ResponseField name="accounts" type="array|null">
+      Массив аккаунтов с той же длиной, что и массив `accounts.addresses` в запросе.
+      Каждый элемент либо:
+
+      - `null` - если аккаунт не существует или если `err` не равен null
+      - Объект, содержащий:
+        - `lamports: <u64>` - количество lamport, назначенных этому аккаунту
+        - `owner: <string>` - закодированный в base-58 Pubkey программы, к которой
+          этот аккаунт был назначен
+        - `data: <[string, encoding]|object>` - данные, связанные с аккаунтом, либо в
+          виде закодированных бинарных данных, либо в формате JSON
+          `{<program>: <state>}`
+        - `executable: <bool>` - булево значение, указывающее, содержит ли аккаунт
+          программу
+        - `rentEpoch: <u64>` - эпоха, в которой этот аккаунт будет в следующий раз
+          обязан оплатить rent
+    </ResponseField>
+
+    <ResponseField name="ошибка" type="object|string|null">
+      Ошибка, если транзакция не удалась, null, если транзакция выполнена успешно. См.
+      [определения ошибок транзакции](https://github.com/solana-labs/solana/blob/c0c60386544ec9a9ec7119229f37386d9f070523/sdk/src/transaction/error.rs#L13)
+    </ResponseField>
+
+    <ResponseField name="внутренние инструкции" type="object|undefined">
+      Определено только если `innerInstructions` был установлен на `true`. Значение
+      представляет собой список
+      [внутренних инструкций](/developers/docs/rpc/json-structures#inner-instructions).
+    </ResponseField>
+
+    <ResponseField name="размер данных загруженных аккаунтов" type="u32|undefined">
+      Количество байтов всех аккаунтов, загруженных этой транзакцией
+    </ResponseField>
+
+    <ResponseField name="логи" type="array|null">
+      Массив сообщений журнала, которые выводятся инструкциями транзакции во время
+      выполнения, null, если симуляция завершилась неудачей до выполнения транзакции
+    </ResponseField>
+
+    <ResponseField name="замещающий блокхеш" type="object|null">
+      Блокхеш, использованный для симуляции транзакции, содержащий:
+
+      - `blockhash: <string>` - блокхеш, использованный для симуляции транзакции
+      - `lastValidBlockHeight: <u64>` - последний допустимый высотный блок, на котором
+        блокхеш действителен
+    </ResponseField>
+
+    <ResponseField name="возвращаемые данные" type="object|null">
+      Самые последние возвращаемые данные, сгенерированные инструкцией в транзакции,
+      содержащие:
+
+      - `programId: <string>` - программа, которая сгенерировала возвращаемые данные,
+        в формате base-58 закодированного Pubkey
+      - `data: <[string, encoding]>` - сами возвращаемые данные, в формате base-64
+        закодированных бинарных данных
+    </ResponseField>
+
+    <ResponseField name="потребленные единицы" type="u64|undefined">
+      Количество единиц вычислительного бюджета, потребленных во время обработки этой
+      транзакции
+    </ResponseField>
+  </Expandable>
+</ResponseField>

@@ -1,0 +1,212 @@
+---
+title: Bắt Đầu Nhanh
+description:
+  Tìm hiểu cách sử dụng crate litesvm-token để kiểm thử với các token SPL
+---
+
+[Xem `litesvm-token` trên crates.io](https://crates.io/crates/litesvm-token)
+
+## Cài Đặt
+
+Hãy đảm bảo bạn đã có tất cả các phụ thuộc cần thiết:
+
+```bash
+cargo add --dev litesvm litesvm-token solana-sdk@4 spl-token spl-associated-token-account
+cargo add --dev solana-system-interface --features bincode
+```
+
+## Kiến Thức Cơ Bản về SPL Token
+
+Trong Solana, việc tạo một token account là một quy trình gồm hai bước.
+
+<Steps>
+<Step title="Tạo một `Mint Account`">
+- Không có số dư token
+- Lưu trữ tất cả thông tin toàn cục của token, như tổng cung, số thập phân, quyền hạn, v.v.
+- Mỗi token chỉ có một mint account
+- Chủ sở hữu là Token Program (TokenKeg hoặc Token 2022)
+</Step>
+
+<Step title="Tạo một `Token Account`">
+- Lưu trữ số dư cho một token SPL cụ thể
+- Liên kết với mint account để xác định token SPL nào đang có trong tài khoản này
+- Có thể có nhiều token account cho một mint account
+- Chủ sở hữu là người có quyền kiểm soát các token bên trong tài khoản này
+</Step>
+</Steps>
+
+## Các Loại Token Account
+
+### Token Account Thông Thường
+
+Một token account lưu trữ số dư của bạn cho một token SPL cụ thể:
+
+```rust
+// Can create token accounts at ANY address
+let token_account = Keypair::new();  // Random address
+let create_ix = system_instruction::create_account(
+    &payer.pubkey(),
+    &token_account.pubkey(),  // Any address you want
+    rent,
+    165,  // Token account size
+    &spl_token::id(),
+);
+let init_ix = spl_token::instruction::initialize_account(
+    &spl_token::id(),
+    &token_account.pubkey(),
+    &mint,
+    &owner.pubkey(),
+)?;
+```
+
+<Columns cols={2}>
+  <Card title="Ưu điểm" icon="check">
+    - Có thể tạo nhiều tài khoản cho cùng một mint/chủ sở hữu
+    - Linh hoạt - có thể sử dụng bất kỳ địa chỉ nào
+  </Card>
+
+  <Card title="Nhược điểm" icon="x">
+    - Không xác định - cần theo dõi địa chỉ thủ công
+    - Người nhận phải cho bạn biết account nào cần gửi đến
+    - Gây nhầm lẫn khi có nhiều account
+  </Card>
+</Columns>
+
+<Info>
+  **Khi nào nên dùng:** Các tài khoản tạm thời/escrow, các tài khoản do chương
+  trình quản lý với logic tùy chỉnh, khi bạn cần nhiều account cho cùng một
+  token, các chiến lược DeFi nâng cao.
+</Info>
+
+### Associated Token Account (ATA)
+
+ATA là một token account tại địa chỉ PDA xác định:
+
+```rust
+// ATA address is ALWAYS the same for owner + mint
+let ata = get_associated_token_address(&owner.pubkey(), &mint);
+// Address derived from: [owner_pubkey, token_program_id, mint]
+```
+
+Cách địa chỉ ATA được dẫn xuất:
+
+```rust
+// ATA is a PDA owned by the Associated Token Program
+let (ata, bump) = Pubkey::find_program_address(
+    &[
+        owner.as_ref(),
+        spl_token::id().as_ref(),
+        mint.as_ref(),
+    ],
+    &spl_associated_token_account::id(),  // ATA program
+);
+```
+
+<Columns cols={2}>
+  <Card title="Ưu điểm" icon="check">
+    - Một account chuẩn duy nhất cho mỗi cặp chủ sở hữu/mint
+    - Xác định - bất kỳ ai cũng có thể tính toán địa chỉ
+    - Đơn giản hóa thanh toán - chỉ cần địa chỉ ví + mint
+    - Quy ước chuẩn trên tất cả các ứng dụng Solana
+  </Card>
+
+  <Card title="Nhược điểm" icon="x">
+    - Chỉ có thể có MỘT ATA cho mỗi cặp chủ sở hữu/mint (theo thiết kế)
+  </Card>
+</Columns>
+
+<Info>
+  **Khuyến nghị cho hầu hết các trường hợp:** Ứng dụng ví, giao thức DeFi, lưu
+  trữ NFT, hệ thống thanh toán và mọi giao dịch chuyển token hướng đến người
+  dùng.
+</Info>
+
+## Ví Dụ Nhanh
+
+Dưới đây là ví dụ đầy đủ về cách tạo token mint và đúc token:
+
+```rust
+use litesvm::LiteSVM;
+use litesvm_token::{
+    get_spl_account,
+    spl_token::{native_mint::DECIMALS, state::Account as TokenAccount},
+    CreateAccount, CreateMint, MintTo, Transfer,
+};
+use solana_sdk::{
+    native_token::LAMPORTS_PER_SOL,
+    signature::{Keypair, Signer},
+};
+
+#[test]
+fn test_create_and_mint_tokens() {
+    let mut svm = LiteSVM::new();
+
+    // Create payer account and fund it
+    let payer = Keypair::new();
+    svm.airdrop(&payer.pubkey(), 10 * LAMPORTS_PER_SOL).unwrap();
+
+    // Create a new SPL token mint with the payer as the mint authority
+    let mint = CreateMint::new(&mut svm, &payer)
+        .authority(&payer.pubkey())
+        .decimals(DECIMALS)
+        .send()
+        .unwrap();
+
+    // Create a token account for the payer
+    let token_account = CreateAccount::new(&mut svm, &payer, &mint)
+        .owner(&payer.pubkey())
+        .send()
+        .unwrap();
+
+    // Mint tokens into the payer's token account
+    MintTo::new(&mut svm, &payer, &mint, &token_account, 1000)
+        .owner(&payer)
+        .send()
+        .unwrap();
+
+    // Verify balance
+    let token_account: TokenAccount = get_spl_account(&svm, &token_account).unwrap();
+    let account_balance = token_account.amount;
+    assert_eq!(account_balance, 1000)
+}
+```
+
+## Các Khái Niệm Chính
+
+### Số Thập Phân của Token
+
+Hầu hết các token sử dụng số thập phân để biểu diễn các lượng phân số:
+
+```rust
+// SOL has 9 decimals
+let one_sol = 10_u64.pow(9);  // 1_000_000_000 lamports
+
+// USDC has 6 decimals
+let one_usdc = 10_u64.pow(6); // 1_000_000 micro-USDC
+
+// Always account for decimals in calculations
+let amount_tokens = 100;
+let amount_raw = amount_tokens * 10_u64.pow(decimals as u32);
+```
+
+### Mối Quan Hệ Giữa Các Tài Khoản
+
+Hiểu rõ mối quan hệ giữa các tài khoản là điều rất quan trọng:
+
+- **Tài Khoản Mint**: Xác định token (nguồn cung, số thập phân, quyền hạn)
+- **Token account**: Lưu trữ token cho một chủ sở hữu cụ thể
+- **Associated token account**: Token account xác định theo công thức cho một
+  cặp chủ sở hữu+mint
+- **Mint Authority**: Có thể tạo token mới
+- **Freeze Authority**: Có thể đóng băng các token account (tùy chọn)
+
+## Khắc Phục Sự Cố
+
+### Các Lỗi Thường Gặp
+
+| Lỗi                         | Nguyên Nhân                                     | Giải Pháp                                            |
+| --------------------------- | ----------------------------------------------- | ---------------------------------------------------- |
+| `AccountNotFound`           | Cố gắng sử dụng một tài khoản chưa tồn tại      | Đảm bảo tài khoản được tạo trước khi sử dụng         |
+| `AccountAlreadyInitialized` | Cố gắng khởi tạo một tài khoản đã được khởi tạo | Kiểm tra xem tài khoản đã tồn tại chưa trước khi tạo |
+| `InsufficientFunds`         | Không đủ lamport cho rent hoặc token để chuyển  | Đảm bảo cung cấp đủ nguồn tài chính/đúc token        |
+| `OwnerMismatch`             | Tài khoản thuộc sở hữu của chương trình sai     | Xác minh ID chương trình đúng khi tạo                |
