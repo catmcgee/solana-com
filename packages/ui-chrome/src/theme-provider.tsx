@@ -7,7 +7,7 @@ import {
   safeStorageGetItem,
   safeStorageSetItem,
 } from "./browser-storage";
-import { isThemeRoute } from "./developer-routes";
+import { isDocsChromeRoute, isThemeRoute } from "./developer-routes";
 
 type Theme = "dark" | "light";
 
@@ -26,9 +26,13 @@ const ThemeContext = createContext<ThemeContextValue>({
 export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname();
   const isThemePage = isThemeRoute(pathname);
+  // The /developers landing applies the docs theme itself (pre-paint script
+  // and header toggle in apps/web); do not touch <html> there.
+  const isDocsChrome = isDocsChromeRoute(pathname);
   const [theme, setTheme] = useState<Theme>("dark"); // Initial theme state; will be updated by useEffect.
 
   useEffect(() => {
+    if (isDocsChrome) return;
     if (isThemePage) {
       const storage = getBrowserStorage("localStorage");
       // Function to update the theme based on the passed theme name
@@ -77,7 +81,7 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
       );
       document.documentElement.classList.add("dark", "tw-dark");
     }
-  }, [pathname, isThemePage]);
+  }, [pathname, isThemePage, isDocsChrome]);
 
   const toggleTheme = () => {
     const newTheme = theme === "dark" ? "light" : "dark";

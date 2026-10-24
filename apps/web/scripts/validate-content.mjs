@@ -126,14 +126,19 @@ function routeExists(pathname) {
   }
   if (pathname.startsWith("/developers/cookbook/")) {
     const slug = pathname.slice("/developers/cookbook/".length);
-    const base = path.join(repoRoot, "apps/docs/content/cookbook", slug);
+    const base = path.join(repoRoot, "apps/docs/developers/cookbook", slug);
     return (
       existsSync(`${base}.mdx`) || existsSync(path.join(base, "index.mdx"))
     );
   }
-  if (pathname.startsWith("/docs/")) {
-    const slug = pathname.slice("/docs/".length);
-    const base = path.join(repoRoot, "apps/docs/content/docs/en", slug);
+  // The docs live at /developers/docs; old /docs/<slug> URLs redirect to the
+  // same slug there (exact legacy redirects were matched above).
+  const docsPrefix = ["/developers/docs/", "/docs/"].find((prefix) =>
+    pathname.startsWith(prefix),
+  );
+  if (docsPrefix) {
+    const slug = pathname.slice(docsPrefix.length);
+    const base = path.join(repoRoot, "apps/docs/developers/docs", slug);
     return (
       existsSync(`${base}.mdx`) || existsSync(path.join(base, "index.mdx"))
     );
@@ -145,7 +150,7 @@ function routeExists(pathname) {
     if (!course || segments.length > 2) return false;
     const contentRoot = path.join(
       repoRoot,
-      "apps/docs/content/developers-learn/en",
+      "apps/docs/developers/bootcamp",
       courseSlug,
     );
     if (segments.length === 1)
@@ -156,7 +161,7 @@ function routeExists(pathname) {
     );
   }
   // Checked after content-backed prefixes so a catch-all rewrite such as
-  // /docs/:path* cannot hide a missing page.
+  // /developers/docs/:path* cannot hide a missing page.
   if (redirectPatterns.some((pattern) => pattern.test(pathname))) return true;
   for (const app of ["web", "docs", "media"]) {
     const base = path.join(repoRoot, `apps/${app}/src/app/[locale]`, pathname);
@@ -296,7 +301,7 @@ function readStaticExport(sourceText, relativePath, exportName) {
 
 const bootcampCurriculumPath = path.join(
   repoRoot,
-  "apps/docs/src/utils/developers-learn-curriculum.ts",
+  "packages/docs-tooling/data/bootcamp/developers-learn-curriculum.ts",
 );
 function readBootcampCourses() {
   const source = ts.createSourceFile(

@@ -6,41 +6,62 @@ import type { NextConfig } from "next";
 import type { Redirect, Rewrite } from "next/dist/lib/load-custom-routes";
 import withBundleAnalyzer from "@next/bundle-analyzer";
 import { withSentryConfig } from "@sentry/nextjs";
+import { createMDX } from "fumadocs-mdx/next";
+import { getSecurityHeaders } from "./src/lib/security-headers";
+import {
+  DOCS_SOURCE_GLOBS,
+  DOCS_SOURCE_ROUTES,
+} from "./docs-trace-includes.mjs";
 
-const securityHeaders: Array<{ key: string; value: string }> = [
-  {
-    key: "X-Frame-Options",
-    value: "SAMEORIGIN",
-  },
-  {
-    key: "X-XSS-Protection",
-    value: "1; mode=block",
-  },
-  {
-    key: "X-Content-Type-Options",
-    value: "nosniff",
-  },
-  {
-    key: "Content-Security-Policy",
-    value: "frame-ancestors 'self'",
-  },
-];
+// X-Frame-Options, nosniff, X-XSS-Protection, frame-ancestors, plus
+// X-Robots-Tag: noindex on previews. Shared with the docs head injection in
+// src/proxy.ts, which builds its own docs HTML responses.
+const securityHeaders = getSecurityHeaders();
 
-if (process.env.NEXT_PUBLIC_VERCEL_ENV === "preview") {
-  securityHeaders.push({
-    key: "X-Robots-Tag",
-    value: "noindex",
-  });
-}
+const svgrOptions = {
+  svgoConfig: {
+    plugins: [
+      {
+        name: "preset-default",
+        params: {
+          overrides: {
+            removeViewBox: false,
+            removeUselessStrokeAndFill: false,
+            cleanupIds: false,
+          },
+        },
+      },
+    ],
+  },
+};
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  // apps/web keeps its own AGENTS.md; `next dev` must not rewrite it.
+  agentRules: false,
   productionBrowserSourceMaps: false,
   trailingSlash: false,
+  // Pages are TypeScript only; MDX is compiled by Fumadocs for the docs.
+  pageExtensions: ["tsx", "ts", "jsx", "js"],
   transpilePackages: ["gsap"],
   // The epoch1000 OG card reads font files from disk at request time
   outputFileTracingIncludes: {
     "/api/epoch1000/og": ["./assets/fonts/epoch1000/*.woff"],
+    // The developer social images read their backgrounds and fonts.
+    "/opengraph/developers/[[...slug]]": [
+      "./public/img/og-backgrounds/*.jpg",
+      "./public/img/logomark-color.svg",
+      "./src/fonts/diatype/ABCDiatype-Medium.woff",
+      "./src/fonts/diatype/ABCDiatype-Bold.woff",
+    ],
+    // Translated docs pages read their sources at request time
+    // (docs-trace-includes.mjs; prerendered routes are covered by
+    // scripts/trace-docs-sources.mjs after the build).
+    ...Object.fromEntries(
+      DOCS_SOURCE_ROUTES.map((route) => [route, DOCS_SOURCE_GLOBS]),
+    ),
+    // /llms.txt is the index generated in apps/docs.
+    "/llms.txt": ["../docs/llms.txt"],
   },
 
   async rewrites() {
@@ -84,27 +105,31 @@ const nextConfig: NextConfig = {
     return existingRedirects;
   },
 
+  // Turbopack (the Next.js 16 default bundler): `*.inline.svg` imports are
+  // React components through SVGR, and every other `.svg` import is a URL
+  // string, as the webpack config below gives `next build --webpack`.
+  turbopack: {
+    rules: {
+      "*.svg": [
+        {
+          condition: { path: /\.inline\.svg$/ },
+          loaders: [{ loader: "@svgr/webpack", options: svgrOptions }],
+          as: "*.js",
+        },
+        {
+          condition: { not: { path: /\.inline\.svg$/ } },
+          type: "asset",
+        },
+      ],
+    },
+  },
+
   webpack(config) {
     config.module.rules.push({
       test: /\.inline\.svg$/,
       use: {
         loader: "@svgr/webpack",
-        options: {
-          svgoConfig: {
-            plugins: [
-              {
-                name: "preset-default",
-                params: {
-                  overrides: {
-                    removeViewBox: false,
-                    removeUselessStrokeAndFill: false,
-                    cleanupIds: false,
-                  },
-                },
-              },
-            ],
-          },
-        },
+        options: svgrOptions,
       },
     });
 
@@ -117,6 +142,17 @@ const nextConfig: NextConfig = {
   },
 
   images: {
+    // Next.js 16 allows only quality 75 by default; these are the `quality`
+    // props the app's next/image components use.
+    qualities: [75, 90, 100],
+    // Next.js 16 rejects local image URLs with a query string unless a
+    // pattern allows it. The first entry is the Next.js 16 default (any local
+    // path, no query); the second keeps the /api/media/image proxy
+    // (src/lib/media/solution-news.ts), whose `path` query varies per image.
+    localPatterns: [
+      { pathname: "**", search: "" },
+      { pathname: "/api/media/image" },
+    ],
     remotePatterns: [
       {
         protocol: "https",
@@ -190,8 +226,16 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      // Applies to every path, docs included: X-Frame-Options, nosniff,
+      // X-XSS-Protection and frame-ancestors, plus X-Robots-Tag: noindex on
+      // previews.
       {
         source: "/:path*",
+        headers: securityHeaders,
+      },
+      // `/:path*` does not cover the bare root, so repeat the rules for "/".
+      {
+        source: "/",
         headers: securityHeaders,
       },
     ];
@@ -221,9 +265,12 @@ const nextConfig: NextConfig = {
 
 const moduleExports = (): NextConfig => {
   const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
+  // Fumadocs MDX compiles the developer docs (source.config.ts).
+  const withMDX = createMDX();
   const plugins = [
     withBundleAnalyzer({ enabled: process.env.ANALYZE === "true" }),
     withNextIntl,
+    withMDX,
   ];
   return plugins.reduce<NextConfig>((acc, next) => next(acc), nextConfig);
 };
@@ -236,8 +283,11 @@ export default withSentryConfig(withBotId(moduleExports), {
   _experimental: {
     thirdPartyOriginStackFrames: true,
   },
-  disableLogger: true,
-  automaticVercelMonitors: true,
+  // Webpack builds only (`next build --webpack`); Turbopack has neither.
+  webpack: {
+    treeshake: { removeDebugLogging: true },
+    automaticVercelMonitors: true,
+  },
   sourcemaps: {
     disable:
       process.env.VERCEL_ENV !== "production" || !process.env.SENTRY_AUTH_TOKEN,

@@ -12,7 +12,21 @@ export function usePolled<T>(
   intervalMs: number,
   mapResponse?: (data: T, response: Response) => T,
 ): T | null {
+  return usePolledState(url, intervalMs, mapResponse).data;
+}
+
+/**
+ * usePolled plus `failed`: true while the latest attempt failed (a non-2xx
+ * answer or a network error), so a panel can say the data is unavailable
+ * instead of waiting forever.
+ */
+export function usePolledState<T>(
+  url: string,
+  intervalMs: number,
+  mapResponse?: (data: T, response: Response) => T,
+): { data: T | null; failed: boolean } {
   const [data, setData] = useState<T | null>(null);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -37,10 +51,14 @@ export function usePolled<T>(
         const res = await fetch(url, { signal: controller.signal });
         if (res.ok) {
           const json = (await res.json()) as T;
-          if (alive) setData(mapResponse ? mapResponse(json, res) : json);
-        }
+          if (alive) {
+            setData(mapResponse ? mapResponse(json, res) : json);
+            setFailed(false);
+          }
+        } else if (alive) setFailed(true);
       } catch {
         // keep last payload; aborts are expected when a tab is backgrounded
+        if (alive && !controller?.signal.aborted) setFailed(true);
       } finally {
         loading = false;
         controller = null;
@@ -68,7 +86,7 @@ export function usePolled<T>(
     };
   }, [url, intervalMs, mapResponse]);
 
-  return data;
+  return { data, failed };
 }
 
 export interface SeriesPoint {
@@ -96,5 +114,24 @@ export interface BlockSample {
   /** cu as a percent of the block compute ceiling. */
   cuPct?: number;
   programs: { name: string; count: number }[];
-  tape: { sig: string; p: string }[];
+  /** First non-vote transactions; `id` is the full signature. */
+  tape: { sig: string; p: string; id?: string; fee?: number }[];
+}
+
+/** One block in /api/slot-time/tip. */
+export interface TipBlock {
+  slot: number;
+  /** Transactions in the block, validator votes included. */
+  txs: number;
+}
+
+/** /api/slot-time/tip: the confirmed tip and the blocks just behind it. */
+export interface TipPayload {
+  /** The confirmed tip when sampled. */
+  tip: number;
+  /** Blocks in the last 12 slots that the server has read, oldest first. */
+  blocks: TipBlock[];
+  /** Slots in that window with no block (skipped by their leader). */
+  skipped: number[];
+  serverTime: number;
 }

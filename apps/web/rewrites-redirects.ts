@@ -1,11 +1,11 @@
 import {
   MEDIA_APP_URL,
-  DOCS_APP_URL,
   templatesAppUrl,
   ACCELERATE_APP_URL,
   BREAKPOINT_APP_URL,
 } from "./apps-urls";
 import { locales } from "@workspace/i18n/config";
+import { DOCS_TRANSLATED_LOCALE_PATTERN } from "./src/lib/docs-edge/paths";
 
 const LOCALE_REGEX = locales.join("|");
 
@@ -14,6 +14,11 @@ type RedirectInput = {
   destination: string;
   localeDestination?: string;
   permanent?: boolean;
+  /**
+   * `false` emits the redirect exactly as written, with no locale twin. Used
+   * by rules that already carry their own locale.
+   */
+  localize?: false;
 };
 
 type LocaleRedirect = RedirectInput & { locale: false };
@@ -27,7 +32,17 @@ type LocaleRedirect = RedirectInput & { locale: false };
  */
 function withLocaleRedirects(redirects: RedirectInput[]): LocaleRedirect[] {
   return redirects.flatMap(
-    ({ source, destination, localeDestination: override, ...rest }) => {
+    ({
+      source,
+      destination,
+      localeDestination: override,
+      localize,
+      ...rest
+    }): LocaleRedirect[] => {
+      if (localize === false) {
+        return [{ source, destination, locale: false, ...rest }];
+      }
+
       const isExternalDest =
         destination.startsWith("https://") || destination.startsWith("http://");
 
@@ -82,8 +97,8 @@ function withMdVariants(redirects: RedirectInput[]): RedirectInput[] {
  */
 const dissolvedGuideRedirects: RedirectInput[] = withMdVariants([
   // Section and category indexes
-  { source: "/developers/guides", destination: "/docs" },
-  { source: "/developers/guides/advanced", destination: "/docs" },
+  { source: "/developers/guides", destination: "/developers/docs" },
+  { source: "/developers/guides/advanced", destination: "/developers/docs" },
   {
     source: "/developers/guides/games",
     destination:
@@ -91,11 +106,11 @@ const dissolvedGuideRedirects: RedirectInput[] = withMdVariants([
   },
   {
     source: "/developers/guides/getstarted",
-    destination: "/docs/intro/quick-start",
+    destination: "/developers/docs/quickstart",
   },
   {
     source: "/developers/guides/dapps",
-    destination: "/developers/bootcamp/fullstack-apps",
+    destination: "/developers/docs/video-guides/2026-developer-bootcamp",
   },
   {
     source: "/developers/guides/depin",
@@ -103,44 +118,44 @@ const dissolvedGuideRedirects: RedirectInput[] = withMdVariants([
   },
   {
     source: "/developers/guides/token-extensions",
-    destination: "/docs/tokens/extensions",
+    destination: "/developers/docs/tokens/extensions",
   },
   // advanced/* → verticals, programs, tools, and cookbook
   {
     source: "/developers/guides/advanced/acl",
-    destination: "/docs/tokenization/token-acl",
+    destination: "/developers/docs/tokenization/token-acl",
   },
   {
     source: "/developers/guides/advanced/dvp",
-    destination: "/docs/tokenization/dvp",
+    destination: "/developers/docs/tokenization/dvp",
   },
   {
     source: "/developers/guides/advanced/nav-strikes",
-    destination: "/docs/tokenization/nav-strikes",
+    destination: "/developers/docs/tokenization/nav-strikes",
   },
   {
     source: "/developers/guides/advanced/exchange",
-    destination: "/docs/defi/exchange",
+    destination: "/developers/docs/defi/exchange",
   },
   {
     source: "/developers/guides/advanced/mev-protection",
-    destination: "/docs/defi/mev-protection",
+    destination: "/developers/docs/defi/mev-protection",
   },
   {
     source: "/developers/guides/advanced/stake-weighted-qos",
-    destination: "/docs/defi/stake-weighted-qos",
+    destination: "/developers/docs/defi/stake-weighted-qos",
   },
   {
     source: "/developers/guides/advanced/idls",
-    destination: "/docs/programs/idls",
+    destination: "/developers/docs/programs/idls",
   },
   {
     source: "/developers/guides/advanced/actions",
-    destination: "/docs/tools/actions",
+    destination: "/developers/docs/tools/actions",
   },
   {
     source: "/developers/guides/advanced/security-best-practices",
-    destination: "/docs/tools/production-readiness",
+    destination: "/developers/docs/tools/production-readiness",
   },
   {
     source: "/developers/guides/advanced/confirmation",
@@ -220,27 +235,27 @@ const dissolvedGuideRedirects: RedirectInput[] = withMdVariants([
   // getstarted/* → payments, tools, cookbook
   {
     source: "/developers/guides/getstarted/intro-to-x402",
-    destination: "/docs/payments/agentic-payments/x402",
+    destination: "/developers/docs/payments/agentic-payments/x402",
   },
   {
     source: "/developers/guides/getstarted/build-a-x402-facilitator",
-    destination: "/docs/tools/x402-facilitator",
+    destination: "/developers/docs/tools/x402-facilitator",
   },
   {
     source: "/developers/guides/getstarted/intro-to-ai",
-    destination: "/docs/intro/coding-with-agents",
+    destination: "/developers/docs/intro/coding-with-agents",
   },
   {
     source: "/developers/guides/getstarted/how-to-verify-a-token",
-    destination: "/docs/tokens/how-to-verify-a-token",
+    destination: "/developers/docs/tokens/how-to-verify-a-token",
   },
   {
     source: "/developers/guides/getstarted/tokens",
-    destination: "/docs/tokens",
+    destination: "/developers/docs/tokens",
   },
   {
     source: "/developers/guides/getstarted/actions",
-    destination: "/docs/tools/actions",
+    destination: "/developers/docs/tools/actions",
   },
   {
     source: "/developers/guides/getstarted/solana-token-airdrop-and-faucets",
@@ -257,88 +272,366 @@ const dissolvedGuideRedirects: RedirectInput[] = withMdVariants([
   // token-extensions/* → tokens extensions reference
   {
     source: "/developers/guides/token-extensions/transfer-hook",
-    destination: "/docs/tokens/extensions/transfer-hook",
+    destination: "/developers/docs/tokens/extensions/transfer-hook",
   },
   {
     source: "/developers/guides/token-extensions/dynamic-meta-data-nft",
-    destination: "/docs/tokens/extensions/dynamic-metadata-nft",
+    destination: "/developers/docs/tokens/extensions/dynamic-metadata-nft",
   },
 ]);
 
 const movedDocsRedirects: RedirectInput[] = withMdVariants([
   {
     source: "/docs/payments/agentic-payments/intro-to-x402",
-    destination: "/docs/payments/agentic-payments/x402",
+    destination: "/developers/docs/payments/agentic-payments/x402",
   },
   {
+    // Points straight at the final page: x402/making-a-payment was merged
+    // into pay-sh (below), and redirects must never chain.
     source: "/docs/payments/agentic-payments/x402-quickstart",
-    destination: "/docs/payments/agentic-payments/x402/making-a-payment",
+    destination: "/developers/docs/payments/pay-sh#let-an-agent-pay-x402",
   },
   {
     source: "/docs/payments/agentic-payments/x402-facilitator",
-    destination: "/docs/tools/x402-facilitator",
-  },
-  {
-    source: "/docs/tools/ai",
-    destination: "/docs/intro/coding-with-agents",
+    destination: "/developers/docs/tools/x402-facilitator",
   },
   {
     source: "/docs/references",
-    destination: "/docs/references/clusters",
+    destination: "/developers/docs/references/clusters",
   },
   {
     source: "/docs/clients/javascript",
-    destination: "/docs/clients/official/javascript",
+    destination: "/developers/docs/clients/official/javascript",
   },
   {
     source: "/docs/clients/game-sdks",
-    destination: "/docs/clients/community/game-sdks",
+    destination: "/developers/docs/clients/community/game-sdks",
   },
   {
     source: "/docs/clients/go",
-    destination: "/docs/clients/community/go",
+    destination: "/developers/docs/clients/community/go",
   },
   {
     source: "/docs/clients/java",
-    destination: "/docs/clients/community/java",
+    destination: "/developers/docs/clients/community/java",
   },
   {
     source: "/docs/clients/python",
-    destination: "/docs/clients/community/python",
+    destination: "/developers/docs/clients/community/python",
   },
   {
     source: "/docs/clients/rust",
-    destination: "/docs/clients/official/rust",
+    destination: "/developers/docs/clients/official/rust",
   },
   {
     source: "/docs/frontend/kit",
-    destination: "/docs/frontend/client",
+    destination: "/developers/docs/frontend/client",
   },
   {
     source: "/docs/intro/quick-start/cross-program-invocation",
-    destination: "/docs/core/cpi",
+    destination: "/developers/docs/core/cpi",
   },
   {
     source: "/docs/intro/quick-start/deploying-programs",
-    destination: "/docs/intro/quick-start/build-first-program",
+    destination: "/developers/docs/programs/build-first-program",
   },
   {
     source: "/docs/intro/quick-start/program-derived-address",
-    destination: "/docs/core/pda",
+    destination: "/developers/docs/core/pda",
   },
   {
     source: "/docs/references/economics/staking",
-    destination: "/docs/references/staking",
+    destination: "/developers/docs/references/staking",
   },
   {
     source: "/docs/advanced/actions",
-    destination: "/docs/tools/actions",
+    destination: "/developers/docs/tools/actions",
   },
   {
     source: "/developers/guides/token-extensions/confidential-transfer",
-    destination: "/docs/tokens/extensions/confidential-transfer",
+    destination: "/developers/docs/tokens/extensions/confidential-transfer",
+  },
+  // Ported from the deleted apps/docs/next.config.ts (saved in
+  // migration/docs-app-redirects.json). They also cover the 17 stale
+  // locale-only payment-button pages that were removed (R8).
+  {
+    source: "/docs/payments/accept-payments/payment-button",
+    destination:
+      "/developers/docs/tools/commerce-kit/quickstart/payment-button",
+  },
+  {
+    source: "/docs/payments/accept-payments/pay-sh",
+    destination: "/developers/docs/payments/pay-sh",
+  },
+  {
+    source: "/docs/payments/subscriptions/pay-sh",
+    destination: "/developers/docs/payments/pay-sh",
+  },
+  {
+    source: "/docs/payments/production-readiness",
+    destination: "/developers/docs/tools/production-readiness",
+  },
+  // Duplicate pages merged into the page that covers the same job
+  // (migration/dup-audit.md, 2026-10-15). Their unique content moved first;
+  // the EN file and its 17 locale copies were deleted. Destinations with an
+  // anchor get no automatic `.md` twin (withMdVariants); see
+  // anchoredMdTwinRedirects below.
+  {
+    // The quickstart launched a plain Token-2022 mint with extensions; its
+    // code, tabs and prose live on this cookbook page (2026-10-16), not on
+    // the compliance-controls issue-asset path.
+    source: "/docs/tokenization/quickstart",
+    destination: "/developers/cookbook/tokens/create-mint-with-extensions",
+  },
+  {
+    // Exact path only: /docs/tokenization/<page> still exists.
+    source: "/docs/tokenization",
+    destination: "/developers/docs/assets#tokenization",
+  },
+  {
+    source: "/docs/payments/quickstart",
+    destination: "/developers/docs/payments/checkout/browser",
+  },
+  {
+    source: "/docs/payments/accept-payments/solana-pay",
+    destination: "/developers/docs/tools/commerce-kit/quickstart/solana-pay",
+  },
+  {
+    source: "/docs/payments/pay-per-call",
+    destination: "/developers/docs/payments/agentic-payments",
+  },
+  {
+    source: "/docs/payments/agentic-payments/x402/making-a-payment",
+    destination: "/developers/docs/payments/pay-sh#let-an-agent-pay-x402",
+  },
+  {
+    source: "/docs/tools/solana-pay/quickstart",
+    destination: "/developers/docs/tools/solana-pay#quick-start",
+  },
+  // The Kora JSON-RPC "Authentication" page was an unlisted stub; Kora
+  // authentication is documented for operators (2026-10-16).
+  {
+    source: "/docs/tools/kora/json-rpc-api/authentication",
+    destination: "/developers/docs/tools/kora/operators/authentication",
+  },
+  {
+    source: "/developers/docs/tools/kora/json-rpc-api/authentication",
+    destination: "/developers/docs/tools/kora/operators/authentication",
+  },
+  // Start here / Resources reorganisation (2026-10-16). "Coming from
+  // Ethereum" became "Coming from EVM" (Resources > Set up), and the program
+  // quickstart moved under Write programs. Both the pre-move /docs URL and
+  // the /developers/docs URL it had for a day redirect.
+  {
+    source: "/docs/from-ethereum",
+    destination: "/developers/docs/from-evm",
+  },
+  {
+    source: "/developers/docs/from-ethereum",
+    destination: "/developers/docs/from-evm",
+  },
+  {
+    source: "/docs/intro/quick-start/build-first-program",
+    destination: "/developers/docs/programs/build-first-program",
+  },
+  {
+    source: "/developers/docs/intro/quick-start/build-first-program",
+    destination: "/developers/docs/programs/build-first-program",
+  },
+  // The Playground quick start and its two walkthroughs were merged into the
+  // Quickstart tutorial (2026-10-16): reading -> Check a balance, writing ->
+  // Send dollars (Send SOL until 2026-10-21). The pages and their locale
+  // copies were deleted.
+  ...[
+    ["", "/developers/docs/quickstart"],
+    ["/reading-from-network", "/developers/docs/quickstart/check-balance"],
+    ["/writing-to-network", "/developers/docs/quickstart/send-dollars"],
+  ].flatMap(([page, destination]) => [
+    { source: `/docs/intro/quick-start${page}`, destination: destination! },
+    {
+      source: `/developers/docs/intro/quick-start${page}`,
+      destination: destination!,
+    },
+  ]),
+  // The "All use cases" hub was removed (2026-10-16): Start here and the tab
+  // landings (Payments, Assets, Markets) link every page it listed. Exact
+  // paths only: /docs/finance/privacy still exists.
+  { source: "/docs/finance", destination: "/developers/docs" },
+  { source: "/developers/docs/finance", destination: "/developers/docs" },
+]);
+
+/**
+ * `.md` twins for the movedDocsRedirects whose destination carries an anchor
+ * (withMdVariants skips those). A markdown twin has no anchors, so it goes to
+ * the destination page's own `.md`. Kept out of withMdVariants, which would
+ * add a `.md.md` twin.
+ */
+const anchoredMdTwinRedirects: RedirectInput[] = [
+  {
+    source: "/docs/payments/agentic-payments/x402-quickstart.md",
+    destination: "/developers/docs/payments/pay-sh.md",
+  },
+  {
+    source: "/docs/payments/agentic-payments/x402/making-a-payment.md",
+    destination: "/developers/docs/payments/pay-sh.md",
+  },
+  {
+    source: "/docs/tokenization.md",
+    destination: "/developers/docs/assets.md",
+  },
+  {
+    source: "/docs/tools/solana-pay/quickstart.md",
+    destination: "/developers/docs/tools/solana-pay.md",
+  },
+];
+
+/**
+ * Quick installation moved into the Quickstart's "Follow along manually"
+ * tab (2026-10-21). Temporary while the docs are in preview.
+ */
+const installRedirects: RedirectInput[] = withMdVariants([
+  // The Quickstart now sends dollars and creates an asset (2026-10-21).
+  {
+    source: "/developers/docs/quickstart/send-sol",
+    destination: "/developers/docs/quickstart/send-dollars",
+    permanent: false,
+  },
+  {
+    source: "/developers/docs/quickstart/create-token",
+    destination: "/developers/docs/quickstart/create-asset",
+    permanent: false,
+  },
+  {
+    source: "/developers/docs/intro/installation",
+    destination: "/developers/docs/quickstart",
+    permanent: false,
+  },
+  {
+    source: "/developers/docs/intro/installation/index",
+    destination: "/developers/docs/quickstart",
+    permanent: false,
+  },
+  {
+    source: "/docs/intro/installation",
+    destination: "/developers/docs/quickstart",
+    permanent: false,
   },
 ]);
+
+/**
+ * The Developer Bootcamp lives in Video tutorials: /developers/bootcamp is
+ * the 2026 Developer Bootcamp video page, with the Video tutorials sidebar.
+ * The old lesson-by-lesson pages (and /developers/learn, its earlier name)
+ * go to the matching video page in one hop. Temporary while the docs are in
+ * preview; make them permanent at launch.
+ */
+const VIDEO = "/developers/docs/video-guides";
+const bootcampRedirects: RedirectInput[] = [
+  ...withMdVariants([
+    {
+      source: "/developers/bootcamp",
+      destination: `${VIDEO}/2026-developer-bootcamp`,
+      permanent: false,
+    },
+    {
+      source: "/developers/learn",
+      destination: `${VIDEO}/2026-developer-bootcamp`,
+      permanent: false,
+    },
+  ]),
+  ...["bootcamp", "learn"].flatMap((base): RedirectInput[] => [
+    {
+      source: `/developers/${base}/solana-crashcourse/:path*`,
+      destination: `${VIDEO}/solana-crash-course`,
+      permanent: false,
+    },
+    {
+      source: `/developers/${base}/depin/:path*`,
+      destination: `${VIDEO}/building-depin-projects`,
+      permanent: false,
+    },
+    {
+      source: `/developers/${base}/:path*`,
+      destination: `${VIDEO}/2026-developer-bootcamp`,
+      permanent: false,
+    },
+  ]),
+];
+
+/**
+ * /docs/tags/<tag> never had pages; the tags index is a hidden docs page.
+ * Temporary, so the index can grow real tag pages later. The
+ * old /docs prefix gets its own rule so it takes one hop, not two.
+ */
+const docsTagRedirects: RedirectInput[] = [
+  {
+    source: "/docs/tags/:tag+",
+    destination: "/developers/docs/tags",
+    permanent: false,
+  },
+  {
+    source: "/developers/docs/tags/:tag+",
+    destination: "/developers/docs/tags",
+    permanent: false,
+  },
+];
+
+/**
+ * The docs moved from /docs to /developers/docs (2026-10-16). Every old
+ * docs URL, its `.md` twin and its locale twins answer one permanent
+ * redirect to the same path under /developers/docs (query strings are kept,
+ * so /docs?q=... search hand-offs still work). Placed LAST: the page-level
+ * redirects above match old /docs URLs first and point straight at the
+ * final /developers/docs page, so a moved page is still one hop.
+ * `localize: false` because the rules carry their own locale handling:
+ * `/en/docs/x` goes straight to the unprefixed English URL.
+ * Greek (/el/docs/...) is handled by greekDocsRedirects, which runs first.
+ */
+const DOCS_MOVE_LOCALES = `:locale(${DOCS_TRANSLATED_LOCALE_PATTERN})`;
+const docsPrefixMoveRedirects: RedirectInput[] = [
+  { source: "/docs", destination: "/developers/docs" },
+  { source: "/docs.md", destination: "/developers/docs.md" },
+  { source: "/docs/:path+", destination: "/developers/docs/:path+" },
+  { source: "/en/docs", destination: "/developers/docs" },
+  { source: "/en/docs.md", destination: "/developers/docs.md" },
+  { source: "/en/docs/:path+", destination: "/developers/docs/:path+" },
+  {
+    source: `/${DOCS_MOVE_LOCALES}/docs`,
+    destination: "/:locale/developers/docs",
+  },
+  {
+    source: `/${DOCS_MOVE_LOCALES}/docs.md`,
+    destination: "/:locale/developers/docs.md",
+  },
+  {
+    source: `/${DOCS_MOVE_LOCALES}/docs/:path+`,
+    destination: "/:locale/developers/docs/:path+",
+  },
+].map((r) => ({ ...r, permanent: true, localize: false as const }));
+
+/**
+ * Greek (el) docs were dropped. One rule,
+ * placed first, sends every el-prefixed docs collection URL (and its `.md`
+ * twin) to the same path without `/el`:
+ *   /el/docs[.md|/*], /el/learn[.md|/*], /el/developers[.md] and
+ *   /el/developers/{docs,cookbook,bootcamp,guides,learn}[.md|/*].
+ * Because it runs before everything else, the per-locale twins below never
+ * see /el docs URLs. A Greek URL whose English page also moved takes two
+ * hops (/el/docs/x -> /docs/x -> /developers/docs/x, or
+ * /el/docs/old -> /docs/old -> /developers/docs/new); that keeps the route
+ * count down instead of adding a Greek copy of every docs redirect.
+ * /el/... pages served by apps/web itself (news, wallets,
+ * /el/developers/payments, ...) do not match.
+ */
+const greekDocsRedirects: RedirectInput[] = [
+  {
+    source:
+      "/el/:path((?:docs|learn|developers/(?:docs|cookbook|bootcamp|guides|learn))(?:\\.md|/.+)?|developers(?:\\.md)?)",
+    destination: "/:path",
+    permanent: true,
+    localize: false,
+  },
+];
 
 const breakpointSubrouteRedirects: RedirectInput[] = [
   { source: "/agenda", destination: "/breakpoint/schedule" },
@@ -381,6 +674,14 @@ const chainMigrationRedirects: RedirectInput[] = [
     permanent: true,
   },
 ];
+
+/*
+ * The developer docs (/developers/docs, /developers/cookbook,
+ * /developers/bootcamp, /learn/<article> and their locale copies) are pages
+ * of this app (Fumadocs, src/app/(docs)/[locale]/developers/docs etc.), so they
+ * need no rewrites: only the redirects above and src/proxy.ts (canonical
+ * paths, Markdown twins).
+ */
 
 export default {
   rewrites: {
@@ -638,180 +939,14 @@ export default {
         destination: `${templatesAppUrl}/developers/templates/:path*`,
         locale: false,
       },
-      // Docs app assets (required for static assets with assetPrefix: "/docs-assets")
-      {
-        source: "/docs-assets/:path+",
-        destination: `${DOCS_APP_URL}/docs-assets/:path+`,
-        locale: false,
-      },
-      // Docs app rewrites
-      {
-        source: "/opengraph/:path+",
-        destination: `${DOCS_APP_URL}/opengraph/:path+`,
-        locale: false,
-      },
-      {
-        source: "/llms.txt",
-        destination: `${DOCS_APP_URL}/llms.txt`,
-        locale: false,
-      },
-      {
-        source: "/llms-full.txt",
-        destination: `${DOCS_APP_URL}/llms-full.txt`,
-        locale: false,
-      },
-      {
-        source: "/docs",
-        destination: `${DOCS_APP_URL}/docs`,
-        locale: false,
-      },
-      {
-        source: "/docs.md",
-        destination: `${DOCS_APP_URL}/docs.md`,
-        locale: false,
-      },
-      {
-        source: "/docs/:path*.md",
-        destination: `${DOCS_APP_URL}/docs/:path*.md`,
-        locale: false,
-      },
-      {
-        source: "/docs/:path*",
-        destination: `${DOCS_APP_URL}/docs/:path*`,
-        locale: false,
-      },
-      {
-        source: "/learn",
-        destination: `${DOCS_APP_URL}/learn`,
-        locale: false,
-      },
-      {
-        source: "/learn/:path*.md",
-        destination: `${DOCS_APP_URL}/learn/:path*.md`,
-        locale: false,
-      },
-      {
-        source: "/learn/:path*",
-        destination: `${DOCS_APP_URL}/learn/:path*`,
-        locale: false,
-      },
-      {
-        source: "/developers",
-        destination: `${DOCS_APP_URL}/developers`,
-        locale: false,
-      },
-      {
-        source: "/developers/:path*.md",
-        destination: `${DOCS_APP_URL}/developers/:path*.md`,
-        locale: false,
-      },
-      {
-        source: "/developers/cookbook",
-        destination: `${DOCS_APP_URL}/developers/cookbook`,
-        locale: false,
-      },
-      {
-        source: "/developers/cookbook/:path*",
-        destination: `${DOCS_APP_URL}/developers/cookbook/:path*`,
-        locale: false,
-      },
-      {
-        source: "/developers/guides",
-        destination: `${DOCS_APP_URL}/developers/guides`,
-        locale: false,
-      },
-      {
-        source: "/developers/guides/:path*",
-        destination: `${DOCS_APP_URL}/developers/guides/:path*`,
-        locale: false,
-      },
-      {
-        source: "/developers/bootcamp",
-        destination: `${DOCS_APP_URL}/developers/bootcamp`,
-        locale: false,
-      },
-      {
-        source: "/developers/bootcamp/:path*",
-        destination: `${DOCS_APP_URL}/developers/bootcamp/:path*`,
-        locale: false,
-      },
-      // Docs app with locale
-      {
-        source: "/:locale/docs",
-        destination: `${DOCS_APP_URL}/:locale/docs`,
-        locale: false,
-      },
-      {
-        source: "/:locale/docs/:path*.md",
-        destination: `${DOCS_APP_URL}/:locale/docs/:path*.md`,
-        locale: false,
-      },
-      {
-        source: "/:locale/docs/:path*",
-        destination: `${DOCS_APP_URL}/:locale/docs/:path*`,
-        locale: false,
-      },
-      {
-        source: "/:locale/learn",
-        destination: `${DOCS_APP_URL}/:locale/learn`,
-        locale: false,
-      },
-      {
-        source: "/:locale/learn/:path*.md",
-        destination: `${DOCS_APP_URL}/:locale/learn/:path*.md`,
-        locale: false,
-      },
-      {
-        source: "/:locale/learn/:path*",
-        destination: `${DOCS_APP_URL}/:locale/learn/:path*`,
-        locale: false,
-      },
-      {
-        source: "/:locale/developers",
-        destination: `${DOCS_APP_URL}/:locale/developers`,
-        locale: false,
-      },
-      {
-        source: "/:locale/developers/:path*.md",
-        destination: `${DOCS_APP_URL}/:locale/developers/:path*.md`,
-        locale: false,
-      },
-      {
-        source: "/:locale/developers/cookbook",
-        destination: `${DOCS_APP_URL}/:locale/developers/cookbook`,
-        locale: false,
-      },
-      {
-        source: "/:locale/developers/cookbook/:path*",
-        destination: `${DOCS_APP_URL}/:locale/developers/cookbook/:path*`,
-        locale: false,
-      },
-      {
-        source: "/:locale/developers/guides",
-        destination: `${DOCS_APP_URL}/:locale/developers/guides`,
-        locale: false,
-      },
-      {
-        source: "/:locale/developers/guides/:path*",
-        destination: `${DOCS_APP_URL}/:locale/developers/guides/:path*`,
-        locale: false,
-      },
-      {
-        source: "/:locale/developers/bootcamp",
-        destination: `${DOCS_APP_URL}/:locale/developers/bootcamp`,
-        locale: false,
-      },
-      {
-        source: "/:locale/developers/bootcamp/:path*",
-        destination: `${DOCS_APP_URL}/:locale/developers/bootcamp/:path*`,
-        locale: false,
-      },
     ],
     afterFiles: [],
     fallback: [],
   },
 
   redirects: withLocaleRedirects([
+    // Keep first: Greek docs URLs go to English before any other rule.
+    ...greekDocsRedirects,
     {
       source:
         "/uploads/posts/bits-to-bricks-crypto-security-michael-coates/heroImage.png",
@@ -827,6 +962,10 @@ export default {
     },
     ...dissolvedGuideRedirects,
     ...movedDocsRedirects,
+    ...anchoredMdTwinRedirects,
+    ...installRedirects,
+    ...bootcampRedirects,
+    ...docsTagRedirects,
     ...chainMigrationRedirects,
     {
       source: "/universities",
@@ -941,19 +1080,19 @@ export default {
     },
     {
       source: "/news/getting-started-with-solana-development",
-      destination: "/docs/intro/dev",
+      destination: "/developers/docs",
     },
     {
       source: "/install",
-      destination: "/docs/intro/installation",
+      destination: "/developers/docs/quickstart",
     },
     {
       source: "/cli",
-      destination: "/docs/intro/installation#install-the-solana-cli",
+      destination: "/developers/docs/quickstart",
     },
     {
       source: "/setup",
-      destination: "/docs/intro/installation",
+      destination: "/developers/docs/quickstart",
     },
     {
       source: "/simd",
@@ -1061,7 +1200,7 @@ export default {
     },
     {
       source: "/developers/guides/getstarted/setup-local-development",
-      destination: "/docs/intro/installation",
+      destination: "/developers/docs/quickstart",
     },
     {
       source: "/environment",
@@ -1072,56 +1211,50 @@ export default {
     {
       source: "/verifiable-builds",
       destination:
-        "/docs/programs/verified-builds#install-the-solana-verify-cli",
+        "/developers/docs/programs/verified-builds#install-the-solana-verify-cli",
     },
     // content redirects:
     {
       source: "/docs/actions",
-      destination: "/docs/tools/actions",
+      destination: "/developers/docs/tools/actions",
     },
     {
       source: "/docs/blinks",
-      destination: "/docs/tools/actions",
+      destination: "/developers/docs/tools/actions",
     },
     {
       source: "/docs/advanced/blinks",
-      destination: "/docs/tools/actions",
+      destination: "/developers/docs/tools/actions",
     },
     {
       source: "/docs/advanced",
-      destination: "/docs/advanced/confirmation",
-    },
-    {
-      source: "/docs/core/transactions/confirmation",
-      destination: "/docs/advanced/confirmation",
+      destination: "/developers/docs/core/transactions/confirmation",
     },
     {
       source: "/docs/core/transactions/retry",
-      destination: "/docs/advanced/retry",
+      destination: "/developers/cookbook/transactions/retry",
     },
     {
       source: "/docs/core/transactions/versions",
-      destination: "/docs/advanced/versions",
+      destination: "/developers/docs/core/transactions/versioned-transactions",
     },
-    {
-      source: "/docs/core/rent",
-      destination: "/docs/core/fees",
-    },
+    // /docs/core/rent and /docs/core/transactions/confirmation are pages
+    // again (new concept pages), so their old redirects are gone.
     {
       source: "/docs/intro/rent",
-      destination: "/docs/core/fees",
+      destination: "/developers/docs/core/rent",
     },
     {
       source: "/docs/intro/transaction_fees",
-      destination: "/docs/core/fees",
+      destination: "/developers/docs/core/fees",
     },
     {
       source: "/docs/intro/transaction-fees",
-      destination: "/docs/core/fees",
+      destination: "/developers/docs/core/fees",
     },
     {
       source: "/docs/core/runtime",
-      destination: "/docs/core/fees",
+      destination: "/developers/docs/core/fees",
     },
     {
       source: "/docs/intro/economics",
@@ -1137,439 +1270,455 @@ export default {
     },
     {
       source: "/docs/intro",
-      destination: "/docs",
+      destination: "/developers/docs",
     },
     {
       source: "/docs/intro/overview",
-      destination: "/docs",
+      destination: "/developers/docs",
     },
     {
       source: "/developers/guides/getstarted/setup-local-development",
-      destination: "/docs/intro/installation",
+      destination: "/developers/docs/quickstart",
     },
     {
       source: "/docs/install",
-      destination: "/docs/intro/installation",
+      destination: "/developers/docs/quickstart",
     },
     {
       source: "/install",
-      destination: "/docs/intro/installation",
+      destination: "/developers/docs/quickstart",
     },
     {
       source: "/setup",
-      destination: "/docs/intro/installation",
+      destination: "/developers/docs/quickstart",
     },
     {
       source: "/docs/programs/debugging",
-      destination: "/docs/programs/anchor/index",
+      // Legacy chain ended on anchor-lang.com via /docs/programs/anchor/:path*.
+      destination: "https://www.anchor-lang.com/docs",
     },
     {
       source: "/docs/programs/lang-c",
-      destination: "/docs/programs/anchor/index",
+      // Legacy chain ended on anchor-lang.com via /docs/programs/anchor/:path*.
+      destination: "https://www.anchor-lang.com/docs",
     },
     {
       source: "/docs/programs/overview",
-      destination: "/docs/programs/anchor/index",
+      // Legacy chain ended on anchor-lang.com via /docs/programs/anchor/:path*.
+      destination: "https://www.anchor-lang.com/docs",
     },
     {
       source: "/docs/programs/lang-rust",
-      destination: "/docs/programs/rust",
+      destination: "/developers/docs/programs/rust",
     },
     {
       source: "/docs/rpc/getConfirmedBlock",
-      destination: "/docs/rpc/deprecated/getconfirmedblock",
+      destination: "/developers/docs/rpc/deprecated/getconfirmedblock",
     },
     {
       source: "/docs/rpc/http/getConfirmedBlock",
-      destination: "/docs/rpc/deprecated/getconfirmedblock",
+      destination: "/developers/docs/rpc/deprecated/getconfirmedblock",
     },
     {
       source: "/docs/rpc/getConfirmedBlocks",
-      destination: "/docs/rpc/deprecated/getconfirmedblocks",
+      destination: "/developers/docs/rpc/deprecated/getconfirmedblocks",
     },
     {
       source: "/docs/rpc/http/getConfirmedBlocks",
-      destination: "/docs/rpc/deprecated/getconfirmedblocks",
+      destination: "/developers/docs/rpc/deprecated/getconfirmedblocks",
     },
     {
       source: "/docs/rpc/getConfirmedBlocksWithLimit",
-      destination: "/docs/rpc/deprecated/getconfirmedblockswithlimit",
+      destination:
+        "/developers/docs/rpc/deprecated/getconfirmedblockswithlimit",
     },
     {
       source: "/docs/rpc/http/getConfirmedBlocksWithLimit",
-      destination: "/docs/rpc/deprecated/getconfirmedblockswithlimit",
+      destination:
+        "/developers/docs/rpc/deprecated/getconfirmedblockswithlimit",
     },
     {
       source: "/docs/rpc/getConfirmedSignaturesForAddress2",
-      destination: "/docs/rpc/deprecated/getconfirmedsignaturesforaddress2",
+      destination:
+        "/developers/docs/rpc/deprecated/getconfirmedsignaturesforaddress2",
     },
     {
       source: "/docs/rpc/http/getConfirmedSignaturesForAddress2",
-      destination: "/docs/rpc/deprecated/getconfirmedsignaturesforaddress2",
+      destination:
+        "/developers/docs/rpc/deprecated/getconfirmedsignaturesforaddress2",
     },
     {
       source: "/docs/rpc/getSignaturesForAddress2",
-      destination: "/docs/rpc/deprecated/getconfirmedsignaturesforaddress2",
+      destination:
+        "/developers/docs/rpc/deprecated/getconfirmedsignaturesforaddress2",
     },
     {
       source: "/docs/rpc/http/getSignaturesForAddress2",
-      destination: "/docs/rpc/deprecated/getconfirmedsignaturesforaddress2",
+      destination:
+        "/developers/docs/rpc/deprecated/getconfirmedsignaturesforaddress2",
     },
     {
       source: "/docs/rpc/deprecated/getSignaturesForAddress2",
-      destination: "/docs/rpc/deprecated/getconfirmedsignaturesforaddress2",
+      destination:
+        "/developers/docs/rpc/deprecated/getconfirmedsignaturesforaddress2",
     },
     {
       source: "/docs/rpc/http/getconfirmedsignaturesforaddress",
-      destination: "/docs/rpc/deprecated/getconfirmedsignaturesforaddress2",
+      destination:
+        "/developers/docs/rpc/deprecated/getconfirmedsignaturesforaddress2",
     },
     {
       source: "/docs/rpc/deprecated/getconfirmedsignaturesforaddress",
-      destination: "/docs/rpc/deprecated/getconfirmedsignaturesforaddress2",
+      destination:
+        "/developers/docs/rpc/deprecated/getconfirmedsignaturesforaddress2",
     },
     {
       source: "/docs/rpc/getconfirmedsignaturesforaddress",
-      destination: "/docs/rpc/deprecated/getconfirmedsignaturesforaddress2",
+      destination:
+        "/developers/docs/rpc/deprecated/getconfirmedsignaturesforaddress2",
     },
     {
       source: "/docs/rpc/getConfirmedTransaction",
-      destination: "/docs/rpc/deprecated/getconfirmedtransaction",
+      destination: "/developers/docs/rpc/deprecated/getconfirmedtransaction",
     },
     {
       source: "/docs/rpc/http/getConfirmedTransaction",
-      destination: "/docs/rpc/deprecated/getconfirmedtransaction",
+      destination: "/developers/docs/rpc/deprecated/getconfirmedtransaction",
     },
     {
       source: "/docs/rpc/getFeeCalculatorForBlockhash",
-      destination: "/docs/rpc/deprecated/getfeecalculatorforblockhash",
+      destination:
+        "/developers/docs/rpc/deprecated/getfeecalculatorforblockhash",
     },
     {
       source: "/docs/rpc/http/getFeeCalculatorForBlockhash",
-      destination: "/docs/rpc/deprecated/getfeecalculatorforblockhash",
+      destination:
+        "/developers/docs/rpc/deprecated/getfeecalculatorforblockhash",
     },
     {
       source: "/docs/rpc/getFeeRateGovernor",
-      destination: "/docs/rpc/deprecated/getfeerategovernor",
+      destination: "/developers/docs/rpc/deprecated/getfeerategovernor",
     },
     {
       source: "/docs/rpc/http/getFeeRateGovernor",
-      destination: "/docs/rpc/deprecated/getfeerategovernor",
+      destination: "/developers/docs/rpc/deprecated/getfeerategovernor",
     },
     {
       source: "/docs/rpc/getFees",
-      destination: "/docs/rpc/deprecated/getfees",
+      destination: "/developers/docs/rpc/deprecated/getfees",
     },
     {
       source: "/docs/rpc/http/getFees",
-      destination: "/docs/rpc/deprecated/getfees",
+      destination: "/developers/docs/rpc/deprecated/getfees",
     },
     {
       source: "/docs/rpc/http/getRecentBlockhash",
-      destination: "/docs/rpc/deprecated/getrecentblockhash",
+      destination: "/developers/docs/rpc/deprecated/getrecentblockhash",
     },
     {
       source: "/docs/rpc/getRecentBlockhash",
-      destination: "/docs/rpc/deprecated/getrecentblockhash",
+      destination: "/developers/docs/rpc/deprecated/getrecentblockhash",
     },
     {
       source: "/docs/rpc/http/getSnapshotSlot",
-      destination: "/docs/rpc/deprecated/getsnapshotslot",
+      destination: "/developers/docs/rpc/deprecated/getsnapshotslot",
     },
     {
       source: "/docs/rpc/getSnapshotSlot",
-      destination: "/docs/rpc/deprecated/getsnapshotslot",
+      destination: "/developers/docs/rpc/deprecated/getsnapshotslot",
     },
     {
       source: "/docs/rpc/http/getStakeActivation",
-      destination: "/docs/rpc/deprecated/getstakeactivation",
+      destination: "/developers/docs/rpc/deprecated/getstakeactivation",
     },
     {
       source: "/docs/rpc/getAccountInfo",
-      destination: "/docs/rpc/http/getaccountinfo",
+      destination: "/developers/docs/rpc/http/getaccountinfo",
     },
     {
       source: "/docs/rpc/getBalance",
-      destination: "/docs/rpc/http/getbalance",
+      destination: "/developers/docs/rpc/http/getbalance",
     },
     {
       source: "/docs/rpc/getBlock",
-      destination: "/docs/rpc/http/getblock",
+      destination: "/developers/docs/rpc/http/getblock",
     },
     {
       source: "/docs/rpc/getBlockCommitment",
-      destination: "/docs/rpc/http/getblockcommitment",
+      destination: "/developers/docs/rpc/http/getblockcommitment",
     },
     {
       source: "/docs/rpc/getBlockHeight",
-      destination: "/docs/rpc/http/getblockheight",
+      destination: "/developers/docs/rpc/http/getblockheight",
     },
     {
       source: "/docs/rpc/getBlockProduction",
-      destination: "/docs/rpc/http/getblockproduction",
+      destination: "/developers/docs/rpc/http/getblockproduction",
     },
     {
       source: "/docs/rpc/getBlocks",
-      destination: "/docs/rpc/http/getblocks",
+      destination: "/developers/docs/rpc/http/getblocks",
     },
     {
       source: "/docs/rpc/getBlocksWithLimit",
-      destination: "/docs/rpc/http/getblockswithlimit",
+      destination: "/developers/docs/rpc/http/getblockswithlimit",
     },
     {
       source: "/docs/rpc/getBlockTime",
-      destination: "/docs/rpc/http/getblocktime",
+      destination: "/developers/docs/rpc/http/getblocktime",
     },
     {
       source: "/docs/rpc/getClusterNodes",
-      destination: "/docs/rpc/http/getclusternodes",
+      destination: "/developers/docs/rpc/http/getclusternodes",
     },
     {
       source: "/docs/rpc/getEpochInfo",
-      destination: "/docs/rpc/http/getepochinfo",
+      destination: "/developers/docs/rpc/http/getepochinfo",
     },
     {
       source: "/docs/rpc/getEpochSchedule",
-      destination: "/docs/rpc/http/getepochschedule",
+      destination: "/developers/docs/rpc/http/getepochschedule",
     },
     {
       source: "/docs/rpc/getFeeForMessage",
-      destination: "/docs/rpc/http/getfeeformessage",
+      destination: "/developers/docs/rpc/http/getfeeformessage",
     },
     {
       source: "/docs/rpc/getFirstAvailableBlock",
-      destination: "/docs/rpc/http/getfirstavailableblock",
+      destination: "/developers/docs/rpc/http/getfirstavailableblock",
     },
     {
       source: "/docs/rpc/getGenesisHash",
-      destination: "/docs/rpc/http/getgenesishash",
+      destination: "/developers/docs/rpc/http/getgenesishash",
     },
     {
       source: "/docs/rpc/getHealth",
-      destination: "/docs/rpc/http/gethealth",
+      destination: "/developers/docs/rpc/http/gethealth",
     },
     {
       source: "/docs/rpc/getHighestSnapshotSlot",
-      destination: "/docs/rpc/http/gethighestsnapshotslot",
+      destination: "/developers/docs/rpc/http/gethighestsnapshotslot",
     },
     {
       source: "/docs/rpc/getIdentity",
-      destination: "/docs/rpc/http/getidentity",
+      destination: "/developers/docs/rpc/http/getidentity",
     },
     {
       source: "/docs/rpc/getInflationGovernor",
-      destination: "/docs/rpc/http/getinflationgovernor",
+      destination: "/developers/docs/rpc/http/getinflationgovernor",
     },
     {
       source: "/docs/rpc/getInflationRate",
-      destination: "/docs/rpc/http/getinflationrate",
+      destination: "/developers/docs/rpc/http/getinflationrate",
     },
     {
       source: "/docs/rpc/getInflationReward",
-      destination: "/docs/rpc/http/getinflationreward",
+      destination: "/developers/docs/rpc/http/getinflationreward",
     },
     {
       source: "/docs/rpc/getLargestAccounts",
-      destination: "/docs/rpc/http/getlargestaccounts",
+      destination: "/developers/docs/rpc/http/getlargestaccounts",
     },
     {
       source: "/docs/rpc/getLatestBlockhash",
-      destination: "/docs/rpc/http/getlatestblockhash",
+      destination: "/developers/docs/rpc/http/getlatestblockhash",
     },
     {
       source: "/docs/rpc/getLeaderSchedule",
-      destination: "/docs/rpc/http/getleaderschedule",
+      destination: "/developers/docs/rpc/http/getleaderschedule",
     },
     {
       source: "/docs/rpc/getMaxRetransmitSlot",
-      destination: "/docs/rpc/http/getmaxretransmitslot",
+      destination: "/developers/docs/rpc/http/getmaxretransmitslot",
     },
     {
       source: "/docs/rpc/getMaxShredInsertSlot",
-      destination: "/docs/rpc/http/getmaxshredinsertslot",
+      destination: "/developers/docs/rpc/http/getmaxshredinsertslot",
     },
     {
       source: "/docs/rpc/getMinimumBalanceForRentExemption",
-      destination: "/docs/rpc/http/getminimumbalanceforrentexemption",
+      destination:
+        "/developers/docs/rpc/http/getminimumbalanceforrentexemption",
     },
     {
       source: "/docs/rpc/getMultipleAccounts",
-      destination: "/docs/rpc/http/getmultipleaccounts",
+      destination: "/developers/docs/rpc/http/getmultipleaccounts",
     },
     {
       source: "/docs/rpc/getProgramAccounts",
-      destination: "/docs/rpc/http/getprogramaccounts",
+      destination: "/developers/docs/rpc/http/getprogramaccounts",
     },
     {
       source: "/docs/rpc/getRecentPerformanceSamples",
-      destination: "/docs/rpc/http/getrecentperformancesamples",
+      destination: "/developers/docs/rpc/http/getrecentperformancesamples",
     },
     {
       source: "/docs/rpc/getRecentPrioritizationFees",
-      destination: "/docs/rpc/http/getrecentprioritizationfees",
+      destination: "/developers/docs/rpc/http/getrecentprioritizationfees",
     },
     {
       source: "/docs/rpc/getSignaturesForAddress",
-      destination: "/docs/rpc/http/getsignaturesforaddress",
+      destination: "/developers/docs/rpc/http/getsignaturesforaddress",
     },
     {
       source: "/docs/rpc/getSignatureStatuses",
-      destination: "/docs/rpc/http/getsignaturestatuses",
+      destination: "/developers/docs/rpc/http/getsignaturestatuses",
     },
     {
       source: "/docs/rpc/getSlot",
-      destination: "/docs/rpc/http/getslot",
+      destination: "/developers/docs/rpc/http/getslot",
     },
     {
       source: "/docs/rpc/getSlotLeader",
-      destination: "/docs/rpc/http/getslotleader",
+      destination: "/developers/docs/rpc/http/getslotleader",
     },
     {
       source: "/docs/rpc/getSlotLeaders",
-      destination: "/docs/rpc/http/getslotleaders",
+      destination: "/developers/docs/rpc/http/getslotleaders",
     },
     {
       source: "/docs/rpc/getStakeMinimumDelegation",
-      destination: "/docs/rpc/http/getstakeminimumdelegation",
+      destination: "/developers/docs/rpc/http/getstakeminimumdelegation",
     },
     {
       source: "/docs/rpc/getSupply",
-      destination: "/docs/rpc/http/getsupply",
+      destination: "/developers/docs/rpc/http/getsupply",
     },
     {
       source: "/docs/rpc/getTokenAccountBalance",
-      destination: "/docs/rpc/http/gettokenaccountbalance",
+      destination: "/developers/docs/rpc/http/gettokenaccountbalance",
     },
     {
       source: "/docs/rpc/getTokenAccountsByDelegate",
-      destination: "/docs/rpc/http/gettokenaccountsbydelegate",
+      destination: "/developers/docs/rpc/http/gettokenaccountsbydelegate",
     },
     {
       source: "/docs/rpc/getTokenAccountsByOwner",
-      destination: "/docs/rpc/http/gettokenaccountsbyowner",
+      destination: "/developers/docs/rpc/http/gettokenaccountsbyowner",
     },
     {
       source: "/docs/rpc/getTokenLargestAccounts",
-      destination: "/docs/rpc/http/gettokenlargestaccounts",
+      destination: "/developers/docs/rpc/http/gettokenlargestaccounts",
     },
     {
       source: "/docs/rpc/getTokenSupply",
-      destination: "/docs/rpc/http/gettokensupply",
+      destination: "/developers/docs/rpc/http/gettokensupply",
     },
     {
       source: "/docs/rpc/getTransaction",
-      destination: "/docs/rpc/http/gettransaction",
+      destination: "/developers/docs/rpc/http/gettransaction",
     },
     {
       source: "/docs/rpc/getTransactionCount",
-      destination: "/docs/rpc/http/gettransactioncount",
+      destination: "/developers/docs/rpc/http/gettransactioncount",
     },
     {
       source: "/docs/rpc/getVersion",
-      destination: "/docs/rpc/http/getversion",
+      destination: "/developers/docs/rpc/http/getversion",
     },
     {
       source: "/docs/rpc/getVoteAccounts",
-      destination: "/docs/rpc/http/getvoteaccounts",
+      destination: "/developers/docs/rpc/http/getvoteaccounts",
     },
     {
       source: "/docs/rpc/isBlockhashValid",
-      destination: "/docs/rpc/http/isblockhashvalid",
+      destination: "/developers/docs/rpc/http/isblockhashvalid",
     },
     {
       source: "/docs/rpc/minimumLedgerSlot",
-      destination: "/docs/rpc/http/minimumledgerslot",
+      destination: "/developers/docs/rpc/http/minimumledgerslot",
     },
     {
       source: "/docs/rpc/requestAirdrop",
-      destination: "/docs/rpc/http/requestairdrop",
+      destination: "/developers/docs/rpc/http/requestairdrop",
     },
     {
       source: "/docs/rpc/sendTransaction",
-      destination: "/docs/rpc/http/sendtransaction",
+      destination: "/developers/docs/rpc/http/sendtransaction",
     },
     {
       source: "/docs/rpc/simulateTransaction",
-      destination: "/docs/rpc/http/simulatetransaction",
+      destination: "/developers/docs/rpc/http/simulatetransaction",
     },
     {
       source: "/docs/rpc/accountSubscribe",
-      destination: "/docs/rpc/websocket/accountsubscribe",
+      destination: "/developers/docs/rpc/websocket/accountsubscribe",
     },
     {
       source: "/docs/rpc/accountUnsubscribe",
-      destination: "/docs/rpc/websocket/accountunsubscribe",
+      destination: "/developers/docs/rpc/websocket/accountunsubscribe",
     },
     {
       source: "/docs/rpc/blockSubscribe",
-      destination: "/docs/rpc/websocket/blocksubscribe",
+      destination: "/developers/docs/rpc/websocket/blocksubscribe",
     },
     {
       source: "/docs/rpc/blockUnsubscribe",
-      destination: "/docs/rpc/websocket/blockunsubscribe",
+      destination: "/developers/docs/rpc/websocket/blockunsubscribe",
     },
     {
       source: "/docs/rpc/logsSubscribe",
-      destination: "/docs/rpc/websocket/logssubscribe",
+      destination: "/developers/docs/rpc/websocket/logssubscribe",
     },
     {
       source: "/docs/rpc/logsUnsubscribe",
-      destination: "/docs/rpc/websocket/logsunsubscribe",
+      destination: "/developers/docs/rpc/websocket/logsunsubscribe",
     },
     {
       source: "/docs/rpc/programSubscribe",
-      destination: "/docs/rpc/websocket/programsubscribe",
+      destination: "/developers/docs/rpc/websocket/programsubscribe",
     },
     {
       source: "/docs/rpc/programUnsubscribe",
-      destination: "/docs/rpc/websocket/programunsubscribe",
+      destination: "/developers/docs/rpc/websocket/programunsubscribe",
     },
     {
       source: "/docs/rpc/rootSubscribe",
-      destination: "/docs/rpc/websocket/rootsubscribe",
+      destination: "/developers/docs/rpc/websocket/rootsubscribe",
     },
     {
       source: "/docs/rpc/rootUnsubscribe",
-      destination: "/docs/rpc/websocket/rootunsubscribe",
+      destination: "/developers/docs/rpc/websocket/rootunsubscribe",
     },
     {
       source: "/docs/rpc/signatureSubscribe",
-      destination: "/docs/rpc/websocket/signaturesubscribe",
+      destination: "/developers/docs/rpc/websocket/signaturesubscribe",
     },
     {
       source: "/docs/rpc/signatureUnsubscribe",
-      destination: "/docs/rpc/websocket/signatureunsubscribe",
+      destination: "/developers/docs/rpc/websocket/signatureunsubscribe",
     },
     {
       source: "/docs/rpc/slotSubscribe",
-      destination: "/docs/rpc/websocket/slotsubscribe",
+      destination: "/developers/docs/rpc/websocket/slotsubscribe",
     },
     {
       source: "/docs/rpc/slotsUpdatesSubscribe",
-      destination: "/docs/rpc/websocket/slotsupdatessubscribe",
+      destination: "/developers/docs/rpc/websocket/slotsupdatessubscribe",
     },
     {
       source: "/docs/rpc/slotsUpdatesUnsubscribe",
-      destination: "/docs/rpc/websocket/slotsupdatesunsubscribe",
+      destination: "/developers/docs/rpc/websocket/slotsupdatesunsubscribe",
     },
     {
       source: "/docs/rpc/slotUnsubscribe",
-      destination: "/docs/rpc/websocket/slotunsubscribe",
+      destination: "/developers/docs/rpc/websocket/slotunsubscribe",
     },
     {
       source: "/docs/rpc/voteSubscribe",
-      destination: "/docs/rpc/websocket/votesubscribe",
+      destination: "/developers/docs/rpc/websocket/votesubscribe",
     },
     {
       source: "/docs/rpc/voteUnsubscribe",
-      destination: "/docs/rpc/websocket/voteunsubscribe",
+      destination: "/developers/docs/rpc/websocket/voteunsubscribe",
     },
     {
       source: "/developers/cookbook/tokens",
-      destination: "/developers/cookbook/tokens/create-mint-account",
+      destination: "/developers/docs/tokens/basics",
     },
     {
       source: "/developers/cookbook/transactions/send-tokens",
-      destination: "developers/cookbook/tokens/transfer-tokens",
+      destination: "/developers/docs/tokens/basics/transfer-tokens",
     },
     {
       source: "/developers/guides/introduction-to-durable-nonces",
@@ -1577,31 +1726,31 @@ export default {
     },
     {
       source: "/developers/guides/advanced/stake-weighted-qos-guide",
-      destination: "/docs/defi/stake-weighted-qos",
+      destination: "/developers/docs/defi/stake-weighted-qos",
     },
     {
       source: "/developers/guides/hello-world-in-your-browser",
-      destination: "/docs/intro/quick-start",
+      destination: "/developers/docs/quickstart",
     },
     {
       source: "/developers/guides/solana-playground",
-      destination: "/docs/intro/quick-start",
+      destination: "/developers/docs/quickstart",
     },
     {
       source: "/developers/guides/solang/solang-getting-started",
-      destination: "/docs/intro/quick-start",
+      destination: "/developers/docs/quickstart",
     },
     {
       source: "/developers/guides/solang-getting-started",
-      destination: "/docs/intro/quick-start",
+      destination: "/developers/docs/quickstart",
     },
     {
       source: "/developers/guides/getstarted/hello-world-in-your-browser",
-      destination: "/docs/intro/quick-start",
+      destination: "/developers/docs/quickstart",
     },
     {
       source: "/developers/guides/local-rust-hello-world",
-      destination: "/docs/programs/rust",
+      destination: "/developers/docs/programs/rust",
     },
     {
       source: "/developers/guides/wallets-explained",
@@ -1613,27 +1762,29 @@ export default {
     },
     {
       source: "/developers/guides/get-program-accounts",
-      destination: "/docs/rpc/http/getprogramaccounts",
+      destination: "/developers/docs/rpc/http/getprogramaccounts",
     },
     {
       source: "/docs/more/exchange",
-      destination: "/docs/defi/exchange",
+      destination: "/developers/docs/defi/exchange",
     },
     {
       source: "/developers/guides/getstarted/intro-to-native-rust",
-      destination: "/docs/programs/rust",
+      destination: "/developers/docs/programs/rust",
     },
     {
       source: "/docs/clients/javascript-reference",
       destination: "/developers/cookbook",
     },
     {
-      source: "/docs/programs/anchor/:path*",
+      // `:path+`, not `:path*`: /docs/programs/anchor itself is the new
+      // "Anchor framework" overview page; only old subpages leave.
+      source: "/docs/programs/anchor/:path+",
       destination: "https://www.anchor-lang.com/docs",
     },
     {
       source: "/docs/intro/dev",
-      destination: "/docs",
+      destination: "/developers/docs",
     },
     {
       source: "/docs/intro/wallets",
@@ -1641,11 +1792,11 @@ export default {
     },
     {
       source: "/developers/resources",
-      destination: "/docs",
+      destination: "/developers/docs",
     },
     {
       source: "/docs/core/clusters",
-      destination: "/docs/references/clusters",
+      destination: "/developers/docs/references/clusters",
     },
     {
       source: "/docs/economics/:path*",
@@ -1657,7 +1808,7 @@ export default {
     },
     {
       source: "/developers/guides/games/game-sdks",
-      destination: "/docs/clients/community/game-sdks",
+      destination: "/developers/docs/clients/community/game-sdks",
     },
     {
       source: "/accelerate/scale-or-die",
@@ -1673,35 +1824,35 @@ export default {
     },
     {
       source: "/docs/terminology",
-      destination: "/docs/references/terminology",
+      destination: "/developers/docs/references/terminology",
     },
     {
       source: "/docs/core/tokens",
-      destination: "/docs/tokens",
+      destination: "/developers/docs/tokens",
     },
     {
       source: "/developers/guides/getstarted/how-to-cpi",
-      destination: "/docs/core/cpi",
+      destination: "/developers/docs/core/cpi",
     },
     {
       source: "/developers/guides/getstarted/how-to-cpi-with-signer",
-      destination: "/docs/core/cpi",
+      destination: "/developers/docs/core/cpi",
     },
     {
       source: "/developers/cookbook/programs/:path*",
-      destination: "/docs/programs/examples",
+      destination: "/developers/docs/programs/examples",
     },
     {
       source: "/developers/cookbook/accounts/create-pda-account",
-      destination: "/docs/core/pda",
+      destination: "/developers/docs/core/pda",
     },
     {
       source: "/developers/cookbook/accounts/sign-with-pda",
-      destination: "/docs/core/cpi",
+      destination: "/developers/docs/core/cpi",
     },
     {
       source: "/developers/cookbook/accounts/close-account",
-      destination: "/docs/core/accounts",
+      destination: "/developers/docs/core/accounts",
     },
     {
       source: "/developers/guides/intro/wallets-explained",
@@ -1709,7 +1860,7 @@ export default {
     },
     {
       source: "/developers/guides/javascript/get-program-accounts",
-      destination: "/docs/rpc/http/getprogramaccounts",
+      destination: "/developers/docs/rpc/http/getprogramaccounts",
     },
     {
       source: "/developers/guides/javascript/compressed-nfts",
@@ -1721,19 +1872,19 @@ export default {
     },
     {
       source: "/developers/guides/getstarted/how-to-create-a-token",
-      destination: "/docs/tokens",
+      destination: "/developers/docs/tokens",
     },
     {
       source: "/developers/guides/getstarted/local-rust-hello-world",
-      destination: "/docs/programs/rust",
+      destination: "/developers/docs/programs/rust",
     },
     {
       source: "/developers/guides/getstarted/rust-to-solana",
-      destination: "/docs/intro/quick-start",
+      destination: "/developers/docs/quickstart",
     },
     {
       source: "/developers/guides/getstarted/scaffold-nextjs-anchor",
-      destination: "/docs#deploy-your-first-solana-application",
+      destination: "/developers/docs#deploy-your-first-solana-application",
     },
     {
       source: "/developers/guides/wallets/add-solana-wallet-adapter-to-nextjs",
@@ -1753,11 +1904,11 @@ export default {
     },
     {
       source: "/developers/guides/getstarted/full-stack-solana-development",
-      destination: "/docs#deploy-your-first-solana-application",
+      destination: "/developers/docs#deploy-your-first-solana-application",
     },
     {
       source: "/docs/toolkit/:path*",
-      destination: "/docs/intro/installation",
+      destination: "/developers/docs/quickstart",
     },
     {
       source: "/developers/cookbook/tokens/create-nft",
@@ -1778,6 +1929,12 @@ export default {
     },
     {
       source: "/docs/programs/faq",
+      destination: "https://solana.stackexchange.com",
+    },
+    // The locale-only faq.mdx files were removed (R8); their `.md` twins
+    // would otherwise 404.
+    {
+      source: "/docs/programs/faq.md",
       destination: "https://solana.stackexchange.com",
     },
     {
@@ -1817,47 +1974,47 @@ export default {
     },
     {
       source: "/developers/cookbook/tokens/approve-token-delegate",
-      destination: "/docs/tokens/basics/approve-delegate",
+      destination: "/developers/docs/tokens/basics/approve-delegate",
     },
     {
       source: "/developers/cookbook/tokens/burn-tokens",
-      destination: "/docs/tokens/basics/burn-tokens",
+      destination: "/developers/docs/tokens/basics/burn-tokens",
     },
     {
       source: "/developers/cookbook/tokens/close-token-accounts",
-      destination: "/docs/tokens/basics/close-account",
+      destination: "/developers/docs/tokens/basics/close-account",
     },
     {
       source: "/developers/cookbook/tokens/create-mint-account",
-      destination: "/docs/tokens/basics/create-mint",
+      destination: "/developers/docs/tokens/basics/create-mint",
     },
     {
       source: "/developers/cookbook/tokens/create-token-account",
-      destination: "/docs/tokens/basics/create-token-account",
+      destination: "/developers/docs/tokens/basics/create-token-account",
     },
     {
       source: "/developers/cookbook/tokens/mint-tokens",
-      destination: "/docs/tokens/basics/mint-tokens",
+      destination: "/developers/docs/tokens/basics/mint-tokens",
     },
     {
       source: "/developers/cookbook/tokens/revoke-token-delegate",
-      destination: "/docs/tokens/basics/revoke-delegate",
+      destination: "/developers/docs/tokens/basics/revoke-delegate",
     },
     {
       source: "/developers/cookbook/tokens/set-update-token-authority",
-      destination: "/docs/tokens/basics/set-authority",
+      destination: "/developers/docs/tokens/basics/set-authority",
     },
     {
       source: "/developers/cookbook/tokens/transfer-tokens",
-      destination: "/docs/tokens/basics/transfer-tokens",
+      destination: "/developers/docs/tokens/basics/transfer-tokens",
     },
     {
       source: "/developers/cookbook/tokens/manage-wrapped-sol",
-      destination: "/docs/tokens/basics/sync-native",
+      destination: "/developers/docs/tokens/basics/sync-native",
     },
     {
       source: "/developers/guides/advanced/verified-builds",
-      destination: "/docs/programs/verified-builds",
+      destination: "/developers/docs/programs/verified-builds",
     },
     {
       source: "/developers/courses",
@@ -1926,55 +2083,56 @@ export default {
     },
     {
       source: "/developers/guides/immutable-owner",
-      destination: "/docs/tokens/extensions/immutable-owner",
+      destination: "/developers/docs/tokens/extensions/immutable-owner",
     },
     {
       source: "/developers/guides/token-extensions/default-account-state",
-      destination: "/docs/tokens/extensions/default-state",
+      destination: "/developers/docs/tokens/extensions/default-state",
     },
     {
       source: "/developers/guides/token-extensions/immutable-owner",
-      destination: "/docs/tokens/extensions/immutable-owner",
+      destination: "/developers/docs/tokens/extensions/immutable-owner",
     },
     {
       source: "/developers/guides/token-extensions/interest-bearing-tokens",
-      destination: "/docs/tokens/extensions/interest-bearing-tokens",
+      destination: "/developers/docs/tokens/extensions/interest-bearing-tokens",
     },
     {
       source: "/developers/guides/token-extensions/required-memo",
-      destination: "/docs/tokens/extensions/memo-transfer",
+      destination: "/developers/docs/tokens/extensions/memo-transfer",
     },
     {
       source: "/developers/guides/token-extensions/mint-close-authority",
-      destination: "/docs/tokens/extensions/close-mint",
+      destination: "/developers/docs/tokens/extensions/close-mint",
     },
     {
       source: "/developers/guides/token-extensions/non-transferable",
-      destination: "/docs/tokens/extensions/non-transferrable-tokens",
+      destination:
+        "/developers/docs/tokens/extensions/non-transferrable-tokens",
     },
     {
       source: "/developers/guides/token-extensions/permanent-delegate",
-      destination: "/docs/tokens/extensions/permanent-delegate",
+      destination: "/developers/docs/tokens/extensions/permanent-delegate",
     },
     {
       source: "/developers/guides/token-extensions/transfer-fee",
-      destination: "/docs/tokens/extensions/transfer-fees",
+      destination: "/developers/docs/tokens/extensions/transfer-fees",
     },
     {
       source: "/developers/guides/token-extensions/metadata-pointer",
-      destination: "/docs/tokens/extensions/metadata",
+      destination: "/developers/docs/tokens/extensions/metadata",
     },
     {
       source: "/developers/guides/token-extensions/reallocate",
-      destination: "/docs/tokens/extensions",
+      destination: "/developers/docs/tokens/extensions",
     },
     {
       source: "/developers/guides/token-extensions/getting-started",
-      destination: "/docs/tokens/extensions",
+      destination: "/developers/docs/tokens/extensions",
     },
     {
       source: "/developers/guides/advanced/how-to-use-priority-fees",
-      destination: "/docs/core/fees",
+      destination: "/developers/docs/core/fees",
     },
     {
       source: "/developers/guides/advanced/how-to-request-optimal-compute",
@@ -1986,16 +2144,18 @@ export default {
     },
     {
       source: "/developers/guides/getstarted/solana-test-validator",
-      destination: "/docs/intro/installation/surfpool-cli-basics",
+      destination: "/developers/docs/intro/installation/surfpool-cli-basics",
     },
     {
       source: "/developers/cookbook/development/start-local-validator",
-      destination: "/docs/intro/installation/surfpool-cli-basics",
+      destination: "/developers/docs/intro/installation/surfpool-cli-basics",
     },
     {
       source:
         "/developers/cookbook/development/using-mainnet-accounts-programs",
-      destination: "/docs/intro/installation/surfpool-cli-basics",
+      destination: "/developers/docs/intro/installation/surfpool-cli-basics",
     },
+    // Keep last: every other /docs URL moves to /developers/docs.
+    ...docsPrefixMoveRedirects,
   ]),
 };

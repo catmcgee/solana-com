@@ -9,7 +9,7 @@ const ValidatorsHero = forwardRef<HTMLElement>((_, ref) => {
 
   return (
     <section className="relative w-full flex overflow-hidden" ref={ref}>
-      <div className="absolute w-[585px] left-1/2 top-[-9.5rem] -translate-x-1/2 min-[576px]:w-[950px] min-[576px]:top-[-2rem] min-[576px]:[transform:translate(-20%,0)] min-[992px]:top-0">
+      <div className="absolute w-[585px] left-1/2 top-[-9.5rem] -translate-x-1/2 min-[576px]:w-[950px] min-[576px]:top-[-2rem] min-[576px]:translate-none min-[576px]:[transform:translate(-20%,0)] min-[992px]:top-0">
         <Image
           src={HeroImage}
           alt="Rings sphere geometry"
@@ -18,7 +18,7 @@ const ValidatorsHero = forwardRef<HTMLElement>((_, ref) => {
         />
       </div>
       <div
-        className="absolute w-[692px] h-[672px] left-1/2 top-[-50%] -translate-x-1/2 -translate-y-1/2 opacity-20 min-[576px]:w-full min-[576px]:max-w-[1144px] min-[576px]:h-[1112px] min-[576px]:opacity-100 min-[576px]:[transform:translate(-25%,-50%)]"
+        className="absolute w-[692px] h-[672px] left-1/2 top-[-50%] -translate-x-1/2 -translate-y-1/2 opacity-20 min-[576px]:w-full min-[576px]:max-w-[1144px] min-[576px]:h-[1112px] min-[576px]:opacity-100 min-[576px]:translate-none min-[576px]:[transform:translate(-25%,-50%)]"
         style={{
           background:
             "radial-gradient(56.83% 56.83% at 50% 50%, #9945ff 0%, rgba(0, 0, 0, 0) 85%)",

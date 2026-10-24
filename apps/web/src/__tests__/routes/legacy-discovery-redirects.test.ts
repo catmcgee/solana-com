@@ -33,11 +33,11 @@ describe("legacy discovery URLs", () => {
   );
 
   it.each([
-    ["/developers/guides/getstarted/tokens", "/docs/tokens"],
-    ["/developers/guides/getstarted/actions", "/docs/tools/actions"],
+    ["/developers/guides/getstarted/tokens", "/developers/docs/tokens"],
+    ["/developers/guides/getstarted/actions", "/developers/docs/tools/actions"],
     [
       "/developers/guides/advanced/security-best-practices",
-      "/docs/tools/production-readiness",
+      "/developers/docs/tools/production-readiness",
     ],
   ])("breaks the redirect loop for %s", (source, destination) => {
     expect(rewritesAndRedirects.redirects).toEqual(

@@ -15,7 +15,7 @@ export const NewsItem = ({ title, summary, image, link }: NewsItemProps) => (
       href={link}
       target="_blank"
       rel="noopener noreferrer"
-      className="block group mb-3 focus:outline-none"
+      className="block group mb-3 focus:outline-hidden"
     >
       <div
         className="

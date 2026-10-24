@@ -886,7 +886,7 @@ function BuildCta({
 }) {
   const ctaHref =
     translations.ctaButtonHref ||
-    "/docs/tokens/extensions/confidential-transfer";
+    "/developers/docs/tokens/extensions/confidential-transfer";
   return (
     <div className="pp-cta-card">
       <div className="pp-stripe" />

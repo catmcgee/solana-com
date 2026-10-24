@@ -161,6 +161,30 @@ export async function getBlockFull(slot: number): Promise<SampledBlock | null> {
   ]);
 }
 
+export interface BlockSignatures {
+  blockTime: number | null;
+  signatures: string[];
+}
+
+/**
+ * One confirmed block with only its transaction signatures: tens of KB, not
+ * the megabytes of getBlockFull, so the docs live feed can sample a block
+ * every second.
+ */
+export async function getBlockSignatures(
+  slot: number,
+): Promise<BlockSignatures | null> {
+  return rpc<BlockSignatures | null>("getBlock", [
+    slot,
+    {
+      transactionDetails: "signatures",
+      rewards: false,
+      commitment: "confirmed",
+      maxSupportedTransactionVersion: 1,
+    },
+  ]);
+}
+
 export async function getConfirmedSlot(): Promise<number> {
   return rpc<number>("getSlot", [{ commitment: "confirmed" }]);
 }

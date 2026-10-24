@@ -224,7 +224,7 @@ function TabSwitcher({
             aria-selected={isActive}
             className={cn(
               "group relative flex shrink-0 items-center gap-2 px-3 py-2.5 font-brand-mono text-[12px] leading-none font-bold uppercase tracking-wide transition-colors",
-              "focus-visible:outline-none focus-visible:text-nd-high-em-text",
+              "focus-visible:outline-hidden focus-visible:text-nd-high-em-text",
               isActive
                 ? "text-nd-high-em-text"
                 : "text-nd-mid-em-text/60 hover:text-nd-high-em-text",
@@ -291,7 +291,7 @@ function ProviderControls({
         />
       ))}
       <button
-        className="shrink-0 border border-nd-border-prominent px-2.5 py-1 font-brand-mono text-[11px] leading-[1.42] font-bold uppercase text-nd-mid-em-text transition-colors hover:bg-nd-border-light/20 hover:text-nd-high-em-text"
+        className="shrink-0 border border-nd-border-prominent px-2.5 py-1 font-brand-mono text-[11px] leading-[1.42] font-bold uppercase text-nd-mid-em-text transition-colors hover:bg-[#ECE4FD]/20 hover:text-nd-high-em-text"
         onClick={() =>
           onChange(
             allProvidersSelected
@@ -330,8 +330,8 @@ function InlineControl<T extends string | number>({
           className={cn(
             "border px-2.5 py-1 font-brand-mono text-[11px] leading-[1.42] font-bold uppercase transition-colors",
             option.value === value
-              ? "border-nd-primary bg-nd-border-light/20 text-nd-high-em-text"
-              : "border-nd-border-prominent text-nd-mid-em-text hover:bg-nd-border-light/20 hover:text-nd-high-em-text",
+              ? "border-nd-primary bg-[#ECE4FD]/20 text-nd-high-em-text"
+              : "border-nd-border-prominent text-nd-mid-em-text hover:bg-[#ECE4FD]/20 hover:text-nd-high-em-text",
           )}
           key={option.value}
           onClick={() => onChange(option.value)}
@@ -364,7 +364,7 @@ function FilterSelect<T extends string>({
     >
       <SelectTrigger
         aria-label={ariaLabel}
-        className="h-auto w-auto shrink-0 gap-1.5 rounded-none border-nd-border-prominent bg-transparent px-2.5 py-1 font-brand-mono text-[11px] leading-[1.42] font-bold text-nd-high-em-text ring-offset-0 transition-colors hover:bg-nd-border-light/20 focus:ring-1 focus:ring-nd-primary focus:ring-offset-0 [&>svg]:h-3.5 [&>svg]:w-3.5"
+        className="h-auto w-auto shrink-0 gap-1.5 rounded-none border-nd-border-prominent bg-transparent px-2.5 py-1 font-brand-mono text-[11px] leading-[1.42] font-bold text-nd-high-em-text ring-offset-0 transition-colors hover:bg-[#ECE4FD]/20 focus:ring-1 focus:ring-nd-primary focus:ring-offset-0 [&>svg]:h-3.5 [&>svg]:w-3.5"
       >
         <span className="text-nd-mid-em-text/70">{label}</span>
         <SelectValue />

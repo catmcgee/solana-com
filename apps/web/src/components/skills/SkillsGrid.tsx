@@ -107,7 +107,7 @@ export function SkillsGrid({
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={translations.searchPlaceholder}
-                className="h-[28px] pl-8 pr-3 text-xs bg-white/5 border border-white/15 rounded-full text-white placeholder:text-white/30 outline-none focus:border-white/40 focus:bg-white/[0.08] focus:shadow-[0_0_0_1px_rgba(255,255,255,0.05)] transition-all duration-200 w-[160px] md:w-[200px]"
+                className="h-[28px] pl-8 pr-3 text-xs bg-white/5 border border-white/15 rounded-full text-white placeholder:text-white/30 outline-hidden focus:border-white/40 focus:bg-white/[0.08] focus:shadow-[0_0_0_1px_rgba(255,255,255,0.05)] transition-all duration-200 w-[160px] md:w-[200px]"
               />
             </div>
             <button

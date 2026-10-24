@@ -4,8 +4,8 @@ import Script from "next/script";
 import {
   getCookieConsentBootstrapScript,
   getCookieConsentDefaultScript,
-  isProductionAnalyticsEnabled,
-} from "@solana-com/ui-chrome";
+} from "@solana-com/ui-chrome/cookie-consent";
+import { isProductionAnalyticsEnabled } from "@solana-com/ui-chrome/analytics";
 import { config } from "src/config";
 
 const GTMTrackingSnippet = () => {

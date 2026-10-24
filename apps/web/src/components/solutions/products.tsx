@@ -81,7 +81,7 @@ export const Products = ({
                   href={href}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="group flex flex-row focus:outline-none focus:ring-2 focus:ring-primary-500 rounded-xl"
+                  className="group flex flex-row focus:outline-hidden focus:ring-2 focus:ring-primary-500 rounded-xl"
                 >
                   {Content}
                 </a>

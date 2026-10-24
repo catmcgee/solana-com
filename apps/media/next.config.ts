@@ -5,6 +5,23 @@ import { withSentryConfig } from "@sentry/nextjs";
 const withNextIntl = createNextIntlPlugin("./i18n/request.ts");
 const assetPrefix = "/media-assets";
 
+const svgrOptions = {
+  svgoConfig: {
+    plugins: [
+      {
+        name: "preset-default",
+        params: {
+          overrides: {
+            removeViewBox: false,
+            removeUselessStrokeAndFill: false,
+            cleanupIds: false,
+          },
+        },
+      },
+    ],
+  },
+};
+
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   trailingSlash: false,
@@ -15,6 +32,8 @@ const nextConfig: NextConfig = {
   },
 
   images: {
+    // Next.js 16 allows only quality 75 by default; reports use quality 100.
+    qualities: [75, 100],
     path: `${assetPrefix}/_next/image`,
     localPatterns: [
       {
@@ -68,28 +87,31 @@ const nextConfig: NextConfig = {
     ],
   },
 
+  // Turbopack (the Next.js 16 default bundler): `*.inline.svg` imports are
+  // React components through SVGR, and every other `.svg` import is a URL
+  // string, as the webpack config below gives `next build --webpack`.
+  turbopack: {
+    rules: {
+      "*.svg": [
+        {
+          condition: { path: /\.inline\.svg$/ },
+          loaders: [{ loader: "@svgr/webpack", options: svgrOptions }],
+          as: "*.js",
+        },
+        {
+          condition: { not: { path: /\.inline\.svg$/ } },
+          type: "asset",
+        },
+      ],
+    },
+  },
+
   webpack(config) {
-    // Support for .inline.svg files from ui-chrome
     config.module.rules.push({
       test: /\.inline\.svg$/,
       use: {
         loader: "@svgr/webpack",
-        options: {
-          svgoConfig: {
-            plugins: [
-              {
-                name: "preset-default",
-                params: {
-                  overrides: {
-                    removeViewBox: false,
-                    removeUselessStrokeAndFill: false,
-                    cleanupIds: false,
-                  },
-                },
-              },
-            ],
-          },
-        },
+        options: svgrOptions,
       },
     });
 
@@ -181,8 +203,11 @@ export default withSentryConfig(moduleExports, {
   project: "javascript-nextjs",
   silent: !process.env.CI,
   widenClientFileUpload: true,
-  disableLogger: true,
-  automaticVercelMonitors: true,
+  // Webpack builds only (`next build --webpack`); Turbopack has neither.
+  webpack: {
+    treeshake: { removeDebugLogging: true },
+    automaticVercelMonitors: true,
+  },
   sourcemaps: {
     disable:
       process.env.VERCEL_ENV !== "production" || !process.env.SENTRY_AUTH_TOKEN,

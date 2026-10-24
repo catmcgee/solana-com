@@ -56,9 +56,9 @@ interface AmbassadorApplicationFormProps {
 
 const LABEL_CLASSES = "font-medium text-[14px] text-black";
 const INPUT_CLASSES =
-  "h-[50px] w-full rounded-lg border border-[#cfcfd6] bg-white px-4 text-[16px] text-[#1a1a1d] placeholder:text-[#757575] focus:border-black focus:outline-none";
+  "h-[50px] w-full rounded-lg border border-[#cfcfd6] bg-white px-4 text-[16px] text-[#1a1a1d] placeholder:text-[#757575] focus:border-black focus:outline-hidden";
 const SELECT_CLASSES =
-  "h-[52px] w-full rounded-lg border border-[#cfcfd6] bg-white pl-[19px] pr-10 text-[16px] text-[#1a1a1d] focus:border-black focus:outline-none";
+  "h-[52px] w-full rounded-lg border border-[#cfcfd6] bg-white pl-[19px] pr-10 text-[16px] text-[#1a1a1d] focus:border-black focus:outline-hidden";
 const ERROR_CLASSES = "border-[#b42318]";
 
 type SubmissionStatus = "idle" | "submitting" | "success" | "error";
@@ -291,7 +291,7 @@ export function AmbassadorApplicationForm({
             aria-describedby={
               countryError ? "ambassador-country-error" : undefined
             }
-            className={`${SELECT_CLASSES} appearance-none invalid:text-[#757575]${countryError ? ` ${ERROR_CLASSES}` : ""}`}
+            className={`${SELECT_CLASSES} appearance-none invalid:text-[#757575] ${countryError ? ERROR_CLASSES : ""}`.trimEnd()}
           >
             <option value="" disabled>
               {t.country.placeholder}
@@ -410,7 +410,7 @@ export function AmbassadorApplicationForm({
           aria-describedby={
             buildIdeaError ? "ambassador-build-idea-error" : undefined
           }
-          className={`${getInputClasses(buildIdeaError)} h-[106px] resize-none py-[15px]`}
+          className={`${getInputClasses(buildIdeaError)} resize-none py-[15px]`}
         />
         <p className="text-[12px] text-[#6d6d78]">{t.buildIdea.wordLimit}</p>
       </Field>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { config, isProxiedPath } from "@@/src/middleware";
+import { config, isProxiedPath } from "@@/src/proxy";
 
 describe("Cross-app middleware routing", () => {
   it("bypasses the main app middleware for media-owned changelog routes", () => {

@@ -288,7 +288,7 @@ export function SenderProviderExperience({
                 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-nd-mid-em-text"
               />
               <input
-                className="h-10 w-full rounded-none border border-nd-border-prominent bg-transparent pl-9 pr-9 font-brand-mono text-[12px] text-nd-high-em-text outline-none placeholder:text-nd-mid-em-text/60 focus:border-nd-primary"
+                className="h-10 w-full rounded-none border border-nd-border-prominent bg-transparent pl-9 pr-9 font-brand-mono text-[12px] text-nd-high-em-text outline-hidden placeholder:text-nd-mid-em-text/60 focus:border-nd-primary"
                 onChange={(event) => {
                   setQuery(event.target.value);
                   setShowAllProviders(false);
@@ -471,7 +471,7 @@ export function SenderProviderExperience({
                               {formatShare(item.share, locale)}
                             </span>
                           </div>
-                          <div className="ml-auto h-1.5 w-full max-w-[150px] overflow-hidden bg-nd-border-light/40">
+                          <div className="ml-auto h-1.5 w-full max-w-[150px] overflow-hidden bg-[#ECE4FD]/40">
                             <span
                               className="block h-full bg-nd-primary"
                               style={{ width: `${item.share * 100}%` }}
@@ -711,7 +711,7 @@ export function SenderProviderExperience({
 
         <div className="mt-5">
           {isLoading ? (
-            <div className="h-[380px] animate-pulse bg-nd-border-light/40" />
+            <div className="h-[380px] animate-pulse bg-[#ECE4FD]/40" />
           ) : chartSeries.length > 0 ? (
             <TimeSeriesChart
               ariaLabel={t("senderExperience.chartAriaLabel", {
@@ -856,7 +856,7 @@ function SenderSortableHeader({
     >
       <button
         className={cn(
-          "flex min-h-10 w-full items-center gap-1.5 px-4 py-3 transition-colors hover:bg-white/[0.04] hover:text-nd-high-em-text focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-nd-primary",
+          "flex min-h-10 w-full items-center gap-1.5 px-4 py-3 transition-colors hover:bg-white/[0.04] hover:text-nd-high-em-text focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-nd-primary",
           align === "right" ? "justify-end" : "justify-start",
         )}
         onClick={() => onSort(sortKey)}
@@ -901,7 +901,7 @@ function CompareProviderButton({
       }
       aria-pressed={isSelected}
       className={cn(
-        "inline-flex h-7 w-7 shrink-0 items-center justify-center border transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-nd-primary",
+        "inline-flex h-7 w-7 shrink-0 items-center justify-center border transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-nd-primary",
         isSelected
           ? "border-current text-nd-high-em-text"
           : "border-nd-border-prominent text-nd-mid-em-text hover:border-nd-high-em-text hover:text-nd-high-em-text",
@@ -953,7 +953,7 @@ function SenderSparkline({
     .map((point) => point.value);
 
   if (definedValues.length === 0) {
-    return <span className="block h-7 w-24 bg-nd-border-light/20" />;
+    return <span className="block h-7 w-24 bg-[#ECE4FD]/20" />;
   }
 
   const minValue = Math.min(...definedValues);

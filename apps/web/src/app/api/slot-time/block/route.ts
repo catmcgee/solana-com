@@ -15,7 +15,7 @@ export const runtime = "nodejs";
 const BLOCK_CU_LIMIT = 100_000_000;
 const BLOCK_CACHE_REVALIDATE_SECONDS = 30;
 const BLOCK_EDGE_STALE_SECONDS = 60;
-const BLOCK_CACHE_KEY = "slot200-block-v5";
+const BLOCK_CACHE_KEY = "slot200-block-v6";
 const BLOCK_RETRY_COOLDOWN_MS = 30_000;
 const BLOCK_STALE_MAX_AGE_MS = 300_000;
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
@@ -43,7 +43,12 @@ interface BlockPayload {
   cu: number;
   cuPct: number;
   programs: { name: string; count: number }[];
-  tape: { sig: string; p: string }[];
+  /**
+   * The block's first non-vote transactions: `sig` is the signature's first
+   * 8 characters (the /200ms tape), `id` the full signature and `fee` the
+   * fee in lamports (the docs live feed links each one to Explorer).
+   */
+  tape: { sig: string; p: string; id: string; fee: number }[];
   serverTime: number;
 }
 
@@ -126,7 +131,7 @@ async function loadBlock(): Promise<BlockPayload> {
   let feeLamports = 0;
   let tipLamports = 0;
   let cu = 0;
-  const tape: { sig: string; p: string }[] = [];
+  const tape: BlockPayload["tape"] = [];
   for (const tx of block.transactions) {
     const m = tx.meta;
     if (m) {
@@ -158,11 +163,10 @@ async function loadBlock(): Promise<BlockPayload> {
       continue;
     }
     counts.set(bucket, (counts.get(bucket) ?? 0) + 1);
-    if (tape.length < 48)
-      tape.push({
-        sig: tx.transaction.signatures[0]?.slice(0, 8) ?? "",
-        p: bucket,
-      });
+    if (tape.length < 48) {
+      const id = tx.transaction.signatures[0] ?? "";
+      tape.push({ sig: id.slice(0, 8), p: bucket, id, fee: m?.fee ?? 0 });
+    }
   }
   const programs = [...counts.entries()]
     .map(([name, count]) => ({ name, count }))

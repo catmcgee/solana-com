@@ -293,7 +293,7 @@ export const WhatsUp: React.FC<WhatsUpProps> = ({
                     <button
                       key={category.id}
                       className={cn(
-                        "p-3 xl:px-5 flex flex-col xl:flex-row items-start xl:items-center justify-start gap-2.5 w-full xl:min-h-16 hover:bg-nd-border-light/20 relative",
+                        "p-3 xl:px-5 flex flex-col xl:flex-row items-start xl:items-center justify-start gap-2.5 w-full xl:min-h-16 hover:bg-[#ECE4FD]/20 relative",
                         "border-r border-b border-nd-border-light xl:border-b-0 xl:border-r-0",
                         activeCategory === category.id
                           ? "!bg-nd-primary !text-nd-inverse xl:before:absolute xl:before:top-1.5 xl:before:left-1.5 xl:before:bottom-1.5 xl:before:w-[3px] xl:before:bg-nd-inverse"
@@ -418,7 +418,7 @@ export const WhatsUp: React.FC<WhatsUpProps> = ({
                             target="_blank"
                             rel="noopener noreferrer"
                             className={cn(
-                              "flex flex-row gap-4 xl:gap-0 p-4 xl:p-0 w-full xl:min-h-16 xl:divide-x xl:divide-nd-border-light hover:bg-nd-border-light/10 transition-colors text-white cursor-pointer",
+                              "flex flex-row gap-4 xl:gap-0 p-4 xl:p-0 w-full xl:min-h-16 xl:divide-x xl:divide-nd-border-light hover:bg-[#ECE4FD]/10 transition-colors text-white cursor-pointer",
                               {
                                 "animate-stretch-in": isIntersecting,
                               },
@@ -452,7 +452,7 @@ export const WhatsUp: React.FC<WhatsUpProps> = ({
                             opacity: { duration: 0.1 },
                           }}
                           className={cn(
-                            "flex flex-row gap-4 xl:gap-0 p-4 xl:p-0 w-full xl:min-h-16 xl:divide-x xl:divide-nd-border-light hover:bg-nd-border-light/10 transition-colors text-white cursor-pointer",
+                            "flex flex-row gap-4 xl:gap-0 p-4 xl:p-0 w-full xl:min-h-16 xl:divide-x xl:divide-nd-border-light hover:bg-[#ECE4FD]/10 transition-colors text-white cursor-pointer",
                             {
                               "animate-flash-background": isNewItem && !allNew,
                             },
@@ -474,7 +474,7 @@ export const WhatsUp: React.FC<WhatsUpProps> = ({
               <div className="flex flex-1 flex-row divide-x divide-nd-border-light border-t border-nd-border-light xl:hidden">
                 <button
                   className={cn(
-                    "py-3 px-5 flex flex-col items-start justify-start gap-2.5 w-full hover:bg-nd-border-light/20 disabled:opacity-50 disabled:cursor-not-allowed",
+                    "py-3 px-5 flex flex-col items-start justify-start gap-2.5 w-full hover:bg-[#ECE4FD]/20 disabled:opacity-50 disabled:cursor-not-allowed",
                   )}
                   type="button"
                   disabled={page === 1}
@@ -489,7 +489,7 @@ export const WhatsUp: React.FC<WhatsUpProps> = ({
                 </button>
                 <button
                   className={cn(
-                    "py-3 px-5 flex flex-col items-end justify-end gap-2.5 w-full hover:bg-nd-border-light/20 disabled:opacity-50 disabled:cursor-not-allowed",
+                    "py-3 px-5 flex flex-col items-end justify-end gap-2.5 w-full hover:bg-[#ECE4FD]/20 disabled:opacity-50 disabled:cursor-not-allowed",
                   )}
                   type="button"
                   disabled={page === 2 || (items?.length ?? 0) <= 5}

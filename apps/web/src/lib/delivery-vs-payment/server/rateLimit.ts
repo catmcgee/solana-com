@@ -41,3 +41,30 @@ export function clientKey(request: Request): string {
   if (last) return last;
   return request.headers.get("x-real-ip") ?? "unknown";
 }
+
+/**
+ * The per-IP rate-limit key: the IPv4 address, or an IPv6 address's /64
+ * prefix, since one host can rotate through its /64 at will.
+ */
+export function ipKey(ip: string): string {
+  const bare = ip.replace(/^\[|\]$/g, "").replace(/%.*$/, "");
+  if (!bare.includes(":")) return bare;
+  const v4 = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/i.exec(bare);
+  if (v4) return v4[1]!;
+  const [head = "", tail] = bare.split("::");
+  const front = head ? head.split(":") : [];
+  const back = tail ? tail.split(":") : [];
+  const groups =
+    tail === undefined
+      ? front
+      : [
+          ...front,
+          ...Array(Math.max(0, 8 - front.length - back.length)).fill("0"),
+          ...back,
+        ];
+  const prefix = groups
+    .slice(0, 4)
+    .map((g) => (parseInt(g, 16) || 0).toString(16))
+    .join(":");
+  return `${prefix}::/64`;
+}

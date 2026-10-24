@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   ACCELERATE_APP_URL,
   BREAKPOINT_APP_URL,
-  DOCS_APP_URL,
   MEDIA_APP_URL,
   templatesAppUrl,
 } from "@@/apps-urls";
@@ -55,11 +54,6 @@ describe("Cross-app rewrites", () => {
       "/podcasts/:path*",
       `${MEDIA_APP_URL}/podcasts/:path*`,
     );
-    expectBeforeFileRewrite("/docs/:path*", `${DOCS_APP_URL}/docs/:path*`);
-    expectBeforeFileRewrite(
-      "/developers/cookbook/:path*",
-      `${DOCS_APP_URL}/developers/cookbook/:path*`,
-    );
     expectBeforeFileRewrite(
       "/developers/templates/:path*",
       `${templatesAppUrl}/developers/templates/:path*`,
@@ -74,16 +68,12 @@ describe("Cross-app rewrites", () => {
     );
   });
 
-  it("keeps templates rewrites before generic developer docs rewrites", () => {
-    expect(expectSourceIndex("/developers/templates")).toBeLessThan(
-      expectSourceIndex("/developers"),
-    );
-    expect(expectSourceIndex("/developers/templates/:path*")).toBeLessThan(
-      expectSourceIndex("/developers/:path*.md"),
-    );
-    expect(expectSourceIndex("/developers/templates/:path*")).toBeLessThan(
-      expectSourceIndex("/developers/cookbook/:path*"),
-    );
+  it("rewrites none of the developer docs (this app renders them)", () => {
+    for (const rewrite of beforeFiles) {
+      expect(rewrite.source).not.toMatch(
+        /^\/(:locale[^/]*\/)?developers\/(:page|docs|cookbook)/,
+      );
+    }
   });
 
   it("keeps specific Accelerate asset rewrites before the generic fallback", () => {
@@ -111,10 +101,6 @@ describe("Cross-app rewrites", () => {
     expectBeforeFileRewrite(
       "/accelerate-assets/_next/:path+",
       `${ACCELERATE_APP_URL}/_next/:path+`,
-    );
-    expectBeforeFileRewrite(
-      "/docs-assets/:path+",
-      `${DOCS_APP_URL}/docs-assets/:path+`,
     );
   });
 

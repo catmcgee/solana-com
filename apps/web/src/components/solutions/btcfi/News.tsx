@@ -21,7 +21,7 @@ const SmallNewsCard = ({ item }: { item: NewsItem }) => (
     href={item.link}
     target="_blank"
     rel="noopener noreferrer"
-    className="group block focus:outline-none"
+    className="group block focus:outline-hidden"
   >
     <article
       className="
@@ -55,7 +55,7 @@ const LargeNewsCard = ({ item }: { item: NewsItem }) => (
     href={item.link}
     target="_blank"
     rel="noopener noreferrer"
-    className="group block focus:outline-none"
+    className="group block focus:outline-hidden"
   >
     <article
       className="

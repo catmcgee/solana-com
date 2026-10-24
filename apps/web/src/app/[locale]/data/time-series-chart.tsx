@@ -146,7 +146,7 @@ export function TimeSeriesChart({
                 "inline-flex items-center gap-2 border px-2.5 py-1 font-brand-mono text-[11px] leading-[1.42] font-bold uppercase transition-colors",
                 disabled
                   ? "border-nd-border-light text-nd-mid-em-text/50"
-                  : "border-nd-border-prominent text-nd-high-em-text hover:bg-nd-border-light/20",
+                  : "border-nd-border-prominent text-nd-high-em-text hover:bg-[#ECE4FD]/20",
               )}
               key={item.id}
               onBlur={() => setHoveredSeriesId(null)}
@@ -174,7 +174,7 @@ export function TimeSeriesChart({
         })}
         {interactiveLegend && series.length > 1 ? (
           <button
-            className="inline-flex items-center border border-nd-border-prominent px-2.5 py-1 font-brand-mono text-[11px] leading-[1.42] font-bold uppercase text-nd-mid-em-text transition-colors hover:bg-nd-border-light/20 hover:text-nd-high-em-text"
+            className="inline-flex items-center border border-nd-border-prominent px-2.5 py-1 font-brand-mono text-[11px] leading-[1.42] font-bold uppercase text-nd-mid-em-text transition-colors hover:bg-[#ECE4FD]/20 hover:text-nd-high-em-text"
             onClick={() => {
               setDisabledSeries(
                 allSeriesSelected

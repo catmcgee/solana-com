@@ -71,7 +71,7 @@ function ResourceCard({
   return (
     <a
       href={url}
-      className="flex flex-col items-start gap-12 px-6 py-8 rounded-xl bg-nd-border-light hover:bg-nd-mid-em-text-alpha/20 backdrop-blur-[8px] text-inherit no-underline"
+      className="flex flex-col items-start gap-12 px-6 py-8 rounded-xl bg-nd-border-light hover:bg-white/20 backdrop-blur-[8px] text-inherit no-underline"
     >
       <div className="shrink-0 grow-0 brightness-0 invert">
         <Icon className="block w-10 h-10" />
@@ -88,7 +88,7 @@ const RESOURCE_CARDS = [
   {
     heading: "Intro to Solana Development",
     body: "Browse official Solana development documentation.",
-    url: "https://solana.com/docs",
+    url: "https://solana.com/developers/docs",
     Icon: Code,
   },
   {

@@ -623,7 +623,7 @@ export function DeliveryVsPaymentPage({
               </p>
               <div className="mt-7 flex flex-wrap gap-x-8 gap-y-4">
                 <ChromeLink
-                  href="/docs/defi/dvp-program"
+                  href="/developers/docs/defi/dvp-program"
                   hrefLang="en"
                   className="inline-flex items-center gap-2 font-brand-mono text-xs uppercase tracking-[0.1em] text-white transition-colors hover:text-nd-highlight-green focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white"
                 >
@@ -687,7 +687,7 @@ export function DeliveryVsPaymentPage({
                 <div className="grid border-t border-white/[0.12]">
                   {relatedStories.map((story) => (
                     <Link
-                      className="group grid grid-cols-[minmax(120px,0.45fr)_1fr_1.05fr_max-content] items-baseline gap-5 border-b border-white/[0.12] py-[22px] text-white transition-colors motion-reduce:transition-none hover:border-nd-highlight-green/65 focus-visible:border-nd-highlight-green/65 focus-visible:outline-none max-sm:grid-cols-[1fr_max-content] max-sm:gap-x-4 max-sm:gap-y-2"
+                      className="group grid grid-cols-[minmax(120px,0.45fr)_1fr_1.05fr_max-content] items-baseline gap-5 border-b border-white/[0.12] py-[22px] text-white transition-colors motion-reduce:transition-none hover:border-nd-highlight-green/65 focus-visible:border-nd-highlight-green/65 focus-visible:outline-hidden max-sm:grid-cols-[1fr_max-content] max-sm:gap-x-4 max-sm:gap-y-2"
                       href={story.href}
                       key={story.href}
                     >
