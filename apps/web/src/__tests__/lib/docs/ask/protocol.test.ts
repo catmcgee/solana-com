@@ -1,16 +1,22 @@
 import { describe, expect, it } from "vitest";
 import {
+  advanceAskStatus,
   askErrorKindFor,
   askErrorKindForEvent,
   askStatusForStage,
+  isAskGenerativeUi,
+  isStaleConversation,
   normalizeCitations,
   normalizeDocsHref,
+  normalizeSuggestedFollowups,
   splitAnswerSections,
   splitCodeFollowupPrompt,
+  toAskGenerativeUi,
   toDonePayload,
   toId,
 } from "@/lib/docs/ask/protocol";
 import { createTokenGenerativeUiFixture } from "@/lib/docs/ask/fixtures/create-token";
+import { AGENT_DONE, AGENT_ERRORS, AGENT_STREAM_ERROR } from "./agent-contract";
 
 const followups = {
   prompt: "Do you want code?",
@@ -65,11 +71,126 @@ describe("toDonePayload", () => {
     ).toBeNull();
   });
 
+  it("reads the agent's real done payload", () => {
+    expect(toDonePayload(AGENT_DONE, "en")).toEqual({
+      response: AGENT_DONE.response,
+      runId: "4821",
+      conversationId: "1307",
+      citations: [
+        {
+          title: "Program Derived Address",
+          url: "/developers/docs/core/pda",
+        },
+        { title: "", url: "/developers/docs/core/cpi" },
+      ],
+      generativeUi: null,
+      codeFollowups: AGENT_DONE.code_followups,
+      suggestedFollowups: {
+        prompt: "Want to keep going? Try one of these:",
+        items: [
+          {
+            label: "Next lesson: Cross Program Invocation",
+            message: "Teach me the next lesson: Cross Program Invocation.",
+            kind: "ask",
+          },
+          {
+            label: "PDA signing",
+            message: "How does a program sign for a PDA with invoke_signed?",
+            kind: "ask",
+          },
+          {
+            label: "Canonical bumps",
+            message: "What is a canonical bump and why does it matter?",
+            kind: "ask",
+          },
+        ],
+      },
+    });
+  });
+
   it("drops code follow-ups without a prompt or valid buttons", () => {
     expect(
       toDonePayload({
         code_followups: { prompt: "Code?", buttons: [{ label: "x" }] },
       }).codeFollowups,
+    ).toBeNull();
+  });
+});
+
+describe("normalizeSuggestedFollowups", () => {
+  it("keeps items with a label and a message, without repeats, at most three", () => {
+    expect(
+      normalizeSuggestedFollowups({
+        prompt: "  ",
+        buttons: [
+          { type: "ask", label: "Rent", message: "What is rent?" },
+          { label: "Rent again", message: "what is rent?" },
+          { label: "No message" },
+          "nope",
+          { label: "Fees", message: "How are fees set?" },
+          { label: "Votes", message: "How do votes land?" },
+          { label: "Fourth", message: "One too many?" },
+        ],
+      }),
+    ).toEqual({
+      prompt: null,
+      items: [
+        { label: "Rent", message: "What is rent?", kind: "ask" },
+        { label: "Fees", message: "How are fees set?", kind: "ask" },
+        { label: "Votes", message: "How do votes land?", kind: "ask" },
+      ],
+    });
+  });
+
+  it("reads a stored copy and a bare list, and returns null when empty", () => {
+    const stored = {
+      prompt: "Next?",
+      items: [{ label: "A", message: "Ask A", kind: "lesson" }],
+    };
+    expect(normalizeSuggestedFollowups(stored)).toEqual(stored);
+    expect(
+      normalizeSuggestedFollowups([{ label: "B", message: "Ask B" }]),
+    ).toEqual({
+      prompt: null,
+      items: [{ label: "B", message: "Ask B", kind: "ask" }],
+    });
+    expect(
+      normalizeSuggestedFollowups({ prompt: "Next?", buttons: [] }),
+    ).toBeNull();
+    expect(normalizeSuggestedFollowups(null)).toBeNull();
+  });
+});
+
+describe("toAskGenerativeUi", () => {
+  it("skips malformed components instead of the whole visual", () => {
+    const ui = {
+      version: "solana-docs-ui/v1",
+      kind: "answer",
+      components: [{ type: "callout", body: "Kept" }, { body: "no type" }, 7],
+    };
+    expect(toAskGenerativeUi(ui)).toEqual({
+      ...ui,
+      components: [{ type: "callout", body: "Kept" }],
+    });
+    expect(isAskGenerativeUi(ui)).toBe(false);
+    expect(
+      toDonePayload({ generative_ui: ui }).generativeUi?.components,
+    ).toEqual([{ type: "callout", body: "Kept" }]);
+  });
+
+  it("returns a valid visual as is, and null with no component left", () => {
+    expect(toAskGenerativeUi(createTokenGenerativeUiFixture)).toBe(
+      createTokenGenerativeUiFixture,
+    );
+    expect(
+      toAskGenerativeUi({
+        version: "solana-docs-ui/v1",
+        kind: "answer",
+        components: [{ title: "no type" }],
+      }),
+    ).toBeNull();
+    expect(
+      toAskGenerativeUi({ version: "solana-docs-ui/v1", kind: "answer" }),
     ).toBeNull();
   });
 });
@@ -247,12 +368,102 @@ describe("status and error mapping", () => {
     expect(askStatusForStage("something_new")).toBe("preparing");
   });
 
+  it("maps every stage the agent sends", () => {
+    const stages = {
+      accepted: "preparing",
+      starting: "preparing",
+      searching_docs: "searching",
+      reading_doc: "searching",
+      using_tool: "searching",
+      retrieving_docs: "searching",
+      building_plan: "searching",
+      response_cache_hit: "writing",
+      rendering_template_answer: "writing",
+      writing: "writing",
+      building_visual_answer: "visual",
+    };
+    for (const [stage, status] of Object.entries(stages)) {
+      expect([stage, askStatusForStage(stage)]).toEqual([stage, status]);
+    }
+  });
+
+  it("only moves the status row forward", () => {
+    expect(advanceAskStatus(undefined, "searching")).toBe("searching");
+    expect(advanceAskStatus("preparing", "searching")).toBe("searching");
+    expect(advanceAskStatus("searching", "preparing")).toBe("searching");
+    expect(advanceAskStatus("writing", "searching")).toBe("writing");
+    expect(advanceAskStatus("writing", "visual")).toBe("visual");
+    expect(advanceAskStatus("visual", "writing")).toBe("visual");
+  });
+
+  it("maps the agent's real error bodies", () => {
+    const kinds = Object.fromEntries(
+      Object.entries(AGENT_ERRORS).map(([name, { status, body }]) => [
+        name,
+        askErrorKindFor(status, body),
+      ]),
+    );
+    expect(kinds).toEqual({
+      // A wrong proxy secret: the proxy answers 502 instead (see ask-route).
+      forbidden: "generic",
+      invalidSession: "session",
+      throttled: "rateLimited",
+      pendingRun: "busy",
+      messageTooLong: "tooLong",
+      invalidConversationId: "generic",
+      invalidMessage: "tooLong",
+      conversationNotFound: "generic",
+      conversationFull: "conversationFull",
+      budget: "unavailable",
+      notProvisioned: "unavailable",
+    });
+    expect(askErrorKindForEvent(AGENT_STREAM_ERROR)).toBe("generic");
+  });
+
+  it("tells the three 429s apart", () => {
+    expect(askErrorKindFor(429, { error: "rate_limited" })).toBe("rateLimited");
+    expect(
+      askErrorKindFor(429, {
+        error: "Please wait for your previous question to finish.",
+      }),
+    ).toBe("busy");
+    // Not the agent's JSON: a capacity limit in front of it.
+    expect(askErrorKindFor(429, "<html>Rate exceeded.</html>")).toBe(
+      "unavailable",
+    );
+    expect(askErrorKindFor(429, "")).toBe("unavailable");
+    expect(askErrorKindFor(429, null)).toBe("unavailable");
+  });
+
+  it("finds a conversation the session can't use", () => {
+    const { conversationNotFound, invalidConversationId, invalidMessage } =
+      AGENT_ERRORS;
+    expect(
+      isStaleConversation(
+        conversationNotFound.status,
+        conversationNotFound.body,
+      ),
+    ).toBe(true);
+    expect(
+      isStaleConversation(
+        invalidConversationId.status,
+        invalidConversationId.body,
+      ),
+    ).toBe(true);
+    expect(
+      isStaleConversation(invalidMessage.status, invalidMessage.body),
+    ).toBe(false);
+    expect(isStaleConversation(404, { error: "Run not found." })).toBe(false);
+    expect(isStaleConversation(404, "<html>Not Found</html>")).toBe(false);
+  });
+
   it("maps statuses and bodies to error kinds", () => {
     expect(askErrorKindFor(401, null)).toBe("session");
-    expect(askErrorKindFor(403, null)).toBe("session");
+    // 403 is a wrong secret or a refused origin: a new token can't help.
+    expect(askErrorKindFor(403, null)).toBe("generic");
+    expect(askErrorKindFor(403, { error: "invalid_origin" })).toBe("generic");
     expect(askErrorKindFor(419, null)).toBe("session");
     expect(askErrorKindFor(400, { error: "invalid_session" })).toBe("session");
-    expect(askErrorKindFor(429, null)).toBe("rateLimited");
     expect(askErrorKindFor(503, { error: "ask_not_configured" })).toBe(
       "unavailable",
     );
@@ -272,5 +483,15 @@ describe("status and error mapping", () => {
     expect(askErrorKindForEvent({ message: "stream error" })).toBe("generic");
     expect(askErrorKindForEvent({ error: "rate_limited" })).toBe("rateLimited");
     expect(askErrorKindForEvent({ error: "invalid_session" })).toBe("generic");
+  });
+
+  it("keeps our codes' kinds when they arrive as stream events", () => {
+    // nous refuses after a template visual already went out (HTTP 200).
+    for (const error of ["ask_unavailable", "ask_timeout", "ask_misconfigured"])
+      expect(askErrorKindForEvent({ error, message: "x" })).toBe("unavailable");
+    expect(askErrorKindForEvent({ error: "ask_failed" })).toBe("incomplete");
+    expect(
+      askErrorKindForEvent({ error: "rate_limited", message: "busy" }),
+    ).toBe("rateLimited");
   });
 });

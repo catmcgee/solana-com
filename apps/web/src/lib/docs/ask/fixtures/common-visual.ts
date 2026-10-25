@@ -97,7 +97,7 @@ export const tokenLifecycleGenerativeUiFixture = {
         },
         {
           title: "Create the token account",
-          command: "spl-token create-account <MINT>",
+          command: "spl-token create-account <MINT_ADDRESS>",
           result: "Wallet has a token account for this mint.",
           effects: [
             { action: "reveal", node_id: "holder-token" },
@@ -117,7 +117,7 @@ export const tokenLifecycleGenerativeUiFixture = {
         },
         {
           title: "Mint supply",
-          command: "spl-token mint <MINT> 100 <TOKEN_ACCOUNT>",
+          command: "spl-token mint <MINT_ADDRESS> 100 <TOKEN_ACCOUNT>",
           result: "The mint supply and holder balance both increase.",
           effects: [
             {

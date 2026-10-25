@@ -5,6 +5,7 @@ import {
   readSse,
   type AskStreamHandlers,
 } from "@/lib/docs/ask/sse";
+import { AGENT_RESPONSE, AGENT_VISUAL, agentStream } from "./agent-contract";
 
 /** A body that delivers `chunks` as separate reads. */
 function streamOf(
@@ -29,6 +30,7 @@ function handlers() {
     onDelta: vi.fn(),
     onUiStatus: vi.fn(),
     onGenerativeUi: vi.fn(),
+    onGenerativeUiWithdrawn: vi.fn(),
     onDone: vi.fn(),
     onError: vi.fn(),
   } satisfies AskStreamHandlers;
@@ -172,5 +174,83 @@ describe("consumeAskStream", () => {
     );
     expect(h.onDelta).toHaveBeenCalledWith("plain text");
     expect(h.onGenerativeUi).not.toHaveBeenCalled();
+  });
+
+  it("reads the agent's real stream", async () => {
+    const h = handlers();
+    const outcome = await consumeAskStream(streamOf([agentStream()]), h, "en");
+    expect(outcome).toBe("done");
+    // `answer_status` feeds the status row; `trace` is ignored.
+    expect(h.onStatus.mock.calls.map(([stage]) => stage)).toEqual([
+      "accepted",
+      "searching_docs",
+      "retrieving_docs",
+      "reading_doc",
+      "building_plan",
+    ]);
+    // The empty `data:` line (a chunk lost to the agent's UTF-8 split) is
+    // skipped; done's full response replaces the streamed text.
+    expect(h.onDelta.mock.calls.map(([text]) => text)).toEqual([
+      AGENT_RESPONSE.slice(0, 120),
+    ]);
+    expect(h.onUiStatus).toHaveBeenCalledWith("building_visual_answer");
+    expect(h.onGenerativeUi).toHaveBeenCalledWith(AGENT_VISUAL);
+    expect(h.onGenerativeUiWithdrawn).not.toHaveBeenCalled();
+    expect(h.onDone).toHaveBeenCalledWith(
+      expect.objectContaining({
+        response: AGENT_RESPONSE,
+        runId: "4821",
+        conversationId: "1307",
+        generativeUi: null,
+        suggestedFollowups: expect.objectContaining({
+          prompt: "Want to keep going? Try one of these:",
+        }),
+      }),
+    );
+  });
+
+  it("reports a visual the agent withdraws", async () => {
+    const h = handlers();
+    await consumeAskStream(
+      streamOf([agentStream({ withdrawVisual: true })]),
+      h,
+    );
+    expect(h.onGenerativeUi).toHaveBeenCalledTimes(1);
+    expect(h.onGenerativeUiWithdrawn).toHaveBeenCalledTimes(1);
+    expect(
+      h.onGenerativeUiWithdrawn.mock.invocationCallOrder[0],
+    ).toBeGreaterThan(h.onGenerativeUi.mock.invocationCallOrder[0]!);
+  });
+
+  it("treats ui_done without a visual as a withdrawal, and a malformed one as noise", async () => {
+    const h = handlers();
+    await consumeAskStream(
+      streamOf([
+        'event: ui_done\ndata: {"generative_ui":null,"cached":false}\n\n',
+        'event: ui_done\ndata: {"generative_ui":{"version":"v0"}}\n\n',
+        'event: ui_done\ndata: {"cached":true}\n\n',
+        "event: done\ndata: {}\n\n",
+      ]),
+      h,
+    );
+    expect(h.onGenerativeUiWithdrawn).toHaveBeenCalledTimes(1);
+    expect(h.onGenerativeUi).not.toHaveBeenCalled();
+  });
+
+  it("keeps a visual with one malformed component", async () => {
+    const h = handlers();
+    await consumeAskStream(
+      streamOf([
+        `event: ui_done\ndata: ${JSON.stringify({
+          generative_ui: {
+            ...ui,
+            components: [...ui.components, { title: "?" }],
+          },
+        })}\n\n`,
+        "event: done\ndata: {}\n\n",
+      ]),
+      h,
+    );
+    expect(h.onGenerativeUi).toHaveBeenCalledWith(ui);
   });
 });

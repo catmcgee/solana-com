@@ -5,9 +5,10 @@ import { nousAskRequest } from "@/lib/docs/ask/server/nous-agent";
 
 /**
  * The docs assistant's API (/api/ask/session, chat, feedback, search,
- * runs/:id). Proxied to the docs agent, or, outside production, answered by
- * the Nous-backed review backend or the canned mock (ASK_SOLANA_BACKEND;
- * see lib/docs/ask/server/backend.ts).
+ * runs/:id, conversations/:id, and outside production the agent's
+ * diagnostics/client-ip). Proxied to the docs agent, or, outside
+ * production, answered by the Nous-backed review backend or the canned mock
+ * (ASK_SOLANA_BACKEND; see lib/docs/ask/server/backend.ts).
  */
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

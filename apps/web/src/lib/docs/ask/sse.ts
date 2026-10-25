@@ -6,11 +6,13 @@
  * - events split on LF or CRLF blank lines; multi-line `data:` is joined;
  * - the decoder and leftover buffer are flushed at the end of the stream;
  * - a stream that ends without `done` or `error` reports `incomplete`.
+ * The agent's `answer_status` stages feed the status row like `status`;
+ * `trace` checkpoints are ignored.
  */
 import {
   askErrorKindForEvent,
-  isAskGenerativeUi,
   isRecord,
+  toAskGenerativeUi,
   toDonePayload,
   type AskDonePayload,
   type AskErrorKind,
@@ -65,13 +67,19 @@ export async function readSse(
 }
 
 export type AskStreamHandlers = {
-  /** Raw stage from `status`, e.g. "searching_docs". */
+  /** Raw stage from `status` or `answer_status`, e.g. "reading_doc". */
   onStatus?: (stage: string) => void;
   onDelta: (text: string) => void;
   /** Raw stage from `ui_status`, e.g. "building_visual". */
   onUiStatus?: (stage: string) => void;
   /** A visual, sent early (`ui_done`) while the text may still stream. */
   onGenerativeUi?: (ui: AskGenerativeUi) => void;
+  /**
+   * `ui_done` without a visual: none could be made, or the agent withdrew
+   * the one it sent (`discarded`, e.g. beside its "not enough cited
+   * documentation" answer). Any visual shown must go.
+   */
+  onGenerativeUiWithdrawn?: () => void;
   onDone: (payload: AskDonePayload) => void;
   onError: (kind: AskErrorKind, detail?: string) => void;
 };
@@ -106,6 +114,7 @@ export async function consumeAskStream(
     const payload = parseData(data);
     switch (event) {
       case "status":
+      case "answer_status":
         handlers.onStatus?.(String(payload.stage ?? payload.status ?? ""));
         return;
       case "ui_status":
@@ -120,8 +129,16 @@ export async function consumeAskStream(
         }
         return;
       case "ui_done": {
-        const ui = payload.generative_ui ?? payload.generativeUi;
-        if (isAskGenerativeUi(ui)) handlers.onGenerativeUi?.(ui);
+        const raw =
+          "generative_ui" in payload
+            ? payload.generative_ui
+            : payload.generativeUi;
+        const ui = toAskGenerativeUi(raw);
+        if (ui) handlers.onGenerativeUi?.(ui);
+        // A malformed visual is skipped; only an explicit "none" withdraws.
+        else if (raw === null || payload.discarded === true) {
+          handlers.onGenerativeUiWithdrawn?.();
+        }
         return;
       }
       case "done": {

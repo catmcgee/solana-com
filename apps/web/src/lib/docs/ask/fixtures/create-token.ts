@@ -80,7 +80,7 @@ export const createTokenGenerativeUiFixture = {
         {
           title: "Create your token account",
           body: "Create the associated token account where your wallet will hold this token.",
-          command: "spl-token create-account <MINT>",
+          command: "spl-token create-account <MINT_ADDRESS>",
           result: "Save the token account address from the command output.",
           effects: [
             {
@@ -105,7 +105,7 @@ export const createTokenGenerativeUiFixture = {
         {
           title: "Mint the starting supply",
           body: "Mint 100 tokens into your token account. The mint supply and account balance both increase.",
-          command: "spl-token mint <MINT> 100 <ACCOUNT>",
+          command: "spl-token mint <MINT_ADDRESS> 100 <ACCOUNT>",
           result: "Your token account balance is now 100.",
           effects: [
             {

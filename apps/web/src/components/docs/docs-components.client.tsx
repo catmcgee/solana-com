@@ -238,7 +238,10 @@ export function AskCodeButton() {
           const pre =
             root?.querySelector('[role="tabpanel"]:not([hidden]) pre') ??
             root?.querySelector("pre");
-          openAskAi(pre?.textContent ?? "");
+          openAskAi({
+            code: pre?.textContent ?? "",
+            language: pre?.getAttribute("data-language") ?? undefined,
+          });
         }}
       >
         <SparkleIcon className="code-copy-icon" />

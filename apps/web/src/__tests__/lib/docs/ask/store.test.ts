@@ -13,6 +13,7 @@ import {
   type AskAssistantMessage,
 } from "@/lib/docs/ask/store";
 import { useAskSelector, useAskState } from "@/lib/docs/ask/use-ask";
+import { AGENT_DONE, AGENT_ERRORS, AGENT_VISUAL } from "./agent-contract";
 
 type FetchArgs = Parameters<typeof fetch>;
 
@@ -454,15 +455,138 @@ describe("conversation", () => {
   });
 
   it("caches first questions only, so a new chat answers a repeat at once", async () => {
-    chatQueue.push(finished("Cached."));
+    chatQueue.push(
+      finished("Cached.", {
+        suggested_followups: AGENT_DONE.suggested_followups,
+      }),
+      finished("Follow-up."),
+    );
     askStore.send("What is rent?");
     await vi.waitFor(() => expect(askStore.getState().busy).toBe(false));
     askStore.reset();
     askStore.send("what is rent?");
     await vi.waitFor(() => expect(lastAssistant().state).toBe("done"));
-    expect(lastAssistant()).toMatchObject({ text: "Cached.", runId: "101" });
-    expect(askStore.getState().conversationId).toBe("7");
+    expect(lastAssistant()).toMatchObject({
+      text: "Cached.",
+      runId: "101",
+      suggestedFollowups: { prompt: "Want to keep going? Try one of these:" },
+    });
+    // The replay doesn't join the first thread's agent conversation.
+    expect(askStore.getState().conversationId).toBeNull();
     expect(chatBodies()).toHaveLength(1);
+    askStore.send("And in Rust?");
+    await vi.waitFor(() => expect(chatBodies()).toHaveLength(2));
+    expect(chatBodies()[1]).not.toHaveProperty("conversation_id");
+  });
+
+  it("moves the status row forward only, through the agent's stages", async () => {
+    const stream = controllableStream();
+    chatQueue.push(stream.response);
+    askStore.send("What is a PDA?");
+    stream.send("status", { stage: "accepted" });
+    stream.send("status", { stage: "searching_docs" });
+    await vi.waitFor(() => expect(lastAssistant().status).toBe("searching"));
+    stream.send("status", { stage: "reading_doc", tool: "read_doc" });
+    stream.send("answer_status", { stage: "building_plan" });
+    stream.send("status", { stage: "starting" });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(lastAssistant().status).toBe("searching");
+    stream.send("answer_status", { stage: "rendering_template_answer" });
+    await vi.waitFor(() => expect(lastAssistant().status).toBe("writing"));
+    stream.send("delta", { text: "A PDA" });
+    stream.send("status", { stage: "using_tool" });
+    await vi.waitFor(() => expect(lastAssistant().text).toBe("A PDA"));
+    expect(lastAssistant().status).toBe("writing");
+    stream.end();
+  });
+
+  it("takes back a visual the agent withdraws, and keeps it out of the answer", async () => {
+    const stream = controllableStream();
+    chatQueue.push(stream.response);
+    askStore.send("What is a PDA?");
+    stream.send("delta", { text: "Not enough cited documentation." });
+    stream.send("ui_status", { stage: "building_visual_answer" });
+    stream.send("ui_done", { generative_ui: AGENT_VISUAL, cached: false });
+    await vi.waitFor(() => expect(lastAssistant().ui).toEqual(AGENT_VISUAL));
+    stream.send("ui_done", { generative_ui: null, discarded: true });
+    await vi.waitFor(() => expect(lastAssistant().ui).toBeUndefined());
+    expect(lastAssistant().status).toBe("writing");
+    stream.send("done", { run_id: 1, conversation_id: 2, generative_ui: null });
+    stream.end();
+    await vi.waitFor(() => expect(askStore.getState().busy).toBe(false));
+    expect(lastAssistant()).not.toHaveProperty("ui");
+  });
+
+  it("clears the visual status when no visual comes", async () => {
+    const stream = controllableStream();
+    chatQueue.push(stream.response);
+    askStore.send("What is a PDA?");
+    stream.send("delta", { text: "Text." });
+    stream.send("ui_status", { stage: "building_visual_answer" });
+    await vi.waitFor(() => expect(lastAssistant().status).toBe("visual"));
+    stream.send("ui_done", { generative_ui: null, cached: false });
+    await vi.waitFor(() => expect(lastAssistant().status).toBe("writing"));
+    stream.end();
+  });
+
+  it("starts a new agent conversation when the old one is gone", async () => {
+    chatQueue.push(
+      finished("First."),
+      Response.json(AGENT_ERRORS.conversationNotFound.body, { status: 404 }),
+      finished("Second.", { conversation_id: 9 }),
+    );
+    askStore.send("First?");
+    await vi.waitFor(() => expect(askStore.getState().busy).toBe(false));
+    expect(askStore.getState().conversationId).toBe("7");
+    askStore.send("Second?");
+    await vi.waitFor(() => expect(askStore.getState().busy).toBe(false));
+    expect(chatBodies().map((body) => body.conversation_id)).toEqual([
+      undefined,
+      "7",
+      undefined,
+    ]);
+    expect(lastAssistant()).toMatchObject({ state: "done", text: "Second." });
+    expect(askStore.getState().conversationId).toBe("9");
+  });
+
+  it("never retries with a conversation found stale", async () => {
+    chatQueue.push(
+      finished("First."),
+      Response.json(AGENT_ERRORS.conversationNotFound.body, { status: 404 }),
+      Response.json(AGENT_ERRORS.budget.body, { status: 503 }),
+      finished("Retried."),
+    );
+    askStore.send("First?");
+    await vi.waitFor(() => expect(askStore.getState().busy).toBe(false));
+    askStore.send("Second?");
+    await vi.waitFor(() => expect(lastAssistant().state).toBe("error"));
+    expect(lastAssistant().error).toBe("unavailable");
+    expect(askStore.getState().conversationId).toBeNull();
+    askStore.retry(lastAssistant().id);
+    await vi.waitFor(() => expect(lastAssistant().text).toBe("Retried."));
+    expect(chatBodies().map((body) => body.conversation_id)).toEqual([
+      undefined,
+      "7",
+      undefined,
+      undefined,
+    ]);
+  });
+
+  it("keeps the agent's suggested follow-ups on the answer", async () => {
+    chatQueue.push(
+      finished("Answer.", {
+        suggested_followups: AGENT_DONE.suggested_followups,
+      }),
+    );
+    askStore.send("What is a PDA?");
+    expect(lastAssistant().suggestedFollowups).toBeNull();
+    await vi.waitFor(() => expect(askStore.getState().busy).toBe(false));
+    expect(lastAssistant().suggestedFollowups).toEqual({
+      prompt: "Want to keep going? Try one of these:",
+      items: AGENT_DONE.suggested_followups.buttons.map(
+        ({ label, message }) => ({ label, message, kind: "ask" }),
+      ),
+    });
   });
 
   it("rates answers with a run id once per choice", async () => {
@@ -523,16 +647,52 @@ describe("entry points", () => {
       '<div id="content" data-page-title="Accounts" data-page-href="/developers/docs/core/accounts"></div>';
   }
 
-  it("asks about code with the page title, cut to 3,500 characters", async () => {
+  it("asks about code, cut to 3,500 characters, showing the page title but sending only its URL", async () => {
     docsPage();
     chatQueue.push(finished("Explained."));
     askStore.open({ code: `  ${"a".repeat(4000)}  ` });
     expect(askStore.getState().open).toBe(true);
-    const sent = askStore.getState().messages[0];
-    expect(sent?.text).toBe(
-      `Explain this code from Accounts:\n\n\`\`\`\n${"a".repeat(3500)}\n\`\`\``,
-    );
+    const fenced = `\`\`\`\n${"a".repeat(3500)}\n\`\`\``;
+    const question = askStore.getState().messages[0];
+    expect(question).toMatchObject({
+      text: `Explain this code from Accounts:\n\n${fenced}`,
+      sent: `Explain this code:\n\n${fenced}`,
+    });
+    expect(question).not.toHaveProperty("pageContext");
     await vi.waitFor(() => expect(askStore.getState().busy).toBe(false));
+    // The agent's router would turn "Accounts" into a canned answer; the
+    // URL lets the answer read the page the code came from.
+    expect(chatBodies()[0]!.message).toBe(`Explain this code:\n\n${fenced}`);
+    expect(chatBodies()[0]).toMatchObject({
+      page_url: "https://solana.com/developers/docs/core/accounts",
+    });
+    expect(chatBodies()[0]).not.toHaveProperty("page_title");
+  });
+
+  it("keeps a code block's language on the fence", async () => {
+    docsPage();
+    chatQueue.push(finished("Explained."));
+    askStore.open({ code: "let x = 1;", language: "rust" });
+    await vi.waitFor(() => expect(askStore.getState().busy).toBe(false));
+    expect(chatBodies()[0]!.message).toBe(
+      "Explain this code:\n\n```rust\nlet x = 1;\n```",
+    );
+  });
+
+  it("sends a code question again without the title", async () => {
+    docsPage();
+    chatQueue.push(
+      Response.json(AGENT_ERRORS.budget.body, { status: 503 }),
+      finished("Explained."),
+    );
+    askStore.open({ code: "let x;" });
+    await vi.waitFor(() => expect(lastAssistant().state).toBe("error"));
+    askStore.retry(lastAssistant().id);
+    await vi.waitFor(() => expect(lastAssistant().state).toBe("done"));
+    expect(chatBodies().map((body) => body.message)).toEqual([
+      "Explain this code:\n\n```\nlet x;\n```",
+      "Explain this code:\n\n```\nlet x;\n```",
+    ]);
   });
 
   it("uses localized prompts", () => {
@@ -545,7 +705,7 @@ describe("entry points", () => {
     );
   });
 
-  it("attaches this page without sending, then prefixes the next question", async () => {
+  it("attaches this page without sending, then sends it beside the next question", async () => {
     docsPage();
     const before = askStore.getState().focusRequest;
     askStore.open({ aboutPage: true });
@@ -570,12 +730,32 @@ describe("entry points", () => {
       pageContext: { title: "Accounts" },
     });
     await vi.waitFor(() => expect(chatBodies()).toHaveLength(1));
-    expect(chatBodies()[0]).toMatchObject({
-      message:
-        "Question about the docs page “Accounts” (https://solana.com/developers/docs/core/accounts):\n\nWhat is rent here?",
+    // The question alone: the server builds any page prefix.
+    expect(chatBodies()[0]).toEqual({
+      session_token: "mock-token",
+      message: "What is rent here?",
       page_url: "https://solana.com/developers/docs/core/accounts",
       page_title: "Accounts",
     });
+  });
+
+  it("keeps an earlier question's page in the history, and checks the length of what is sent", async () => {
+    docsPage();
+    chatQueue.push(finished("About accounts."), finished("Second."));
+    askStore.open({ aboutPage: true });
+    // 4,000 characters fit: the page no longer counts against the limit.
+    expect(askStore.send("x".repeat(4000))).toEqual({
+      ok: true,
+      queued: false,
+    });
+    await vi.waitFor(() => expect(askStore.getState().busy).toBe(false));
+    askStore.send("And the fees?");
+    await vi.waitFor(() => expect(chatBodies()).toHaveLength(2));
+    const asked = `Question about the docs page “Accounts” (https://solana.com/developers/docs/core/accounts):\n\n${"x".repeat(4000)}`;
+    expect(chatBodies()[1]!.history).toEqual([
+      { role: "user", content: `${asked.slice(0, 999)}…` },
+      { role: "assistant", content: "About accounts." },
+    ]);
   });
 
   it("routes openAskAi events and [data-docs-ask-open] clicks", async () => {
@@ -672,9 +852,57 @@ describe("persistence", () => {
         text: "Kept too",
         citations: [],
         codeFollowups: null,
+        suggestedFollowups: null,
         runId: "5",
       },
     ]);
     expect(askStore.getState().conversationId).toBe("9");
+  });
+
+  it("restores the code question as sent, follow-ups and a busy error", () => {
+    sessionStorage.setItem(
+      ASK_STORAGE_KEYS.thread,
+      JSON.stringify({
+        messages: [
+          {
+            id: "1",
+            role: "user",
+            text: "Explain this code from Accounts:\n\n```\nx\n```",
+            sent: "Explain this code:\n\n```\nx\n```",
+          },
+          {
+            id: "2",
+            role: "assistant",
+            state: "done",
+            text: "Answer.",
+            suggestedFollowups: {
+              prompt: "Next?",
+              items: [{ label: "Rent", message: "What is rent?", kind: "ask" }],
+            },
+            runId: 5,
+          },
+          { id: "3", role: "user", text: "Again?" },
+          {
+            id: "4",
+            role: "assistant",
+            state: "error",
+            error: "busy",
+            text: "",
+          },
+        ],
+      }),
+    );
+    askStore.subscribe(() => undefined);
+    const [question, answer, , failed] = askStore.getState().messages;
+    expect(question).toMatchObject({
+      sent: "Explain this code:\n\n```\nx\n```",
+    });
+    expect(answer).toMatchObject({
+      suggestedFollowups: {
+        prompt: "Next?",
+        items: [{ label: "Rent", message: "What is rent?", kind: "ask" }],
+      },
+    });
+    expect(failed).toMatchObject({ state: "error", error: "busy" });
   });
 });

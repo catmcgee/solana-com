@@ -5,17 +5,21 @@
  * - the key includes the locale and the attached page, so the same words
  *   about different pages are different entries;
  * - entries are written only after a real `done` on a first turn (see
- *   client.ts), never for truncated streams or follow-ups.
+ *   client.ts), never for truncated streams or follow-ups;
+ * - a replay starts a new conversation: two threads that open with the same
+ *   question must not share (and fill) one agent conversation.
  */
 import { ASK_STORAGE_KEYS } from "./config";
 import {
-  isAskGenerativeUi,
   isRecord,
   normalizeCitations,
   normalizeCodeFollowups,
+  normalizeSuggestedFollowups,
+  toAskGenerativeUi,
   toId,
   type AskCitation,
   type AskGenerativeUi,
+  type AskSuggestedFollowups,
   type CodeFollowups,
 } from "./protocol";
 
@@ -27,12 +31,12 @@ export type CachedAnswer = {
   createdAt: number;
   content: string;
   citations: AskCitation[];
+  /** Never a visual the agent withdrew (see client.ts). */
   generativeUi: AskGenerativeUi | null;
   codeFollowups: CodeFollowups | null;
+  suggestedFollowups: AskSuggestedFollowups | null;
   /** The original run, so feedback on a replay rates the same answer. */
   runId: string | null;
-  /** The original conversation, so a follow-up keeps the first turn's context. */
-  conversationId: string | null;
 };
 
 /** Cache key, or null for an empty question. */
@@ -62,9 +66,7 @@ function normalizeEntry(value: unknown): CachedAnswer | null {
       ? value.createdAt
       : null;
   const content = typeof value.content === "string" ? value.content : "";
-  const generativeUi = isAskGenerativeUi(value.generativeUi)
-    ? value.generativeUi
-    : null;
+  const generativeUi = toAskGenerativeUi(value.generativeUi);
   if (!key || !createdAt || (!content.trim() && !generativeUi)) return null;
   return {
     key,
@@ -73,8 +75,8 @@ function normalizeEntry(value: unknown): CachedAnswer | null {
     citations: normalizeCitations(value.citations),
     generativeUi,
     codeFollowups: normalizeCodeFollowups(value.codeFollowups),
+    suggestedFollowups: normalizeSuggestedFollowups(value.suggestedFollowups),
     runId: toId(value.runId),
-    conversationId: toId(value.conversationId),
   };
 }
 

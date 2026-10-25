@@ -24,7 +24,10 @@ import { AskHeader } from "./ask-header.client";
 import { AskThread } from "./ask-thread.client";
 import { PALETTE } from "./ui";
 
-/** Id of the docked panel (the resize handle controls it). */
+/**
+ * Id of the panel in every layout (the resize handle and the launchers
+ * control it).
+ */
 export const ASK_PANEL_ID = "docs-ask-panel";
 
 /**
@@ -157,10 +160,18 @@ function ResizeHandle() {
 /**
  * Docked (viewport >= 1280px): a right-hand sidebar under the docs header,
  * beside the page, which makes room for it (html[data-ask=docked] and
- * --ask-w, see docs-page.tsx). Not modal: the page stays usable.
+ * --ask-w, see docs-page.tsx). Not modal: the page stays usable. Esc from
+ * inside closes it, and the root hands focus back to whatever opened it.
  */
 export function DockedPanel({ animate }: { animate: boolean }) {
   const t = useTranslations("docsAsk");
+  const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
+    if (event.key !== "Escape" || event.defaultPrevented) return;
+    // Esc that ends an IME composition isn't for the panel.
+    if (event.nativeEvent.isComposing) return;
+    event.preventDefault();
+    askStore.close();
+  };
   return (
     <aside
       id={ASK_PANEL_ID}
@@ -168,6 +179,7 @@ export function DockedPanel({ animate }: { animate: boolean }) {
       data-docs=""
       data-ask-panel=""
       aria-label={t("panelLabel")}
+      onKeyDown={onKeyDown}
       className={cn(
         "fixed bottom-0 end-0 top-16 z-30 w-[var(--ask-w,420px)] border-s border-[var(--sol-line)] [view-transition-name:ask-panel]",
         animate && ENTER,
@@ -239,6 +251,7 @@ export function ModalPanel({
           />
         )}
         <DialogContent
+          id={ASK_PANEL_ID}
           data-dev-landing="docs"
           data-docs=""
           data-ask-panel=""

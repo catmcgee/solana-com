@@ -12,6 +12,7 @@ import { docsSearchServer } from "@/lib/docs/search";
 import { ASK_MAX_MESSAGE_CHARS } from "../config";
 import { isRecord, toId } from "../protocol";
 import { askRouteMethod } from "./agent-proxy";
+import { docTopics, suggestFollowups } from "./followups";
 import {
   planMockAnswer,
   type MockCitation,
@@ -260,14 +261,27 @@ async function mockChat(
   }
 
   const page = await resolvePage(body.page_url);
+  const question = questionText(message, body.page_url);
   const plan = planMockAnswer({
-    question: questionText(message, body.page_url),
+    question,
     priorTopic: prior?.topic,
     followUp: priorId !== null,
     page,
   });
   const citations = await citationsFor(plan, page);
   const text = plan.render(citations);
+  // As the Nous backend builds them: the pages' topics, then the pages the
+  // answer did not link.
+  const suggestedFollowups = suggestFollowups({
+    question,
+    answer: text,
+    pages: citations.map((citation) => ({
+      url: citation.url,
+      title: citation.title,
+      topics: docTopics(`${citation.url}\n${citation.title}\n${text}`),
+    })),
+    citations: citations.filter((citation) => text.includes(citation.url)),
+  });
 
   const conversationId = priorId ?? String(nextId());
   remember(conversations, conversationId, {
@@ -282,6 +296,7 @@ async function mockChat(
       : conversationId,
     citations,
     code_followups: plan.codeFollowups,
+    suggested_followups: suggestedFollowups,
   };
   remember(runs, runId, {
     ...done,

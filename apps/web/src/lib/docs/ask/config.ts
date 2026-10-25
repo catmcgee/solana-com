@@ -4,14 +4,14 @@
  */
 
 /**
- * Base URL of the docs agent API. Same-origin by default: the route at
- * app/api/ask/[...path] proxies to the agent (or serves the review mock).
+ * The docs agent API, always same-origin: the route at app/api/ask/[...path]
+ * proxies to the agent with its secret (or answers from a review backend).
+ * The agent itself refuses browsers (403 without the secret), so there is
+ * no setting to call it directly.
  */
-export function askApiBase(): string {
-  return process.env.NEXT_PUBLIC_ASK_API_URL || "/api/ask";
-}
+export const ASK_API_BASE = "/api/ask";
 
-/** The agent rejects messages longer than this. */
+/** The agent rejects messages longer than this (counted in code points). */
 export const ASK_MAX_MESSAGE_CHARS = 4_000;
 
 /** Code sent from a code block's Ask button is cut to this, leaving room for the prompt. */

@@ -16,6 +16,8 @@
  *   before paint.
  * - A question that arrives while an answer is streaming is queued, not
  *   dropped.
+ * - A question goes out as the reader's words; the page it is about goes
+ *   in `page_url` / `page_title`, and the server builds any prefix.
  */
 import {
   DOCS_ASK_OPEN_ATTR,
@@ -41,17 +43,20 @@ import {
   type AskPageContext,
 } from "./page-context";
 import {
+  advanceAskStatus,
   askStatusForStage,
-  isAskGenerativeUi,
   isRecord,
   normalizeCitations,
   normalizeCodeFollowups,
+  normalizeSuggestedFollowups,
+  toAskGenerativeUi,
   toId,
   type AskCitation,
   type AskErrorKind,
   type AskGenerativeUi,
   type AskHistoryTurn,
   type AskStatus,
+  type AskSuggestedFollowups,
   type CodeFollowups,
 } from "./protocol";
 
@@ -62,6 +67,8 @@ export type {
   AskErrorKind,
   AskGenerativeUi,
   AskStatus,
+  AskSuggestedFollowup,
+  AskSuggestedFollowups,
   CodeFollowupButton,
   CodeFollowups,
 } from "./protocol";
@@ -72,9 +79,21 @@ export type AskRating = "up" | "down";
 export type AskUserMessage = {
   id: string;
   role: "user";
+  /** What the panel shows: the reader's words, or a code block's prompt and code. */
   text: string;
   /** The page attached with "Ask about this page", shown above the message. */
   pageContext?: AskPageContext;
+  /**
+   * The page a code block's code came from: sent as page_url without its
+   * title (the agent's router answers titles), so the answer reads it.
+   */
+  pageUrl?: string;
+  /**
+   * The question as sent, when it differs from `text`: a code block's Ask
+   * shows "Explain this code from {title}:" but sends the code without the
+   * title, which the agent's router would answer with a canned template.
+   */
+  sent?: string;
 };
 
 export type AskAssistantMessage = {
@@ -93,6 +112,8 @@ export type AskAssistantMessage = {
   ui?: AskGenerativeUi;
   citations: AskCitation[];
   codeFollowups: CodeFollowups | null;
+  /** "Want to keep going?" questions from `done`, shown after the code follow-ups. */
+  suggestedFollowups: AskSuggestedFollowups | null;
   /** Null hides the rating buttons. */
   runId: string | null;
   error?: AskErrorKind;
@@ -130,6 +151,8 @@ export type AskState = {
 export type AskOpenOptions = {
   /** Code from a code block: asks the explainCode prompt about it. */
   code?: string;
+  /** The code block's language, kept on the fence. */
+  language?: string;
   /** A question to send at once (e.g. from the search hand-off). */
   question?: string;
   /** Attach this page (or the given page) to the composer; does not send. */
@@ -150,12 +173,17 @@ export type AskSendResult =
 
 /** Localized prompt builders; the UI root sets them from `docsAsk.prompts`. */
 export type AskPrompts = {
+  /** Shown above a code block's code (the question's heading). */
   explainCode: (title: string) => string;
+  /** Sent with a code block's code: no page title (see AskUserMessage.sent). */
+  explainCodeSent: () => string;
+  /** Prefixes an earlier about-page question in `history` (review backends). */
   aboutPage: (page: AskPageContext) => string;
 };
 
 const DEFAULT_PROMPTS: AskPrompts = {
   explainCode: (title) => `Explain this code from ${title}:`,
+  explainCodeSent: () => "Explain this code:",
   aboutPage: ({ title, url }) =>
     `Question about the docs page “${title}” (${url}):`,
 };
@@ -176,7 +204,13 @@ type Core = {
   focusRequest: number;
 };
 
-type QueuedQuestion = { text: string; pageContext: AskPageContext | null };
+type QueuedQuestion = {
+  text: string;
+  pageContext: AskPageContext | null;
+  sent?: string;
+  /** A code block's page (AskUserMessage.pageUrl). */
+  pageUrl?: string;
+};
 
 function initialCore(): Core {
   return {
@@ -368,6 +402,13 @@ function restoreMessage(value: unknown): AskMessage | null {
       ...(isAskPageContext(value.pageContext)
         ? { pageContext: value.pageContext }
         : {}),
+      ...(typeof value.sent === "string" && value.sent.trim()
+        ? { sent: value.sent }
+        : {}),
+      ...(typeof value.pageUrl === "string" &&
+      /^https?:\/\//.test(value.pageUrl)
+        ? { pageUrl: value.pageUrl }
+        : {}),
     };
   }
   if (value.role !== "assistant") return null;
@@ -383,7 +424,9 @@ function restoreMessage(value: unknown): AskMessage | null {
     "tooLong",
     "conversationFull",
     "offline",
+    "busy",
   ];
+  const ui = toAskGenerativeUi(value.ui);
   const error = interrupted
     ? "incomplete"
     : (errors.find((kind) => kind === value.error) ??
@@ -393,9 +436,10 @@ function restoreMessage(value: unknown): AskMessage | null {
     role: "assistant",
     state: interrupted ? "error" : saved,
     text: typeof value.text === "string" ? value.text : "",
-    ...(isAskGenerativeUi(value.ui) ? { ui: value.ui } : {}),
+    ...(ui ? { ui } : {}),
     citations: normalizeCitations(value.citations),
     codeFollowups: normalizeCodeFollowups(value.codeFollowups),
+    suggestedFollowups: normalizeSuggestedFollowups(value.suggestedFollowups),
     runId: toId(value.runId),
     ...(error ? { error } : {}),
     ...(value.rating === "up" || value.rating === "down"
@@ -482,8 +526,9 @@ function newId(): string {
   return `${Date.now().toString(36)}-${idCounter}-${random}`;
 }
 
-function wireMessage(text: string, pageContext: AskPageContext | null): string {
-  return pageContext ? `${prompts.aboutPage(pageContext)}\n\n${text}` : text;
+/** A question as the server gets it (`message`). */
+function sentText(user: { text: string; sent?: string }): string {
+  return user.sent ?? user.text;
 }
 
 function clip(text: string, max: number): string {
@@ -504,8 +549,11 @@ function recentHistory(messages: AskMessage[]): AskHistoryTurn[] {
     turns.push(
       {
         role: "user",
+        // Earlier turns keep their page: only the current one has page_url.
         content: clip(
-          wireMessage(user.text, user.pageContext ?? null),
+          user.pageContext
+            ? `${prompts.aboutPage(user.pageContext)}\n\n${sentText(user)}`
+            : sentText(user),
           ASK_HISTORY_LIMITS.userChars,
         ),
       },
@@ -519,16 +567,18 @@ function recentHistory(messages: AskMessage[]): AskHistoryTurn[] {
 }
 
 function startTurn(
-  text: string,
-  pageContext: AskPageContext | null,
+  question: QueuedQuestion,
   options: { retry?: boolean } = {},
 ) {
+  const { text, pageContext, sent, pageUrl } = question;
   const history = recentHistory(core.messages);
   const user: AskUserMessage = {
     id: newId(),
     role: "user",
     text,
     ...(pageContext ? { pageContext } : {}),
+    ...(sent !== undefined && sent !== text ? { sent } : {}),
+    ...(pageUrl && !pageContext ? { pageUrl } : {}),
   };
   const assistant: AskAssistantMessage = {
     id: newId(),
@@ -538,6 +588,7 @@ function startTurn(
     text: "",
     citations: [],
     codeFollowups: null,
+    suggestedFollowups: null,
     runId: null,
   };
   const firstTurn = core.conversationId === null && core.messages.length === 0;
@@ -553,9 +604,9 @@ function startTurn(
 
   void streamChat(
     {
-      message: wireMessage(text, pageContext),
+      message: sentText(user),
       conversationId: core.conversationId,
-      page: pageContext,
+      page: pageContext ?? (user.pageUrl ? { url: user.pageUrl } : null),
       history,
       locale: currentLocale(),
       signal: abort.signal,
@@ -564,12 +615,12 @@ function startTurn(
     {
       onStatus: (stage) => {
         if (!live()) return;
-        updateMessage(id, (m) =>
-          // Once text is showing, a late status does not send it back.
-          m.text || m.status === "visual"
-            ? m
-            : { ...m, status: askStatusForStage(stage) },
-        );
+        updateMessage(id, (m) => {
+          // Forward only: reading a page after searching, or a late stage
+          // once text shows, does not send the row back.
+          const status = advanceAskStatus(m.status, askStatusForStage(stage));
+          return status === m.status ? m : { ...m, status };
+        });
       },
       onDelta: (delta) => {
         if (!live()) return;
@@ -595,6 +646,22 @@ function startTurn(
           status: "writing",
         }));
       },
+      onGenerativeUiWithdrawn: () => {
+        if (!live()) return;
+        updateMessage(id, (m) => {
+          if (!m.ui && m.status !== "visual") return m;
+          const { ui: _withdrawn, ...rest } = m;
+          return {
+            ...rest,
+            status: m.status === "visual" ? "writing" : m.status,
+          };
+        });
+      },
+      onConversationReset: () => {
+        // The old id is stale: `done` brings the new one, and a retry
+        // after a failure must not send the old one again.
+        if (live()) commit({ conversationId: null }, { saveThread: "soon" });
+      },
       onDone: (payload) => {
         if (!live()) return;
         finishTurn(
@@ -607,6 +674,10 @@ function startTurn(
             ...(payload.generativeUi ? { ui: payload.generativeUi } : {}),
             citations: payload.citations,
             codeFollowups: payload.codeFollowups,
+            suggestedFollowups: freshSuggestions(
+              payload.suggestedFollowups,
+              id,
+            ),
             runId: payload.runId,
           }),
           payload.conversationId,
@@ -658,9 +729,37 @@ function finishTurn(
   drainQueue();
 }
 
+/**
+ * Suggestions without the ones the previous answer already offered (the
+ * same topic gives the same questions turn after turn), or null when none
+ * are left.
+ */
+function freshSuggestions(
+  suggestions: AskSuggestedFollowups | null,
+  answerId: string,
+): AskSuggestedFollowups | null {
+  if (!suggestions) return null;
+  const index = core.messages.findIndex((message) => message.id === answerId);
+  const previous = core.messages
+    .slice(0, Math.max(index, 0))
+    .findLast((message) => message.role === "assistant");
+  const offered = new Set(
+    previous?.role === "assistant"
+      ? (previous.suggestedFollowups?.items ?? []).map((item) =>
+          item.message.trim().toLowerCase(),
+        )
+      : [],
+  );
+  const items = suggestions.items.filter(
+    (item) => !offered.has(item.message.trim().toLowerCase()),
+  );
+  if (items.length === suggestions.items.length) return suggestions;
+  return items.length > 0 ? { ...suggestions, items } : null;
+}
+
 function drainQueue() {
   const next = queue.shift();
-  if (next) startTurn(next.text, next.pageContext);
+  if (next) startTurn(next);
 }
 
 // --- Actions -----------------------------------------------------------------
@@ -684,10 +783,17 @@ function open(options?: AskOpenOptions | string) {
   const code = opts.code?.trim();
   const question = opts.question?.trim();
   if (code) {
-    send(
-      `${prompts.explainCode(currentPageTitle())}\n\n\`\`\`\n${code.slice(0, ASK_MAX_CODE_CHARS)}\n\`\`\``,
-      { pageContext: null },
-    );
+    const language = /^[\w#+.-]{1,24}$/.test(opts.language ?? "")
+      ? opts.language
+      : "";
+    const fenced = `\`\`\`${language}\n${code.slice(0, ASK_MAX_CODE_CHARS)}\n\`\`\``;
+    // The page goes as page_url alone, so the answer reads the page the
+    // code came from without the agent's router seeing its title.
+    const pageUrl = readPageContext()?.url;
+    ask(`${prompts.explainCode(currentPageTitle())}\n\n${fenced}`, null, {
+      sent: `${prompts.explainCodeSent()}\n\n${fenced}`,
+      ...(pageUrl ? { pageUrl } : {}),
+    });
   } else if (question) {
     send(question, { pageContext: null });
   } else {
@@ -758,22 +864,41 @@ function resetWidth() {
  */
 function send(text: string, options: AskSendOptions = {}): AskSendResult {
   start();
-  const trimmed = text.trim();
-  if (!trimmed) return { ok: false, reason: "empty" };
   const usesAttached = options.pageContext === undefined;
   const pageContext = usesAttached
     ? core.pageContext
     : (options.pageContext ?? null);
-  if (wireMessage(trimmed, pageContext).length > ASK_MAX_MESSAGE_CHARS) {
+  return ask(text, pageContext, { clearAttached: usesAttached });
+}
+
+/**
+ * Sends (or queues) one question. `sent` is what goes out when it isn't
+ * `text`; `clearAttached` drops the composer's page chip once accepted.
+ */
+function ask(
+  text: string,
+  pageContext: AskPageContext | null,
+  options: { sent?: string; pageUrl?: string; clearAttached?: boolean } = {},
+): AskSendResult {
+  const trimmed = text.trim();
+  if (!trimmed) return { ok: false, reason: "empty" };
+  const question: QueuedQuestion = {
+    text: trimmed,
+    pageContext,
+    ...(options.sent ? { sent: options.sent } : {}),
+    ...(options.pageUrl ? { pageUrl: options.pageUrl } : {}),
+  };
+  // The limit applies to what is sent; the page goes in its own fields.
+  if (sentText(question).length > ASK_MAX_MESSAGE_CHARS) {
     return { ok: false, reason: "tooLong" };
   }
-  if (usesAttached && core.pageContext) commit({ pageContext: null });
+  if (options.clearAttached && core.pageContext) commit({ pageContext: null });
   if (core.busy) {
-    queue.push({ text: trimmed, pageContext });
+    queue.push(question);
     commit();
     return { ok: true, queued: true };
   }
-  startTurn(trimmed, pageContext);
+  startTurn(question);
   return { ok: true, queued: false };
 }
 
@@ -806,10 +931,15 @@ function retry(messageId: string) {
     userIndex--;
   const user = core.messages[userIndex];
   if (!user || user.role !== "user") return;
-  const pageContext = user.pageContext ?? null;
+  const question: QueuedQuestion = {
+    text: user.text,
+    pageContext: user.pageContext ?? null,
+    ...(user.sent ? { sent: user.sent } : {}),
+    ...(user.pageUrl ? { pageUrl: user.pageUrl } : {}),
+  };
 
   if (core.busy) {
-    queue.push({ text: user.text, pageContext });
+    queue.push(question);
     commit();
     return;
   }
@@ -823,7 +953,8 @@ function retry(messageId: string) {
       conversationId: messages.length > 0 ? core.conversationId : null,
     });
   }
-  startTurn(user.text, pageContext, { retry: true });
+  // A conversation found stale was already dropped (onConversationReset).
+  startTurn(question, { retry: true });
 }
 
 /** New chat: stops any answer and clears the conversation. */

@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { consumeAskStream, type AskStreamHandlers } from "@/lib/docs/ask/sse";
+import {
+  AGENT_ERRORS,
+  agentResponse,
+  agentStream,
+  validationRedirectResponse,
+} from "./agent-contract";
 
 // The docs index and pages are stand-ins: the mock only needs their shape.
 vi.mock("@/lib/docs/search", () => ({
@@ -57,7 +63,7 @@ vi.mock("@/lib/docs/llms", () => ({
 const { GET, POST } = await import("@/app/api/ask/[...path]/route");
 const { mockAskRequest, chunkAnswer } =
   await import("@/lib/docs/ask/server/mock-agent");
-const { proxyAskRequest, askRouteMethod } =
+const { proxyAskRequest, askRouteMethod, agentChatBody, visitorIp } =
   await import("@/lib/docs/ask/server/agent-proxy");
 const { planMockAnswer } = await import("@/lib/docs/ask/server/mock-answers");
 
@@ -137,6 +143,7 @@ describe("/api/ask route", () => {
   it("never serves the mock on production", async () => {
     vi.stubEnv("ASK_SOLANA_MOCK", "1");
     vi.stubEnv("VERCEL_ENV", "production");
+    vi.stubEnv("ASK_API_URL", "");
     vi.stubEnv("ASK_AGENT_URL", "");
     const response = await POST(post("session", {}), context("session"));
     expect(response.status).toBe(503);
@@ -179,7 +186,8 @@ describe("mock agent", () => {
       runId: expect.stringMatching(/^\d+$/),
       conversationId: expect.stringMatching(/^\d+$/),
       codeFollowups: {
-        prompt: "Want to see this in code?",
+        prompt:
+          "Do you want to see a code example for that? If so, what language do you want it in?",
         buttons: [
           expect.objectContaining({ label: "TypeScript" }),
           expect.objectContaining({ label: "Rust" }),
@@ -322,6 +330,8 @@ describe("mock agent", () => {
 describe("agent proxy", () => {
   beforeEach(() => {
     vi.stubEnv("ASK_SOLANA_MOCK", "");
+    vi.stubEnv("ASK_API_URL", "");
+    vi.stubEnv("ASK_PROXY_SECRET", "");
     vi.stubEnv("ASK_AGENT_URL", "https://agent.example/");
     vi.stubEnv("ASK_SOLANA_PROXY_SECRET", "s3cret");
   });
@@ -334,6 +344,37 @@ describe("agent proxy", () => {
       error: "ask_not_configured",
       message: "Ask AI is not configured.",
     });
+  });
+
+  it("reads the agent runbook's env names first, ours as fallback", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(async () => Response.json({ ok: true }));
+    vi.stubEnv("ASK_API_URL", "https://ask-stg.example");
+    vi.stubEnv("ASK_PROXY_SECRET", "runbook-secret");
+    await proxyAskRequest(post("session", {}), ["session"]);
+    let [url, init] = fetchMock.mock.calls[0]!;
+    expect(String(url)).toBe("https://ask-stg.example/api/ask/session");
+    expect(new Headers(init?.headers).get("x-ask-proxy-secret")).toBe(
+      "runbook-secret",
+    );
+
+    // Only the runbook's names.
+    vi.stubEnv("ASK_AGENT_URL", "");
+    vi.stubEnv("ASK_SOLANA_PROXY_SECRET", "");
+    expect(
+      (await proxyAskRequest(post("session", {}), ["session"])).status,
+    ).toBe(200);
+
+    // Only ours.
+    vi.stubEnv("ASK_API_URL", " ");
+    vi.stubEnv("ASK_PROXY_SECRET", "");
+    vi.stubEnv("ASK_AGENT_URL", "https://agent.example/");
+    vi.stubEnv("ASK_SOLANA_PROXY_SECRET", "s3cret");
+    await proxyAskRequest(post("session", {}), ["session"]);
+    [url, init] = fetchMock.mock.calls[2]!;
+    expect(String(url)).toBe("https://agent.example/api/ask/session");
+    expect(new Headers(init?.headers).get("x-ask-proxy-secret")).toBe("s3cret");
   });
 
   it("streams the agent's response with the secret added", async () => {
@@ -350,8 +391,15 @@ describe("agent proxy", () => {
         "chat",
         { session_token: "t", message: "hi" },
         {
+          accept: "text/event-stream, application/json",
           "x-ask-client-capabilities": "early-status",
           cookie: "private",
+          "user-agent": "Mozilla/5.0",
+          "x-vercel-forwarded-for": "203.0.113.7",
+          "x-forwarded-for": "203.0.113.7",
+          "x-real-ip": "203.0.113.7",
+          "x-vercel-ip-country": "PT",
+          "x-vercel-ip-city": "Lisbon",
         },
       ),
       context("chat"),
@@ -370,6 +418,21 @@ describe("agent proxy", () => {
     expect(headers.get("x-ask-proxy-secret")).toBe("s3cret");
     expect(headers.get("x-ask-client-capabilities")).toBe("early-status");
     expect(headers.get("cookie")).toBeNull();
+    // The agent's rate limits key on this one header; nothing else about
+    // the visitor goes upstream.
+    expect(headers.get("x-ask-client-ip")).toBe("203.0.113.7");
+    for (const name of [
+      "x-forwarded-for",
+      "x-real-ip",
+      "x-vercel-forwarded-for",
+      "x-vercel-ip-country",
+      "x-vercel-ip-city",
+      "user-agent",
+    ]) {
+      expect([name, headers.get(name)]).toEqual([name, null]);
+    }
+    // JSON first, so a failed validation is a 422, not a redirect.
+    expect(headers.get("accept")).toBe("application/json, text/event-stream");
     expect(JSON.parse(String(init?.body))).toEqual({
       session_token: "t",
       message: "hi",
@@ -403,17 +466,163 @@ describe("agent proxy", () => {
   });
 
   it("passes agent errors through for the client to map", async () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      Response.json(
-        { error: "rate_limited" },
-        { status: 429, headers: { "retry-after": "60" } },
-      ),
+    vi.spyOn(globalThis, "fetch").mockImplementation(async () =>
+      agentResponse(AGENT_ERRORS.throttled),
     );
     const response = await proxyAskRequest(post("chat", { message: "hi" }), [
       "chat",
     ]);
     expect(response.status).toBe(429);
-    expect(response.headers.get("retry-after")).toBe("60");
+    expect(response.headers.get("retry-after")).toBe("42");
+    expect(await response.json()).toEqual(AGENT_ERRORS.throttled.body);
+  });
+
+  it("streams the agent's real answer unchanged", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(
+      async () =>
+        new Response(agentStream({ withdrawVisual: true }), {
+          headers: { "content-type": "text/event-stream" },
+        }),
+    );
+    const response = await proxyAskRequest(post("chat", { message: "hi" }), [
+      "chat",
+    ]);
+    expect(await response.text()).toBe(agentStream({ withdrawVisual: true }));
+  });
+
+  it("answers a rejected secret or a redirect with 502, and logs it", async () => {
+    const errors = vi.mocked(console.error);
+    for (const upstream of [
+      agentResponse(AGENT_ERRORS.forbidden),
+      validationRedirectResponse(),
+    ]) {
+      vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(upstream);
+      const response = await proxyAskRequest(post("chat", { message: "hi" }), [
+        "chat",
+      ]);
+      expect(response.status).toBe(502);
+      expect(response.headers.get("location")).toBeNull();
+      expect(await response.json()).toEqual({
+        error: "ask_misconfigured",
+        message: "Ask AI is unavailable.",
+      });
+    }
+    expect(errors.mock.calls.map(([message]) => message)).toEqual([
+      "[ask/proxy] agent rejected the proxy secret",
+      "[ask/proxy] agent redirected instead of answering",
+    ]);
+  });
+
+  it("asks for JSON on every other path and forwards the run's session header", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(async () => Response.json({ ok: true }));
+    await proxyAskRequest(post("feedback", { run_id: 1, rating: "up" }), [
+      "feedback",
+    ]);
+    await proxyAskRequest(
+      new Request(`${ORIGIN}/api/ask/runs/42`, {
+        headers: { referer: `${ORIGIN}/developers/docs`, "x-ask-session": "t" },
+      }),
+      ["runs", "42"],
+    );
+    const [feedback, run] = fetchMock.mock.calls.map(
+      ([, init]) => new Headers(init?.headers),
+    );
+    expect(feedback!.get("accept")).toBe("application/json");
+    expect(run!.get("accept")).toBe("application/json");
+    expect(run!.get("x-ask-session")).toBe("t");
+  });
+
+  it("sends the attached page's title after the question, never its URL", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(async () => new Response(null, { status: 204 }));
+    await proxyAskRequest(
+      post("chat", {
+        session_token: "t",
+        message: "What are decimals?",
+        page_url: "https://solana.com/developers/docs/tokens/create-token",
+        page_title: "Create a\nToken",
+        history: [{ role: "user", content: "Earlier" }],
+      }),
+      ["chat"],
+    );
+    expect(JSON.parse(String(fetchMock.mock.calls[0]![1]?.body))).toEqual({
+      session_token: "t",
+      message:
+        "What are decimals?\n\n(Asked on the docs page “Create a Token”.)",
+      page_url: "https://solana.com/developers/docs/tokens/create-token",
+      page_title: "Create a\nToken",
+    });
+  });
+
+  it("leaves the page out when the question would pass 4,000 characters", () => {
+    const long = "é".repeat(3_990);
+    expect(
+      agentChatBody({ message: long, page_title: "Accounts" }).message,
+    ).toBe(long);
+    expect(agentChatBody({ message: "Hi", page_title: "  " }).message).toBe(
+      "Hi",
+    );
+    expect(agentChatBody({ message: "Hi" })).toEqual({ message: "Hi" });
+  });
+
+  it("finds the visitor's IP from Vercel's headers", () => {
+    const request = (headers: Record<string, string>) =>
+      new Request(`${ORIGIN}/api/ask/chat`, { headers });
+    expect(
+      visitorIp(
+        request({
+          "x-vercel-forwarded-for": "2001:db8::1, 10.0.0.1",
+          "x-forwarded-for": "198.51.100.1",
+        }),
+      ),
+    ).toBe("2001:db8::1");
+    expect(visitorIp(request({ "x-real-ip": "198.51.100.2" }))).toBe(
+      "198.51.100.2",
+    );
+    expect(
+      visitorIp(request({ "x-forwarded-for": "198.51.100.3, 10.0.0.2" })),
+    ).toBe("198.51.100.3");
+    expect(visitorIp(request({ "x-forwarded-for": "<script>" }))).toBeNull();
+    expect(visitorIp(request({}))).toBeNull();
+  });
+
+  it("allows GET diagnostics/client-ip off production only", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(async () =>
+        Response.json({ per_visitor_bucketing: true }),
+      );
+    const diagnostics = (init: RequestInit = {}) =>
+      proxyAskRequest(
+        new Request(`${ORIGIN}/api/ask/diagnostics/client-ip`, {
+          ...init,
+          headers: {
+            referer: `${ORIGIN}/developers/docs`,
+            "x-vercel-forwarded-for": "203.0.113.9",
+          },
+        }),
+        ["diagnostics", "client-ip"],
+      );
+    vi.stubEnv("VERCEL_ENV", "preview");
+    expect((await diagnostics()).status).toBe(200);
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(String(url)).toBe(
+      "https://agent.example/api/ask/diagnostics/client-ip",
+    );
+    expect(new Headers(init?.headers).get("x-ask-client-ip")).toBe(
+      "203.0.113.9",
+    );
+    expect((await diagnostics({ method: "POST", body: "{}" })).status).toBe(
+      405,
+    );
+    vi.stubEnv("VERCEL_ENV", "production");
+    expect((await diagnostics()).status).toBe(404);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    // The review backends don't serve it.
+    expect(askRouteMethod(["diagnostics", "client-ip"])).toBeNull();
   });
 
   it("rejects cross-site requests, unknown paths, wrong methods and large bodies", async () => {

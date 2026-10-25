@@ -54,6 +54,7 @@ export function AskAi() {
   useEffect(() => {
     askStore.setPrompts({
       explainCode: (title) => t("prompts.explainCode", { title }),
+      explainCodeSent: () => t("prompts.explainCodeSent"),
       aboutPage: ({ title, url }) => t("prompts.aboutPage", { title, url }),
     });
   }, [t]);

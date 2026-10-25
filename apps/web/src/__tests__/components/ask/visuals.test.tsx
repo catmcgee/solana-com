@@ -147,6 +147,10 @@ describe("AskVisual markup", () => {
     expect(card("p").className).not.toContain("border-t-");
     expect(card("p").querySelector(".rotate-45")).not.toBeNull();
     expect(card("x").querySelector(".rotate-45")).toBeNull();
+    // A breath of the tone on the head, none for an unknown kind.
+    const tint = "bg-[color-mix(in_oklab,var(--tone-soft)_55%,transparent)]";
+    expect(card("p").firstElementChild).toHaveClass(tint);
+    expect(card("x").firstElementChild).not.toHaveClass(tint);
     expect(within(card("p")).queryByText("program")).toBeNull();
     expect(within(card("s")).getByText("signer")).toBeInTheDocument();
     expect(within(card("r")).getByText("RPC node")).toBeInTheDocument();
@@ -379,16 +383,28 @@ describe("steps", () => {
     expect(toggle).toHaveAttribute("aria-expanded", "false");
   });
 
-  it("numbers the steps in one purple and runs the rail purple to green", () => {
+  it("numbers each step in the tone of the card it changes; the rail runs purple to green", () => {
     const { container } = renderVisual(createTokenGenerativeUiFixture);
     const steps = [...container.querySelectorAll<HTMLElement>("ol > li")];
-    // No colour per position: the cards already use the hues for kinds.
+    // Create the mint (purple), create your token account (green), mint
+    // the supply (the mint first: purple). No colour per position.
+    expect(steps.map((step) => step.dataset.tone)).toEqual([
+      "purple",
+      "green",
+      "purple",
+    ]);
+    expect(steps[1]!.className).toContain("[--tone:var(--tone-green)]");
     for (const step of steps) {
       expect(step.style.getPropertyValue("--step")).toBe("");
-      expect(step.querySelector("span")!.className).toContain(
-        "text-[var(--tone-purple)]",
-      );
+      const circle = step.querySelector("span")!;
+      expect(circle.className).toContain("text-[var(--tone)]");
+      expect(circle.className).toContain("bg-[var(--tone-soft)]");
     }
+    // The title lights in the same tone.
+    expect(
+      screen.getByRole("button", { name: "Create your token account" })
+        .className,
+    ).toContain("hover:text-[var(--tone)]");
     expect(
       steps.map((step) => step.style.getPropertyValue("--rail-from")),
     ).toEqual([
@@ -397,6 +413,42 @@ describe("steps", () => {
       "var(--tone-green)",
     ]);
     expect(container.querySelectorAll("[data-rail]")).toHaveLength(2);
+  });
+});
+
+describe("step tones", () => {
+  const tones = (visual: AskGenerativeUi) =>
+    [
+      ...renderVisual(visual).container.querySelectorAll<HTMLElement>(
+        "li[data-tone]",
+      ),
+    ].map((step) => step.dataset.tone);
+
+  it("follow the kind of card each step acts on", () => {
+    const signing = commonVisualGenerativeUiFixtures.find(
+      (fixture) => fixture.name === "transaction signing",
+    )!;
+    // Instructions (blue), the signer (green), the RPC node (amber).
+    expect(tones(signing.ui)).toEqual(["blue", "green", "amber"]);
+  });
+
+  it("tone the optional steps' titles too", () => {
+    const { container } = renderVisual(tokenLifecycleGenerativeUiFixture);
+    // Closing the token account: green, as the account's card.
+    const extra = container.querySelector<HTMLElement>('[data-step="step-6"]')!;
+    expect(extra.className).toContain("[--tone:var(--tone-green)]");
+  });
+
+  it("stay purple without a model to point at", () => {
+    expect(
+      tones(
+        ui({
+          type: "step_flow",
+          title: "Deploy",
+          steps: [{ title: "Build" }, { title: "Ship" }],
+        }),
+      ),
+    ).toEqual(["purple", "purple"]);
   });
 });
 
@@ -437,6 +489,25 @@ describe("callouts and commands", () => {
     });
     expect(writeText).toHaveBeenCalledWith("spl-token create-account <MINT>");
     expect(screen.getByRole("status")).toHaveTextContent("Copied");
+  });
+
+  it("shows a line of code without the shell prompt", () => {
+    renderVisual(
+      ui({
+        type: "command_list",
+        commands: [
+          { command: "rpc.getBalance(address).send()" },
+          { command: "solana balance <ADDRESS>" },
+        ],
+      }),
+    );
+    expect(screen.getAllByText("$")).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "Copy code" })).toHaveLength(
+      1,
+    );
+    expect(
+      screen.getAllByRole("button", { name: "Copy command" }),
+    ).toHaveLength(1);
   });
 
   it("labels multi-line code as code", () => {

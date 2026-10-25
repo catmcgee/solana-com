@@ -66,9 +66,23 @@ export function CommandText({ command }: { command: string }) {
 }
 
 /**
+ * A shell command, not code: a program name first (`solana`, `spl-token`),
+ * no call or assignment (`rpc.getBalance(address).send()` is code).
+ */
+function isShellCommand(command: string) {
+  const first = command.trim().split(/\s+/)[0] ?? "";
+  return (
+    /^[\w@./-]+$/.test(first) &&
+    !/^(?:const|let|var|await|import|return|fn|pub)$/.test(first) &&
+    !/[;=]\s*$|\)\s*;?\s*$/.test(command.trim())
+  );
+}
+
+/**
  * One shell command with a green `$` prompt, as the docs' terminals (not
  * selected or copied), and a copy button; multi-line code drops the prompt
- * and scrolls instead of wrapping.
+ * and scrolls instead of wrapping, and a line of code (a model visual's
+ * `rpc.getBalance(address).send()`) shows without the prompt.
  * `row` sits in a list frame, `boxed` stands alone in a step, `compact`
  * goes in the setup checklist.
  */
@@ -83,6 +97,7 @@ export function CommandRow({
 }) {
   const t = useTranslations("docsAsk");
   const multiline = command.includes("\n");
+  const shell = !multiline && isShellCommand(command);
   const size = variant === "compact" ? "text-[12px]" : "text-[13px]";
   // Commands read left to right on right-to-left pages too, as in the docs.
   return (
@@ -97,7 +112,7 @@ export function CommandRow({
           "rounded-lg border border-[var(--sol-line)] py-1 ps-3 pe-1",
       )}
     >
-      {multiline ? null : (
+      {shell ? (
         <span
           aria-hidden="true"
           className={cn(
@@ -108,7 +123,7 @@ export function CommandRow({
         >
           $
         </span>
-      )}
+      ) : null}
       {/* The size sits on the box too, so its line box matches the prompt's. */}
       <div className={cn(size, "min-w-0 flex-1 py-[3px] leading-5")}>
         {multiline ? (
@@ -140,7 +155,7 @@ export function CommandRow({
       </div>
       <CopyButton
         text={command}
-        label={t(multiline ? "copyCode" : "copyCommand")}
+        label={t(shell ? "copyCommand" : "copyCode")}
       />
     </div>
   );

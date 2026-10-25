@@ -8,8 +8,10 @@
 import type {
   AskEffectAction,
   AskNodeTone,
+  VisualNode,
+  VisualStep,
 } from "@/lib/docs/ask/generative-ui/schema";
-import { toneScope } from "../ui";
+import { toneScope, type AskTone } from "../ui";
 
 /**
  * Points `--tone` (text, arrows, marks), `--tone-soft` (fills) and
@@ -40,6 +42,30 @@ export const EFFECT_GLYPHS: Record<
   },
   close: { glyph: "×", className: "text-[var(--tone-amber)]" },
 };
+
+/**
+ * A step's tone: that of the first card it changes (a reveal, update or
+ * close; else a card it links), or failing those the first card it lights
+ * up. A step and the card it acts on then share a colour, which means the
+ * card's kind. Purple without a model, for a card of no known kind, and for
+ * a step that touches no card.
+ */
+export function stepTone(
+  step: VisualStep,
+  nodes: readonly VisualNode[] | undefined,
+): AskTone {
+  if (!nodes?.length) return "purple";
+  const tones = new Map(nodes.map((node) => [node.id, node.tone]));
+  const card = (id?: string) => (id && tones.has(id) ? id : undefined);
+  const id =
+    step.effects.find(
+      (effect) => effect.action !== "connect" && card(effect.nodeId),
+    )?.nodeId ??
+    step.effects.find((effect) => card(effect.nodeId))?.nodeId ??
+    step.touches.find((touched) => card(touched));
+  const tone = id ? tones.get(id) : undefined;
+  return !tone || tone === "neutral" ? "purple" : tone;
+}
 
 function mix(from: string, to: string, weight: number) {
   if (weight <= 0) return from;

@@ -18,6 +18,8 @@ export const DOCS_ASK_OPEN_ATTR = "data-docs-ask-open";
 export type AskAiOpenOptions = {
   /** Code to explain (sent at once, cut to 3,500 characters). */
   code?: string;
+  /** The code's language, as its block names it ("ts", "rust"). */
+  language?: string;
   /** A question to send at once. */
   question?: string;
   /** Attach this page to the composer and focus it; nothing is sent. */

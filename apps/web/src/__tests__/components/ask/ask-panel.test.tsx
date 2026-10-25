@@ -23,13 +23,16 @@ vi.mock("fumadocs-core/highlight/client", () => ({
 }));
 
 const { AskAi } = await import("@/components/docs/ask/ask-ai.client");
+const { AskHeaderButton } =
+  await import("@/components/docs/ask/ask-launcher.client");
 
 const encoder = new TextEncoder();
 const sse = (name: string, data: unknown) =>
   `event: ${name}\ndata: ${JSON.stringify(data)}\n\n`;
 
+/** A long in-depth part (two code blocks), so it folds under "Full answer". */
 const ANSWER =
-  "### Summary response\nA mint account defines a token.\n\n### Indepth response\nIt stores `decimals` and the mint authority.\n\nWant to see this in code?";
+  "### Summary response\nA mint account defines a token.\n\n### Indepth response\nIt stores `decimals` and the mint authority.\n\n```ts\nconst mint = await createMint();\n```\n\n```ts\nconst account = await createAccount();\n```\n\nWant to see this in code?";
 
 function answer(done: Record<string, unknown> = {}, text = ANSWER) {
   return new Response(
@@ -242,6 +245,59 @@ describe("Ask AI launcher and panel", () => {
     expect(
       screen.getByRole("complementary", { name: "Ask AI" }),
     ).toBeInTheDocument();
+  });
+
+  it("closes the docked panel on Esc from inside it, back to the opener", async () => {
+    renderAsk();
+    const launcher = screen.getByRole("button", { name: "Ask AI" });
+    launcher.focus();
+    await act(async () => fireEvent.click(launcher));
+    expect(document.activeElement).toBe(composer());
+    // An IME composition's Esc stays with the composer.
+    await act(async () =>
+      fireEvent.keyDown(composer(), { key: "Escape", isComposing: true }),
+    );
+    expect(askStore.getState().open).toBe(true);
+    await act(async () => fireEvent.keyDown(composer(), { key: "Escape" }));
+    expect(screen.queryByRole("complementary")).toBeNull();
+    expect(askStore.getState().open).toBe(false);
+    expect(document.activeElement).toBe(launcher);
+  });
+
+  it("tells assistive tech whether the panel is open, and which it is", async () => {
+    renderAsk();
+    const launcher = screen.getByRole("button", { name: "Ask AI" });
+    expect(launcher).toHaveAttribute("aria-expanded", "false");
+    expect(launcher).not.toHaveAttribute("aria-controls");
+    // Docked, the panel is a sidebar, not a popup.
+    expect(launcher).not.toHaveAttribute("aria-haspopup");
+    await act(async () => fireEvent.click(launcher));
+    expect(launcher).toHaveAttribute("aria-expanded", "true");
+    const panel = screen.getByRole("complementary", { name: "Ask AI" });
+    expect(launcher).toHaveAttribute("aria-controls", panel.id);
+  });
+
+  it("gives the header's ✨ the same state, a dialog below 1280px, and warms the session", async () => {
+    setViewport(1100);
+    render(
+      <NextIntlClientProvider locale="en" messages={en}>
+        <AskHeaderButton label="Ask AI">✨</AskHeaderButton>
+        <AskAi />
+      </NextIntlClientProvider>,
+    );
+    const header = screen.getByTitle("Ask AI");
+    expect(header).toHaveAttribute("aria-haspopup", "dialog");
+    expect(header).toHaveAttribute("aria-expanded", "false");
+    const sessions = () =>
+      fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/session"))
+        .length;
+    expect(sessions()).toBe(0);
+    await act(async () => fireEvent.focus(header));
+    await waitFor(() => expect(sessions()).toBe(1));
+    await act(async () => fireEvent.click(header));
+    const dialog = screen.getByRole("dialog", { name: "Ask AI" });
+    expect(header).toHaveAttribute("aria-expanded", "true");
+    expect(header).toHaveAttribute("aria-controls", dialog.id);
   });
 
   it("toggles with ⌘I / Ctrl+I, but not from other text fields", async () => {
@@ -476,8 +532,10 @@ describe("Ask AI conversation", () => {
     await screen.findByText("A mint account defines a token.", {
       selector: "p",
     });
+    // Sent without the page title, which the agent's router would answer
+    // with a canned template; shown with it.
     expect(chatBodies()[0]!.message).toBe(
-      "Explain this code from Create a keypair:\n\n```\nconst signer = await generate();\n```",
+      "Explain this code:\n\n```\nconst signer = await generate();\n```",
     );
     // The question reads as a title, its code in a frame under it, not as
     // raw fences.
@@ -516,10 +574,11 @@ describe("Ask AI conversation", () => {
     await screen.findByText("A mint account defines a token.", {
       selector: "p",
     });
+    // The reader's words; the page goes in its own fields.
     expect(chatBodies()[0]).toMatchObject({
-      message:
-        "Question about the docs page “Accounts” (https://solana.com/developers/docs/core/accounts):\n\nWhat is rent?",
+      message: "What is rent?",
       page_url: "https://solana.com/developers/docs/core/accounts",
+      page_title: "Accounts",
     });
     // Shown above the question, and gone from the composer.
     expect(screen.getAllByText("This page: Accounts")).toHaveLength(1);
@@ -600,6 +659,106 @@ describe("Ask AI sidebar shell", () => {
     expect(
       within(turns[0] as HTMLElement).getByText("Sources (1)"),
     ).toBeInTheDocument();
+  });
+
+  it("keeps one disclaimer under the first finished answer, and the agent's next questions on the latest", async () => {
+    const suggested = {
+      suggested_followups: {
+        prompt: "Want to keep going? Try one of these:",
+        buttons: [
+          {
+            type: "ask",
+            label: "Rent exemption",
+            message: "How does rent exemption affect creating accounts?",
+          },
+        ],
+      },
+    };
+    // The second answer repeats one: it is not offered again.
+    const more = {
+      suggested_followups: {
+        ...suggested.suggested_followups,
+        buttons: [
+          ...suggested.suggested_followups.buttons,
+          {
+            type: "ask",
+            label: "Account ownership",
+            message: "How do programs own and modify account data?",
+          },
+        ],
+      },
+    };
+    chats.push(answer(suggested), answer(more, "Rent is a deposit."));
+    renderAsk();
+    await act(async () => askStore.open());
+    const disclaimer =
+      "Answers can be wrong. Check them against the linked pages.";
+    await ask("What is a mint?");
+    await screen.findByText("A mint account defines a token.", {
+      selector: "p",
+    });
+    const next = screen.getByRole("group", {
+      name: "Want to keep going? Try one of these:",
+    });
+    const code = screen.getByRole("group", {
+      name: "Want to see this in code?",
+    });
+    expect(
+      code.compareDocumentPosition(next) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    await act(async () =>
+      fireEvent.click(
+        within(next).getByRole("button", { name: "Rent exemption" }),
+      ),
+    );
+    await screen.findByText("Rent is a deposit.", { selector: "p" });
+    expect(chatBodies()[1]).toMatchObject({
+      message: "How does rent exemption affect creating accounts?",
+    });
+    const turns = [
+      ...document.querySelector("[data-ask-panel] ol")!.children,
+    ] as HTMLElement[];
+    expect(turns).toHaveLength(2);
+    expect(within(turns[0]!).getByText(disclaimer)).toBeInTheDocument();
+    expect(screen.getAllByText(disclaimer)).toHaveLength(1);
+    // Only the latest answer offers next questions.
+    expect(
+      screen.getAllByRole("group", {
+        name: "Want to keep going? Try one of these:",
+      }),
+    ).toHaveLength(1);
+    expect(
+      within(turns[1]!).getByRole("button", { name: "Account ownership" }),
+    ).toBeInTheDocument();
+    expect(
+      within(turns[1]!).queryByRole("button", { name: "Rent exemption" }),
+    ).toBeNull();
+  });
+
+  it("puts the disclaimer under the first answer that links pages, not a decline", async () => {
+    chats.push(
+      answer(
+        { citations: [], code_followups: null },
+        "I can't help with that here.",
+      ),
+      answer(),
+    );
+    renderAsk();
+    await act(async () => askStore.open());
+    await ask("Will SOL go up?");
+    await screen.findByText("I can't help with that here.", { selector: "p" });
+    const disclaimer =
+      "Answers can be wrong. Check them against the linked pages.";
+    expect(screen.queryByText(disclaimer)).toBeNull();
+    await ask("What is a mint?");
+    await screen.findByText("A mint account defines a token.", {
+      selector: "p",
+    });
+    const turns = [
+      ...document.querySelector("[data-ask-panel] ol")!.children,
+    ] as HTMLElement[];
+    expect(within(turns[1]!).getByText(disclaimer)).toBeInTheDocument();
+    expect(screen.getAllByText(disclaimer)).toHaveLength(1);
   });
 
   it("shows New chat as a labelled button once there is a conversation", async () => {

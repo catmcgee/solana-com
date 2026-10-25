@@ -104,10 +104,12 @@ function useAnnouncement(last: AskAssistantMessage | undefined): string {
 /**
  * The conversation as a list of turns (question as heading, then its
  * answer), scrolled to the end as answers arrive while the reader is at the
- * bottom. Once they scroll up it stays put; a labelled "Jump to latest"
- * pill appears at the inline end only while something new is arriving or
- * has arrived below. A polite live region announces status changes and
- * finished answers.
+ * bottom, until the latest question reaches the top: a tall visual then
+ * leaves the question, status and summary in view rather than pushing them
+ * off. Once they scroll up (or following stops) it stays put; a labelled
+ * "Jump to latest" pill appears at the inline end only while something new
+ * is arriving or has arrived below. A polite live region announces status
+ * changes and finished answers.
  */
 export function AskThread({ fullscreen }: { fullscreen: boolean }) {
   const messages = useAskSelector((s) => s.messages);
@@ -115,10 +117,20 @@ export function AskThread({ fullscreen }: { fullscreen: boolean }) {
   const scroller = useRef<HTMLDivElement>(null);
   const content = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
+  /** Following stops at the latest question (until the reader goes past it). */
+  const capped = useRef(true);
   const [away, setAway] = useState(false);
   const [unseen, setUnseen] = useState(false);
 
   const turns = useMemo(() => toTurns(messages), [messages]);
+  // The disclaimer ("check them against the linked pages") stays under
+  // the first finished answer that links pages, not under a decline.
+  const firstDone = messages.find(
+    (message) =>
+      message.role === "assistant" &&
+      message.state === "done" &&
+      message.citations.length > 0,
+  )?.id;
   const last = messages.at(-1);
   const lastAssistant = last?.role === "assistant" ? last : undefined;
   const announcement = useAnnouncement(lastAssistant);
@@ -143,6 +155,18 @@ export function AskThread({ fullscreen }: { fullscreen: boolean }) {
     }
   }, []);
 
+  /** Where the latest turn starts, in the scroller's content. */
+  const latestTop = useCallback(() => {
+    const el = scroller.current;
+    const turn = content.current?.querySelector("ol > li:last-child");
+    if (!el || !turn) return Infinity;
+    return (
+      turn.getBoundingClientRect().top -
+      el.getBoundingClientRect().top +
+      el.scrollTop
+    );
+  }, []);
+
   const onScroll = useCallback(() => {
     const el = scroller.current;
     if (!el) return;
@@ -150,14 +174,34 @@ export function AskThread({ fullscreen }: { fullscreen: boolean }) {
     stick.current = distance < STICK_THRESHOLD;
     setAway(!stick.current);
     if (stick.current) setUnseen(false);
-  }, []);
+    // The reader went down past the question themselves: follow again.
+    if (stick.current && el.scrollTop > latestTop() + 1) capped.current = false;
+  }, [latestTop]);
 
-  // A new question always brings the end into view.
+  // Follows the end, but not past the latest question's top: there it
+  // stops, and the Jump to latest pill offers the rest.
+  const follow = useCallback(() => {
+    const el = scroller.current;
+    if (!el) return;
+    const top = capped.current ? latestTop() : Infinity;
+    if (el.scrollHeight - el.clientHeight > top + 1) {
+      el.scrollTop = top;
+      stick.current = false;
+      setAway(true);
+      return;
+    }
+    toBottom();
+  }, [latestTop, toBottom]);
+
+  // A new question always brings the end into view. A thread restored as
+  // it was (or remounted for full screen) opens at its end, uncapped.
   const count = messages.length;
+  const lastIsNew = isNew(messages.at(-1)?.id);
   useEffect(() => {
     stick.current = true;
+    capped.current = lastIsNew;
     toBottom();
-  }, [count, toBottom]);
+  }, [count, lastIsNew, toBottom]);
 
   // New content while the reader is up the thread: offer the way down.
   const step = progress(messages);
@@ -174,12 +218,12 @@ export function AskThread({ fullscreen }: { fullscreen: boolean }) {
     const el = content.current;
     if (!el || typeof ResizeObserver === "undefined") return;
     const observer = new ResizeObserver(() => {
-      if (stick.current) toBottom();
+      if (stick.current) follow();
       else onScroll();
     });
     observer.observe(el);
     return () => observer.disconnect();
-  }, [toBottom, onScroll]);
+  }, [follow, onScroll]);
   const onToggle = (event: MouseEvent<HTMLDivElement>) => {
     if ((event.target as Element).closest?.("[aria-expanded], summary"))
       stick.current = false;
@@ -221,6 +265,7 @@ export function AskThread({ fullscreen }: { fullscreen: boolean }) {
                     answer={turn.answer}
                     latest={index === turns.length - 1}
                     fullscreen={fullscreen}
+                    disclaimer={!!firstDone && turn.answer?.id === firstDone}
                     enterQuestion={isNew(turn.question?.id)}
                     enterAnswer={isNew(turn.answer?.id)}
                   />
@@ -235,6 +280,7 @@ export function AskThread({ fullscreen }: { fullscreen: boolean }) {
           type="button"
           onClick={() => {
             stick.current = true;
+            capped.current = false;
             setUnseen(false);
             toBottom(true);
           }}

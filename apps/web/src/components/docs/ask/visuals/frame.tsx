@@ -143,8 +143,9 @@ export function VisualLinks({
 }
 
 /**
- * The frame's one paragraph (the model's or the flow's), shown only when
- * the answer has no summary to say it already.
+ * A paragraph under a frame's label row: the model's or the flow's (shown
+ * only when the answer has no summary to say it already), or a command
+ * list's.
  */
 export function FrameProse({ text }: { text: string }) {
   return (

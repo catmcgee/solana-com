@@ -9,6 +9,7 @@ import {
   type DocsTab,
 } from "@/data/developers/docs-nav";
 import { localizedHref } from "@/data/developers/hub";
+import { AskHeaderButton } from "@/components/docs/ask/ask-launcher.client";
 import {
   DocsSearchField,
   HeaderMenus,
@@ -208,22 +209,20 @@ export async function DocsHeader({
             <SearchIcon />
           </a>
           {/* Opened by the Ask AI root (DOCS_ASK_OPEN_ATTR), so it needs
-              JS. Below 1024px docs pages move the search icon after the
-              tools (docs.css, order 2); the same order keeps this beside
-              it, and the menu goes last: search, Ask AI, menu everywhere.
-              From 1024px, where the search icon is a field tile, this is
-              one too. */}
-          <button
-            type="button"
+              JS; it says whether the panel is open and warms the session
+              on hover or focus. Below 1024px docs pages move the search
+              icon after the tools (docs.css, order 2); the same order keeps
+              this beside it, and the menu goes last: search, Ask AI, menu
+              everywhere. From 1024px, where the search icon is a field
+              tile, this is one too. */}
+          <AskHeaderButton
+            label={tc("askAI")}
             className="grid size-8 place-items-center rounded-lg text-[var(--sol-muted)] outline-hidden transition-[background-color,box-shadow] duration-150 hover:bg-[var(--sol-soft)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sol-purple)] motion-reduce:transition-none lg:ms-1.5 lg:size-[2.375rem] lg:rounded-[10px] lg:bg-[var(--sol-field)] lg:shadow-[inset_0_0_0_1px_var(--sol-field-line)] lg:hover:bg-[var(--sol-field)] lg:hover:shadow-[inset_0_0_0_1px_var(--sol-field-line-hover)] xl:!hidden max-lg:[[data-docs]_&]:order-2 [html:not([data-dh-js])_&]:!hidden"
-            aria-label={tc("askAI")}
-            title={tc("askAI")}
-            data-docs-ask-open=""
           >
             <span aria-hidden="true" className="text-[15px] leading-none">
               ✨
             </span>
-          </button>
+          </AskHeaderButton>
           <ThemeToggle {...toggle} />
           <LanguageMenu
             locale={locale}

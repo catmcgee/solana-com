@@ -16,9 +16,11 @@ import {
   modelStateAtStep,
   type VisualConceptModel,
   type VisualLink,
+  type VisualNode,
   type VisualStep,
   type VisualStepFlow,
 } from "@/lib/docs/ask/generative-ui/schema";
+import { toneScope } from "../ui";
 import { CommandRow } from "./command-row.client";
 import { ModelDiagram, type ModelFocus } from "./concept-model.client";
 import {
@@ -32,7 +34,7 @@ import {
 } from "./frame";
 import { CircleCheckIcon, DisclosureIcon } from "./icons";
 import { enterItem, RAIL_DRAW_MS, staggerStyle, useEnter } from "./motion";
-import { EFFECT_GLYPHS, railColor } from "./tones";
+import { EFFECT_GLYPHS, railColor, stepTone } from "./tones";
 
 /**
  * Which step the reader is looking at: hover wins over keyboard focus, which
@@ -109,8 +111,8 @@ function StepTitle({
       onClick={() => pointer.onToggle(step.id)}
       className={cn(
         base,
-        "rounded-sm text-start transition-colors duration-150 motion-reduce:transition-none [@media(hover:hover)]:hover:text-[var(--tone-purple)]",
-        active && "text-[var(--tone-purple)]",
+        "rounded-sm text-start transition-colors duration-150 motion-reduce:transition-none [@media(hover:hover)]:hover:text-[var(--tone)]",
+        active && "text-[var(--tone)]",
         focusRing,
       )}
     >
@@ -219,28 +221,33 @@ function StepDetails({ step }: { step: VisualStep }) {
 }
 
 /*
- * Every numeral is the docs' purple "active" colour: the cards are coloured
- * by kind, so a colour per position would give one hue two meanings.
- * Hover only where there is a real hover; focus only from the keyboard.
+ * A numeral takes its step's tone (`stepTone`: the kind of card it acts
+ * on), never a colour per position, so a hue means one thing in the whole
+ * diagram. Hover only where there is a real hover; focus only from the
+ * keyboard.
  */
 const circleIdle =
-  "border-[var(--tone-purple-line)] bg-[var(--tone-purple-soft)] text-[var(--tone-purple)]";
+  "border-[var(--tone-line)] bg-[var(--tone-soft)] text-[var(--tone)]";
 const circleOn =
-  "border-[var(--tone-purple)] bg-[var(--tone-purple)] text-white dark:text-[var(--sol-page)]";
+  "border-[var(--tone)] bg-[var(--tone)] text-white dark:text-[var(--sol-page)]";
 const circleHover =
-  "[@media(hover:hover)]:group-hover/step:border-[var(--tone-purple)] [@media(hover:hover)]:group-hover/step:bg-[var(--tone-purple)] [@media(hover:hover)]:group-hover/step:text-white dark:[@media(hover:hover)]:group-hover/step:text-[var(--sol-page)] group-has-[:focus-visible]/step:border-[var(--tone-purple)] group-has-[:focus-visible]/step:bg-[var(--tone-purple)] group-has-[:focus-visible]/step:text-white dark:group-has-[:focus-visible]/step:text-[var(--sol-page)]";
+  "[@media(hover:hover)]:group-hover/step:border-[var(--tone)] [@media(hover:hover)]:group-hover/step:bg-[var(--tone)] [@media(hover:hover)]:group-hover/step:text-white dark:[@media(hover:hover)]:group-hover/step:text-[var(--sol-page)] group-has-[:focus-visible]/step:border-[var(--tone)] group-has-[:focus-visible]/step:bg-[var(--tone)] group-has-[:focus-visible]/step:text-white dark:group-has-[:focus-visible]/step:text-[var(--sol-page)]";
 
 /**
- * The numbered rail: purple circles that fill while the step is pointed
- * at, joined by a hairline that runs the Solana gradient down the flow and,
- * on a visual's first appearance, draws downward one slice after another.
+ * The numbered rail: circles in each step's tone that fill while the step
+ * is pointed at, joined by a hairline that runs the Solana gradient down
+ * the flow and, on a visual's first appearance, draws downward one slice
+ * after another.
  */
 function StepRail({
   steps,
+  nodes,
   pointer,
   staggerFrom = 0,
 }: {
   steps: VisualStep[];
+  /** The model's cards, which give each step its tone. */
+  nodes?: VisualNode[];
   pointer?: StepPointer;
   /** Items already in the entrance sequence (the model's cards). */
   staggerFrom?: number;
@@ -253,6 +260,7 @@ function StepRail({
       {steps.map((step, index) => {
         const last = index === count - 1;
         const active = pointer?.activeId === step.id;
+        const tone = stepTone(step, nodes);
         const style = {
           "--rail-from": railColor(index, count),
           "--rail-to": railColor(index + 1, count),
@@ -265,9 +273,11 @@ function StepRail({
             key={step.id}
             data-step={step.id}
             data-active={active || undefined}
+            data-tone={tone}
             style={style}
             className={cn(
               "group/step grid grid-cols-[1.5rem_minmax(0,1fr)] gap-x-3",
+              toneScope[tone],
               enter && enterItem,
             )}
             {...pointerProps(step, pointer)}
@@ -355,12 +365,14 @@ function SetupChecklist({
   );
 }
 
-/** "More you can do": optional steps, folded. */
+/** "More you can do": optional steps, folded; titles in the steps' tones. */
 function OptionalSteps({
   steps,
+  nodes,
   pointer,
 }: {
   steps: VisualStep[];
+  nodes?: VisualNode[];
   pointer?: StepPointer;
 }) {
   const t = useTranslations("docsAsk.visuals");
@@ -376,6 +388,7 @@ function OptionalSteps({
               key={step.id}
               data-step={step.id}
               data-active={pointer?.activeId === step.id || undefined}
+              className={toneScope[stepTone(step, nodes)]}
               {...pointerProps(step, pointer)}
             >
               <StepTitle step={step} pointer={pointer} />
@@ -406,11 +419,14 @@ function footerLinks(flow: VisualStepFlow, extra: VisualLink[] = []) {
 
 function FlowBody({
   flow,
+  nodes,
   links,
   pointer,
   staggerFrom,
 }: {
   flow: VisualStepFlow;
+  /** The model's cards, when the flow is drawn with them. */
+  nodes?: VisualNode[];
   links: VisualLink[];
   pointer?: StepPointer;
   staggerFrom?: number;
@@ -424,12 +440,13 @@ function FlowBody({
       {flow.steps.length > 0 ? (
         <StepRail
           steps={flow.steps}
+          nodes={nodes}
           pointer={pointer}
           staggerFrom={staggerFrom}
         />
       ) : null}
       {flow.optional.length > 0 ? (
-        <OptionalSteps steps={flow.optional} pointer={pointer} />
+        <OptionalSteps steps={flow.optional} nodes={nodes} pointer={pointer} />
       ) : null}
       <VisualLinks
         className="border-t border-[var(--sol-line)] px-3.5 py-2.5"
@@ -516,6 +533,7 @@ export function VisualModelFlowBlock({
       <div className="border-t border-[var(--sol-line)]">
         <FlowBody
           flow={flow}
+          nodes={model.nodes}
           links={footerLinks(flow, model.links)}
           pointer={pointer}
           staggerFrom={model.nodes.length}

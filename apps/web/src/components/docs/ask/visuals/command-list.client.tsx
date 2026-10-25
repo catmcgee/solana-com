@@ -1,26 +1,16 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { cn } from "@/app/components/utils";
 import type { VisualCommandList } from "@/lib/docs/ask/generative-ui/schema";
 import { CommandRow } from "./command-row.client";
-import { bodyText, VisualFrame } from "./frame";
+import { FrameProse, VisualFrame } from "./frame";
 
 /** command_list: copyable shell commands, one per row. */
 export function VisualCommandListBlock({ list }: { list: VisualCommandList }) {
   const t = useTranslations("docsAsk.visuals");
   return (
     <VisualFrame label={t("commands")} title={list.title}>
-      {list.body ? (
-        <p
-          className={cn(
-            bodyText,
-            "m-0 border-b border-[var(--sol-line)] px-3.5 py-2.5 text-[13px] leading-[1.6]",
-          )}
-        >
-          {list.body}
-        </p>
-      ) : null}
+      {list.body ? <FrameProse text={list.body} /> : null}
       <div>
         {list.commands.map((item, index) => (
           <CommandRow

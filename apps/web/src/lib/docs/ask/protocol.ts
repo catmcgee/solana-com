@@ -8,9 +8,13 @@
  *   /developers/docs, in the reader's locale, so they navigate client-side.
  */
 import { DOCS_LOCALES } from "../locales.mjs";
-import { isAskGenerativeUi, type AskGenerativeUi } from "./generative-ui/types";
+import {
+  isAskGenerativeUi,
+  toAskGenerativeUi,
+  type AskGenerativeUi,
+} from "./generative-ui/types";
 
-export { isAskGenerativeUi };
+export { isAskGenerativeUi, toAskGenerativeUi };
 export type {
   AskGenerativeUi,
   AskGenerativeUiComponent,
@@ -34,6 +38,23 @@ export type CodeFollowupButton = {
 
 export type CodeFollowups = { prompt: string; buttons: CodeFollowupButton[] };
 
+/** One "what next" question; `kind` is the agent's button type ("ask"). */
+export type AskSuggestedFollowup = {
+  label: string;
+  /** Sent as the next question when the pill is chosen. */
+  message: string;
+  kind: string;
+};
+
+/**
+ * The agent's `suggested_followups` ("Want to keep going? Try one of
+ * these:"): next lessons and related questions, without a code language.
+ */
+export type AskSuggestedFollowups = {
+  prompt: string | null;
+  items: AskSuggestedFollowup[];
+};
+
 /** A finished answer (`done` event, JSON fallback, or `GET /runs/:id`). */
 export type AskDonePayload = {
   /** Full answer text when the server sends it; it replaces the streamed text. */
@@ -43,6 +64,7 @@ export type AskDonePayload = {
   citations: AskCitation[];
   generativeUi: AskGenerativeUi | null;
   codeFollowups: CodeFollowups | null;
+  suggestedFollowups: AskSuggestedFollowups | null;
 };
 
 /**
@@ -59,7 +81,9 @@ export type AskErrorKind =
   | "incomplete"
   | "tooLong"
   | "conversationFull"
-  | "offline";
+  | "offline"
+  /** The agent is still finishing this session's previous answer. */
+  | "busy";
 
 /** What the status row says while an answer is on its way (`docsAsk.status.<status>`). */
 export type AskStatus = "preparing" | "searching" | "writing" | "visual";
@@ -184,11 +208,51 @@ export function normalizeCodeFollowups(value: unknown): CodeFollowups | null {
   return { prompt, buttons };
 }
 
+/** The agent sends at most three. */
+const MAX_SUGGESTED_FOLLOWUPS = 3;
+
+/**
+ * Suggested follow-ups in the panel's shape. Reads the agent's
+ * `{prompt, buttons: [{type, label, message}]}`, a bare list of buttons,
+ * and a stored copy (`{prompt, items: [{kind, label, message}]}`). Items
+ * need a label and a message; repeats (by message) are dropped. Null when
+ * none is left.
+ */
+export function normalizeSuggestedFollowups(
+  value: unknown,
+): AskSuggestedFollowups | null {
+  const record = isRecord(value) ? value : {};
+  const list = Array.isArray(value)
+    ? value
+    : Array.isArray(record.buttons)
+      ? record.buttons
+      : Array.isArray(record.items)
+        ? record.items
+        : [];
+  const seen = new Set<string>();
+  const items = list
+    .flatMap((item) => {
+      if (!isRecord(item)) return [];
+      const label = toNonEmptyString(item.label);
+      const message = toNonEmptyString(item.message);
+      if (!label || !message || seen.has(message.toLowerCase())) return [];
+      seen.add(message.toLowerCase());
+      const kind =
+        toNonEmptyString(item.kind) ?? toNonEmptyString(item.type) ?? "ask";
+      return [{ label, message, kind }];
+    })
+    .slice(0, MAX_SUGGESTED_FOLLOWUPS);
+  return items.length > 0
+    ? { prompt: toNonEmptyString(record.prompt), items }
+    : null;
+}
+
 /**
  * A `done` payload (or any finished-answer JSON) in the client's shape.
  * Accepts the field aliases the agent has used: run_id/runId,
  * conversation_id/conversationId, response/content/text/answer,
- * generative_ui/generativeUi, code_followups/codeFollowups.
+ * generative_ui/generativeUi, code_followups/codeFollowups,
+ * suggested_followups/suggestedFollowups.
  */
 export function toDonePayload(
   value: unknown,
@@ -205,9 +269,12 @@ export function toDonePayload(
     runId: toId(done.run_id) ?? toId(done.runId),
     conversationId: toId(done.conversation_id) ?? toId(done.conversationId),
     citations: normalizeCitations(done.citations, locale),
-    generativeUi: isAskGenerativeUi(generativeUi) ? generativeUi : null,
+    generativeUi: toAskGenerativeUi(generativeUi),
     codeFollowups: normalizeCodeFollowups(
       done.code_followups ?? done.codeFollowups,
+    ),
+    suggestedFollowups: normalizeSuggestedFollowups(
+      done.suggested_followups ?? done.suggestedFollowups,
     ),
   };
 }
@@ -275,26 +342,71 @@ export function splitAnswerSections(text: string): {
 }
 
 /**
- * The status row for a raw stage from `status` / `ui_status` events:
- * searching_docs → searching, building_visual → visual, a cache hit →
- * writing, anything else → preparing.
+ * The status row for a raw stage from `status`, `answer_status` and
+ * `ui_status` events:
+ * - searching: searching_docs, reading_doc, using_tool, retrieving_docs,
+ *   building_plan (the agent is still gathering what to answer from);
+ * - writing: writing, a response cache hit, a rendered template answer;
+ * - visual: building_visual_answer and other ui stages;
+ * - preparing: accepted, starting and anything unknown.
  */
 export function askStatusForStage(stage: string): AskStatus {
   const normalized = stage.trim().toLowerCase();
-  if (normalized.startsWith("search")) return "searching";
   if (normalized.includes("visual") || normalized.startsWith("ui")) {
     return "visual";
   }
-  if (normalized === "cache_hit" || normalized.startsWith("writ")) {
+  if (/^(?:search|read|retriev|using_tool|building_plan)/.test(normalized)) {
+    return "searching";
+  }
+  if (/^(?:writ|rendering_template)|cache_hit$/.test(normalized)) {
     return "writing";
   }
   return "preparing";
 }
 
+const STATUS_ORDER: readonly AskStatus[] = [
+  "preparing",
+  "searching",
+  "writing",
+  "visual",
+];
+
+/**
+ * The status row only moves forward: the agent reports `searching_docs`,
+ * then `reading_doc` per page, then (with a canonical page) `building_plan`,
+ * so a later stage of an earlier step must not send "Writing" back to
+ * "Searching".
+ */
+export function advanceAskStatus(
+  current: AskStatus | undefined,
+  next: AskStatus,
+): AskStatus {
+  if (!current) return next;
+  return STATUS_ORDER.indexOf(next) > STATUS_ORDER.indexOf(current)
+    ? next
+    : current;
+}
+
+/** The agent's 401 text, and the `invalid_session` code of the review backends. */
+const SESSION_REFUSED =
+  /invalid[_ ]session|session[_ ](?:expired|invalid)|valid session_token/;
+
 /**
  * The error kind for a failed request, from its status and body (the agent
- * and proxy send `{error: "<code>", message?}`). `session` means the token
- * was refused and a fresh one should be tried.
+ * sends `{error: "<text>"}`, Laravel validation `{message, errors}`, the
+ * proxy and review backends `{error: "<code>", message?}`). `session`
+ * means the token was refused and a fresh one should be tried.
+ *
+ * - 403 is not a session problem: the agent answers 403 only to a wrong
+ *   proxy secret (the proxy turns that into 502), and our own 403s
+ *   (`invalid_origin`, `bot`) won't pass with a new token either.
+ * - 429 has three causes: the per-minute throttle (`rateLimited`), the
+ *   agent's two-pending-answers cap, "Please wait for your previous
+ *   question to finish." (`busy`; the agent keeps answering after Stop),
+ *   and a capacity limit in front of the agent, which sends no JSON
+ *   (`unavailable`).
+ * - 422 with `errors`: a rejected `message` is too long; anything else
+ *   (a stale `conversation_id`, an over-long feedback comment) is generic.
  */
 export function askErrorKindFor(
   status: number,
@@ -303,21 +415,26 @@ export function askErrorKindFor(
   const text = (
     typeof body === "string" ? body : JSON.stringify(body ?? "")
   ).toLowerCase();
-  if (
-    status === 401 ||
-    status === 403 ||
-    status === 419 ||
-    /invalid[_ ]session|session[_ ](expired|invalid)/.test(text)
-  ) {
+  if (status === 401 || status === 419 || SESSION_REFUSED.test(text)) {
     return "session";
   }
-  if (status === 429 || /\brate[_ ]limit/.test(text)) return "rateLimited";
-  if (status === 413 || /too[_ -]?long|max(imum)?[_ -]?length/.test(text)) {
+  if (status === 429) {
+    if (!isRecord(body)) return "unavailable";
+    return /previous question/.test(text) ? "busy" : "rateLimited";
+  }
+  if (/\brate[_ ]limit/.test(text)) return "rateLimited";
+  if (status === 422 && isRecord(body) && isRecord(body.errors)) {
+    return "message" in body.errors ? "tooLong" : "generic";
+  }
+  if (
+    status === 413 ||
+    /too[_ -]?long|max(?:imum)?[_ -]?length|max_chars/.test(text)
+  ) {
     return "tooLong";
   }
   if (
     status === 409 ||
-    /conversation[_ ](limit|full)|too many messages/.test(text)
+    /conversation[_ ](?:limit|full)|too many messages/.test(text)
   ) {
     return "conversationFull";
   }
@@ -325,8 +442,43 @@ export function askErrorKindFor(
   return "generic";
 }
 
+/**
+ * True when the request named a conversation this session can't use: the
+ * agent's 404 "Conversation not found for this session." (a new token, a
+ * second tab, a backend switch) or a 422 that rejects `conversation_id`.
+ * The client then starts a new conversation and sends the question again.
+ */
+export function isStaleConversation(status: number, body: unknown): boolean {
+  if (status === 404) {
+    const text = typeof body === "string" ? body : JSON.stringify(body ?? "");
+    return /conversation not found/i.test(text);
+  }
+  return (
+    status === 422 &&
+    isRecord(body) &&
+    isRecord(body.errors) &&
+    "conversation_id" in body.errors
+  );
+}
+
+/**
+ * Our own codes for a service that is down or slow. The nous backend can
+ * start the stream (with a template visual) before the gateway answers, so
+ * its refusal arrives as an error event instead of an HTTP status.
+ */
+const UNAVAILABLE_CODES = new Set([
+  "ask_unavailable",
+  "ask_timeout",
+  "ask_misconfigured",
+]);
+
 /** The kind for an `event: error` payload from the stream. */
 export function askErrorKindForEvent(payload: unknown): AskErrorKind {
+  if (isRecord(payload) && typeof payload.error === "string") {
+    if (UNAVAILABLE_CODES.has(payload.error)) return "unavailable";
+    // The answer started, then the model stopped (nous `ask_failed`).
+    if (payload.error === "ask_failed") return "incomplete";
+  }
   const kind = askErrorKindFor(0, payload);
   return kind === "session" ? "generic" : kind;
 }

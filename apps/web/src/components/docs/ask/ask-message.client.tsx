@@ -3,14 +3,12 @@
 import { useTranslations } from "next-intl";
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/app/components/utils";
-import {
-  splitAnswerSections,
-  splitCodeFollowupPrompt,
-} from "@/lib/docs/ask/protocol";
+import { splitCodeFollowupPrompt } from "@/lib/docs/ask/protocol";
 import type { AskAssistantMessage, AskUserMessage } from "@/lib/docs/ask/store";
-import { AskActions } from "./ask-actions.client";
+import { answerParts } from "./answer-fold";
+import { AskActions, entranceClass, useEntrance } from "./ask-actions.client";
 import { AskError, AskStopped } from "./ask-error.client";
-import { AskFollowups } from "./ask-followups.client";
+import { AskFollowups, AskSuggestedFollowups } from "./ask-followups.client";
 import { AskFullAnswer, AskMarkdown } from "./ask-markdown.client";
 import { AskSources, FileTextIcon } from "./ask-sources.client";
 import { AskStatusRow } from "./ask-status.client";
@@ -142,8 +140,35 @@ export function AskQuestion({
 }
 
 /**
+ * "Answers can be wrong…", once, under the first finished answer: the
+ * empty state says it before the first question, and one quiet line keeps
+ * saying it after (not a footer on every answer, or under the composer).
+ */
+function Disclaimer({
+  messageId,
+  animate,
+}: {
+  messageId: string;
+  animate: boolean;
+}) {
+  const t = useTranslations("docsAsk");
+  const enter = useEntrance(`${messageId}:disclaimer`, animate);
+  return (
+    <p
+      className={cn(
+        "m-0 mt-3 text-[12px] leading-4 text-[var(--sol-dim)]",
+        enter && cn(entranceClass, "[animation-delay:280ms]"),
+      )}
+    >
+      <bdi>{t("disclaimer")}</bdi>
+    </p>
+  );
+}
+
+/**
  * An answer: no bubble, no avatar, no name. Status while it is on its way,
- * the summary, the visual, "Full answer", then (when done) sources,
+ * the summary (or opening paragraph), the visual, the rest (folded under
+ * "Full answer" when long, see ./answer-fold.ts), then (when done) sources,
  * follow-ups and actions; the latest answer shows them in full, older ones
  * fold sources and keep actions for hover. A failure or Stop ends it with
  * one line instead.
@@ -152,6 +177,7 @@ export function AssistantMessage({
   message,
   latest,
   fullscreen,
+  disclaimer = false,
 }: {
   message: AskAssistantMessage;
   /**
@@ -160,26 +186,32 @@ export function AssistantMessage({
    */
   latest: boolean;
   fullscreen: boolean;
+  /** The thread's first finished answer, which carries the disclaimer. */
+  disclaimer?: boolean;
 }) {
   const t = useTranslations("docsAsk");
-  const { state, status, ui, codeFollowups } = message;
+  const { state, status, ui, codeFollowups, suggestedFollowups } = message;
   const active = state === "pending" || state === "streaming";
   // Seen on its way (here, or asked again): its tail (sources, follow-ups,
   // actions) fades in as it finishes. A thread restored on reload, or an
   // answer that finished while the panel was closed, appears as it is.
   const [live, setLive] = useState(active);
   if (active && !live) setLive(true);
-  const { summary, inDepth, prompt } = useMemo(() => {
+  const hasVisual = !!ui;
+  const { lead, rest, fold, prompt } = useMemo(() => {
     const split = splitCodeFollowupPrompt(message.text, codeFollowups);
-    return { ...splitAnswerSections(split.body), prompt: split.prompt };
-  }, [message.text, codeFollowups]);
-  const copyText = [summary, inDepth].filter(Boolean).join("\n\n");
+    return {
+      ...answerParts(split.body, active, hasVisual),
+      prompt: split.prompt,
+    };
+  }, [message.text, codeFollowups, active, hasVisual]);
+  const copyText = [lead, rest].filter(Boolean).join("\n\n");
   const done = state === "done";
-  const partial = !!summary || !!ui;
+  const partial = !!lead || !!ui;
   // English answers stay left to right on an Arabic page. Known once text
   // arrives, for icons to flip with `group-data-[dir=rtl]/answer:`.
-  const lead = summary || inDepth;
-  const dir = lead ? textDirection(lead) : "auto";
+  const first = lead || rest;
+  const dir = first ? textDirection(first) : "auto";
 
   return (
     <div
@@ -195,26 +227,37 @@ export function AssistantMessage({
       <span dir="auto" className={visuallyHidden}>
         {t("panelLabel")}:{" "}
       </span>
-      {active && !summary && !ui ? (
-        <AskStatusRow status={status ?? "preparing"} />
-      ) : null}
-      {summary ? <AskMarkdown text={summary} streaming={active} /> : null}
+      {/* Until the first word: a visual that arrives early (a template)
+          goes under the status row, which keeps saying it's on its way. */}
+      {active && !lead ? <AskStatusRow status={status ?? "preparing"} /> : null}
+      {lead ? <AskMarkdown text={lead} streaming={active} /> : null}
       {ui ? (
-        <div className={summary ? "mt-4" : undefined}>
-          <AskVisual ui={ui} streaming={active} summary={summary} />
+        <div className={lead || active ? "mt-4" : undefined}>
+          <AskVisual ui={ui} streaming={active} summary={lead} />
         </div>
-      ) : active && status === "visual" && summary ? (
+      ) : active && status === "visual" && lead ? (
         <div className="mt-4">
           <AskStatusRow status="visual" />
         </div>
       ) : null}
-      {inDepth ? (
+      {rest && fold ? (
         <AskFullAnswer
           messageId={message.id}
-          text={inDepth}
+          text={rest}
           streaming={active}
           partial={state === "error" || state === "stopped"}
         />
+      ) : rest ? (
+        // Short enough to read here; it fades in where the folded row was.
+        <div
+          className={cn(
+            "mt-4",
+            live &&
+              "animate-in fade-in-0 duration-200 motion-reduce:animate-none",
+          )}
+        >
+          <AskMarkdown text={rest} streaming={active} />
+        </div>
       ) : null}
       {state === "error" || state === "stopped" ? (
         // With nothing above it, the line takes the status row's place.
@@ -241,6 +284,13 @@ export function AssistantMessage({
               animate={live}
             />
           ) : null}
+          {suggestedFollowups ? (
+            <AskSuggestedFollowups
+              suggestions={suggestedFollowups}
+              afterCode={!!codeFollowups}
+              animate={live}
+            />
+          ) : null}
           <AskActions message={message} copyText={copyText} animate={live} />
         </>
       ) : null}
@@ -262,6 +312,9 @@ export function AssistantMessage({
           />
         </div>
       ) : null}
+      {done && disclaimer ? (
+        <Disclaimer messageId={message.id} animate={live && latest} />
+      ) : null}
     </div>
   );
 }
@@ -275,6 +328,7 @@ export function AskTurn({
   answer,
   latest,
   fullscreen,
+  disclaimer = false,
   enterQuestion,
   enterAnswer,
 }: {
@@ -282,6 +336,8 @@ export function AskTurn({
   answer?: AskAssistantMessage;
   latest: boolean;
   fullscreen: boolean;
+  /** The answer is the thread's first finished one. */
+  disclaimer?: boolean;
   enterQuestion: boolean;
   enterAnswer: boolean;
 }) {
@@ -303,6 +359,7 @@ export function AskTurn({
             message={answer}
             latest={latest}
             fullscreen={fullscreen}
+            disclaimer={disclaimer}
           />
         </div>
       ) : null}

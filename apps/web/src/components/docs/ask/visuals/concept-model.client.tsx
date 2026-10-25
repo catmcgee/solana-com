@@ -96,7 +96,7 @@ function NodeCard({
       data-touched={touched || undefined}
       style={enter ? staggerStyle(index) : undefined}
       className={cn(
-        "min-w-0 overflow-hidden rounded-lg border bg-[var(--sol-page)] transition-[opacity,background-color,border-color,box-shadow] duration-150 motion-reduce:transition-none",
+        "flex min-w-0 flex-col overflow-hidden rounded-lg border bg-[var(--sol-page)] transition-[opacity,background-color,border-color,box-shadow] duration-150 motion-reduce:transition-none",
         // A part of no known kind highlights in the docs' purple.
         TONE_ACCENT[neutral ? "purple" : node.tone],
         closed
@@ -109,29 +109,40 @@ function NodeCard({
         enter && enterItem,
       )}
     >
-      <div className="flex min-w-0 items-center gap-2 px-3 py-2">
-        {closed || neutral ? null : (
-          <span
-            aria-hidden="true"
-            className="size-[5px] shrink-0 rotate-45 rounded-[1px] bg-[var(--tone)]"
-          />
+      {/* The head (name, type, description) carries a breath of the
+          card's tone, above the hairline rows; none once closed, or for a
+          part of no known kind. */}
+      <div
+        className={cn(
+          !closed &&
+            !neutral &&
+            "bg-[color-mix(in_oklab,var(--tone-soft)_55%,transparent)]",
         )}
-        <p className="m-0 min-w-0 flex-1 text-[13px] font-medium leading-5 text-[var(--sol-text)] [overflow-wrap:anywhere] @2xl:text-[14px]">
-          {node.name}
-        </p>
-        {closed ? (
-          <span className="inline-flex shrink-0 items-center rounded-full border border-dashed border-[var(--sol-line-strong)] px-1.5 text-[11px] font-medium leading-4 text-[var(--sol-dim)]">
-            {t("closed")}
-          </span>
-        ) : type && !namesType(node.name, type) ? (
-          <span className={tonePill}>{type}</span>
+      >
+        <div className="flex min-w-0 items-center gap-2 px-3 py-2">
+          {closed || neutral ? null : (
+            <span
+              aria-hidden="true"
+              className="size-[5px] shrink-0 rotate-45 rounded-[1px] bg-[var(--tone)]"
+            />
+          )}
+          <p className="m-0 min-w-0 flex-1 text-[13px] font-medium leading-5 text-[var(--sol-text)] [overflow-wrap:anywhere] @2xl:text-[14px]">
+            {node.name}
+          </p>
+          {closed ? (
+            <span className="inline-flex shrink-0 items-center rounded-full border border-dashed border-[var(--sol-line-strong)] px-1.5 text-[11px] font-medium leading-4 text-[var(--sol-dim)]">
+              {t("closed")}
+            </span>
+          ) : type && !namesType(node.name, type) ? (
+            <span className={tonePill}>{type}</span>
+          ) : null}
+        </div>
+        {node.description ? (
+          <p className="m-0 -mt-1 px-3 pb-2 text-[12px] leading-[1.5] text-[var(--sol-muted)] @2xl:text-[13px]">
+            {node.description}
+          </p>
         ) : null}
       </div>
-      {node.description ? (
-        <p className="m-0 -mt-1 px-3 pb-2 text-[12px] leading-[1.5] text-[var(--sol-muted)] @2xl:text-[13px]">
-          {node.description}
-        </p>
-      ) : null}
       {rows.length > 0 ? (
         <dl className="m-0">
           {rows.map((row, i) => (
@@ -241,7 +252,9 @@ export function ModelDiagram({
       <ul
         className={cn(
           // px-3.5: the cards' edges line up with the labels and the rail.
-          "m-0 grid list-none gap-2 px-3.5 py-3",
+          // items-start: a card without fields stays its own height beside
+          // one with, not a tall tinted slab.
+          "m-0 grid list-none items-start gap-2 px-3.5 py-3",
           gridColumns(model.nodes.length),
         )}
       >

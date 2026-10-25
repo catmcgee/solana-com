@@ -1,19 +1,27 @@
 /**
  * Client for the docs agent API, proxied same-origin at /api/ask:
  *
- *   POST /session     -> { session_token }
- *   POST /chat        -> SSE (status, delta, ui_status, ui_done, done, error)
- *                        or one JSON answer
+ *   POST /session     -> { session_token, expires_at? }
+ *   POST /chat        -> SSE (status, answer_status, delta, ui_status,
+ *                        ui_done, done, error) or one JSON answer
  *   POST /feedback    -> 2xx
- *   GET  /runs/:id    -> a finished answer
+ *   GET  /runs/:id    -> a finished answer (token in x-ask-session)
  *
- * Ported from Bri's ui-chrome/ask-solana/api.ts. Changes: a refused session
- * (401, 403, 419 or `{error: "invalid_session"}`) is cleared and retried
- * once, for chat and feedback; failures map to an AskErrorKind the panel
- * has a message for; the page a question is about is sent as
- * `page_url` / `page_title`; recent turns are sent as `history` for
- * backends without conversation memory; and the answer cache only stores
- * real, first-turn answers.
+ * Ported from Bri's ui-chrome/ask-solana/api.ts. Changes:
+ * - a refused session (401, 419 or `{error: "invalid_session"}`) is cleared
+ *   and retried once, for chat and feedback; a token is kept until the
+ *   `expires_at` the server gave it;
+ * - a conversation the session can't use (after a new token, from another
+ *   tab or backend) is dropped and the question sent again, once;
+ * - the agent's "previous question still finishing" 429 is retried once
+ *   after its Retry-After (up to 10 s);
+ * - failures map to an AskErrorKind the panel has a message for;
+ * - `message` is the question alone; the page it is about goes in
+ *   `page_url` / `page_title` (the agent's router answers page titles with
+ *   canned templates); recent turns go in `history` for backends without
+ *   conversation memory;
+ * - the answer cache only stores real, first-turn answers, never a visual
+ *   the agent withdrew.
  */
 import {
   answerCacheKey,
@@ -21,14 +29,16 @@ import {
   writeCachedAnswer,
 } from "./answer-cache";
 import {
+  ASK_API_BASE,
   ASK_CLIENT_CAPABILITIES,
   ASK_STORAGE_KEYS,
-  askApiBase,
   isPrerendering,
 } from "./config";
 import type { AskPageContext } from "./page-context";
 import {
   askErrorKindFor,
+  isRecord,
+  isStaleConversation,
   toDonePayload,
   type AskDonePayload,
   type AskErrorKind,
@@ -49,11 +59,23 @@ export class AskRequestError extends Error {
   }
 }
 
-type StoredSession = { token: string; createdAt: number };
+type StoredSession = {
+  token: string;
+  createdAt: number;
+  /** From the server's `expires_at` (ms); absent from the review backends and Bri's entries. */
+  expiresAt?: number;
+};
 
-/** The server's token lifetime; a refused token is replaced sooner. */
-const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+/** The agent's default token lifetime, for tokens stored without `expiresAt`. */
+const FALLBACK_SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+/** A token this close to expiring is replaced before it is refused. */
+const SESSION_EXPIRY_MARGIN_MS = 60 * 1000;
 const MAX_ERROR_BODY_CHARS = 2_000;
+
+/** The agent's pending-answers 429 is retried once if it asks to wait this long or less. */
+const BUSY_RETRY_MAX_MS = 10_000;
+/** Wait when such a 429 has no Retry-After. */
+const BUSY_RETRY_DEFAULT_MS = 3_000;
 
 let sessionInFlight: Promise<string> | null = null;
 
@@ -65,22 +87,44 @@ function readStoredSession(): string | null {
     if (
       typeof parsed.token !== "string" ||
       !parsed.token ||
-      typeof parsed.createdAt !== "number" ||
-      Date.now() - parsed.createdAt > SESSION_TTL_MS
+      typeof parsed.createdAt !== "number"
     ) {
       return null;
     }
-    return parsed.token;
+    const expiresAt =
+      typeof parsed.expiresAt === "number"
+        ? parsed.expiresAt
+        : parsed.createdAt + FALLBACK_SESSION_TTL_MS;
+    return Date.now() < expiresAt - SESSION_EXPIRY_MARGIN_MS
+      ? parsed.token
+      : null;
   } catch {
     return null;
   }
 }
 
-function storeSession(token: string) {
+/** `expires_at` as ms since the epoch: Unix seconds (the agent), ms, or an ISO date. */
+function expiryMs(value: unknown): number | undefined {
+  const ms =
+    typeof value === "number"
+      ? value < 1e12
+        ? value * 1000
+        : value
+      : typeof value === "string"
+        ? Date.parse(value)
+        : Number.NaN;
+  return Number.isFinite(ms) && ms > Date.now() ? ms : undefined;
+}
+
+function storeSession(token: string, expiresAt: number | undefined) {
   try {
     window.localStorage.setItem(
       ASK_STORAGE_KEYS.session,
-      JSON.stringify({ token, createdAt: Date.now() } satisfies StoredSession),
+      JSON.stringify({
+        token,
+        createdAt: Date.now(),
+        ...(expiresAt ? { expiresAt } : {}),
+      } satisfies StoredSession),
     );
   } catch {
     // Private mode or blocked storage: the token lives for this page only.
@@ -111,7 +155,7 @@ async function readErrorBody(res: Response): Promise<unknown> {
 }
 
 async function requestSession(): Promise<string> {
-  const res = await fetch(`${askApiBase()}/session`, {
+  const res = await fetch(`${ASK_API_BASE}/session`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: "{}",
@@ -124,11 +168,14 @@ async function requestSession(): Promise<string> {
       res.status,
     );
   }
-  const data = (await res.json()) as { session_token?: unknown };
+  const data = (await res.json()) as {
+    session_token?: unknown;
+    expires_at?: unknown;
+  };
   if (typeof data.session_token !== "string" || !data.session_token) {
     throw new AskRequestError("generic", "session response has no token");
   }
-  storeSession(data.session_token);
+  storeSession(data.session_token, expiryMs(data.expires_at));
   return data.session_token;
 }
 
@@ -151,6 +198,43 @@ export function warmAskSession(): void {
   if (readStoredSession()) return;
   void getSessionToken().catch(() => {
     // The send path reports errors; warming never blocks the UI.
+  });
+}
+
+/**
+ * How long a 429 asks to wait, from Retry-After (seconds or a date) or the
+ * agent's `retry_after_seconds`; null when it doesn't say.
+ */
+function retryAfterMs(res: Response, body: unknown): number | null {
+  const header = res.headers.get("retry-after")?.trim();
+  if (header) {
+    const ms = /^\d+$/.test(header)
+      ? Number(header) * 1000
+      : Date.parse(header) - Date.now();
+    if (Number.isFinite(ms)) return Math.max(0, ms);
+  }
+  const seconds = isRecord(body) ? body.retry_after_seconds : undefined;
+  return typeof seconds === "number" && Number.isFinite(seconds)
+    ? Math.max(0, seconds * 1000)
+    : null;
+}
+
+/** Resolves after `ms`, or rejects when `signal` aborts first. */
+function wait(ms: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal.aborted) {
+      reject(signal.reason);
+      return;
+    }
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(signal.reason);
+    };
+    const timer = setTimeout(() => {
+      signal.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    signal.addEventListener("abort", onAbort, { once: true });
   });
 }
 
@@ -180,6 +264,8 @@ export type AskChatTiming = {
     | "chat_request_start"
     | "chat_response_start"
     | "session_retry"
+    | "conversation_reset"
+    | "busy_retry"
     | "first_status"
     | "first_delta"
     | "first_ui"
@@ -191,14 +277,28 @@ export type AskChatTiming = {
 
 export type AskChatHandlers = AskStreamHandlers & {
   onTiming?: (timing: AskChatTiming) => void;
+  /**
+   * The request's conversation was dropped (a new session can't use it, or
+   * the server no longer knows it); the answer starts a new one, whose id
+   * comes with `done`. Don't send the old id again.
+   */
+  onConversationReset?: () => void;
 };
 
 export type AskChatRequest = {
-  /** The text sent to the agent (prompts and page prefix included). */
+  /**
+   * The question as sent: the reader's words, or a code block's prompt and
+   * code. No page prefix: the page goes in `page` (the agent's workflow
+   * router answers page titles such as "Create a Token" with canned
+   * templates).
+   */
   message: string;
   conversationId: string | null;
-  /** The page the question is about, sent as page_url / page_title. */
-  page?: AskPageContext | null;
+  /**
+   * The page the question is about, sent as page_url / page_title; a code
+   * block's page has no title (see AskUserMessage.pageUrl).
+   */
+  page?: AskPageContext | { url: string; title?: undefined } | null;
   /** Earlier turns of this conversation, already capped (see store.ts). */
   history?: AskHistoryTurn[];
   /** Reader's locale, for the cache key and docs link prefixes. */
@@ -223,7 +323,8 @@ export async function streamChat(
   request: AskChatRequest,
   handlers: AskChatHandlers,
 ): Promise<void> {
-  const { message, conversationId, page, history, locale, signal } = request;
+  const { message, page, history, locale, signal } = request;
+  let conversationId = request.conversationId;
   const startedAt = nowMs();
   const cacheKey =
     request.cache && conversationId === null
@@ -272,6 +373,10 @@ export async function streamChat(
       ui = generativeUi;
       handlers.onGenerativeUi?.(generativeUi);
     },
+    onGenerativeUiWithdrawn: () => {
+      ui = null;
+      handlers.onGenerativeUiWithdrawn?.();
+    },
     onDone: (payload) => {
       if (finished || signal.aborted) return;
       finished = true;
@@ -283,8 +388,8 @@ export async function streamChat(
           citations: payload.citations,
           generativeUi: payload.generativeUi ?? ui,
           codeFollowups: payload.codeFollowups,
+          suggestedFollowups: payload.suggestedFollowups,
           runId: payload.runId,
-          conversationId: payload.conversationId,
         });
       }
       handlers.onDone(payload);
@@ -306,16 +411,18 @@ export async function streamChat(
     handlers.onDone({
       response: cached.content,
       runId: cached.runId,
-      conversationId: cached.conversationId,
+      // A replay starts a new conversation (see answer-cache.ts).
+      conversationId: null,
       citations: cached.citations,
       generativeUi: cached.generativeUi,
       codeFollowups: cached.codeFollowups,
+      suggestedFollowups: cached.suggestedFollowups,
     });
     return;
   }
 
   const send = (sessionToken: string) =>
-    fetch(`${askApiBase()}/chat`, {
+    fetch(`${ASK_API_BASE}/chat`, {
       method: "POST",
       headers: {
         accept: "text/event-stream, application/json",
@@ -333,9 +440,19 @@ export async function streamChat(
       signal,
     });
 
+  const dropConversation = () => {
+    if (conversationId === null) return;
+    conversationId = null;
+    report("conversation_reset");
+    handlers.onConversationReset?.();
+  };
+
   let streamStarted = false;
+  let sessionRetried = false;
+  let conversationRetried = false;
+  let busyRetried = false;
   try {
-    for (let attempt = 0; ; attempt++) {
+    for (;;) {
       report("session_start");
       const sessionToken = await getSessionToken();
       report("session_ready");
@@ -344,12 +461,37 @@ export async function streamChat(
       report("chat_response_start", res.status);
 
       if (!res.ok) {
-        const kind = askErrorKindFor(res.status, await readErrorBody(res));
-        if (kind === "session" && attempt === 0) {
-          // Expired or rotated token: mint a fresh one and retry once.
+        const body = await readErrorBody(res);
+        const kind = askErrorKindFor(res.status, body);
+        if (kind === "session" && !sessionRetried) {
+          // Expired or rotated token: mint a fresh one and retry once. The
+          // agent scopes conversations to the session, so the new one
+          // can't continue the old conversation.
+          sessionRetried = true;
           report("session_retry", res.status);
           clearAskSession();
+          dropConversation();
           continue;
+        }
+        if (
+          conversationId !== null &&
+          !conversationRetried &&
+          isStaleConversation(res.status, body)
+        ) {
+          conversationRetried = true;
+          dropConversation();
+          continue;
+        }
+        if (kind === "busy" && !busyRetried) {
+          // The agent is finishing an answer the reader stopped; it says
+          // when to come back.
+          const delay = retryAfterMs(res, body) ?? BUSY_RETRY_DEFAULT_MS;
+          if (delay <= BUSY_RETRY_MAX_MS) {
+            busyRetried = true;
+            report("busy_retry", delay);
+            await wait(delay, signal);
+            continue;
+          }
         }
         wrapped.onError(kind === "session" ? "generic" : kind);
         return;
@@ -391,7 +533,7 @@ export async function sendFeedback(options: {
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const sessionToken = await getSessionToken();
-      const res = await fetch(`${askApiBase()}/feedback`, {
+      const res = await fetch(`${ASK_API_BASE}/feedback`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -413,15 +555,18 @@ export async function sendFeedback(options: {
 }
 
 /**
- * A finished run, for a later "202 + run_id, then poll" fallback when the
- * agent cannot stream.
+ * A finished run (`GET /runs/:id`, which needs the session that asked it),
+ * for a later "202 + run_id, then poll" fallback when the agent cannot
+ * stream.
  */
 export async function getAskRun(
   runId: string,
   signal: AbortSignal,
   locale?: string | null,
 ): Promise<AskDonePayload> {
-  const res = await fetch(`${askApiBase()}/runs/${encodeURIComponent(runId)}`, {
+  const sessionToken = await getSessionToken();
+  const res = await fetch(`${ASK_API_BASE}/runs/${encodeURIComponent(runId)}`, {
+    headers: { "x-ask-session": sessionToken },
     signal,
   });
   if (!res.ok) {

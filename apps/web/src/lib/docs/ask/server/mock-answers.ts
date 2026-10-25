@@ -8,8 +8,8 @@ import {
   tokenLifecycleGenerativeUiFixture,
   transactionSigningGenerativeUiFixture,
 } from "../fixtures/common-visual";
-import { createTokenGenerativeUiFixture } from "../fixtures/create-token";
 import type { AskGenerativeUi } from "../generative-ui/types";
+import { CONCEPTUAL_CODE_PROMPT } from "./followups";
 
 /**
  * Canned answers for the review mock (./mock-agent.ts), written in the
@@ -84,7 +84,8 @@ export type MockPage = {
   breadcrumbs?: string[];
 };
 
-const FOLLOWUP_PROMPT = "Want to see this in code?";
+/** The docs agent's question after a conceptual answer, with code buttons. */
+const FOLLOWUP_PROMPT = CONCEPTUAL_CODE_PROMPT;
 
 const fence = (language: string, code: string) =>
   `\`\`\`${language}\n${code.trim()}\n\`\`\``;
@@ -240,7 +241,7 @@ const TOPICS: MockTopic[] = [
     match:
       /\b(create|creating|make|launch|issue)\b[^.?!]*\btokens?\b|token[- ]?extensions?|token-?2022|spl-token/i,
     answer: `### Summary response
-Create the mint with the Token Extensions program (Token-2022), create a token account for your wallet, then mint the starting supply into it. On the CLI, \`--program-2022\` selects Token Extensions. Choose extensions such as metadata when you create the mint: most of them can't be added later.
+Create the mint with the \`spl-token\` CLI, create a token account for your wallet, then mint the starting supply into it. The classic Token Program covers most tokens; use Token Extensions (Token-2022) only when you need an extension such as on-chain metadata.
 
 ### Indepth response
 **On devnet, from the CLI**
@@ -250,8 +251,7 @@ ${fence(
   `
 solana config set --url devnet
 solana airdrop 2
-spl-token create-token --program-2022 --enable-metadata
-spl-token initialize-metadata <MINT_ADDRESS> "Example" "EXMPL" https://example.com/metadata.json
+spl-token create-token
 spl-token create-account <MINT_ADDRESS>
 spl-token mint <MINT_ADDRESS> 100`,
 )}
@@ -259,20 +259,19 @@ spl-token mint <MINT_ADDRESS> 100`,
 What each step creates:
 
 1. \`create-token\` creates the **mint account**. It stores decimals (9 by default), the supply and the mint authority, which is your wallet.
-2. \`initialize-metadata\` writes the name, symbol and URI into the mint itself, using the metadata extension enabled in step 1.
-3. \`create-account\` creates your **associated token account**, the account that holds your balance of this mint.
-4. \`mint\` adds 100 tokens to the supply and to your token account in one instruction.
+2. \`create-account\` creates your **associated token account**, the account that holds your balance of this mint.
+3. \`mint\` adds 100 tokens to the supply and to your token account in one instruction.
 
-Other extensions you can enable at creation include transfer fees, interest-bearing balances and non-transferable tokens. See [Extensions](/developers/docs/tokens/extensions) for the full list.`,
-    visual: createTokenGenerativeUiFixture,
+To store a name, symbol and URI on the mint itself, create a Token-2022 mint with the metadata extension instead (\`spl-token create-token --program-id TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb --enable-metadata\`), then run \`spl-token initialize-metadata\`. [Quickstart: create a token with the CLI](/developers/docs/tokens/quickstart) walks through both.`,
+    visual: tokenLifecycleGenerativeUiFixture,
     code: [],
-    next: "To change what the token shows in wallets later, update its metadata with the update authority you set when you created it. [Metadata Pointer & Token Metadata](/developers/docs/tokens/extensions/metadata) covers the fields and the update instructions.",
-    searchQueries: ["create token", "token extensions"],
+    next: "To send some to another wallet, run `spl-token transfer <MINT_ADDRESS> 10 <RECIPIENT_WALLET_ADDRESS> --fund-recipient`, which also creates the recipient's token account (add `--allow-unfunded-recipient` when that wallet holds no SOL). [Quickstart: create a token with the CLI](/developers/docs/tokens/quickstart) covers the transfer.",
+    searchQueries: ["create token", "token quickstart"],
     preferredUrls: [
       "/developers/docs/tokens/quickstart",
-      "/developers/docs/tokens/extensions",
-      "/developers/docs/tokens/extensions/metadata",
       "/developers/docs/tokens/basics/create-mint",
+      "/developers/docs/tokens/basics/create-token-account",
+      "/developers/docs/tokens/extensions/metadata",
     ],
   },
   {

@@ -3,6 +3,7 @@ import { NextIntlClientProvider } from "next-intl";
 import type { ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import en from "../../../../../../packages/i18n/messages/web/en/common.json";
+import { templateVisual } from "@/lib/docs/ask/fixtures/template-visuals";
 import {
   askStore,
   resetAskStoreForTests,
@@ -18,7 +19,7 @@ const { AskActions } = await import("@/components/docs/ask/ask-actions.client");
 const { AskSources } = await import("@/components/docs/ask/ask-sources.client");
 const { AskError, AskStopped } =
   await import("@/components/docs/ask/ask-error.client");
-const { AskFollowups } =
+const { AskFollowups, AskSuggestedFollowups } =
   await import("@/components/docs/ask/ask-followups.client");
 const { AskFullAnswer } =
   await import("@/components/docs/ask/ask-markdown.client");
@@ -45,6 +46,7 @@ function message(
     text: "A mint account defines a token.",
     citations: [],
     codeFollowups: null,
+    suggestedFollowups: null,
     runId: "101",
     ...overrides,
   };
@@ -257,6 +259,19 @@ describe("AskError", () => {
     expect(retry).toHaveBeenCalledWith("a1");
   });
 
+  it("is a muted line for a wait, not a red one", () => {
+    render(
+      withIntl(
+        <AskError kind="busy" messageId="a1" latest hasPartial={false} />,
+      ),
+    );
+    const row = screen
+      .getByText(en.docsAsk.errors.busy, { selector: "p > bdi" })
+      .closest("p")!.parentElement!.parentElement!;
+    expect(row.className).toContain("--sol-muted");
+    expect(row.className).not.toContain("--sol-red");
+  });
+
   it("says the answer stopped when part of it arrived", () => {
     render(
       withIntl(<AskError kind="generic" messageId="a1" latest hasPartial />),
@@ -266,6 +281,20 @@ describe("AskError", () => {
         selector: "p > bdi",
       }),
     ).toBeInTheDocument();
+  });
+
+  it("says a timeout mid-answer stopped it, in a line, not a box", () => {
+    const { container } = render(
+      withIntl(
+        <AskError kind="unavailable" messageId="a1" latest hasPartial />,
+      ),
+    );
+    expect(
+      screen.getByText("The answer stopped before it finished.", {
+        selector: "p > bdi",
+      }),
+    ).toBeInTheDocument();
+    expect(container.firstElementChild!.className).not.toContain("rounded-xl");
   });
 
   it("boxes only service and network failures", () => {
@@ -305,6 +334,34 @@ describe("AskError", () => {
     expect(screen.queryByRole("button")).toBeNull();
     expect(setDraft).toHaveBeenCalledWith("What is rent?");
     expect(setPage).toHaveBeenCalledWith(page);
+  });
+
+  it("puts the question back when the agent is still busy, with no button", () => {
+    const setDraft = vi
+      .spyOn(askStore, "setComposerDraft")
+      .mockImplementation(() => {});
+    withState({
+      composerDraft: "",
+      messages: [
+        {
+          id: "u7",
+          role: "user",
+          text: "Explain this code from Keypairs:\n\n```\nx\n```",
+          sent: "Explain this code:\n\n```\nx\n```",
+        },
+        message({ id: "a7", state: "error", error: "busy", text: "" }),
+      ],
+    });
+    render(withIntl(<AskError kind="busy" messageId="a7" />));
+    expect(
+      screen.getByText(
+        "Your previous question is still finishing. Try again in a moment.",
+        { selector: "p > bdi" },
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button")).toBeNull();
+    // What was sent goes back: a code ask without the page title.
+    expect(setDraft).toHaveBeenCalledWith("Explain this code:\n\n```\nx\n```");
   });
 
   it("leaves a draft the reader already started", () => {
@@ -380,6 +437,52 @@ describe("AskFollowups", () => {
   });
 });
 
+describe("AskSuggestedFollowups", () => {
+  it("puts the agent's next questions on the same pill row", () => {
+    const send = vi
+      .spyOn(askStore, "send")
+      .mockImplementation(() => ({ ok: true, queued: false }));
+    render(
+      withIntl(
+        <AskSuggestedFollowups
+          afterCode
+          suggestions={{
+            prompt: "Want to keep going? Try one of these:",
+            items: [
+              {
+                label: "Next lesson: Programs",
+                message: "Teach me the next lesson: Programs.",
+                kind: "ask",
+              },
+              {
+                label: "PDA signing",
+                message: "How does a program sign for a PDA?",
+                kind: "ask",
+              },
+            ],
+          }}
+        />,
+      ),
+    );
+    const row = screen.getByRole("group", {
+      name: "Want to keep going? Try one of these:",
+    });
+    expect(row.className).toContain("flex-wrap");
+    // Right under the code follow-ups: a tighter gap.
+    expect(row.className).toContain("mt-3");
+    const pills = within(row).getAllByRole("button");
+    expect(pills.map((pill) => pill.textContent)).toEqual([
+      "Next lesson: Programs",
+      "PDA signing",
+    ]);
+    expect(pills[0]!.className).toContain("hover:bg-[var(--sol-purple-soft)]");
+    fireEvent.click(pills[1]!);
+    expect(send).toHaveBeenCalledWith("How does a program sign for a PDA?", {
+      pageContext: null,
+    });
+  });
+});
+
 describe("AskFullAnswer", () => {
   it("folds the in-depth part under a docs accordion row", async () => {
     render(
@@ -447,6 +550,205 @@ describe("AssistantMessage", () => {
     expect(nav().className).toContain("mt-0");
     expect(actions().className).toContain("mt-0");
     expect(actions().className).toContain("opacity-0");
+  });
+});
+
+describe("AssistantMessage folding", () => {
+  const fullAnswer = () =>
+    screen.queryByRole("button", { name: "Full answer" });
+  const twoBlocks = "```ts\nconst a = 1;\n```\n\n```ts\nconst b = 2;\n```";
+  const sectioned = (inDepth: string) =>
+    `### Summary response\nA mint defines a token.\n\n### Indepth response\n${inDepth}`;
+
+  it("reads a short in-depth part inline, after the summary", () => {
+    render(
+      withIntl(
+        <AssistantMessage
+          message={message({ text: sectioned("It stores decimals.") })}
+          latest
+          fullscreen={false}
+        />,
+      ),
+    );
+    expect(fullAnswer()).toBeNull();
+    expect(screen.getByText("It stores decimals.")).toBeInTheDocument();
+  });
+
+  it("folds a long in-depth part, and the in-depth part while it streams", () => {
+    const { rerender } = render(
+      withIntl(
+        <AssistantMessage
+          message={message({
+            id: "s1",
+            state: "streaming",
+            text: sectioned("It stores"),
+          })}
+          latest
+          fullscreen={false}
+        />,
+      ),
+    );
+    expect(fullAnswer()).toBeInTheDocument();
+    expect(screen.queryByText("It stores")).toBeNull();
+    rerender(
+      withIntl(
+        <AssistantMessage
+          message={message({
+            id: "s1",
+            text: sectioned(`It stores:\n\n${twoBlocks}`),
+          })}
+          latest
+          fullscreen={false}
+        />,
+      ),
+    );
+    expect(fullAnswer()).toBeInTheDocument();
+    expect(screen.queryByText("It stores:")).toBeNull();
+  });
+
+  it("folds a shorter in-depth part beside a visual, as Bri's panel does", () => {
+    const inDepth = "It stores decimals and the mint authority. ".repeat(16);
+    const text = sectioned(inDepth.trim());
+    const { rerender } = render(
+      withIntl(
+        <AssistantMessage
+          message={message({ text })}
+          latest
+          fullscreen={false}
+        />,
+      ),
+    );
+    expect(fullAnswer()).toBeNull();
+    rerender(
+      withIntl(
+        <AssistantMessage
+          message={message({ text, ui: templateVisual("tokenLifecycle") })}
+          latest
+          fullscreen={false}
+        />,
+      ),
+    );
+    expect(fullAnswer()).toBeInTheDocument();
+  });
+
+  it("keeps the status row above a visual that arrives before the text", () => {
+    const { container } = render(
+      withIntl(
+        <AssistantMessage
+          message={message({
+            state: "streaming",
+            status: "writing",
+            text: "",
+            ui: templateVisual("pdaDerivation", true),
+          })}
+          latest
+          fullscreen={false}
+        />,
+      ),
+    );
+    const status = screen.getByText(en.docsAsk.status.writing);
+    const visual = container.querySelector("[data-ask-visual]")!;
+    expect(visual).not.toBeNull();
+    expect(
+      status.compareDocumentPosition(visual) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("folds a long answer without headings after its opening paragraph", () => {
+    const opening =
+      `A PDA is an address without a private key. ${"Programs derive it from seeds. ".repeat(6)}`.trim();
+    render(
+      withIntl(
+        <AssistantMessage
+          message={message({ text: `${opening}\n\n${twoBlocks}` })}
+          latest
+          fullscreen={false}
+        />,
+      ),
+    );
+    expect(screen.getByText(opening)).toBeInTheDocument();
+    expect(fullAnswer()).toBeInTheDocument();
+    expect(screen.queryByText("const a = 1;")).toBeNull();
+  });
+});
+
+describe("AssistantMessage tail", () => {
+  const codeFollowups = {
+    prompt: "Do you want to see a code example for that?",
+    buttons: [
+      {
+        type: "show_code",
+        label: "TypeScript",
+        language: "typescript",
+        message: "Show me the code in TypeScript.",
+      },
+    ],
+  };
+  const suggestedFollowups = {
+    prompt: "Want to keep going? Try one of these:",
+    items: [{ label: "Rent", message: "How does rent work?", kind: "ask" }],
+  };
+
+  it("shows suggested follow-ups after the code follow-ups, on the latest answer", () => {
+    const answer = message({ codeFollowups, suggestedFollowups });
+    const { rerender } = render(
+      withIntl(<AssistantMessage message={answer} latest fullscreen={false} />),
+    );
+    const code = screen.getByRole("group", { name: codeFollowups.prompt });
+    const next = screen.getByRole("group", { name: suggestedFollowups.prompt });
+    expect(
+      code.compareDocumentPosition(next) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    rerender(
+      withIntl(
+        <AssistantMessage message={answer} latest={false} fullscreen={false} />,
+      ),
+    );
+    expect(
+      screen.queryByRole("group", { name: suggestedFollowups.prompt }),
+    ).toBeNull();
+  });
+
+  it("says answers can be wrong once, under the actions of the answer that carries it", () => {
+    const disclaimer =
+      "Answers can be wrong. Check them against the linked pages.";
+    const { rerender } = render(
+      withIntl(
+        <AssistantMessage message={message()} latest fullscreen={false} />,
+      ),
+    );
+    expect(screen.queryByText(disclaimer)).toBeNull();
+    rerender(
+      withIntl(
+        <AssistantMessage
+          message={message()}
+          latest
+          fullscreen={false}
+          disclaimer
+        />,
+      ),
+    );
+    const line = screen.getByText(disclaimer).closest("p")!;
+    expect(line.className).toContain("text-[12px]");
+    expect(line.className).toContain("text-[var(--sol-dim)]");
+    const actions = screen
+      .getByRole("button", { name: "Ask again" })
+      .closest(".flex-wrap")!;
+    expect(
+      actions.compareDocumentPosition(line) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    // Not while the answer is on its way.
+    rerender(
+      withIntl(
+        <AssistantMessage
+          message={message({ state: "streaming" })}
+          latest
+          fullscreen={false}
+          disclaimer
+        />,
+      ),
+    );
+    expect(screen.queryByText(disclaimer)).toBeNull();
   });
 });
 

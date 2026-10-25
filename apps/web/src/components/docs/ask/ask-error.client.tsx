@@ -14,8 +14,17 @@ const textButton = cn(
   focusRing,
 );
 
-/** The docs' danger glyph at 16px (its own class sizes it only in callouts). */
-function DangerIcon({ className }: { className?: string }) {
+/**
+ * A docs callout glyph at 16px (its own class sizes it only in callouts):
+ * danger for failures, info for a wait.
+ */
+function LineIcon({
+  type = "danger",
+  className,
+}: {
+  type?: "danger" | "info";
+  className?: string;
+}) {
   return (
     <span
       aria-hidden="true"
@@ -24,15 +33,30 @@ function DangerIcon({ className }: { className?: string }) {
         className,
       )}
     >
-      <CalloutIcon type="danger" />
+      <CalloutIcon type={type} />
     </span>
   );
 }
 
 /** Nothing else is in the turn: the one case for a tinted box. */
 const BOXED: ReadonlySet<AskErrorKind> = new Set(["unavailable", "offline"]);
-/** Asking again right away can't help: the question goes back instead. */
-const NO_RETRY: ReadonlySet<AskErrorKind> = new Set(["rateLimited", "tooLong"]);
+/**
+ * Asking again right away can't help: the question goes back instead. That
+ * includes `busy`, the agent still finishing a stopped answer: its line
+ * already says to try again in a moment, and the question waits in the
+ * composer for it.
+ */
+const NO_RETRY: ReadonlySet<AskErrorKind> = new Set([
+  "rateLimited",
+  "tooLong",
+  "busy",
+]);
+
+/**
+ * Nothing went wrong, the reader only has to wait (the agent finishing a
+ * stopped answer, the per-minute limit): a muted line, not a red one.
+ */
+const WAIT: ReadonlySet<AskErrorKind> = new Set(["rateLimited", "busy"]);
 
 const restored = new Set<string>();
 
@@ -51,7 +75,8 @@ function useRestoreQuestion(messageId: string, enabled: boolean) {
       .slice(0, Math.max(index, 0))
       .findLast((message) => message.role === "user");
     if (question?.role !== "user") return;
-    askStore.setComposerDraft(question.text);
+    // What was sent: a code block's ask goes back without the page title.
+    askStore.setComposerDraft(question.sent ?? question.text);
     if (question.pageContext && !pageContext)
       askStore.setPageContext(question.pageContext);
   }, [messageId, enabled]);
@@ -60,8 +85,9 @@ function useRestoreQuestion(messageId: string, enabled: boolean) {
 /**
  * Why an answer failed, with the one action that helps. On the latest turn:
  * a red line with the docs' danger icon and a "Try again" (or "New chat"
- * when the conversation is full) text button; a tinted danger box only when
- * the service or the network is down. Older turns just say they didn't
+ * when the conversation is full) text button (a muted info line for a
+ * wait); a tinted danger box only when the service or the network is
+ * down. Older turns just say they didn't
  * finish. `latest` and `hasPartial` default to the message in the store.
  */
 export function AskError({
@@ -98,8 +124,12 @@ export function AskError({
     );
   }
 
-  // A failure after some text: the text did load, it just stopped.
-  const shown = kind === "generic" && partial ? "incomplete" : kind;
+  // A failure after some text: the text did load, it just stopped (a
+  // timeout mid-answer arrives as `unavailable`).
+  const shown =
+    (kind === "generic" || kind === "unavailable") && partial
+      ? "incomplete"
+      : kind;
   const full = kind === "conversationFull";
   const action = NO_RETRY.has(kind) ? null : (
     <button
@@ -117,7 +147,7 @@ export function AskError({
   if (BOXED.has(kind) && !partial) {
     return (
       <div className="mt-3 flex items-start gap-2.5 rounded-xl border border-[#fecaca] bg-[#fef2f2] px-3.5 py-3 text-[13px] leading-5 text-[var(--sol-text)] dark:border-[#7f1d1d] dark:bg-[oklab(0.577099_0.191149_0.0987651/0.2)]">
-        <DangerIcon className="text-[#991b1b] dark:text-[#fca5a5]" />
+        <LineIcon className="text-[#991b1b] dark:text-[#fca5a5]" />
         <div className="min-w-0">
           <p className="m-0 inline">
             <bdi>{t(`errors.${shown}`)}</bdi>
@@ -127,9 +157,15 @@ export function AskError({
       </div>
     );
   }
+  const wait = WAIT.has(kind);
   return (
-    <div className="mt-3 flex items-start gap-2 text-[13px] leading-5 text-[var(--sol-red)]">
-      <DangerIcon />
+    <div
+      className={cn(
+        "mt-3 flex items-start gap-2 text-[13px] leading-5",
+        wait ? "text-[var(--sol-muted)]" : "text-[var(--sol-red)]",
+      )}
+    >
+      <LineIcon type={wait ? "info" : "danger"} />
       <div className="min-w-0">
         <p className="m-0 inline">
           <bdi>{t(`errors.${shown}`)}</bdi>
