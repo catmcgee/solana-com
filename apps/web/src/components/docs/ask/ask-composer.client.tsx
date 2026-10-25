@@ -55,9 +55,21 @@ export function AskComposer({ fullscreen }: { fullscreen: boolean }) {
   const placeholder = empty ? t("placeholder") : t("placeholderFollowUp");
 
   return (
-    // The rule spans the panel (in full screen too, like the header's), so
-    // the thread's last line never runs straight into the field.
-    <div className="shrink-0 border-t border-[var(--sol-line)]">
+    // A rule across the panel keeps the thread's last line off the field.
+    // Full screen reads as one page, so the thread fades out above the
+    // field instead.
+    <div
+      className={cn(
+        "relative shrink-0",
+        !fullscreen && "border-t border-[var(--sol-line)]",
+      )}
+    >
+      {fullscreen ? (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 -top-8 h-8 bg-gradient-to-t from-[var(--sol-page)] to-transparent"
+        />
+      ) : null}
       <div
         className={cn(
           "pt-3",

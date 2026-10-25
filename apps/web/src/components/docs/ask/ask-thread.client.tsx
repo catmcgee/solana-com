@@ -233,6 +233,14 @@ export function AskThread({ fullscreen }: { fullscreen: boolean }) {
 
   return (
     <div className="relative min-h-0 flex-1">
+      {/* Full screen has no header rule: the thread fades out under the
+          buttons instead of being cut off. */}
+      {fullscreen ? (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 top-0 z-[1] h-6 bg-gradient-to-b from-[var(--sol-page)] to-transparent"
+        />
+      ) : null}
       <div
         ref={scroller}
         onScroll={onScroll}
