@@ -18,6 +18,11 @@
  *   dropped.
  * - A question goes out as the reader's words; the page it is about goes
  *   in `page_url` / `page_title`, and the server builds any prefix.
+ * - "Expand to full screen" is also a link that opens the thread full
+ *   screen in a new tab (./handoff.ts): the store leaves the thread for it
+ *   in localStorage and, in the new tab, takes it back on load. An answer
+ *   still arriving then is finished here and passed on (passOnAnswer); the
+ *   new tab waits for it (followAnswer).
  */
 import {
   DOCS_ASK_OPEN_ATTR,
@@ -35,6 +40,19 @@ import {
   ASK_STORAGE_KEYS,
   isPrerendering,
 } from "./config";
+import {
+  ASK_HANDOFF_TTL_MS,
+  discardHandoff,
+  handoffKey,
+  isThreadId,
+  newThreadId,
+  parseHandoff,
+  pruneHandoffs,
+  readFullscreenLink,
+  readHandoff,
+  withoutFullscreenParams,
+  writeHandoff,
+} from "./handoff";
 import {
   currentLocale,
   currentPageTitle,
@@ -146,6 +164,11 @@ export type AskState = {
   composerDraft: string;
   /** Increments whenever the composer should take focus. */
   focusRequest: number;
+  /**
+   * This tab's thread in the full-screen link (`askThread`, ./handoff.ts);
+   * a new one with New chat. Empty until hydrated.
+   */
+  threadId: string;
 };
 
 export type AskOpenOptions = {
@@ -202,6 +225,7 @@ type Core = {
   pageContext: AskPageContext | null;
   composerDraft: string;
   focusRequest: number;
+  threadId: string;
 };
 
 type QueuedQuestion = {
@@ -226,6 +250,7 @@ function initialCore(): Core {
     pageContext: null,
     composerDraft: "",
     focusRequest: 0,
+    threadId: "",
   };
 }
 
@@ -237,6 +262,25 @@ let controller: AbortController | null = null;
 let activeId: string | null = null;
 let threadSaveTimer: ReturnType<typeof setTimeout> | null = null;
 let widthSaveTimer: ReturnType<typeof setTimeout> | null = null;
+let handoffTimer: ReturnType<typeof setTimeout> | null = null;
+/** The last handoff this tab wrote (see releaseHandoff). */
+let lastHandoff: { threadId: string; savedAt: number } | null = null;
+/**
+ * The answer that was still arriving when this tab last handed the thread
+ * over; passOnAnswer hands it over again once it ends. `released`: by a
+ * plain click (see releaseHandoff).
+ */
+let sharedAnswer: {
+  threadId: string;
+  answerId: string;
+  until: number;
+  released: boolean;
+} | null = null;
+/**
+ * How long a handoff stays after it was read, or after a plain click left
+ * it: other tabs opened from the same link may not have read it yet.
+ */
+const HANDOFF_RELEASE_MS = 15_000;
 let appliedHtml: string | null = null;
 let teardown: Array<() => void> = [];
 const listeners = new Set<() => void>();
@@ -271,6 +315,7 @@ function derive(c: Core): AskState {
     pageContext: c.pageContext,
     composerDraft: c.composerDraft,
     focusRequest: c.focusRequest,
+    threadId: c.threadId,
   };
 }
 
@@ -378,6 +423,7 @@ function saveThread(now: boolean) {
     writeJson(session(), ASK_STORAGE_KEYS.thread, {
       messages: core.messages.slice(-ASK_MAX_STORED_MESSAGES),
       conversationId: core.conversationId,
+      threadId: core.threadId,
     });
   };
   // Streaming changes the thread many times a second; batch those writes.
@@ -387,6 +433,20 @@ function saveThread(now: boolean) {
 
 function flushThread() {
   if (threadSaveTimer) saveThread(true);
+}
+
+function onPageHide() {
+  flushThread();
+  // The answer ends with this page: a tab waiting for it stops waiting.
+  if (activeId)
+    passOnAnswer(
+      activeId,
+      withAnswer(activeId, {
+        state: "error",
+        status: undefined,
+        error: "incomplete",
+      }),
+    );
 }
 
 function restoreMessage(value: unknown): AskMessage | null {
@@ -448,9 +508,44 @@ function restoreMessage(value: unknown): AskMessage | null {
   };
 }
 
+const STATUSES: readonly AskStatus[] = [
+  "preparing",
+  "searching",
+  "writing",
+  "visual",
+];
+
+function isInFlight(
+  value: unknown,
+): value is Record<string, unknown> & { state: "pending" | "streaming" } {
+  return (
+    isRecord(value) &&
+    (value.state === "pending" || value.state === "streaming")
+  );
+}
+
+/** An answer another tab is still writing, as it stood (see followAnswer). */
+function restoreInFlight(value: unknown): AskAssistantMessage | null {
+  if (!isInFlight(value)) return null;
+  const message = restoreMessage(value);
+  if (message?.role !== "assistant") return null;
+  const { error: _incomplete, ...rest } = message;
+  return {
+    ...rest,
+    state: value.state,
+    status: STATUSES.find((status) => status === value.status) ?? "preparing",
+  };
+}
+
 function hydrate() {
   if (core.hydrated) return;
-  const thread = readJson(session(), ASK_STORAGE_KEYS.thread);
+  // Opened from the full-screen link: full screen, with the thread the
+  // link's tab left (if it is still there) in place of this tab's own.
+  const link = readFullscreenLink(window.location.search);
+  const handoff = link?.threadId ? readHandoff(local(), link.threadId) : null;
+  pruneHandoffs(local());
+  const stored = readJson(session(), ASK_STORAGE_KEYS.thread);
+  const thread: unknown = handoff ?? stored;
   const ui = readJson(session(), ASK_STORAGE_KEYS.ui);
   const width = Number.parseInt(
     local()?.getItem(ASK_STORAGE_KEYS.width) ?? "",
@@ -463,18 +558,128 @@ function hydrate() {
           return message ? [message] : [];
         })
       : [];
+  // An answer the link's tab was still writing: it finishes there, and this
+  // tab waits for it rather than calling it broken. Not behind questions
+  // asked here before hydration (while prerendering).
+  const last =
+    handoff && link?.threadId && core.messages.length === 0
+      ? restoreInFlight(handoff.messages.at(-1))
+      : null;
+  const inFlight = last && messages.at(-1)?.id === last.id ? last : null;
+  if (inFlight) messages[messages.length - 1] = inFlight;
   appliedHtml = null;
-  commit({
-    hydrated: true,
-    // Actions taken before hydration (an early openAskAi) win over storage.
-    open: core.open || (isRecord(ui) && ui.open === true),
-    fullscreen: core.fullscreen || (isRecord(ui) && ui.fullscreen === true),
-    preferredWidth: width > 0 ? width : core.preferredWidth,
-    messages: [...messages, ...core.messages],
-    conversationId:
-      core.conversationId ??
-      (isRecord(thread) ? toId(thread.conversationId) : null),
-  });
+  commit(
+    {
+      hydrated: true,
+      // Actions taken before hydration (an early openAskAi) win over storage.
+      open: core.open || !!link || (isRecord(ui) && ui.open === true),
+      fullscreen:
+        core.fullscreen || !!link || (isRecord(ui) && ui.fullscreen === true),
+      preferredWidth: width > 0 ? width : core.preferredWidth,
+      messages: [...messages, ...core.messages],
+      conversationId:
+        core.conversationId ??
+        (isRecord(thread) ? toId(thread.conversationId) : null),
+      // A handed-off thread is this tab's own copy from now on.
+      threadId:
+        !handoff && isRecord(stored) && isThreadId(stored.threadId)
+          ? stored.threadId
+          : newThreadId(),
+      ...(handoff
+        ? {
+            pageContext: core.pageContext ?? handoff.pageContext,
+            composerDraft: core.composerDraft || handoff.composerDraft,
+          }
+        : {}),
+      ...(inFlight ? { busy: true } : {}),
+    },
+    // Kept in this tab's session from the start, so a reload keeps it.
+    handoff ? { saveThread: "now" } : {},
+  );
+  if (handoff && link?.threadId) {
+    discardLater(link.threadId, handoff.savedAt);
+    if (inFlight)
+      followAnswer(
+        link.threadId,
+        inFlight.id,
+        handoff.savedAt + ASK_HANDOFF_TTL_MS,
+      );
+  }
+  if (link) clearFullscreenLink();
+}
+
+/** Deletes a handoff this tab read, once other tabs had time to read it. */
+function discardLater(threadId: string, savedAt: number) {
+  const timer = setTimeout(
+    () => discardHandoff(local(), threadId, savedAt),
+    HANDOFF_RELEASE_MS,
+  );
+  teardown.push(() => clearTimeout(timer));
+}
+
+/**
+ * Waits for the answer `id` that the link's tab was still writing: it shows
+ * here as still arriving, with new questions queued behind it, until that
+ * tab hands the thread over again with it ended (passOnAnswer); then this
+ * tab takes it and the conversation id. Stop or New chat here stop waiting;
+ * a tab that never says (it crashed) leaves it incomplete at `until`.
+ */
+function followAnswer(threadId: string, id: string, until: number) {
+  const abort = new AbortController();
+  controller = abort;
+  activeId = id;
+  const live = () => activeId === id;
+  const onStorage = (event: StorageEvent) => {
+    if (event.key !== handoffKey(threadId) || !live()) return;
+    const next = parseHandoff(event.newValue);
+    const raw = next?.messages.find((m) => isRecord(m) && m.id === id);
+    if (!next || !raw || isInFlight(raw)) return;
+    const message = restoreMessage(raw);
+    if (message?.role !== "assistant") return;
+    abort.abort();
+    finishTurn(id, () => message, next.conversationId);
+    discardLater(threadId, next.savedAt);
+  };
+  const timer = setTimeout(
+    () => {
+      if (!live()) return;
+      abort.abort();
+      finishTurn(id, (m) => ({
+        ...m,
+        state: "error",
+        status: undefined,
+        error: "incomplete",
+      }));
+    },
+    Math.max(0, until - Date.now()),
+  );
+  const stopFollowing = () => {
+    clearTimeout(timer);
+    window.removeEventListener("storage", onStorage);
+  };
+  window.addEventListener("storage", onStorage);
+  abort.signal.addEventListener("abort", stopFollowing, { once: true });
+  teardown.push(stopFollowing);
+}
+
+/**
+ * Drops ?ask=full&askThread from the address bar (the rest of the query and
+ * the hash stay), so a reload or a shared URL is the plain page. A task
+ * later: Next's router patches history.replaceState in an effect that runs
+ * after this one (parents after children), and syncs its own URL from
+ * calls whose state lacks its marker, hence `null`.
+ */
+function clearFullscreenLink() {
+  setTimeout(() => {
+    try {
+      const { pathname, search, hash } = window.location;
+      const url = withoutFullscreenParams({ pathname, search, hash });
+      if (url !== `${pathname}${search}${hash}`)
+        window.history.replaceState(null, "", url);
+    } catch {
+      // A sandboxed frame may refuse; the panel is open either way.
+    }
+  }, 0);
 }
 
 // --- Start -----------------------------------------------------------------
@@ -506,7 +711,7 @@ function start() {
   started = true;
   readViewport();
   listen(window, "resize", readViewport);
-  listen(window, "pagehide", flushThread);
+  listen(window, "pagehide", onPageHide);
   if (isPrerendering()) {
     listen(document, "prerenderingchange", hydrate, { once: true });
   } else {
@@ -726,7 +931,17 @@ function finishTurn(
     },
     { saveThread: "now" },
   );
+  passOnAnswer(id, core.messages);
   drainQueue();
+}
+
+/** The thread with answer `id` changed by `patch`. */
+function withAnswer(id: string, patch: Partial<AskAssistantMessage>) {
+  return core.messages.map((message) =>
+    message.id === id && message.role === "assistant"
+      ? { ...message, ...patch }
+      : message,
+  );
 }
 
 /**
@@ -817,6 +1032,71 @@ function setFullscreen(fullscreen: boolean) {
 
 function toggleFullscreen() {
   setFullscreen(!(core.open && core.fullscreen));
+}
+
+/**
+ * Leaves this thread in localStorage for a tab the full-screen link may
+ * open (./handoff.ts). Called as the browser may open it: pointer down,
+ * middle click, context menu, a modified click or Enter, a drag.
+ */
+function prepareHandoff() {
+  if (!core.hydrated || isPrerendering()) return;
+  const savedAt = handOver(core.threadId, core.messages);
+  if (savedAt === null) return;
+  sharedAnswer = activeId
+    ? {
+        threadId: core.threadId,
+        answerId: activeId,
+        until: savedAt + ASK_HANDOFF_TTL_MS,
+        released: false,
+      }
+    : null;
+}
+
+/** Writes the handoff for `threadId`; returns its `savedAt`, or null. */
+function handOver(threadId: string, messages: AskMessage[]): number | null {
+  if (handoffTimer) clearTimeout(handoffTimer);
+  handoffTimer = null;
+  const savedAt = writeHandoff(local(), threadId, {
+    messages: messages.slice(-ASK_MAX_STORED_MESSAGES),
+    conversationId: core.conversationId,
+    pageContext: core.pageContext,
+    composerDraft: core.composerDraft,
+  });
+  lastHandoff = savedAt === null ? null : { threadId, savedAt };
+  return savedAt;
+}
+
+/**
+ * The shared answer `id` ended (in `messages`): hands the thread over again,
+ * so a new tab waiting for it (followAnswer) takes the end, and a tab still
+ * loading gets it whole. Released as the first was after a plain click.
+ */
+function passOnAnswer(id: string, messages: AskMessage[]) {
+  const shared = sharedAnswer;
+  if (shared?.answerId !== id) return;
+  sharedAnswer = null;
+  if (Date.now() > shared.until) return;
+  if (handOver(shared.threadId, messages) !== null && shared.released)
+    releaseHandoff();
+}
+
+/**
+ * A plain click expands in place, so the handoff its pointer down left is
+ * not needed. Removed after a grace period rather than at once: a middle
+ * click just before may have opened a tab that has not read it yet. A
+ * newer handoff is left alone. The one passOnAnswer writes as a streaming
+ * answer ends goes the same way.
+ */
+function releaseHandoff() {
+  const left = lastHandoff;
+  if (!left) return;
+  if (sharedAnswer) sharedAnswer = { ...sharedAnswer, released: true };
+  if (handoffTimer) clearTimeout(handoffTimer);
+  handoffTimer = setTimeout(() => {
+    handoffTimer = null;
+    discardHandoff(local(), left.threadId, left.savedAt);
+  }, HANDOFF_RELEASE_MS);
 }
 
 function saveWidthSoon() {
@@ -960,6 +1240,11 @@ function retry(messageId: string) {
 /** New chat: stops any answer and clears the conversation. */
 function reset() {
   start();
+  if (activeId)
+    passOnAnswer(
+      activeId,
+      withAnswer(activeId, { state: "stopped", status: undefined }),
+    );
   controller?.abort();
   controller = null;
   activeId = null;
@@ -972,6 +1257,8 @@ function reset() {
       pageContext: null,
       composerDraft: "",
       focusRequest: core.focusRequest + 1,
+      // A new thread, so a new full-screen link.
+      threadId: newThreadId(),
     },
     { saveThread: "now" },
   );
@@ -1036,6 +1323,8 @@ export const askStore = {
   toggle,
   setFullscreen,
   toggleFullscreen,
+  prepareHandoff,
+  releaseHandoff,
   setWidth,
   resetWidth,
   send,
@@ -1089,8 +1378,12 @@ export function resetAskStoreForTests() {
   teardown = [];
   if (threadSaveTimer) clearTimeout(threadSaveTimer);
   if (widthSaveTimer) clearTimeout(widthSaveTimer);
+  if (handoffTimer) clearTimeout(handoffTimer);
   threadSaveTimer = null;
   widthSaveTimer = null;
+  handoffTimer = null;
+  lastHandoff = null;
+  sharedAnswer = null;
   controller = null;
   activeId = null;
   queue = [];

@@ -3,9 +3,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { openAskAi } from "@/lib/docs/ask-ai";
 import { clearAskSession } from "@/lib/docs/ask/client";
 import {
+  ASK_PREPAINT_FULLSCREEN_TIMEOUT_MS,
   ASK_STORAGE_KEYS,
   DOCS_ASK_PREPAINT_SCRIPT,
 } from "@/lib/docs/ask/config";
+import { ASK_HANDOFF_TTL_MS, isThreadId } from "@/lib/docs/ask/handoff";
 import {
   askStore,
   connectAskAiEvents,
@@ -204,6 +206,16 @@ describe("panel state", () => {
 
 describe("prepaint script", () => {
   const run = () => new Function(DOCS_ASK_PREPAINT_SCRIPT)();
+  const setPrerendering = (value: boolean) =>
+    Object.defineProperty(document, "prerendering", {
+      value,
+      configurable: true,
+    });
+
+  afterEach(() => {
+    window.history.replaceState(null, "", "/");
+    setPrerendering(false);
+  });
 
   it("docks before paint when the panel was left open on a wide screen", () => {
     sessionStorage.setItem(ASK_STORAGE_KEYS.ui, JSON.stringify({ open: true }));
@@ -213,12 +225,9 @@ describe("prepaint script", () => {
     expect(html.style.getPropertyValue("--ask-w")).toBe("720px");
   });
 
-  it("does nothing when closed, full screen or narrow", () => {
+  it("does nothing when closed or narrow", () => {
     run();
-    sessionStorage.setItem(
-      ASK_STORAGE_KEYS.ui,
-      JSON.stringify({ open: true, fullscreen: true }),
-    );
+    window.history.replaceState(null, "", "/developers?ask=docked");
     run();
     sessionStorage.setItem(ASK_STORAGE_KEYS.ui, JSON.stringify({ open: true }));
     Object.defineProperty(window, "innerWidth", {
@@ -227,6 +236,63 @@ describe("prepaint script", () => {
     });
     run();
     expect(html.hasAttribute("data-ask")).toBe(false);
+  });
+
+  it("hides the page for a full-screen link at any width, whatever was stored", () => {
+    Object.defineProperty(window, "innerWidth", {
+      value: 390,
+      configurable: true,
+    });
+    sessionStorage.setItem(
+      ASK_STORAGE_KEYS.ui,
+      JSON.stringify({ open: false }),
+    );
+    window.history.replaceState(
+      null,
+      "",
+      "/developers/docs/core/accounts?x=1&ask=full&askThread=abc#rent",
+    );
+    run();
+    expect(html.getAttribute("data-ask")).toBe("fullscreen");
+    expect(html.style.getPropertyValue("--ask-w")).toBe("");
+  });
+
+  it("hides the page for a panel left full screen, except while prerendering", () => {
+    sessionStorage.setItem(
+      ASK_STORAGE_KEYS.ui,
+      JSON.stringify({ open: true, fullscreen: true }),
+    );
+    // This tab's storage may be stale in a prerender: the store decides.
+    setPrerendering(true);
+    run();
+    expect(html.hasAttribute("data-ask")).toBe(false);
+    // The link itself is not stale.
+    window.history.replaceState(null, "", "/developers?ask=full");
+    run();
+    expect(html.getAttribute("data-ask")).toBe("fullscreen");
+    html.removeAttribute("data-ask");
+    window.history.replaceState(null, "", "/developers");
+    setPrerendering(false);
+    run();
+    expect(html.getAttribute("data-ask")).toBe("fullscreen");
+  });
+
+  it("shows the page again if the full-screen panel never mounts", () => {
+    vi.useFakeTimers();
+    window.history.replaceState(null, "", "/developers?ask=full");
+    run();
+    vi.advanceTimersByTime(ASK_PREPAINT_FULLSCREEN_TIMEOUT_MS - 1);
+    expect(html.getAttribute("data-ask")).toBe("fullscreen");
+    vi.advanceTimersByTime(1);
+    expect(html.hasAttribute("data-ask")).toBe(false);
+
+    // Mounted: the store owns the attribute from then on.
+    run();
+    const panel = document.createElement("div");
+    panel.setAttribute("data-ask-panel", "");
+    document.body.appendChild(panel);
+    vi.advanceTimersByTime(ASK_PREPAINT_FULLSCREEN_TIMEOUT_MS);
+    expect(html.getAttribute("data-ask")).toBe("fullscreen");
   });
 });
 
@@ -781,6 +847,447 @@ describe("entry points", () => {
       pageContext: { title: "Accounts" },
     });
     disconnect();
+  });
+});
+
+describe("full-screen link", () => {
+  const ID = "0123456789abcdef01234567";
+  const HANDOFF = `${ASK_STORAGE_KEYS.handoff}${ID}`;
+  const LINK = `/developers/docs/core/accounts?x=1&ask=full&askThread=${ID}#rent`;
+  const handedOff = ({
+    savedAt = Date.now(),
+    finished = false,
+    conversationId = "7",
+  } = {}) =>
+    JSON.stringify({
+      v: 1,
+      savedAt,
+      messages: [
+        { id: "u1", role: "user", text: "What is a PDA?" },
+        {
+          id: "a1",
+          role: "assistant",
+          state: "done",
+          text: "An address with no key.",
+          runId: 5,
+        },
+        { id: "u2", role: "user", text: "And rent?" },
+        finished
+          ? {
+              id: "a2",
+              role: "assistant",
+              state: "done",
+              text: "Rent is a deposit.",
+              runId: 6,
+            }
+          : // Still streaming in the other tab.
+            {
+              id: "a2",
+              role: "assistant",
+              state: "streaming",
+              status: "writing",
+              text: "Rent is",
+            },
+      ],
+      conversationId,
+      pageContext: {
+        title: "Accounts",
+        url: "https://solana.com/developers/docs/core/accounts",
+      },
+      composerDraft: "Show me code",
+    });
+  const ownThread = () =>
+    sessionStorage.setItem(
+      ASK_STORAGE_KEYS.thread,
+      JSON.stringify({
+        messages: [{ id: "o1", role: "user", text: "This tab's own" }],
+        conversationId: "3",
+      }),
+    );
+  const here = () => `${location.pathname}${location.search}${location.hash}`;
+
+  afterEach(() => {
+    window.history.replaceState(null, "", "/");
+    Object.defineProperty(document, "prerendering", {
+      value: false,
+      configurable: true,
+    });
+  });
+
+  it("opens full screen with the thread the link's tab left and cleans the URL", async () => {
+    ownThread();
+    localStorage.setItem(HANDOFF, handedOff());
+    window.history.replaceState({ kept: true }, "", LINK);
+    askStore.subscribe(() => undefined);
+
+    const state = askStore.getState();
+    expect(state).toMatchObject({
+      hydrated: true,
+      open: true,
+      layout: "fullscreen",
+      prevLayout: "docked",
+      conversationId: "7",
+      pageContext: {
+        title: "Accounts",
+        url: "https://solana.com/developers/docs/core/accounts",
+      },
+      composerDraft: "Show me code",
+    });
+    expect(state.messages.map((m) => m.text)).toEqual([
+      "What is a PDA?",
+      "An address with no key.",
+      "And rent?",
+      "Rent is",
+    ]);
+    // The answer the other tab is still writing shows as still arriving
+    // (see "waits for the answer…" below), not as broken.
+    expect(lastAssistant()).toMatchObject({
+      id: "a2",
+      state: "streaming",
+      status: "writing",
+    });
+    expect(lastAssistant().error).toBeUndefined();
+    expect(state.busy).toBe(true);
+    // The copy is this tab's own from now on.
+    expect(isThreadId(state.threadId)).toBe(true);
+    expect(state.threadId).not.toBe(ID);
+    const saved = JSON.parse(sessionStorage.getItem(ASK_STORAGE_KEYS.thread)!);
+    expect(saved).toMatchObject({
+      conversationId: "7",
+      threadId: state.threadId,
+    });
+    expect(saved.messages).toHaveLength(4);
+    expect(JSON.parse(sessionStorage.getItem(ASK_STORAGE_KEYS.ui)!)).toEqual({
+      open: true,
+      fullscreen: true,
+    });
+    expect(html.getAttribute("data-ask")).toBe("fullscreen");
+
+    await vi.waitFor(() =>
+      expect(here()).toBe("/developers/docs/core/accounts?x=1#rent"),
+    );
+    expect(window.history.state).toBeNull();
+
+    // Esc (Exit full screen) goes back to the docked panel.
+    askStore.setFullscreen(false);
+    expect(html.getAttribute("data-ask")).toBe("docked");
+    expect(html.style.getPropertyValue("--ask-w")).toBe("420px");
+  });
+
+  it("opens full screen with this tab's own thread when the handoff is gone or expired", async () => {
+    ownThread();
+    localStorage.setItem(
+      HANDOFF,
+      handedOff({ savedAt: Date.now() - ASK_HANDOFF_TTL_MS - 1 }),
+    );
+    window.history.replaceState(null, "", LINK);
+    askStore.subscribe(() => undefined);
+    expect(askStore.getState()).toMatchObject({
+      layout: "fullscreen",
+      conversationId: "3",
+    });
+    expect(askStore.getState().messages.map((m) => m.text)).toEqual([
+      "This tab's own",
+    ]);
+    expect(localStorage.getItem(HANDOFF)).toBeNull();
+    await vi.waitFor(() =>
+      expect(here()).toBe("/developers/docs/core/accounts?x=1#rent"),
+    );
+  });
+
+  it("opens full screen, empty, from a link without a thread", async () => {
+    window.history.replaceState(null, "", "/ja/developers?ask=full");
+    askStore.subscribe(() => undefined);
+    expect(askStore.getState()).toMatchObject({
+      layout: "fullscreen",
+      messages: [],
+    });
+    await vi.waitFor(() => expect(here()).toBe("/ja/developers"));
+  });
+
+  it("waits for activation before taking a handoff or touching the URL", async () => {
+    Object.defineProperty(document, "prerendering", {
+      value: true,
+      configurable: true,
+    });
+    localStorage.setItem(HANDOFF, handedOff());
+    window.history.replaceState(null, "", LINK);
+    askStore.subscribe(() => undefined);
+    askStore.prepareHandoff();
+    expect(askStore.getState()).toMatchObject({ hydrated: false, open: false });
+    expect(localStorage.getItem(HANDOFF)).not.toBeNull();
+    expect(
+      Object.keys(localStorage).filter((key) =>
+        key.startsWith(ASK_STORAGE_KEYS.handoff),
+      ),
+    ).toEqual([HANDOFF]);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(here()).toBe(LINK);
+
+    Object.defineProperty(document, "prerendering", {
+      value: false,
+      configurable: true,
+    });
+    document.dispatchEvent(new Event("prerenderingchange"));
+    expect(askStore.getState()).toMatchObject({
+      hydrated: true,
+      layout: "fullscreen",
+      conversationId: "7",
+    });
+    expect(askStore.getState().messages).toHaveLength(4);
+    await vi.waitFor(() =>
+      expect(here()).toBe("/developers/docs/core/accounts?x=1#rent"),
+    );
+  });
+
+  it("gives the thread to every tab opened from the link in time, then deletes it", () => {
+    vi.useFakeTimers();
+    localStorage.setItem(HANDOFF, handedOff({ finished: true }));
+    window.history.replaceState(null, "", LINK);
+    askStore.subscribe(() => undefined);
+    expect(askStore.getState().messages).toHaveLength(4);
+    expect(askStore.getState().busy).toBe(false);
+    // A second Ctrl-click's tab, loading a moment later.
+    vi.advanceTimersByTime(250);
+    resetAskStoreForTests();
+    sessionStorage.clear();
+    window.history.replaceState(null, "", LINK);
+    askStore.subscribe(() => undefined);
+    expect(askStore.getState()).toMatchObject({
+      layout: "fullscreen",
+      conversationId: "7",
+    });
+    expect(askStore.getState().messages.map((m) => m.id)).toEqual([
+      "u1",
+      "a1",
+      "u2",
+      "a2",
+    ]);
+    vi.advanceTimersByTime(14_999);
+    expect(localStorage.getItem(HANDOFF)).not.toBeNull();
+    vi.advanceTimersByTime(1);
+    expect(localStorage.getItem(HANDOFF)).toBeNull();
+  });
+
+  it("waits for the answer the link's tab was still writing, then takes it", async () => {
+    localStorage.setItem(HANDOFF, handedOff({ conversationId: "" }));
+    window.history.replaceState(null, "", LINK);
+    askStore.subscribe(() => undefined);
+    expect(askStore.getState()).toMatchObject({
+      busy: true,
+      conversationId: null,
+    });
+    // Asked here meanwhile: it waits rather than going out in a
+    // conversation the other tab is still answering in.
+    expect(askStore.send("Show me code")).toEqual({ ok: true, queued: true });
+    expect(chatBodies()).toHaveLength(0);
+    const changed = (key: string, newValue: string | null) =>
+      window.dispatchEvent(new StorageEvent("storage", { key, newValue }));
+    changed("docs-ask:other", "x");
+    changed(HANDOFF, handedOff());
+    changed(HANDOFF, null);
+    expect(lastAssistant()).toMatchObject({ id: "a2", state: "streaming" });
+
+    chatQueue.push(finished("Here is code."));
+    changed(HANDOFF, handedOff({ finished: true, conversationId: "8" }));
+    expect(askStore.getState().messages[3]).toMatchObject({
+      id: "a2",
+      state: "done",
+      text: "Rent is a deposit.",
+      runId: "6",
+    });
+    expect(askStore.getState().conversationId).toBe("8");
+    // Then the question asked here, in the same conversation.
+    await vi.waitFor(() => expect(lastAssistant().text).toBe("Here is code."));
+    expect(chatBodies()).toEqual([
+      expect.objectContaining({
+        message: "Show me code",
+        conversation_id: "8",
+      }),
+    ]);
+    // Already ended here: a later snapshot changes nothing.
+    changed(HANDOFF, handedOff({ finished: true, conversationId: "9" }));
+    expect(askStore.getState().conversationId).toBe("7");
+  });
+
+  it("stops waiting on Stop, and when the handoff expires", () => {
+    vi.useFakeTimers();
+    localStorage.setItem(HANDOFF, handedOff());
+    window.history.replaceState(null, "", LINK);
+    askStore.subscribe(() => undefined);
+    askStore.stop();
+    expect(lastAssistant()).toMatchObject({ id: "a2", state: "stopped" });
+    expect(askStore.getState().busy).toBe(false);
+    window.dispatchEvent(
+      new StorageEvent("storage", {
+        key: HANDOFF,
+        newValue: handedOff({ finished: true }),
+      }),
+    );
+    expect(lastAssistant()).toMatchObject({ id: "a2", state: "stopped" });
+
+    // The link's tab never says (it crashed): incomplete at the expiry.
+    resetAskStoreForTests();
+    sessionStorage.clear();
+    localStorage.setItem(
+      HANDOFF,
+      handedOff({ savedAt: Date.now() - ASK_HANDOFF_TTL_MS + 1_000 }),
+    );
+    window.history.replaceState(null, "", LINK);
+    askStore.subscribe(() => undefined);
+    expect(askStore.getState().busy).toBe(true);
+    vi.advanceTimersByTime(999);
+    expect(lastAssistant().state).toBe("streaming");
+    vi.advanceTimersByTime(1);
+    expect(lastAssistant()).toMatchObject({
+      id: "a2",
+      state: "error",
+      error: "incomplete",
+      text: "Rent is",
+    });
+    expect(askStore.getState().busy).toBe(false);
+  });
+
+  it("hands a streaming answer over again as it ends: done, New chat or the page going", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const handedOver = (threadId: string) =>
+      JSON.parse(
+        localStorage.getItem(`${ASK_STORAGE_KEYS.handoff}${threadId}`) ??
+          "null",
+      );
+    const streaming = async (question: string) => {
+      const stream = controllableStream();
+      chatQueue.push(stream.response);
+      askStore.send(question);
+      stream.send("delta", { text: "Rent is" });
+      await vi.waitFor(() => expect(lastAssistant().text).toBe("Rent is"));
+      return stream;
+    };
+
+    // Ctrl-click mid-answer, then the answer finishes.
+    const first = await streaming("What is rent?");
+    const { threadId } = askStore.getState();
+    askStore.prepareHandoff();
+    expect(handedOver(threadId).messages.at(-1)).toMatchObject({
+      state: "streaming",
+      text: "Rent is",
+    });
+    first.send("delta", { text: " a deposit." });
+    first.send("done", { run_id: 1, conversation_id: 9 });
+    first.end();
+    await vi.waitFor(() => expect(askStore.getState().busy).toBe(false));
+    expect(handedOver(threadId)).toMatchObject({
+      conversationId: "9",
+      messages: [
+        { role: "user", text: "What is rent?" },
+        { role: "assistant", state: "done", text: "Rent is a deposit." },
+      ],
+    });
+    // Left for the tab to take (it deletes it).
+    vi.advanceTimersByTime(20_000);
+    expect(handedOver(threadId)).not.toBeNull();
+
+    // A plain click mid-answer: that end is dropped after the grace period.
+    const second = await streaming("And fees?");
+    askStore.prepareHandoff();
+    askStore.releaseHandoff();
+    second.send("done", { run_id: 2, conversation_id: 9 });
+    second.end();
+    await vi.waitFor(() => expect(askStore.getState().busy).toBe(false));
+    expect(handedOver(threadId).messages.at(-1)).toMatchObject({
+      state: "done",
+    });
+    vi.advanceTimersByTime(15_000);
+    expect(handedOver(threadId)).toBeNull();
+
+    // New chat mid-answer: stopped.
+    await streaming("And PDAs?");
+    askStore.prepareHandoff();
+    askStore.reset();
+    expect(handedOver(threadId).messages.at(-1)).toMatchObject({
+      state: "stopped",
+      text: "Rent is",
+    });
+
+    // The page going mid-answer: incomplete there; this tab is unchanged.
+    await streaming("And mints?");
+    const next = askStore.getState().threadId;
+    askStore.prepareHandoff();
+    window.dispatchEvent(new Event("pagehide"));
+    expect(handedOver(next).messages.at(-1)).toMatchObject({
+      state: "error",
+      error: "incomplete",
+    });
+    expect(lastAssistant().state).toBe("streaming");
+  });
+
+  it("leaves the thread for a new tab, never the session token, pruning expired ones", async () => {
+    const expired = `${ASK_STORAGE_KEYS.handoff}eeeeeeeeeeeeeeee`;
+    localStorage.setItem(
+      expired,
+      JSON.stringify({ v: 1, savedAt: Date.now() - ASK_HANDOFF_TTL_MS - 1 }),
+    );
+    chatQueue.push(finished("A PDA is an address."));
+    askStore.send("What is a PDA?");
+    await vi.waitFor(() => expect(askStore.getState().busy).toBe(false));
+    askStore.setComposerDraft("And rent?");
+    askStore.setPageContext({
+      title: "Accounts",
+      url: "https://solana.com/developers/docs/core/accounts",
+    });
+    const { threadId } = askStore.getState();
+    expect(isThreadId(threadId)).toBe(true);
+
+    askStore.prepareHandoff();
+    const raw = localStorage.getItem(`${ASK_STORAGE_KEYS.handoff}${threadId}`)!;
+    expect(JSON.parse(raw)).toMatchObject({
+      v: 1,
+      savedAt: expect.any(Number),
+      conversationId: "7",
+      pageContext: { title: "Accounts" },
+      composerDraft: "And rent?",
+      messages: [
+        { role: "user", text: "What is a PDA?" },
+        { role: "assistant", state: "done", text: "A PDA is an address." },
+      ],
+    });
+    expect(raw).not.toContain("mock-token");
+    expect(localStorage.getItem(expired)).toBeNull();
+    // This tab is unchanged.
+    expect(askStore.getState()).toMatchObject({ open: false, threadId });
+  });
+
+  it("drops a plain click's handoff after a grace period, unless replaced", () => {
+    askStore.subscribe(() => undefined);
+    vi.useFakeTimers();
+    const key = `${ASK_STORAGE_KEYS.handoff}${askStore.getState().threadId}`;
+    askStore.prepareHandoff();
+    askStore.releaseHandoff();
+    vi.advanceTimersByTime(14_000);
+    // A tab a middle click opened just before may still want it.
+    expect(localStorage.getItem(key)).not.toBeNull();
+    vi.advanceTimersByTime(1_000);
+    expect(localStorage.getItem(key)).toBeNull();
+
+    askStore.prepareHandoff();
+    askStore.releaseHandoff();
+    vi.advanceTimersByTime(1);
+    askStore.prepareHandoff();
+    vi.advanceTimersByTime(20_000);
+    expect(localStorage.getItem(key)).not.toBeNull();
+  });
+
+  it("keeps the thread id across reloads; New chat starts a new one", async () => {
+    chatQueue.push(finished("Saved."));
+    askStore.send("Saved?");
+    await vi.waitFor(() => expect(askStore.getState().busy).toBe(false));
+    const { threadId } = askStore.getState();
+    resetAskStoreForTests();
+    askStore.subscribe(() => undefined);
+    expect(askStore.getState().threadId).toBe(threadId);
+    askStore.reset();
+    expect(askStore.getState().threadId).not.toBe(threadId);
+    expect(isThreadId(askStore.getState().threadId)).toBe(true);
   });
 });
 

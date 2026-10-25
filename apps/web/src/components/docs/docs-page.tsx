@@ -171,13 +171,19 @@ export async function DocsPageView({
           narrower than at 1280px: its examples then show inline. The
           header moves over only as far as its 92rem bar has room, so it
           lines up with the page without squeezing its tabs (2rem less:
-          the panel's room replaces .docs-body's own end padding). */}
+          the panel's room replaces .docs-body's own end padding). Full
+          screen (html[data-ask=fullscreen], set before paint for a
+          full-screen link) hides the page under the dialog: on a load at
+          once, as the first style runs no transition; on Expand once the
+          dialog has faded in (150ms), so the page doesn't blink out first.
+          It also stops the body's colour transition, which would
+          otherwise fade from light to dark behind it as the theme loads. */}
       <div
         data-docs=""
         data-dev-landing="docs"
         data-mode={wide ? "wide" : undefined}
         lang={contentLocale === locale ? undefined : contentLocale}
-        className="xl:[html[data-ask=docked]_&>.dh]:pe-[min(var(--ask-w)_-_2rem,max(0px,100%_-_92rem))] xl:[html[data-ask=docked]_&>:not(.dh)]:pe-[var(--ask-w)]"
+        className="xl:[html[data-ask=docked]_&>.dh]:pe-[min(var(--ask-w)_-_2rem,max(0px,100%_-_92rem))] xl:[html[data-ask=docked]_&>:not(.dh)]:pe-[var(--ask-w)] [html[data-ask=fullscreen]_&]:invisible [html[data-ask=fullscreen]_&]:[transition:visibility_0s_150ms] motion-reduce:[html[data-ask=fullscreen]_&]:[transition:none] [html[data-ask=fullscreen]_body:has(&)]:transition-none"
       >
         <DocsHeader
           locale={contentLocale}

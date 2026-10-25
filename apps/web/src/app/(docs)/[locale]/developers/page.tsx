@@ -65,7 +65,11 @@ export default async function Page({ params }: Props) {
   // (ChromeWrapper skips them on this route). With Ask AI docked
   // (html[data-ask=docked]) the page makes room for it, and the header as
   // far as its 92rem bar allows, exactly as on the docs pages (see
-  // DocsPageView), so it holds still across the view transition.
+  // DocsPageView), so it holds still across the view transition. Full
+  // screen hides the page (after the dialog's fade-in on Expand) and stops
+  // the body's colour transition, as there (here the body is dark until
+  // this wrapper is parsed, see docs-chrome.css, and would fade to white
+  // behind a full-screen link).
   return (
     <>
       <DocsThemePrepaint />
@@ -76,7 +80,7 @@ export default async function Page({ params }: Props) {
       />
       <div
         data-dev-landing="docs"
-        className="xl:[html[data-ask=docked]_&>.dh]:pe-[min(var(--ask-w)_-_2rem,max(0px,100%_-_92rem))] xl:[html[data-ask=docked]_&>:not(.dh)]:pe-[var(--ask-w)]"
+        className="xl:[html[data-ask=docked]_&>.dh]:pe-[min(var(--ask-w)_-_2rem,max(0px,100%_-_92rem))] xl:[html[data-ask=docked]_&>:not(.dh)]:pe-[var(--ask-w)] [html[data-ask=fullscreen]_&]:invisible [html[data-ask=fullscreen]_&]:[transition:visibility_0s_150ms] motion-reduce:[html[data-ask=fullscreen]_&]:[transition:none] [html[data-ask=fullscreen]_body:has(&)]:transition-none"
       >
         <DocsHeader locale={locale} />
         <DevelopersHub locale={locale} updates={updates} />

@@ -231,12 +231,42 @@ describe("Ask AI launcher and panel", () => {
     expect(askStore.getState().open).toBe(false);
   });
 
+  it("keeps focus on the toggle between the overlay and full screen", async () => {
+    setViewport(1100);
+    renderAsk();
+    await act(async () => askStore.open());
+    const dialog = screen.getByRole("dialog", { name: "Ask AI" });
+    const expand = within(dialog).getByRole("link", {
+      name: "Expand to full screen",
+    });
+    expand.focus();
+    await act(async () => fireEvent.click(expand));
+    expect(html.dataset.ask).toBe("fullscreen");
+    const exit = within(dialog).getByRole("button", {
+      name: "Exit full screen",
+    });
+    expect(exit).toHaveFocus();
+    await act(async () => fireEvent.click(exit));
+    expect(html.dataset.ask).toBe("overlay");
+    expect(
+      within(dialog).getByRole("link", { name: "Expand to full screen" }),
+    ).toHaveFocus();
+    // A click from elsewhere leaves focus where the dialog puts it.
+    composer().focus();
+    await act(async () =>
+      fireEvent.click(
+        within(dialog).getByRole("link", { name: "Expand to full screen" }),
+      ),
+    );
+    expect(composer()).toHaveFocus();
+  });
+
   it("expands to full screen; Esc returns to the docked panel", async () => {
     renderAsk();
     await act(async () => askStore.open());
     await act(async () =>
       fireEvent.click(
-        screen.getByRole("button", { name: "Expand to full screen" }),
+        screen.getByRole("link", { name: "Expand to full screen" }),
       ),
     );
     const dialog = screen.getByRole("dialog", { name: "Ask AI" });
@@ -249,6 +279,200 @@ describe("Ask AI launcher and panel", () => {
     expect(
       screen.getByRole("complementary", { name: "Ask AI" }),
     ).toBeInTheDocument();
+  });
+
+  it("expands from a link: a plain click in place, other clicks for a new tab", async () => {
+    window.history.replaceState(
+      null,
+      "",
+      "/developers/docs/core/accounts?view=a%20b#rent",
+    );
+    chats.push(answer());
+    renderAsk();
+    await act(async () => askStore.open());
+    await ask("What is a mint?");
+    await screen.findByRole("button", { name: "Ask again" });
+    const panel = screen.getByRole("complementary", { name: "Ask AI" });
+    const link = within(panel).getByRole("link", {
+      name: "Expand to full screen",
+    });
+    const { threadId } = askStore.getState();
+    const key = `docs-ask:handoff:${threadId}`;
+    expect(link).toHaveAttribute("title", "Expand to full screen");
+    expect(link).toHaveAttribute(
+      "href",
+      `/developers/docs/core/accounts?view=a%20b&ask=full&askThread=${threadId}#rent`,
+    );
+    // The page moved on since render (an anchor): the link follows.
+    window.history.replaceState(
+      null,
+      "",
+      "/developers/docs/core/accounts?view=a%20b#pda",
+    );
+    fireEvent.focus(link);
+    expect(link.getAttribute("href")).toMatch(/#pda$/);
+
+    // What the browser does with a click once React is done: record, and
+    // stop jsdom from navigating.
+    let prevented: boolean | null = null;
+    const record = (event: Event) => {
+      prevented = event.defaultPrevented;
+      event.preventDefault();
+    };
+    document.addEventListener("click", record);
+    document.addEventListener("auxclick", record);
+    const handedOff = () => JSON.parse(localStorage.getItem(key) ?? "null");
+
+    // Ctrl/Cmd-click: the browser opens the link; this tab stays as it is.
+    for (const modifier of ["ctrlKey", "metaKey", "shiftKey"] as const) {
+      localStorage.removeItem(key);
+      await act(async () => {
+        fireEvent.pointerDown(link, { [modifier]: true });
+        fireEvent.click(link, { [modifier]: true });
+      });
+      expect(prevented).toBe(false);
+      expect(handedOff()?.messages).toHaveLength(2);
+      expect(askStore.getState().layout).toBe("docked");
+    }
+
+    // Middle click.
+    localStorage.removeItem(key);
+    prevented = null;
+    await act(async () => {
+      fireEvent.pointerDown(link, { button: 1 });
+      fireEvent(link, new MouseEvent("auxclick", { bubbles: true, button: 1 }));
+    });
+    expect(prevented).toBe(false);
+    expect(handedOff()).toMatchObject({ v: 1, conversationId: "7" });
+
+    // Context menu ("Open in new tab"), and Ctrl+Enter from the keyboard.
+    localStorage.removeItem(key);
+    fireEvent.contextMenu(link);
+    expect(handedOff()).not.toBeNull();
+    localStorage.removeItem(key);
+    fireEvent.keyDown(link, { key: "Enter", ctrlKey: true });
+    expect(handedOff()).not.toBeNull();
+    expect(screen.queryByRole("dialog")).toBeNull();
+
+    // A plain click: full screen in place.
+    await act(async () => fireEvent.click(link));
+    expect(prevented).toBe(true);
+    const dialog = screen.getByRole("dialog", { name: "Ask AI" });
+    expect(html.dataset.ask).toBe("fullscreen");
+    // Its way back stays a button.
+    expect(
+      within(dialog).getByRole("button", { name: "Exit full screen" }),
+    ).toBeInTheDocument();
+    expect(within(dialog).queryByRole("link", { name: /full screen/ })).toBe(
+      null,
+    );
+    document.removeEventListener("click", record);
+    document.removeEventListener("auxclick", record);
+    window.history.replaceState(null, "", "/");
+  });
+
+  it("opens a full-screen link with the thread its tab left", async () => {
+    const id = "0123456789abcdef01234567";
+    localStorage.setItem(
+      `docs-ask:handoff:${id}`,
+      JSON.stringify({
+        v: 1,
+        savedAt: Date.now(),
+        messages: [
+          { id: "u1", role: "user", text: "What is a mint?" },
+          {
+            id: "a1",
+            role: "assistant",
+            state: "done",
+            text: "### Summary response\nA mint account defines a token.",
+            runId: 101,
+          },
+        ],
+        conversationId: "7",
+        pageContext: null,
+        composerDraft: "And decimals?",
+      }),
+    );
+    window.history.replaceState(
+      null,
+      "",
+      `/developers/docs/core/accounts?ask=full&askThread=${id}`,
+    );
+    renderAsk();
+    const dialog = await screen.findByRole("dialog", { name: "Ask AI" });
+    expect(html.dataset.ask).toBe("fullscreen");
+    expect(within(dialog).getByText("What is a mint?")).toBeInTheDocument();
+    expect(
+      within(dialog).getByText("A mint account defines a token."),
+    ).toBeInTheDocument();
+    expect(composer().value).toBe("And decimals?");
+    await waitFor(() => expect(location.search).toBe(""));
+    // Esc: back to the docked panel, in this tab.
+    await act(async () => fireEvent.keyDown(dialog, { key: "Escape" }));
+    expect(
+      screen.getByRole("complementary", { name: "Ask AI" }),
+    ).toBeInTheDocument();
+    expect(html.dataset.ask).toBe("docked");
+    window.history.replaceState(null, "", "/");
+  });
+
+  it("shows an answer its tab was still writing as arriving, then finished", async () => {
+    const id = "0123456789abcdef01234567";
+    const key = `docs-ask:handoff:${id}`;
+    const handoff = (last: Record<string, unknown>) =>
+      JSON.stringify({
+        v: 1,
+        savedAt: Date.now(),
+        messages: [
+          { id: "u1", role: "user", text: "What is a mint?" },
+          { id: "a1", role: "assistant", ...last },
+        ],
+        conversationId: null,
+        pageContext: null,
+        composerDraft: "",
+      });
+    localStorage.setItem(
+      key,
+      handoff({
+        state: "streaming",
+        status: "writing",
+        text: "### Summary response\nA mint account",
+      }),
+    );
+    window.history.replaceState(
+      null,
+      "",
+      `/developers/docs/core/accounts?ask=full&askThread=${id}`,
+    );
+    renderAsk();
+    const dialog = await screen.findByRole("dialog", { name: "Ask AI" });
+    expect(within(dialog).getByText("A mint account")).toBeInTheDocument();
+    expect(
+      within(dialog).queryByText(en.docsAsk.errors.incomplete, {
+        exact: false,
+      }),
+    ).toBeNull();
+    expect(
+      within(dialog).getByRole("button", { name: "Stop" }),
+    ).toBeInTheDocument();
+
+    await act(async () =>
+      window.dispatchEvent(
+        new StorageEvent("storage", {
+          key,
+          newValue: handoff({
+            state: "done",
+            text: "### Summary response\nA mint account defines a token.",
+            runId: 101,
+          }),
+        }),
+      ),
+    );
+    expect(
+      within(dialog).getAllByText("A mint account defines a token.")[0],
+    ).toBeInTheDocument();
+    expect(within(dialog).queryByRole("button", { name: "Stop" })).toBeNull();
+    window.history.replaceState(null, "", "/");
   });
 
   it("closes the docked panel on Esc from inside it, back to the opener", async () => {
@@ -418,7 +642,7 @@ describe("Ask AI conversation", () => {
     );
     await act(async () =>
       fireEvent.click(
-        screen.getByRole("button", { name: "Expand to full screen" }),
+        screen.getByRole("link", { name: "Expand to full screen" }),
       ),
     );
     const dialog = screen.getByRole("dialog", { name: "Ask AI" });
@@ -781,7 +1005,7 @@ describe("Ask AI sidebar shell", () => {
     ).toBeNull();
     // A phone sheet is already full screen: no Expand there.
     expect(
-      within(panel).getByRole("button", { name: "Expand to full screen" })
+      within(panel).getByRole("link", { name: "Expand to full screen" })
         .className,
     ).toContain("max-sm:hidden");
     await ask("What is a mint?");

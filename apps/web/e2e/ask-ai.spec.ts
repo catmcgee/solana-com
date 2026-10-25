@@ -28,10 +28,7 @@ const DOCS_PAGE = "/developers/docs/core/accounts";
 const sse = (event: string, data: unknown) =>
   `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
 
-async function setup(page: Page) {
-  const errors: string[] = [];
-  const chats: string[] = [];
-  const asks: Record<string, unknown>[] = [];
+function watchErrors(page: Page, errors: string[]) {
   page.on("console", (m) => {
     // Headless Chromium has no WebGL for the home page's hero scene.
     if (m.type() !== "error" || /UnicornScene|WebGL/.test(m.text())) return;
@@ -40,6 +37,13 @@ async function setup(page: Page) {
     errors.push(m.text());
   });
   page.on("pageerror", (e) => errors.push(String(e)));
+}
+
+async function setup(page: Page) {
+  const errors: string[] = [];
+  const chats: string[] = [];
+  const asks: Record<string, unknown>[] = [];
+  watchErrors(page, errors);
   await page.addInitScript(() =>
     localStorage.setItem(
       "cookie_consent",
@@ -176,7 +180,7 @@ test("Ask AI overlays narrower screens, expands to full screen, and Escape steps
   await expect(dialog(page)).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("data-ask", "overlay");
   await dialog(page)
-    .getByRole("button", { name: "Expand to full screen" })
+    .getByRole("link", { name: "Expand to full screen" })
     .click();
   await expect(page.locator("html")).toHaveAttribute("data-ask", "fullscreen");
   await page.keyboard.press("Escape");
@@ -189,6 +193,53 @@ test("Ask AI overlays narrower screens, expands to full screen, and Escape steps
   await expect(dialog(page)).toBeVisible();
   await page.keyboard.press("ControlOrMeta+i");
   await expect(dialog(page)).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test("Ctrl-click on Expand opens the conversation full screen in a new tab", async ({
+  page,
+  context,
+}) => {
+  test.skip(!ASK_MOCK, "needs the mocked agent");
+  const { errors } = await setup(page);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(`${DOCS_PAGE}?view=x#rent`);
+  await page.waitForLoadState("load");
+  await page.getByRole("button", { name: "Ask AI", exact: true }).click();
+  await composer(page).fill("What is a mint?");
+  await composer(page).press("Enter");
+  await expect(docked(page).getByText(ASK_ANSWER).first()).toBeVisible();
+  const expand = docked(page).getByRole("link", {
+    name: "Expand to full screen",
+  });
+  await expect(expand).toHaveAttribute(
+    "href",
+    new RegExp(`^${DOCS_PAGE}\\?view=x&ask=full&askThread=\\w+#rent$`),
+  );
+  // The new tab's errors count too, from its first script.
+  context.once("page", (tab) => watchErrors(tab, errors));
+  const [tab] = await Promise.all([
+    context.waitForEvent("page"),
+    expand.click({ modifiers: ["ControlOrMeta"] }),
+  ]);
+  // The new tab: full screen, the same thread, and a clean URL.
+  await expect(dialog(tab)).toBeVisible();
+  await expect(dialog(tab).getByText("What is a mint?")).toBeVisible();
+  await expect(dialog(tab).getByText(ASK_ANSWER).first()).toBeVisible();
+  await expect(tab).toHaveURL(new RegExp(`${DOCS_PAGE}\\?view=x#rent$`));
+  // This tab stays as it was.
+  await expect(page.locator("html")).toHaveAttribute("data-ask", "docked");
+  await expect(dialog(page)).toHaveCount(0);
+  // Escape in the new tab docks the panel there; a reload keeps the thread.
+  await tab.keyboard.press("Escape");
+  await expect(tab.locator("html")).toHaveAttribute("data-ask", "docked");
+  await tab.reload();
+  await expect(docked(tab).getByText(ASK_ANSWER).first()).toBeVisible();
+  // A plain click still expands in place.
+  await expand.click();
+  await expect(page.locator("html")).toHaveAttribute("data-ask", "fullscreen");
+  await expect(dialog(page).getByText(ASK_ANSWER).first()).toBeVisible();
+  expect(context.pages()).toHaveLength(2);
   expect(errors).toEqual([]);
 });
 

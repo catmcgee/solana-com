@@ -1,9 +1,20 @@
 "use client";
 
 import { DialogTitle } from "@radix-ui/react-dialog";
+import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
-import type { ReactNode } from "react";
+import {
+  useCallback,
+  useLayoutEffect,
+  useRef,
+  type KeyboardEvent,
+  type MouseEvent,
+  type ReactNode,
+  type RefCallback,
+  type SyntheticEvent,
+} from "react";
 import { cn } from "@/app/components/utils";
+import { fullscreenHref } from "@/lib/docs/ask/handoff";
 import { askStore } from "@/lib/docs/ask/store";
 import { useAskSelector } from "@/lib/docs/ask/use-ask";
 import { Maximize2Icon, Minimize2Icon, XIcon } from "../docs-ui-icons";
@@ -14,14 +25,17 @@ function HeaderButton({
   onClick,
   className,
   children,
+  ref,
 }: {
   label: string;
-  onClick: () => void;
+  onClick: (event: MouseEvent<HTMLButtonElement>) => void;
   className?: string;
   children: ReactNode;
+  ref?: RefCallback<HTMLElement>;
 }) {
   return (
     <button
+      ref={ref}
       type="button"
       aria-label={label}
       title={label}
@@ -30,6 +44,89 @@ function HeaderButton({
     >
       {children}
     </button>
+  );
+}
+
+function currentFullscreenHref(): string {
+  if (typeof window === "undefined") return "";
+  const { pathname, search, hash } = window.location;
+  return fullscreenHref(
+    { pathname, search, hash },
+    askStore.getState().threadId,
+  );
+}
+
+const modified = (event: MouseEvent | KeyboardEvent) =>
+  event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
+
+/**
+ * Expand to full screen: looks like the other header buttons but is a link
+ * to this page full screen (lib/docs/ask/handoff.ts), so Ctrl/Cmd-click,
+ * Shift-click, middle-click and "Open in new tab" open the conversation in
+ * a new tab. A plain click expands in place. Whenever the browser may be
+ * about to open the link, the thread is left for the new tab first.
+ */
+function ExpandLink({
+  label,
+  className,
+  onExpand,
+  ref,
+}: {
+  label: string;
+  className?: string;
+  /** Before a plain click expands in place. */
+  onExpand?: (event: MouseEvent<HTMLAnchorElement>) => void;
+  ref?: RefCallback<HTMLElement>;
+}) {
+  const link = useRef<HTMLAnchorElement | null>(null);
+  const setLink = useCallback(
+    (element: HTMLAnchorElement | null) => {
+      link.current = element;
+      ref?.(element);
+    },
+    [ref],
+  );
+  const pathname = usePathname();
+  const threadId = useAskSelector((s) => s.threadId);
+  // The link is this page and this thread. After a client-side navigation
+  // the address bar changes only as the new page commits, after render.
+  useLayoutEffect(() => {
+    if (link.current) link.current.href = currentFullscreenHref();
+  }, [pathname, threadId]);
+  // A hash or query change re-renders nothing: refresh before each use.
+  const refresh = (event: SyntheticEvent<HTMLAnchorElement>) => {
+    event.currentTarget.href = currentFullscreenHref();
+  };
+  const handOff = (event: SyntheticEvent<HTMLAnchorElement>) => {
+    refresh(event);
+    askStore.prepareHandoff();
+  };
+  return (
+    <a
+      ref={setLink}
+      href={currentFullscreenHref()}
+      aria-label={label}
+      title={label}
+      onPointerEnter={refresh}
+      onFocus={refresh}
+      onPointerDown={handOff}
+      onAuxClick={handOff}
+      onContextMenu={handOff}
+      onDragStart={handOff}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" && modified(event)) handOff(event);
+      }}
+      onClick={(event) => {
+        if (event.button !== 0 || modified(event)) return handOff(event);
+        event.preventDefault();
+        askStore.releaseHandoff();
+        onExpand?.(event);
+        askStore.setFullscreen(true);
+      }}
+      className={cn(headerIconButton, focusRing, className)}
+    >
+      <Maximize2Icon />
+    </a>
   );
 }
 
@@ -52,6 +149,20 @@ export function AskHeader({
   const t = useTranslations("docsAsk");
   const tc = useTranslations("commands");
   const empty = useAskSelector((s) => s.messages.length === 0 && !s.busy);
+  // Overlay ↔ full screen keeps the dialog but swaps Expand (a link) and
+  // Exit (a button): focus on one moves to the other, not to the dialog.
+  const toggle = useRef<HTMLElement | null>(null);
+  const keepFocus = useRef(false);
+  const setToggle = useCallback((element: HTMLElement | null) => {
+    toggle.current = element;
+  }, []);
+  const toggled = (event: MouseEvent<HTMLElement>) => {
+    keepFocus.current = document.activeElement === event.currentTarget;
+  };
+  useLayoutEffect(() => {
+    if (keepFocus.current) toggle.current?.focus({ preventScroll: true });
+    keepFocus.current = false;
+  }, [fullscreen]);
   const titleClass = fullscreen
     ? visuallyHidden
     : "m-0 text-[14px] font-medium leading-5 tracking-normal text-[var(--sol-text)]";
@@ -92,13 +203,25 @@ export function AskHeader({
           )}
           {/* A phone sheet is already full screen; full screen keeps its
               way back at every width. */}
-          <HeaderButton
-            label={fullscreen ? t("collapse") : t("expand")}
-            onClick={() => askStore.setFullscreen(!fullscreen)}
-            className={fullscreen ? undefined : "max-sm:hidden"}
-          >
-            {fullscreen ? <Minimize2Icon /> : <Maximize2Icon />}
-          </HeaderButton>
+          {fullscreen ? (
+            <HeaderButton
+              ref={setToggle}
+              label={t("collapse")}
+              onClick={(event) => {
+                toggled(event);
+                askStore.setFullscreen(false);
+              }}
+            >
+              <Minimize2Icon />
+            </HeaderButton>
+          ) : (
+            <ExpandLink
+              ref={setToggle}
+              label={t("expand")}
+              onExpand={toggled}
+              className="max-sm:hidden"
+            />
+          )}
           <HeaderButton label={tc("close")} onClick={() => askStore.close()}>
             <XIcon />
           </HeaderButton>
