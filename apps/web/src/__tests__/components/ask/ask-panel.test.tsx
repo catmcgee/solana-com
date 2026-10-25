@@ -928,7 +928,7 @@ describe("Ask AI sidebar shell", () => {
     expect(screen.queryByRole("button", { name: "Jump to latest" })).toBeNull();
   });
 
-  it("goes full screen under the docs header, which stays usable", async () => {
+  it("goes full screen over the whole window, docs header included", async () => {
     const page = document.createElement("div");
     page.innerHTML =
       '<header class="dh"><button>Theme</button></header><main id="docs-body"></main><footer></footer>';
@@ -936,20 +936,13 @@ describe("Ask AI sidebar shell", () => {
     renderAsk();
     await act(async () => askStore.setFullscreen(true));
     const dialog = screen.getByRole("dialog", { name: "Ask AI" });
-    expect(dialog.className).toContain("top-16");
-    expect(dialog).not.toHaveAttribute("aria-modal");
-    // The page behind is inert, the header isn't.
-    expect(page.querySelector("main")).toHaveAttribute("inert");
-    expect(page.querySelector("footer")).toHaveAttribute("inert");
-    expect(page.querySelector("header")).not.toHaveAttribute("inert");
-    // Using the header keeps the panel.
-    await act(async () => {
-      fireEvent.pointerDown(page.querySelector("header button")!);
-      fireEvent.focus(page.querySelector("header button")!);
-    });
-    expect(askStore.getState().layout).toBe("fullscreen");
+    expect(dialog.className).toContain("inset-0");
+    expect(dialog.className).not.toContain("top-16");
+    // Modal: the page, header included, is hidden from assistive tech.
+    expect(page).toHaveAttribute("aria-hidden", "true");
     await act(async () => fireEvent.keyDown(dialog, { key: "Escape" }));
     expect(askStore.getState().layout).toBe("docked");
-    expect(page.querySelector("main")).not.toHaveAttribute("inert");
+    expect(page).not.toHaveAttribute("aria-hidden");
+    page.remove();
   });
 });

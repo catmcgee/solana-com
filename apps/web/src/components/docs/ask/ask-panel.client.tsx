@@ -8,7 +8,6 @@ import {
 } from "@radix-ui/react-dialog";
 import { useTranslations } from "next-intl";
 import {
-  useEffect,
   useRef,
   useState,
   type KeyboardEvent,
@@ -192,30 +191,11 @@ export function DockedPanel({ animate }: { animate: boolean }) {
 }
 
 /**
- * Full screen sits under the docs header, which stays usable (search,
- * theme, tabs). The page behind the panel can't be seen, so it is made
- * inert: Tab moves between the header and the panel only.
- */
-function useInertPage(active: boolean) {
-  useEffect(() => {
-    if (!active) return;
-    const header = document.querySelector("header.dh");
-    const behind = [...(header?.parentElement?.children ?? [])].filter(
-      (element) => element !== header && !element.hasAttribute("inert"),
-    );
-    for (const element of behind) element.setAttribute("inert", "");
-    return () => {
-      for (const element of behind) element.removeAttribute("inert");
-    };
-  }, [active]);
-}
-
-/**
- * Overlay (narrower viewports) and full screen, as a dialog. The overlay
- * slides in from the inline end over a dimmed page (full width below
- * 640px) and is modal; Esc closes it. Full screen fills the window under
- * the docs header, reads in a centred column and isn't modal, so the
- * header keeps working; Esc goes back to the previous layout.
+ * Overlay (narrower viewports) and full screen, as a modal dialog. The
+ * overlay slides in from the inline end over a dimmed page (full width
+ * below 640px); Esc closes it. Full screen covers the whole window, docs
+ * header included, and reads in a centred column; Esc goes back to the
+ * previous layout.
  */
 export function ModalPanel({
   layout,
@@ -231,11 +211,10 @@ export function ModalPanel({
   onClosedFocus: () => void;
 }) {
   const fullscreen = layout === "fullscreen";
-  useInertPage(fullscreen);
   return (
     <DialogRoot
       open
-      modal={!fullscreen}
+      modal
       onOpenChange={(open) => {
         if (!open) askStore.close();
       }}
@@ -264,30 +243,16 @@ export function ModalPanel({
             event.preventDefault();
             onClosedFocus();
           }}
-          // The header (and anything it opens, like search) is outside
-          // the full-screen panel but part of the page: using it keeps the
-          // panel open.
-          onInteractOutside={(event) => {
-            if (fullscreen) event.preventDefault();
-          }}
           onEscapeKeyDown={(event) => {
             if (!fullscreen) return;
             event.preventDefault();
-            // Esc in the header's own menus or the search dialog is theirs.
-            const target = event.target;
-            if (
-              target instanceof Element &&
-              target !== document.body &&
-              !target.closest("[data-ask-panel]")
-            )
-              return;
             askStore.setFullscreen(false);
           }}
           className={cn(
             "fixed outline-hidden",
             fullscreen
-              ? // Under the docs header (z-40), over the page.
-                "inset-x-0 bottom-0 top-16 z-[35]"
+              ? // Over the docs header (z-40) and its menus (z-50).
+                "inset-0 z-[55]"
               : "inset-y-0 end-0 z-[55] w-[min(28rem,100vw)] border-s border-[var(--sol-line)] shadow-[var(--sol-menu-shadow)] max-sm:inset-0 max-sm:w-full max-sm:border-s-0 dark:border-[var(--sol-line-strong)]",
             animate &&
               (fullscreen
