@@ -623,7 +623,7 @@ describe("Ask AI sidebar shell", () => {
     fireEvent.scroll(el);
   }
 
-  it("groups each question with its answer, ruled off from the turn before", async () => {
+  it("groups each question with its answer, the question in a bubble", async () => {
     chats.push(answer(), answer({}, "Rent is a deposit."));
     renderAsk();
     await act(async () => askStore.open());
@@ -637,14 +637,20 @@ describe("Ask AI sidebar shell", () => {
     const thread = document.querySelector("[data-ask-panel] ol")!;
     const turns = [...thread.children];
     expect(turns).toHaveLength(2);
-    expect(turns[0]!.className).not.toContain("border-t");
-    expect(turns[1]!.className).toContain("border-t");
-    // Questions are headings in their own direction; answers too.
+    // Turns are spaced, not ruled off.
+    expect(turns[1]!.className).toContain("mt-8");
+    expect(turns[1]!.className).not.toContain("border-t");
+    // Questions are headings in their own direction, inside a bubble at the
+    // inline end; answers stay unboxed.
     const heading = within(turns[1] as HTMLElement).getByRole("heading", {
       level: 3,
     });
     expect(heading).toHaveAttribute("dir", "auto");
     expect(heading.textContent).toBe("You: And rent?");
+    const bubble = heading.parentElement!;
+    expect(bubble.className).toContain("rounded-[20px]");
+    expect(bubble.className).toContain("bg-[var(--sol-purple-soft)]");
+    expect(bubble.parentElement!.className).toContain("items-end");
     // The answer takes its text's direction (and says so, for icons that
     // flip with it): English stays left to right on an Arabic page.
     const answerRoot = within(turns[1] as HTMLElement)

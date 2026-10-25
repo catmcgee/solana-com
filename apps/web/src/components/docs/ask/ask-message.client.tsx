@@ -17,11 +17,6 @@ import { enterUp, mono, textDirection, visuallyHidden } from "./ui";
 
 const FENCE = /```[^\n]*\n([\s\S]*?)(?:\n```|$)/g;
 
-/** The question carries code (a code block's Ask). */
-function hasSnippet(text: string) {
-  return /```[^\n]*\n/.test(text);
-}
-
 /**
  * A question's words and any fenced code in it (a code block's Ask). The
  * words become the heading; "Explain this code from Keypairs:" drops its
@@ -72,7 +67,7 @@ function QuestionSnippet({ code }: { code: string }) {
       dir="ltr"
       className={cn(
         mono,
-        "m-0 mt-2.5 whitespace-pre-wrap break-words rounded-xl border border-[var(--sol-line)] bg-[var(--ask-code-bg)] px-4 py-3 text-[13px] leading-[1.7] text-[var(--sol-text)] [&_code]:[font-family:inherit]",
+        "m-0 mt-2 whitespace-pre-wrap break-words rounded-xl border border-[var(--sol-line)] bg-[var(--sol-page)] px-3.5 py-2.5 text-[13px] leading-[1.7] text-[var(--sol-text)] [&_code]:[font-family:inherit]",
       )}
     >
       <code
@@ -89,8 +84,9 @@ function QuestionSnippet({ code }: { code: string }) {
 }
 
 /**
- * A question, as the heading of its turn (not a chat bubble): the page it
- * was asked about above it, any code below it.
+ * A question, as a speech bubble at the inline end (the start of its turn,
+ * so still a heading for screen readers): the page it was asked about above
+ * it, any code inside it. Answers stay unboxed.
  */
 export function AskQuestion({
   message,
@@ -106,9 +102,9 @@ export function AskQuestion({
   );
   const page = message.pageContext;
   return (
-    <div>
+    <div className="flex flex-col items-end">
       {page ? (
-        <p className="m-0 mb-1 flex min-w-0 items-center gap-1.5 text-[12px] leading-4 text-[var(--sol-dim)]">
+        <p className="m-0 mb-1.5 flex min-w-0 max-w-[85%] items-center gap-1.5 text-[12px] leading-4 text-[var(--sol-dim)]">
           <FileTextIcon className="size-3.5 shrink-0" />
           <span aria-hidden="true" className="min-w-0 truncate">
             {page.title}
@@ -120,21 +116,32 @@ export function AskQuestion({
       ) : null}
       {/* The reader's words set their own direction (English on an Arabic
           page); the hidden "You:" has its own, so it doesn't decide. */}
-      <h3
-        dir="auto"
+      <div
         className={cn(
-          "m-0 whitespace-pre-wrap break-words font-medium tracking-[-0.01em] text-[var(--sol-text)]",
-          fullscreen ? "text-[17px] leading-7" : "text-[15px] leading-6",
+          "max-w-[85%] rounded-[20px] bg-[var(--sol-purple-soft)] text-[var(--sol-text)]",
+          fullscreen ? "px-5 py-3" : "px-4 py-2.5",
+          // Code needs the room; words keep the bubble to their width.
+          snippets.length ? "w-full" : "w-fit",
         )}
       >
-        <span dir="auto" className={visuallyHidden}>
-          {t("you")}:{" "}
-        </span>
-        {heading}
-      </h3>
-      {snippets.map((code, index) => (
-        <QuestionSnippet key={index} code={code} />
-      ))}
+        <h3
+          dir="auto"
+          className={cn(
+            "m-0 whitespace-pre-wrap break-words font-normal",
+            fullscreen
+              ? "text-[16px] leading-[1.6]"
+              : "text-[14.5px] leading-[1.55]",
+          )}
+        >
+          <span dir="auto" className={visuallyHidden}>
+            {t("you")}:{" "}
+          </span>
+          {heading}
+        </h3>
+        {snippets.map((code, index) => (
+          <QuestionSnippet key={index} code={code} />
+        ))}
+      </div>
     </div>
   );
 }
@@ -349,12 +356,7 @@ export function AskTurn({
         </div>
       ) : null}
       {answer ? (
-        <div
-          className={cn(
-            question && (hasSnippet(question.text) ? "mt-4" : "mt-3"),
-            enterAnswer && enterUp,
-          )}
-        >
+        <div className={cn(question && "mt-5", enterAnswer && enterUp)}>
           <AssistantMessage
             message={answer}
             latest={latest}

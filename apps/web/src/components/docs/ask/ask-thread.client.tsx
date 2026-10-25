@@ -255,10 +255,7 @@ export function AskThread({ fullscreen }: { fullscreen: boolean }) {
               {turns.map((turn, index) => (
                 <li
                   key={turn.key}
-                  className={cn(
-                    "group/turn",
-                    index > 0 && "mt-8 border-t border-[var(--sol-line)] pt-6",
-                  )}
+                  className={cn("group/turn", index > 0 && "mt-8")}
                 >
                   <AskTurn
                     question={turn.question}
