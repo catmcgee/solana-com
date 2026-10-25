@@ -160,7 +160,11 @@ describe("Ask AI launcher and panel", () => {
   it("is a launcher named exactly “Ask AI” that docks the panel at 1440px", async () => {
     renderAsk();
     const launcher = screen.getByRole("button", { name: "Ask AI" });
-    expect(launcher.textContent).toBe("✨Ask AI");
+    // The ✨ follows the label, drawn white.
+    expect(launcher.textContent).toBe("Ask AI✨");
+    expect(launcher.querySelector('[aria-hidden="true"]')!.className).toContain(
+      "brightness-0 invert",
+    );
     // No kbd hint: the shortcut is only in the tooltip.
     expect(launcher.querySelector("kbd")).toBeNull();
     expect(launcher).toHaveAttribute("title", "Ctrl I to open or close");

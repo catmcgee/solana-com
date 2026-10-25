@@ -63,7 +63,7 @@ export function AskHeaderButton({
 }
 
 /**
- * "✨ Ask AI": a purple pill at the bottom end of the page from 1280px,
+ * "Ask AI ✨": a purple pill at the bottom end of the page from 1280px,
  * where it sits in the table of contents' column (narrower screens use the
  * header's ✨ button, so the pill never covers the page). Hidden while the
  * panel is open, including before hydration when the prepaint script has
@@ -105,13 +105,15 @@ export function AskLauncher() {
           focusRing,
         )}
       >
+        {tc("askAI")}
+        {/* The emoji's colours can't be set, so a filter draws it white,
+            like the label. */}
         <span
           aria-hidden="true"
-          className="inline-block text-[15px] leading-none transition-transform duration-200 motion-safe:group-hover:rotate-12 motion-safe:group-hover:scale-110 motion-reduce:transition-none"
+          className="inline-block text-[15px] leading-none brightness-0 invert transition-transform duration-200 motion-safe:group-hover:rotate-12 motion-safe:group-hover:scale-110 motion-reduce:transition-none"
         >
           ✨
         </span>
-        {tc("askAI")}
       </button>
     </div>
   );
