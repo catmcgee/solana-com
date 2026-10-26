@@ -254,6 +254,12 @@ test("phones open Ask AI from the header as a full-screen sheet", async ({
   await expect(page.locator("[data-ask-launcher]")).toBeHidden();
   await page.locator(".dh-tools [data-docs-ask-open]").click();
   await expect(dialog(page)).toBeVisible();
+  // Measured once it has slid in (mid-way its box is a fraction off).
+  await dialog(page).evaluate((el) =>
+    Promise.allSettled(
+      el.getAnimations().map((animation) => animation.finished),
+    ),
+  );
   const box = await dialog(page).boundingBox();
   expect(box?.width).toBe(390);
   expect(box?.height).toBe(844);
@@ -273,10 +279,84 @@ test("the page actions menu asks about this page", async ({ page }) => {
   await composer(page).fill("What is rent?");
   await composer(page).press("Enter");
   await expect(docked(page).getByText(ASK_ANSWER).first()).toBeVisible();
-  expect(String(asks[0]?.message)).toContain("“Accounts”");
+  // The reader's words; the page goes in its own fields.
+  expect(asks[0]).toMatchObject({
+    message: "What is rent?",
+    page_url: "https://solana.com/developers/docs/core/accounts",
+    page_title: "Accounts",
+  });
+  expect(errors).toEqual([]);
+});
+
+test("selected text asks Ask AI about it, without sending it or copying it", async ({
+  page,
+  context,
+}) => {
+  test.skip(!ASK_MOCK, "needs the mocked agent");
+  const { errors, asks } = await setup(page);
+  const chatRequests: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().includes("/api/ask/chat"))
+      chatRequests.push(request.url());
+  });
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(DOCS_PAGE);
+  await page.waitForLoadState("load");
+  // The reader's clipboard holds something of their own.
+  await page.evaluate(() => navigator.clipboard.writeText("e2e-sentinel"));
+
+  // Drag across an article paragraph's first line.
+  const paragraph = page
+    .locator("#content > p, #content > span")
+    .filter({ hasText: /\w{4,}/ })
+    .first();
+  await paragraph.scrollIntoViewIfNeeded();
+  const box = (await paragraph.boundingBox())!;
+  await page.mouse.move(box.x + 4, box.y + 10);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width * 0.6, box.y + 10, { steps: 6 });
+  const pill = page.getByRole("button", {
+    name: "Ask AI about this",
+    exact: true,
+  });
+  // Not mid-drag.
+  await expect(pill).toHaveCount(0);
+  await page.mouse.up();
+  await expect(pill).toBeVisible();
+  const selected = await page.evaluate(() =>
+    document.getSelection()!.toString().trim(),
+  );
+  expect(selected.length).toBeGreaterThan(10);
+  await pill.click();
+
+  // Open, with the selection quoted in the composer and the caret there.
+  await expect(docked(page)).toBeVisible();
+  const words = selected.split(/\s+/).slice(0, 3).join(" ");
+  await expect(
+    docked(page).locator("p").filter({ hasText: words }),
+  ).toBeVisible();
+  await expect(composer(page)).toBeFocused();
+  await expect(pill).toHaveCount(0);
+  expect(await page.evaluate(() => document.getSelection()!.toString())).toBe(
+    "",
+  );
+  // Nothing sent, nothing copied.
+  expect(chatRequests).toEqual([]);
+  expect(asks).toEqual([]);
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
+    "e2e-sentinel",
+  );
+
+  // Sent with the reader's question: the quote goes ahead of it.
+  await composer(page).fill("Why?");
+  await composer(page).press("Enter");
+  await expect(docked(page).getByText(ASK_ANSWER).first()).toBeVisible();
+  expect(String(asks[0]?.message)).toMatch(/^> .+\n\nWhy\?$/s);
   expect(asks[0]?.page_url).toBe(
     "https://solana.com/developers/docs/core/accounts",
   );
+  await expect(docked(page).locator("blockquote")).toContainText(words);
   expect(errors).toEqual([]);
 });
 
@@ -338,6 +418,39 @@ test("the site header's search opens Inkeep's search", async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
+test("a drag past a code block's edge onto its Run bar asks about the code alone", async ({
+  page,
+}) => {
+  test.skip(!ASK_MOCK, "needs the mocked agent");
+  const { errors, asks } = await setup(page);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(CODE_PAGE);
+  await page.waitForLoadState("load");
+  // A runnable example: its Run bar sits right under the code.
+  const code = page.locator("#content .code-block pre").first();
+  await code.scrollIntoViewIfNeeded();
+  const lines = code.locator(".line").filter({ hasText: /\S/ });
+  const last = (await lines.last().boundingBox())!;
+  const box = (await code.boundingBox())!;
+  // From the start of the last line to just under the block.
+  await page.mouse.move(last.x + 1, last.y + last.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 300, box.y + box.height + 10, { steps: 8 });
+  await page.mouse.up();
+  const lastLine = (await lines.last().textContent())!;
+  await page
+    .getByRole("button", { name: "Ask AI about this", exact: true })
+    .click();
+  await expect(docked(page)).toBeVisible();
+  await composer(page).press("Enter");
+  await expect(docked(page).getByText(ASK_ANSWER).first()).toBeVisible();
+  // Fenced with its language, verbatim, without the bar's "Run".
+  expect(asks[0]?.message).toBe(
+    `\`\`\`ts\n${lastLine.trimEnd()}\n\`\`\`\n\nExplain this`,
+  );
+  expect(errors).toEqual([]);
+});
+
 test("a code block's Ask button asks the docs' panel about its code", async ({
   page,
 }) => {
@@ -352,6 +465,9 @@ test("a code block's Ask button asks the docs' panel about its code", async ({
   await ask.scrollIntoViewIfNeeded();
   await ask.click();
   await expect(docked(page).getByText(ASK_ANSWER).first()).toBeVisible();
-  expect(String(asks[0]?.message)).toContain("Explain this code from");
+  // Sent without the page title (the panel shows it); the page goes as
+  // page_url.
+  expect(String(asks[0]?.message)).toMatch(/^Explain this code:\n\n```/);
+  expect(asks[0]?.page_url).toBe(`https://solana.com${CODE_PAGE}`);
   expect(chats).toEqual([]);
 });

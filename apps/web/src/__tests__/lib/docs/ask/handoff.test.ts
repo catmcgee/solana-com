@@ -18,17 +18,30 @@ const ID = "0123456789abcdef01234567";
 const KEY = `${ASK_STORAGE_KEYS.handoff}${ID}`;
 const NOW = 1_800_000_000_000;
 
+const ACCOUNTS = {
+  title: "Accounts",
+  url: "https://solana.com/developers/docs/core/accounts",
+};
+
 const snapshot = {
   messages: [
-    { id: "u1", role: "user", text: "What is a PDA?" },
+    {
+      id: "u1",
+      role: "user",
+      text: "What is a PDA?",
+      quote: { text: "A program derived address" },
+    },
     { id: "a1", role: "assistant", state: "done", text: "An address." },
   ],
   conversationId: "7",
-  pageContext: {
-    title: "Accounts",
-    url: "https://solana.com/developers/docs/core/accounts",
-  },
+  pageContext: ACCOUNTS,
   composerDraft: "And rent?",
+  composerQuote: {
+    text: "let pda = find();",
+    code: true,
+    language: "rust",
+    pageContext: ACCOUNTS,
+  },
 };
 
 beforeEach(() => {
@@ -149,6 +162,7 @@ describe("handoff", () => {
         conversationId: 9,
         pageContext: { title: "x", url: "javascript:alert(1)" },
         composerDraft: 3,
+        composerQuote: { text: 5 },
       }),
     );
     expect(readHandoff(localStorage, ID, NOW)).toEqual({
@@ -158,7 +172,28 @@ describe("handoff", () => {
       conversationId: "9",
       pageContext: null,
       composerDraft: "",
+      composerQuote: null,
     });
+    // A quote keeps its words without a page it can't trust; snapshots
+    // from before quotes have none.
+    localStorage.setItem(
+      KEY,
+      JSON.stringify({
+        v: 1,
+        savedAt: NOW,
+        composerQuote: {
+          text: "Rent",
+          code: "yes",
+          language: "<script>",
+          pageContext: { title: "x", url: "javascript:alert(1)" },
+        },
+      }),
+    );
+    expect(readHandoff(localStorage, ID, NOW)?.composerQuote).toEqual({
+      text: "Rent",
+    });
+    localStorage.setItem(KEY, JSON.stringify({ v: 1, savedAt: NOW }));
+    expect(readHandoff(localStorage, ID, NOW)?.composerQuote).toBeNull();
     localStorage.setItem(KEY, JSON.stringify({ v: 2, savedAt: NOW }));
     expect(readHandoff(localStorage, ID, NOW)).toBeNull();
     localStorage.setItem(KEY, "{not json");

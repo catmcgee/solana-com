@@ -6,8 +6,13 @@
  */
 import { useEffect, useState } from "react";
 
+/**
+ * The docs' focus ring: 2px purple, 2px out, from the keyboard only. Solid
+ * by name: `outline-hidden` sets Tailwind's outline style to none, which
+ * plain `outline` would pick up.
+ */
 export const focusRing =
-  "outline-hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sol-purple)]";
+  "outline-hidden focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sol-purple)]";
 
 /** The docs' signature label (sidebar sections, "On this page"). */
 export const signatureLabel =

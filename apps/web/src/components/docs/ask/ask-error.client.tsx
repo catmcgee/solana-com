@@ -61,25 +61,44 @@ const WAIT: ReadonlySet<AskErrorKind> = new Set(["rateLimited", "busy"]);
 const restored = new Set<string>();
 
 /**
- * Puts a refused question (and its page) back in the composer, once, unless
- * the reader has started typing something else.
+ * Puts a refused question (and its page or quote) back in the composer,
+ * once, unless the reader has started typing or quoting something else.
+ * A quote sent without words goes back without them: its question
+ * (`explainSelection`, "Explain this") was ours, not the reader's.
  */
-function useRestoreQuestion(messageId: string, enabled: boolean) {
+function useRestoreQuestion(
+  messageId: string,
+  enabled: boolean,
+  explainSelection: string,
+) {
   useEffect(() => {
     if (!enabled || restored.has(messageId)) return;
     restored.add(messageId);
-    const { messages, composerDraft, pageContext } = askStore.getState();
-    if (composerDraft.trim()) return;
+    const { messages, composerDraft, composerQuote, pageContext } =
+      askStore.getState();
+    if (composerDraft.trim() || composerQuote) return;
     const index = messages.findIndex((message) => message.id === messageId);
     const question = messages
       .slice(0, Math.max(index, 0))
       .findLast((message) => message.role === "user");
     if (question?.role !== "user") return;
+    if (question.quote) {
+      // The words and the quote card, as they were; the page goes with
+      // the quote.
+      askStore.setComposerDraft(
+        question.text === explainSelection ? "" : question.text,
+      );
+      askStore.setComposerQuote({
+        ...question.quote,
+        ...(question.pageContext ? { pageContext: question.pageContext } : {}),
+      });
+      return;
+    }
     // What was sent: a code block's ask goes back without the page title.
     askStore.setComposerDraft(question.sent ?? question.text);
     if (question.pageContext && !pageContext)
       askStore.setPageContext(question.pageContext);
-  }, [messageId, enabled]);
+  }, [messageId, enabled, explainSelection]);
 }
 
 /**
@@ -114,7 +133,11 @@ export function AskError({
       message?.role === "assistant" && (!!message.text.trim() || !!message.ui)
     );
   });
-  useRestoreQuestion(messageId, isLatest && NO_RETRY.has(kind));
+  useRestoreQuestion(
+    messageId,
+    isLatest && NO_RETRY.has(kind),
+    t("prompts.explainSelection"),
+  );
 
   if (!isLatest) {
     return (

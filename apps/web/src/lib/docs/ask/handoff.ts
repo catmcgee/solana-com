@@ -17,6 +17,7 @@
 import { ASK_LINK_PARAMS, ASK_STORAGE_KEYS } from "./config";
 import { isAskPageContext, type AskPageContext } from "./page-context";
 import { isRecord, toId } from "./protocol";
+import { restoreComposerQuote, type AskComposerQuote } from "./quote";
 
 export const ASK_HANDOFF_TTL_MS = 10 * 60 * 1000;
 
@@ -28,6 +29,8 @@ export type AskHandoff = {
   conversationId: string | null;
   pageContext: AskPageContext | null;
   composerDraft: string;
+  /** The composer's quote card ("Ask AI about this"); null in older snapshots. */
+  composerQuote: AskComposerQuote | null;
 };
 
 type UrlParts = { pathname: string; search: string; hash: string };
@@ -129,6 +132,7 @@ export function parseHandoff(
     pageContext: isAskPageContext(value.pageContext) ? value.pageContext : null,
     composerDraft:
       typeof value.composerDraft === "string" ? value.composerDraft : "",
+    composerQuote: restoreComposerQuote(value.composerQuote),
   };
 }
 

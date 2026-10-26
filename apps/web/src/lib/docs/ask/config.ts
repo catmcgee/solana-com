@@ -17,6 +17,9 @@ export const ASK_MAX_MESSAGE_CHARS = 4_000;
 /** Code sent from a code block's Ask button is cut to this, leaving room for the prompt. */
 export const ASK_MAX_CODE_CHARS = 3_500;
 
+/** Text selected on the page ("Ask AI about this") is cut to this, at a word. */
+export const ASK_MAX_QUOTE_CHARS = 1_200;
+
 /** Messages kept in sessionStorage; the agent caps a conversation at about 40. */
 export const ASK_MAX_STORED_MESSAGES = 40;
 

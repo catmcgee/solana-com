@@ -15,6 +15,12 @@ export const DOCS_ASK_CODE_EVENT = DOCS_ASK_OPEN_EVENT;
  */
 export const DOCS_ASK_OPEN_ATTR = "data-docs-ask-open";
 
+/**
+ * Marks a page's article content: selecting text inside it offers "Ask AI
+ * about this" (components/docs/ask/ask-selection.client.tsx).
+ */
+export const DOCS_ASK_SELECTION_ATTR = "data-docs-ask-selection";
+
 export type AskAiOpenOptions = {
   /** Code to explain (sent at once, cut to 3,500 characters). */
   code?: string;
@@ -24,6 +30,11 @@ export type AskAiOpenOptions = {
   question?: string;
   /** Attach this page to the composer and focus it; nothing is sent. */
   aboutPage?: boolean;
+  /**
+   * Text selected on this page: attached to the composer as a quote, which
+   * takes focus; nothing is sent. `code` when it lies in one code block.
+   */
+  selection?: { text: string; code?: boolean; language?: string };
 };
 
 /**

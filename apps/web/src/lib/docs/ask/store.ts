@@ -17,7 +17,9 @@
  * - A question that arrives while an answer is streaming is queued, not
  *   dropped.
  * - A question goes out as the reader's words; the page it is about goes
- *   in `page_url` / `page_title`, and the server builds any prefix.
+ *   in `page_url` / `page_title`, and the server builds any prefix. Text
+ *   selected on the page ("Ask AI about this") waits in the composer as a
+ *   quote and goes ahead of the words (./quote.ts), its page as above.
  * - "Expand to full screen" is also a link that opens the thread full
  *   screen in a new tab (./handoff.ts): the store leaves the thread for it
  *   in localStorage and, in the new tab, takes it back on load. An answer
@@ -61,6 +63,15 @@ import {
   type AskPageContext,
 } from "./page-context";
 import {
+  fenceLanguage,
+  quotedQuestion,
+  quotedQuestionWithin,
+  restoreQuote,
+  toQuote,
+  type AskComposerQuote,
+  type AskQuote,
+} from "./quote";
+import {
   advanceAskStatus,
   askStatusForStage,
   isRecord,
@@ -80,6 +91,7 @@ import {
 
 export { DOCS_ASK_PREPAINT_SCRIPT } from "./config";
 export type { AskPageContext } from "./page-context";
+export type { AskComposerQuote, AskQuote } from "./quote";
 export type {
   AskCitation,
   AskErrorKind,
@@ -109,9 +121,12 @@ export type AskUserMessage = {
   /**
    * The question as sent, when it differs from `text`: a code block's Ask
    * shows "Explain this code from {title}:" but sends the code without the
-   * title, which the agent's router would answer with a canned template.
+   * title, which the agent's router would answer with a canned template;
+   * a quoted question sends the quote ahead of the words.
    */
   sent?: string;
+  /** Text selected on the page that the question is about, shown above it. */
+  quote?: AskQuote;
 };
 
 export type AskAssistantMessage = {
@@ -162,6 +177,8 @@ export type AskState = {
   /** Page attached to the next question (composer chip). */
   pageContext: AskPageContext | null;
   composerDraft: string;
+  /** Selected text attached to the next question (composer quote card). */
+  composerQuote: AskComposerQuote | null;
   /** Increments whenever the composer should take focus. */
   focusRequest: number;
   /**
@@ -180,6 +197,12 @@ export type AskOpenOptions = {
   question?: string;
   /** Attach this page (or the given page) to the composer; does not send. */
   aboutPage?: boolean | AskPageContext;
+  /**
+   * Text selected on this page: attached to the composer as a quote (in
+   * place of any earlier one, keeping the draft), which takes focus. Does
+   * not send.
+   */
+  selection?: AskQuote;
 };
 
 export type AskSendOptions = {
@@ -202,11 +225,14 @@ export type AskPrompts = {
   explainCodeSent: () => string;
   /** Prefixes an earlier about-page question in `history` (review backends). */
   aboutPage: (page: AskPageContext) => string;
+  /** The question for a quote sent without one. */
+  explainSelection: () => string;
 };
 
 const DEFAULT_PROMPTS: AskPrompts = {
   explainCode: (title) => `Explain this code from ${title}:`,
   explainCodeSent: () => "Explain this code:",
+  explainSelection: () => "Explain this",
   aboutPage: ({ title, url }) =>
     `Question about the docs page “${title}” (${url}):`,
 };
@@ -224,6 +250,7 @@ type Core = {
   busy: boolean;
   pageContext: AskPageContext | null;
   composerDraft: string;
+  composerQuote: AskComposerQuote | null;
   focusRequest: number;
   threadId: string;
 };
@@ -234,6 +261,7 @@ type QueuedQuestion = {
   sent?: string;
   /** A code block's page (AskUserMessage.pageUrl). */
   pageUrl?: string;
+  quote?: AskQuote;
 };
 
 function initialCore(): Core {
@@ -249,6 +277,7 @@ function initialCore(): Core {
     busy: false,
     pageContext: null,
     composerDraft: "",
+    composerQuote: null,
     focusRequest: 0,
     threadId: "",
   };
@@ -314,6 +343,7 @@ function derive(c: Core): AskState {
     queued: queue.length,
     pageContext: c.pageContext,
     composerDraft: c.composerDraft,
+    composerQuote: c.composerQuote,
     focusRequest: c.focusRequest,
     threadId: c.threadId,
   };
@@ -455,6 +485,8 @@ function restoreMessage(value: unknown): AskMessage | null {
   if (!id) return null;
   if (value.role === "user") {
     if (typeof value.text !== "string" || !value.text.trim()) return null;
+    // Threads saved before quotes existed simply have none.
+    const quote = restoreQuote(value.quote);
     return {
       id,
       role: "user",
@@ -469,6 +501,7 @@ function restoreMessage(value: unknown): AskMessage | null {
       /^https?:\/\//.test(value.pageUrl)
         ? { pageUrl: value.pageUrl }
         : {}),
+      ...(quote ? { quote } : {}),
     };
   }
   if (value.role !== "assistant") return null;
@@ -589,6 +622,7 @@ function hydrate() {
         ? {
             pageContext: core.pageContext ?? handoff.pageContext,
             composerDraft: core.composerDraft || handoff.composerDraft,
+            composerQuote: core.composerQuote ?? handoff.composerQuote,
           }
         : {}),
       ...(inFlight ? { busy: true } : {}),
@@ -751,17 +785,17 @@ function recentHistory(messages: AskMessage[]): AskHistoryTurn[] {
     if (user.role !== "user" || answer?.role !== "assistant") return;
     if (answer.state !== "done" && answer.state !== "stopped") return;
     if (!answer.text.trim()) return;
+    // Earlier turns keep their page: only the current one has page_url.
+    const about = user.pageContext
+      ? `${prompts.aboutPage(user.pageContext)}\n\n`
+      : "";
+    const max = ASK_HISTORY_LIMITS.userChars;
+    // A quote goes ahead of the question: it is cut so the question stays.
+    const question = user.quote
+      ? quotedQuestionWithin(user.quote, user.text, max - about.length)
+      : sentText(user);
     turns.push(
-      {
-        role: "user",
-        // Earlier turns keep their page: only the current one has page_url.
-        content: clip(
-          user.pageContext
-            ? `${prompts.aboutPage(user.pageContext)}\n\n${sentText(user)}`
-            : sentText(user),
-          ASK_HISTORY_LIMITS.userChars,
-        ),
-      },
+      { role: "user", content: clip(`${about}${question}`, max) },
       {
         role: "assistant",
         content: clip(answer.text, ASK_HISTORY_LIMITS.assistantChars),
@@ -775,7 +809,7 @@ function startTurn(
   question: QueuedQuestion,
   options: { retry?: boolean } = {},
 ) {
-  const { text, pageContext, sent, pageUrl } = question;
+  const { text, pageContext, sent, pageUrl, quote } = question;
   const history = recentHistory(core.messages);
   const user: AskUserMessage = {
     id: newId(),
@@ -784,6 +818,7 @@ function startTurn(
     ...(pageContext ? { pageContext } : {}),
     ...(sent !== undefined && sent !== text ? { sent } : {}),
     ...(pageUrl && !pageContext ? { pageUrl } : {}),
+    ...(quote ? { quote } : {}),
   };
   const assistant: AskAssistantMessage = {
     id: newId(),
@@ -989,18 +1024,27 @@ function open(options?: AskOpenOptions | string) {
       : isAskPageContext(opts.aboutPage)
         ? opts.aboutPage
         : null;
+  const quote = opts.selection ? toQuote(opts.selection) : null;
+  // The quote keeps the page it was selected on, sent as an about-page
+  // question sends its page, even if the reader moves on before sending.
+  const quotePage = quote ? readPageContext() : null;
   commit({
     open: true,
     ...(page ? { pageContext: page } : {}),
+    ...(quote
+      ? {
+          composerQuote: quotePage
+            ? { ...quote, pageContext: quotePage }
+            : quote,
+        }
+      : {}),
   });
   warmAskSession();
 
   const code = opts.code?.trim();
   const question = opts.question?.trim();
   if (code) {
-    const language = /^[\w#+.-]{1,24}$/.test(opts.language ?? "")
-      ? opts.language
-      : "";
+    const language = fenceLanguage(opts.language);
     const fenced = `\`\`\`${language}\n${code.slice(0, ASK_MAX_CODE_CHARS)}\n\`\`\``;
     // The page goes as page_url alone, so the answer reads the page the
     // code came from without the agent's router seeing its title.
@@ -1062,6 +1106,7 @@ function handOver(threadId: string, messages: AskMessage[]): number | null {
     conversationId: core.conversationId,
     pageContext: core.pageContext,
     composerDraft: core.composerDraft,
+    composerQuote: core.composerQuote,
   });
   lastHandoff = savedAt === null ? null : { threadId, savedAt };
   return savedAt;
@@ -1158,7 +1203,12 @@ function send(text: string, options: AskSendOptions = {}): AskSendResult {
 function ask(
   text: string,
   pageContext: AskPageContext | null,
-  options: { sent?: string; pageUrl?: string; clearAttached?: boolean } = {},
+  options: {
+    sent?: string;
+    pageUrl?: string;
+    quote?: AskQuote;
+    clearAttached?: boolean;
+  } = {},
 ): AskSendResult {
   const trimmed = text.trim();
   if (!trimmed) return { ok: false, reason: "empty" };
@@ -1167,6 +1217,7 @@ function ask(
     pageContext,
     ...(options.sent ? { sent: options.sent } : {}),
     ...(options.pageUrl ? { pageUrl: options.pageUrl } : {}),
+    ...(options.quote ? { quote: options.quote } : {}),
   };
   // The limit applies to what is sent; the page goes in its own fields.
   if (sentText(question).length > ASK_MAX_MESSAGE_CHARS) {
@@ -1182,11 +1233,30 @@ function ask(
   return { ok: true, queued: false };
 }
 
-/** Sends the composer's draft and clears it when accepted. */
+/**
+ * Sends the composer's draft, and its quote if there is one, and clears
+ * them when accepted. A quote without a draft asks explainSelection.
+ */
 function submitComposer(): AskSendResult {
-  const result = send(core.composerDraft);
-  if (result.ok) commit({ composerDraft: "" });
+  const quote = core.composerQuote;
+  const result = quote ? sendQuote(quote) : send(core.composerDraft);
+  if (result.ok) commit({ composerDraft: "", composerQuote: null });
   return result;
+}
+
+/**
+ * The quote ahead of the reader's words, as `sent`; the bubble shows the
+ * words with the quote above them. Its page goes in page_url / page_title
+ * (else the attached page's), and the page chip goes as with any send.
+ */
+function sendQuote({ pageContext, ...quote }: AskComposerQuote) {
+  start();
+  const question = core.composerDraft.trim() || prompts.explainSelection();
+  return ask(question, pageContext ?? core.pageContext, {
+    sent: quotedQuestion(quote, question),
+    quote,
+    clearAttached: true,
+  });
 }
 
 /** Stops the streaming answer, keeping what arrived; queued questions follow. */
@@ -1216,6 +1286,7 @@ function retry(messageId: string) {
     pageContext: user.pageContext ?? null,
     ...(user.sent ? { sent: user.sent } : {}),
     ...(user.pageUrl ? { pageUrl: user.pageUrl } : {}),
+    ...(user.quote ? { quote: user.quote } : {}),
   };
 
   if (core.busy) {
@@ -1256,6 +1327,7 @@ function reset() {
       busy: false,
       pageContext: null,
       composerDraft: "",
+      composerQuote: null,
       focusRequest: core.focusRequest + 1,
       // A new thread, so a new full-screen link.
       threadId: newThreadId(),
@@ -1297,6 +1369,12 @@ function setComposerDraft(composerDraft: string) {
   if (composerDraft !== core.composerDraft) commit({ composerDraft });
 }
 
+/** Attaches a quote to the next question as it is (null removes the card). */
+function setComposerQuote(composerQuote: AskComposerQuote | null) {
+  start();
+  commit({ composerQuote });
+}
+
 function focusComposer() {
   commit({ focusRequest: core.focusRequest + 1 });
 }
@@ -1336,6 +1414,7 @@ export const askStore = {
   setPageContext,
   attachCurrentPage,
   setComposerDraft,
+  setComposerQuote,
   focusComposer,
   setPrompts,
   /** Mint a session ahead of the first question (launcher hover/focus). */

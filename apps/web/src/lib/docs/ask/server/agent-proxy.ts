@@ -121,6 +121,11 @@ export function visitorIp(request: Request): string | null {
  * turned any question asked on Create a Token or CPI into that page's
  * template. A title can still match on its own line; a URL never goes in.
  * Skipped when the message would pass the agent's 4,000 characters.
+ *
+ * Known gap: text quoted with "Ask AI about this" is part of `message`
+ * (ahead of the question), so the router reads it too, and a quote that
+ * matches a workflow gets its template. Closing it needs the agent: route
+ * on the reader's words only, or take the quote in a field of its own.
  */
 export function agentChatBody(
   value: Record<string, unknown>,

@@ -222,7 +222,9 @@ export async function DocsPageView({
                   )}
                 </div>
               )}
-              <div id="content-area">
+              {/* The article: selecting text in it offers "Ask AI about
+                  this" (DOCS_ASK_SELECTION_ATTR). */}
+              <div id="content-area" data-docs-ask-selection="">
                 <header id="header">
                   <div className="page-heading">
                     {crumbs.length ? (

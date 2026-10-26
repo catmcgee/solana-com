@@ -850,7 +850,229 @@ describe("entry points", () => {
   });
 });
 
+describe("selected text", () => {
+  const ACCOUNTS = {
+    title: "Accounts",
+    url: "https://solana.com/developers/docs/core/accounts",
+  };
+  function docsPage() {
+    document.body.innerHTML =
+      '<div id="content" data-page-title="Accounts" data-page-href="/developers/docs/core/accounts"></div>';
+  }
+  const chats = () =>
+    fetchMock.mock.calls.filter(([input]) => String(input).endsWith("/chat"));
+
+  it("opens with the selection as a quote and focuses the composer, keeping the draft, never sending", () => {
+    docsPage();
+    askStore.setComposerDraft("Why?");
+    const before = askStore.getState().focusRequest;
+    askStore.open({
+      selection: { text: "  Rent is   a\n\n  deposit,\tkept\u00a0back.  " },
+    });
+    expect(askStore.getState()).toMatchObject({
+      open: true,
+      composerDraft: "Why?",
+      // Tidied: runs of spaces collapsed, a paragraph break kept as one
+      // newline. Its page goes with it.
+      composerQuote: {
+        text: "Rent is a\ndeposit, kept back.",
+        pageContext: ACCOUNTS,
+      },
+      // Not the page chip: the quote carries its page.
+      pageContext: null,
+      focusRequest: before + 1,
+      messages: [],
+    });
+    expect(chats()).toHaveLength(0);
+  });
+
+  it("replaces an earlier quote", () => {
+    askStore.open({ selection: { text: "First" } });
+    askStore.open({ selection: { text: "Second" } });
+    expect(askStore.getState().composerQuote).toEqual({ text: "Second" });
+    // Removed from the composer.
+    askStore.setComposerQuote(null);
+    expect(askStore.getState().composerQuote).toBeNull();
+  });
+
+  it("ignores a selection of whitespace or a single character", () => {
+    askStore.open({ selection: { text: " \n\t " } });
+    askStore.open({ selection: { text: " x " } });
+    expect(askStore.getState()).toMatchObject({
+      open: true,
+      composerQuote: null,
+    });
+  });
+
+  it("cuts a long quote at a word, with an ellipsis", () => {
+    const words = Array.from({ length: 400 }, (_, i) => `word${i}`).join(" ");
+    askStore.open({ selection: { text: words } });
+    const text = askStore.getState().composerQuote!.text;
+    expect(text.length).toBeLessThanOrEqual(1200);
+    expect(text).toMatch(/ word\d+…$/);
+    expect(words.startsWith(text.slice(0, -1))).toBe(true);
+    expect(words.charAt(text.length - 1)).toBe(" ");
+  });
+
+  it("sends the quote ahead of the question, with its page, and clears it", async () => {
+    docsPage();
+    chatQueue.push(finished("About rent."));
+    askStore.open({
+      selection: { text: "Rent is a deposit.\nIt comes back." },
+    });
+    askStore.setComposerDraft("  Why is it needed?  ");
+    expect(askStore.submitComposer()).toEqual({ ok: true, queued: false });
+    const sent = "> Rent is a deposit.\n> It comes back.\n\nWhy is it needed?";
+    expect(askStore.getState()).toMatchObject({
+      composerDraft: "",
+      composerQuote: null,
+    });
+    // The bubble shows the words with the quote above them.
+    expect(askStore.getState().messages[0]).toEqual({
+      id: expect.any(String),
+      role: "user",
+      text: "Why is it needed?",
+      pageContext: ACCOUNTS,
+      sent,
+      quote: { text: "Rent is a deposit.\nIt comes back." },
+    });
+    await vi.waitFor(() => expect(chatBodies()).toHaveLength(1));
+    expect(chatBodies()[0]).toEqual({
+      session_token: "mock-token",
+      message: sent,
+      page_url: ACCOUNTS.url,
+      page_title: "Accounts",
+    });
+  });
+
+  it("asks the localized explainSelection without a question", async () => {
+    askStore.setPrompts({ explainSelection: () => "Explique ça" });
+    chatQueue.push(finished("Expliqué."));
+    askStore.open({ selection: { text: "Rent is a deposit." } });
+    expect(askStore.submitComposer()).toMatchObject({ ok: true });
+    expect(askStore.getState().messages[0]).toMatchObject({
+      text: "Explique ça",
+      sent: "> Rent is a deposit.\n\nExplique ça",
+    });
+    // No quote and no words: nothing to send.
+    expect(askStore.submitComposer()).toEqual({ ok: false, reason: "empty" });
+  });
+
+  it("keeps code as it is, fenced with its language (longer than its own fences)", async () => {
+    chatQueue.push(finished("Explained."), finished("Again."));
+    askStore.open({
+      selection: {
+        text: "\n  let x = 1;\n\n    y();\n\n",
+        code: true,
+        language: "rust",
+      },
+    });
+    expect(askStore.getState().composerQuote).toEqual({
+      text: "  let x = 1;\n\n    y();",
+      code: true,
+      language: "rust",
+    });
+    askStore.submitComposer();
+    await vi.waitFor(() => expect(askStore.getState().busy).toBe(false));
+    expect(chatBodies()[0]!.message).toBe(
+      "```rust\n  let x = 1;\n\n    y();\n```\n\nExplain this",
+    );
+    askStore.open({
+      selection: { text: "md = `\n```\n`", code: true, language: "<b>" },
+    });
+    askStore.submitComposer();
+    await vi.waitFor(() => expect(chatBodies()).toHaveLength(2));
+    expect(chatBodies()[1]!.message).toBe(
+      "````\nmd = `\n```\n`\n````\n\nExplain this",
+    );
+  });
+
+  it("counts the quote against the length limit, keeping both when refused", () => {
+    askStore.open({ selection: { text: "q".repeat(1000) } });
+    // "> " + 1,000 + "\n\n" + the question: 4,001 characters.
+    askStore.setComposerDraft("x".repeat(2997));
+    expect(askStore.submitComposer()).toEqual({
+      ok: false,
+      reason: "tooLong",
+    });
+    expect(askStore.getState()).toMatchObject({
+      composerDraft: "x".repeat(2997),
+      composerQuote: { text: "q".repeat(1000) },
+      messages: [],
+    });
+    askStore.setComposerDraft("x".repeat(2996));
+    expect(askStore.submitComposer()).toMatchObject({ ok: true });
+  });
+
+  it("sends the quote again on retry, and in the history", async () => {
+    docsPage();
+    chatQueue.push(
+      Response.json(AGENT_ERRORS.budget.body, { status: 503 }),
+      finished("About rent."),
+      finished("Second."),
+    );
+    askStore.open({ selection: { text: "Rent is a deposit." } });
+    askStore.setComposerDraft("Why?");
+    askStore.submitComposer();
+    await vi.waitFor(() => expect(lastAssistant().state).toBe("error"));
+    askStore.retry(lastAssistant().id);
+    await vi.waitFor(() => expect(lastAssistant().state).toBe("done"));
+    askStore.send("And then?");
+    await vi.waitFor(() => expect(chatBodies()).toHaveLength(3));
+    const sent = "> Rent is a deposit.\n\nWhy?";
+    expect(chatBodies().map((body) => body.message)).toEqual([
+      sent,
+      sent,
+      "And then?",
+    ]);
+    expect(chatBodies()[2]!.history).toEqual([
+      {
+        role: "user",
+        content: `Question about the docs page “Accounts” (${ACCOUNTS.url}):\n\n${sent}`,
+      },
+      { role: "assistant", content: "About rent." },
+    ]);
+  });
+
+  it("keeps a long quote's question in the history, cutting the quote instead", async () => {
+    docsPage();
+    chatQueue.push(finished("It expires."), finished("In Rust."));
+    const words = Array.from({ length: 300 }, (_, i) => `word${i}`).join(" ");
+    askStore.open({ selection: { text: words } });
+    askStore.setComposerDraft("Why does it expire?");
+    askStore.submitComposer();
+    await vi.waitFor(() => expect(lastAssistant().state).toBe("done"));
+    // Sent whole: 1,200 characters of quote, then the question.
+    expect(chatBodies()[0]!.message).toMatch(
+      /^> word0 .{1150,}…\n\nWhy does it expire\?$/s,
+    );
+    askStore.send("Show me that in Rust");
+    await vi.waitFor(() => expect(chatBodies()).toHaveLength(2));
+    const [turn] = chatBodies()[1]!.history as Array<{ content: string }>;
+    expect(turn!.content.length).toBeLessThanOrEqual(1000);
+    expect(turn!.content).toMatch(
+      /^Question about the docs page “Accounts” \(.+\):\n\n> word0 word1 .+…\n\nWhy does it expire\?$/s,
+    );
+  });
+
+  it("clears the quote with New chat, and routes openAskAi selections", () => {
+    const disconnect = connectAskAiEvents();
+    openAskAi({ selection: { text: "Rent is a deposit." } });
+    expect(askStore.getState()).toMatchObject({
+      open: true,
+      composerQuote: { text: "Rent is a deposit." },
+    });
+    askStore.reset();
+    expect(askStore.getState().composerQuote).toBeNull();
+    disconnect();
+  });
+});
+
 describe("full-screen link", () => {
+  const ACCOUNTS = {
+    title: "Accounts",
+    url: "https://solana.com/developers/docs/core/accounts",
+  };
   const ID = "0123456789abcdef01234567";
   const HANDOFF = `${ASK_STORAGE_KEYS.handoff}${ID}`;
   const LINK = `/developers/docs/core/accounts?x=1&ask=full&askThread=${ID}#rent`;
@@ -863,7 +1085,12 @@ describe("full-screen link", () => {
       v: 1,
       savedAt,
       messages: [
-        { id: "u1", role: "user", text: "What is a PDA?" },
+        {
+          id: "u1",
+          role: "user",
+          text: "What is a PDA?",
+          quote: { text: "A program derived address" },
+        },
         {
           id: "a1",
           role: "assistant",
@@ -895,6 +1122,7 @@ describe("full-screen link", () => {
         url: "https://solana.com/developers/docs/core/accounts",
       },
       composerDraft: "Show me code",
+      composerQuote: { text: "Rent is a deposit", pageContext: ACCOUNTS },
     });
   const ownThread = () =>
     sessionStorage.setItem(
@@ -932,6 +1160,11 @@ describe("full-screen link", () => {
         url: "https://solana.com/developers/docs/core/accounts",
       },
       composerDraft: "Show me code",
+      // The quote waiting in the composer goes with it, and quotes asked.
+      composerQuote: { text: "Rent is a deposit", pageContext: ACCOUNTS },
+    });
+    expect(state.messages[0]).toMatchObject({
+      quote: { text: "A program derived address" },
     });
     expect(state.messages.map((m) => m.text)).toEqual([
       "What is a PDA?",
@@ -1235,6 +1468,7 @@ describe("full-screen link", () => {
       title: "Accounts",
       url: "https://solana.com/developers/docs/core/accounts",
     });
+    askStore.setComposerQuote({ text: "Rent is a deposit" });
     const { threadId } = askStore.getState();
     expect(isThreadId(threadId)).toBe(true);
 
@@ -1246,6 +1480,7 @@ describe("full-screen link", () => {
       conversationId: "7",
       pageContext: { title: "Accounts" },
       composerDraft: "And rent?",
+      composerQuote: { text: "Rent is a deposit" },
       messages: [
         { role: "user", text: "What is a PDA?" },
         { role: "assistant", state: "done", text: "A PDA is an address." },
@@ -1364,6 +1599,58 @@ describe("persistence", () => {
       },
     ]);
     expect(askStore.getState().conversationId).toBe("9");
+  });
+
+  it("keeps a question's quote across a reload; threads from before quotes still load", async () => {
+    document.body.innerHTML =
+      '<div id="content" data-page-title="Accounts" data-page-href="/developers/docs/core/accounts"></div>';
+    chatQueue.push(finished("Quoted answer."));
+    askStore.open({ selection: { text: "Rent is a deposit" } });
+    askStore.submitComposer();
+    await vi.waitFor(() => expect(askStore.getState().busy).toBe(false));
+
+    resetAskStoreForTests();
+    askStore.subscribe(() => undefined);
+    expect(askStore.getState().messages[0]).toEqual({
+      id: expect.any(String),
+      role: "user",
+      text: "Explain this",
+      pageContext: {
+        title: "Accounts",
+        url: "https://solana.com/developers/docs/core/accounts",
+      },
+      sent: "> Rent is a deposit\n\nExplain this",
+      quote: { text: "Rent is a deposit" },
+    });
+
+    resetAskStoreForTests();
+    sessionStorage.setItem(
+      ASK_STORAGE_KEYS.thread,
+      JSON.stringify({
+        messages: [
+          // Saved before quotes existed.
+          { id: "1", role: "user", text: "Old question" },
+          { id: "2", role: "user", text: "Bad quote", quote: { text: 7 } },
+          {
+            id: "3",
+            role: "user",
+            text: "Code",
+            quote: { text: "let x;", code: true, language: "rust" },
+          },
+        ],
+      }),
+    );
+    askStore.subscribe(() => undefined);
+    expect(askStore.getState().messages).toEqual([
+      { id: "1", role: "user", text: "Old question" },
+      { id: "2", role: "user", text: "Bad quote" },
+      {
+        id: "3",
+        role: "user",
+        text: "Code",
+        quote: { text: "let x;", code: true, language: "rust" },
+      },
+    ]);
   });
 
   it("restores the code question as sent, follow-ups and a busy error", () => {

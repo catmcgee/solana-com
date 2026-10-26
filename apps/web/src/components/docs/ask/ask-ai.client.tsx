@@ -7,11 +7,18 @@ import { useAskSelector } from "@/lib/docs/ask/use-ask";
 import { COMPOSER_SELECTOR } from "./ask-composer.client";
 import { AskLauncher, LAUNCHER_SELECTOR } from "./ask-launcher.client";
 import { DockedPanel, ModalPanel } from "./ask-panel.client";
+import { AskSelection } from "./ask-selection.client";
 
+/**
+ * Focuses the composer with the caret at the end of the draft: the docked
+ * field stays mounted and would keep wherever its caret last was.
+ */
 function focusComposer() {
-  document
-    .querySelector<HTMLTextAreaElement>(COMPOSER_SELECTOR)
-    ?.focus({ preventScroll: true });
+  const field = document.querySelector<HTMLTextAreaElement>(COMPOSER_SELECTOR);
+  if (!field) return;
+  field.focus({ preventScroll: true });
+  const end = field.value.length;
+  field.setSelectionRange(end, end);
 }
 
 /** Text fields other than our composer keep ⌘I / Ctrl+I (italic, say). */
@@ -25,14 +32,15 @@ function isOtherField(target: EventTarget | null) {
 }
 
 /**
- * Ask AI on /developers and the docs: the launcher and the one panel,
- * mounted once in the docs layout so the conversation survives client-side
- * navigation. Routes every opener to the store (`openAskAi()` from code
- * blocks, page actions and the search hand-off; `[data-docs-ask-open]`
- * buttons; ⌘I / Ctrl+I), passes the localized prompts to it, and gives
- * focus back to whatever opened the panel when it closes. Stored state
- * (an open panel, the thread) is read after hydration, and not at all
- * while the page is only prerendered.
+ * Ask AI on /developers and the docs: the launcher, the one panel and the
+ * "Ask AI about this" pill by selected text, mounted once in the docs
+ * layout so the conversation survives client-side navigation. Routes every
+ * opener to the store (`openAskAi()` from code blocks, page actions and
+ * the search hand-off; `[data-docs-ask-open]` buttons; ⌘I / Ctrl+I; the
+ * pill), passes the localized prompts to it, and gives focus back to
+ * whatever opened the panel when it closes. Stored state (an open panel,
+ * the thread) is read after hydration, and not at all while the page is
+ * only prerendered.
  */
 export function AskAi() {
   const t = useTranslations("docsAsk");
@@ -56,6 +64,7 @@ export function AskAi() {
       explainCode: (title) => t("prompts.explainCode", { title }),
       explainCodeSent: () => t("prompts.explainCodeSent"),
       aboutPage: ({ title, url }) => t("prompts.aboutPage", { title, url }),
+      explainSelection: () => t("prompts.explainSelection"),
     });
   }, [t]);
 
@@ -121,6 +130,7 @@ export function AskAi() {
   return (
     <>
       <AskLauncher />
+      <AskSelection />
       {hydrated && open ? (
         layout === "docked" ? (
           <DockedPanel animate={animate} />

@@ -317,8 +317,10 @@ export async function DevelopersHub({
   };
 
   return (
+    // Selecting text in it offers "Ask AI about this" (DOCS_ASK_SELECTION_ATTR).
     <main
       id="dl-main"
+      data-docs-ask-selection=""
       tabIndex={-1}
       className="overflow-hidden bg-[var(--dl-bg)] font-brand text-base text-[var(--dl-text)] outline-hidden"
     >

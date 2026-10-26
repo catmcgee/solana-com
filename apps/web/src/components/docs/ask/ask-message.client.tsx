@@ -1,10 +1,20 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
 import { cn } from "@/app/components/utils";
 import { splitCodeFollowupPrompt } from "@/lib/docs/ask/protocol";
-import type { AskAssistantMessage, AskUserMessage } from "@/lib/docs/ask/store";
+import type {
+  AskAssistantMessage,
+  AskQuote,
+  AskUserMessage,
+} from "@/lib/docs/ask/store";
 import { answerParts } from "./answer-fold";
 import { AskActions, entranceClass, useEntrance } from "./ask-actions.client";
 import { AskError, AskStopped } from "./ask-error.client";
@@ -42,18 +52,17 @@ function splitQuestion(text: string): { heading: string; snippets: string[] } {
   };
 }
 
+/** Fades out the bottom of a box cut short by its max height (useCut). */
+const cutFade = "[mask-image:linear-gradient(to_bottom,#000_65%,transparent)]";
+
 /**
- * The asked code as a reminder, in the answer's code frame: four lines,
- * wrapped rather than cut sideways, fading out at the bottom when there is
- * more (like the docs' collapsed code blocks). The page has the rest. The
- * fade is on the code, so the frame's border stays whole.
+ * Whether `box` is cut short by its max height, re-measured as the panel
+ * is resized (wrapping changes the height).
  */
-function QuestionSnippet({ code }: { code: string }) {
-  const frame = useRef<HTMLElement>(null);
+function useCut(box: RefObject<HTMLElement | null>, text: string): boolean {
   const [cut, setCut] = useState(false);
-  // Re-measured as the panel is resized: wrapping changes the height.
   useLayoutEffect(() => {
-    const el = frame.current;
+    const el = box.current;
     if (!el) return;
     const measure = () => setCut(el.scrollHeight > el.clientHeight + 1);
     measure();
@@ -61,21 +70,37 @@ function QuestionSnippet({ code }: { code: string }) {
     const observer = new ResizeObserver(measure);
     observer.observe(el);
     return () => observer.disconnect();
-  }, [code]);
+  }, [box, text]);
+  return cut;
+}
+
+/**
+ * The asked code as a reminder, in the answer's code frame: four lines,
+ * wrapped rather than cut sideways, fading out at the bottom when there is
+ * more (like the docs' collapsed code blocks). The page has the rest. The
+ * fade is on the code, so the frame's border stays whole.
+ */
+function QuestionSnippet({
+  code,
+  className = "mt-2",
+}: {
+  code: string;
+  className?: string;
+}) {
+  const frame = useRef<HTMLElement>(null);
+  const cut = useCut(frame, code);
   return (
     <pre
       dir="ltr"
       className={cn(
         mono,
-        "m-0 mt-2 whitespace-pre-wrap break-words rounded-xl border border-[var(--sol-line)] bg-[var(--sol-page)] px-3.5 py-2.5 text-[13px] leading-[1.7] text-[var(--sol-text)] [&_code]:[font-family:inherit]",
+        "m-0 whitespace-pre-wrap break-words rounded-xl border border-[var(--sol-line)] bg-[var(--sol-page)] px-3.5 py-2.5 text-[13px] leading-[1.7] text-[var(--sol-text)] [&_code]:[font-family:inherit]",
+        className,
       )}
     >
       <code
         ref={frame}
-        className={cn(
-          "block max-h-[6.8em] overflow-hidden",
-          cut && "[mask-image:linear-gradient(to_bottom,#000_65%,transparent)]",
-        )}
+        className={cn("block max-h-[6.8em] overflow-hidden", cut && cutFade)}
       >
         {code}
       </code>
@@ -84,9 +109,48 @@ function QuestionSnippet({ code }: { code: string }) {
 }
 
 /**
+ * The text a question is about ("Ask AI about this"), above its words in
+ * the bubble: code in the snippet frame, prose as a quote with the accent
+ * bar, four lines at most, fading out when there is more. It follows the
+ * words in the DOM (`order-first` puts it on top), so the turn's heading
+ * still starts it and is read before the quote.
+ */
+function QuestionQuote({ quote }: { quote: AskQuote }) {
+  const t = useTranslations("docsAsk");
+  const box = useRef<HTMLDivElement>(null);
+  const cut = useCut(box, quote.text);
+  const label = (
+    <span className={visuallyHidden}>{t("selection.quote")}: </span>
+  );
+  if (quote.code)
+    return (
+      <div className="order-first mb-2">
+        {label}
+        <QuestionSnippet code={quote.text} className="" />
+      </div>
+    );
+  return (
+    <blockquote className="order-first m-0 mb-2 border-s-2 border-[var(--sol-purple)] ps-3 text-[13.5px] leading-[1.55] text-[var(--sol-muted)]">
+      {label}
+      <div
+        ref={box}
+        dir="auto"
+        className={cn(
+          "max-h-[6.2em] overflow-hidden whitespace-pre-line break-words",
+          cut && cutFade,
+        )}
+      >
+        {quote.text}
+      </div>
+    </blockquote>
+  );
+}
+
+/**
  * A question, as a speech bubble at the inline end (the start of its turn,
  * so still a heading for screen readers): the page it was asked about above
- * it, any code inside it. Answers stay unboxed.
+ * it; inside it, the text it quotes (on top, though read after the
+ * words), then its words and any code. Answers stay unboxed.
  */
 export function AskQuestion({
   message,
@@ -101,6 +165,7 @@ export function AskQuestion({
     [message.text],
   );
   const page = message.pageContext;
+  const quote = message.quote;
   return (
     <div className="flex flex-col items-end">
       {page ? (
@@ -118,10 +183,10 @@ export function AskQuestion({
           page); the hidden "You:" has its own, so it doesn't decide. */}
       <div
         className={cn(
-          "max-w-[85%] rounded-[20px] bg-[var(--sol-purple-soft)] text-[var(--sol-text)]",
+          "flex max-w-[85%] flex-col rounded-[20px] bg-[var(--sol-purple-soft)] text-[var(--sol-text)]",
           fullscreen ? "px-5 py-3" : "px-4 py-2.5",
           // Code needs the room; words keep the bubble to their width.
-          snippets.length ? "w-full" : "w-fit",
+          snippets.length || quote?.code ? "w-full" : "w-fit",
         )}
       >
         <h3
@@ -138,6 +203,7 @@ export function AskQuestion({
           </span>
           {heading}
         </h3>
+        {quote ? <QuestionQuote quote={quote} /> : null}
         {snippets.map((code, index) => (
           <QuestionSnippet key={index} code={code} />
         ))}
